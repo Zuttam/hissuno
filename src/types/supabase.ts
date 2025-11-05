@@ -13,34 +13,102 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      // Add your database tables here
-      // Example:
-      // users: {
-      //   Row: {
-      //     id: string
-      //     email: string
-      //     created_at: string
-      //   }
-      //   Insert: {
-      //     id?: string
-      //     email: string
-      //     created_at?: string
-      //   }
-      //   Update: {
-      //     id?: string
-      //     email?: string
-      //     created_at?: string
-      //   }
-      // }
+      project_analyses: {
+        Row: {
+          archive_temp_path: string | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          project_id: string
+          prompt: string | null
+          result: Json | null
+          source_kind: 'path' | 'upload' | null
+          source_value: string | null
+          started_at: string | null
+          status: 'pending' | 'running' | 'completed' | 'failed'
+          summary: Json | null
+          updated_at: string
+        }
+        Insert: {
+          archive_temp_path?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          project_id: string
+          prompt?: string | null
+          result?: Json | null
+          source_kind?: 'path' | 'upload' | null
+          source_value?: string | null
+          started_at?: string | null
+          status?: 'pending' | 'running' | 'completed' | 'failed'
+          summary?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          archive_temp_path?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          project_id?: string
+          prompt?: string | null
+          result?: Json | null
+          source_kind?: 'path' | 'upload' | null
+          source_value?: string | null
+          started_at?: string | null
+          status?: 'pending' | 'running' | 'completed' | 'failed'
+          summary?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            columns: ['project_id']
+            referencedRelation: 'projects'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      projects: {
+        Row: {
+          archive_temp_path: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          source_kind: 'path' | 'upload' | null
+          repository_branch: string | null
+          repository_url: string | null
+          updated_at: string
+        }
+        Insert: {
+          archive_temp_path?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          source_kind?: 'path' | 'upload' | null
+          repository_branch?: string | null
+          repository_url?: string | null
+          updated_at?: string
+        }
+        Update: {
+          archive_temp_path?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          source_kind?: 'path' | 'upload' | null
+          repository_branch?: string | null
+          repository_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
-    Views: {
-      // Add your database views here
-    }
-    Functions: {
-      // Add your database functions here
-    }
-    Enums: {
-      // Add your database enums here
-    }
+    Views: Record<string, never>
+    Functions: Record<string, never>
+    Enums: Record<string, never>
   }
 }

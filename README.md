@@ -1,4 +1,4 @@
-##About the project 
+## About the project 
 Title: Customize AI 
 Subtitle: End-User influenced software 
 
@@ -13,6 +13,7 @@ Customize taps into the emerging market of vibe coded software, where non-techni
 2.⁠ ⁠⁠customize present the user with the extracted information via a dedicated page that shows the design system and components and available actions 
 3.⁠ ⁠⁠⁠⁠the developer reviews the extracted information and can prompt the agent for any issues 
 4.⁠ ⁠⁠the developer gets a code snippet they can embed in their frontend which communicates with customize’s server to pull the user generated asset
+5.⁠ ⁠⁠the developer opens the Customize Developer Studio (available at the root `/`) to upload a ZIP or link to a local path, review the design system/API analysis, and iterate on prompts in a Lovable-style workspace.
 
 **end-user side:⁠**
 
@@ -100,6 +101,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to see your app.
 
+### 5. Explore the Developer Dashboard
+
+- Visit [http://localhost:3000/](http://localhost:3000/) to access the admin-facing studio.
+- Choose to either provide a local directory path (accessible to the server) or upload a `.zip` archive—no GitHub integration required yet.
+- Add an optional prompt to steer the analysis and click **Run analysis**.
+- Review the output across two tabs:
+  - **Design system & components** highlights CSS tokens and exported React components.
+  - **APIs** summarizes detected API handlers and inferred routes.
+- Use the left-rail history to revisit recent runs and reuse prompts.
+
 ## Features
 
 ### ✅ Implemented
@@ -109,6 +120,7 @@ Open [http://localhost:3000](http://localhost:3000) to see your app.
 - **TypeScript**: Full type safety across frontend and backend
 - **Modern UI**: Responsive chat interface with Tailwind CSS
 - **Middleware**: Session management with Supabase
+- **Developer Dashboard**: Lovable-style admin studio for running design system/API analyses
 
 ### 🚀 Ready to Implement
 
@@ -135,6 +147,37 @@ Stream AI responses for chat messages.
 ```
 
 **Response:** Streaming text response
+
+### POST /api/analyze
+
+Inspect a provided codebase (local path or uploaded archive) and return a structured summary of the design system and API surface.
+
+**Request:** `multipart/form-data`
+
+- `prompt` (optional string)
+- `path` (optional string) – absolute directory path on the server
+- `upload` (optional file) – `.zip` archive of the project
+
+> Provide either `path` or `upload`.
+
+**Response:**
+
+```json
+{
+  "analysis": {
+    "id": "uuid",
+    "result": {
+      "designSystem": { "tokens": [], "components": [] },
+      "apiSurface": { "endpoints": [] },
+      "stats": { "fileCount": 12, "componentCount": 5, "apiCount": 2 },
+      "warnings": []
+    }
+  },
+  "history": [
+    { "id": "uuid", "prompt": "...", "source": { "kind": "path", "value": "/path" } }
+  ]
+}
+```
 
 ## Supabase Setup
 
