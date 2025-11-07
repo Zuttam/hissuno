@@ -1,0 +1,354 @@
+openapi: 3.1.0
+info:
+  title: Aurora Rides API
+  version: 1.0.0
+  description: REST API for Aurora Rides ride-hailing platform
+  
+servers:
+  - url: http://localhost:4000/api
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [System]
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /analytics:
+    get:
+      summary: Get analytics metrics
+      tags: [Analytics]
+      responses:
+        "200":
+          description: Operational metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  analytics:
+                    $ref: '#/components/schemas/Analytics'
+
+  /rides:
+    get:
+      summary: List all rides
+      tags: [Rides]
+      responses:
+        "200":
+          description: List of rides
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rides:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Ride'
+    post:
+      summary: Create a new ride
+      tags: [Rides]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, pickupLocation, dropoffLocation, fare, distance]
+              properties:
+                customerId:
+                  type: string
+                pickupLocation:
+                  type: string
+                dropoffLocation:
+                  type: string
+                fare:
+                  type: number
+                distance:
+                  type: number
+      responses:
+        "201":
+          description: Ride created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ride:
+                    $ref: '#/components/schemas/Ride'
+
+  /rides/{id}:
+    get:
+      summary: Get ride by ID
+      tags: [Rides]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ride details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ride:
+                    $ref: '#/components/schemas/Ride'
+        "404":
+          description: Ride not found
+    patch:
+      summary: Update ride status
+      tags: [Rides]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, accepted, in_progress, completed, cancelled]
+      responses:
+        "200":
+          description: Ride updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ride:
+                    $ref: '#/components/schemas/Ride'
+        "404":
+          description: Ride not found
+
+  /drivers:
+    get:
+      summary: List all drivers
+      tags: [Drivers]
+      responses:
+        "200":
+          description: List of drivers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  drivers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Driver'
+
+  /drivers/{id}:
+    get:
+      summary: Get driver by ID
+      tags: [Drivers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Driver details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  driver:
+                    $ref: '#/components/schemas/Driver'
+        "404":
+          description: Driver not found
+    patch:
+      summary: Update driver status
+      tags: [Drivers]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [available, busy, offline]
+      responses:
+        "200":
+          description: Driver updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  driver:
+                    $ref: '#/components/schemas/Driver'
+
+  /bookings:
+    get:
+      summary: List all bookings
+      tags: [Bookings]
+      responses:
+        "200":
+          description: List of bookings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Booking'
+    post:
+      summary: Create a new booking
+      tags: [Bookings]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [customerId, customerName, pickupLocation, dropoffLocation]
+              properties:
+                customerId:
+                  type: string
+                customerName:
+                  type: string
+                pickupLocation:
+                  type: string
+                dropoffLocation:
+                  type: string
+      responses:
+        "201":
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  booking:
+                    $ref: '#/components/schemas/Booking'
+
+components:
+  schemas:
+    Ride:
+      type: object
+      properties:
+        id:
+          type: string
+        customerId:
+          type: string
+        driverId:
+          type: string
+          nullable: true
+        pickupLocation:
+          type: string
+        dropoffLocation:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, in_progress, completed, cancelled]
+        fare:
+          type: number
+        distance:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Driver:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        vehicleType:
+          type: string
+        rating:
+          type: number
+        completedRides:
+          type: integer
+        status:
+          type: string
+          enum: [available, busy, offline]
+        currentLocation:
+          type: string
+
+    Booking:
+      type: object
+      properties:
+        id:
+          type: string
+        customerId:
+          type: string
+        customerName:
+          type: string
+        rideId:
+          type: string
+          nullable: true
+        pickupLocation:
+          type: string
+        dropoffLocation:
+          type: string
+        requestedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled]
+
+    Analytics:
+      type: object
+      properties:
+        totalRides:
+          type: integer
+        activeRides:
+          type: integer
+        totalRevenue:
+          type: number
+        averageRating:
+          type: number
+        topDrivers:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              rides:
+                type: integer
