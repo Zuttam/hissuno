@@ -1,0 +1,76 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark &));
+
+:root {
+  color-scheme: light;
+  /* Wireframe grayscale palette */
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --border: #2a2a2a;
+  --border-subtle: #e5e5e5;
+  --surface: #fafafa;
+  --surface-hover: #f5f5f5;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  
+  /* Accent colors */
+  --accent-primary: #3a3a3a;
+  --accent-primary-hover: #2a2a2a;
+  --accent-selected: #2563eb;
+  --accent-selected-hover: #1d4ed8;
+  --accent-success: #10b981;
+  --accent-warning: #ff9900;
+  --accent-danger: #ff3333;
+}
+
+.dark {
+  color-scheme: dark;
+  /* Dark mode wireframe palette */
+  --background: #0f0f0f;
+  --foreground: #e5e5e5;
+  --border: #d0d0d0;
+  --border-subtle: #2a2a2a;
+  --surface: #1a1a1a;
+  --surface-hover: #252525;
+  --text-secondary: #999999;
+  --text-tertiary: #666666;
+  
+  /* Accent colors (slightly adjusted for dark mode) */
+  --accent-primary: #d0d0d0;
+  --accent-primary-hover: #e5e5e5;
+  --accent-selected: #3b82f6;
+  --accent-selected-hover: #60a5fa;
+  --accent-success: #34d399;
+  --accent-warning: #ffaa33;
+  --accent-danger: #ff5555;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}

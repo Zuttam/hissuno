@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@customize/widget": "file:../../../customize-dev/packages/widget",
     "@tanstack/react-query": "^5.51.1",
     "axios": "^1.7.5",
     "classnames": "^2.5.1",
