@@ -1,10 +1,11 @@
 import { Alert, Card, SectionHeader, ToggleGroup } from '@/components/ui'
 import type { SourceCodeCardProps } from '@/components/projects/shared/types'
 import { UploadFolderPicker } from '@/components/projects/shared/upload-folder/upload-folder-picker'
-import { GitHubIntegrationPlaceholder } from '@/components/projects/shared/upload-folder/github-integration-placeholder'
+import { GitHubRepoPicker } from '@/components/projects/shared/github-repo-picker'
 
 export function SourceCodeCard({
   uploadProps,
+  githubProps,
   codebaseError,
 }: SourceCodeCardProps) {
   const { codebaseMode, onCodebaseModeChange } = uploadProps
@@ -21,7 +22,7 @@ export function SourceCodeCard({
         onChange={onCodebaseModeChange}
         options={[
           { value: 'upload-folder', label: 'Upload folder' },
-          { value: 'github', label: 'GitHub (coming soon)', disabled: true },
+          { value: 'github', label: 'GitHub' },
         ]}
       />
 
@@ -38,9 +39,17 @@ export function SourceCodeCard({
           onGitignoreChange={uploadProps.onGitignoreChange}
           onClearGitignoreSelection={uploadProps.onClearGitignoreSelection}
         />
-      ) : (
-        <GitHubIntegrationPlaceholder />
-      )}
+      ) : githubProps ? (
+        <GitHubRepoPicker
+          selectedRepo={githubProps.selectedRepo}
+          selectedBranch={githubProps.selectedBranch}
+          onRepoChange={githubProps.onRepoChange}
+          onBranchChange={githubProps.onBranchChange}
+          hasGitHubIntegration={githubProps.hasGitHubIntegration}
+          onConnectGitHub={githubProps.onConnectGitHub}
+          isConnecting={githubProps.isConnecting}
+        />
+      ) : null}
 
       {codebaseError ? <Alert variant="danger">{codebaseError}</Alert> : null}
     </Card>

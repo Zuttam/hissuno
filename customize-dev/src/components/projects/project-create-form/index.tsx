@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createProject } from '@/lib/projects/client'
+import { createClient } from '@/lib/supabase/client'
 import {
   filterFilesForUpload,
   selectGitignore,
@@ -11,6 +12,7 @@ import {
   type GitignoreSelection,
 } from '@/lib/projects/source-code-utils'
 import type { CodebaseMode, StepId } from '../shared/types'
+import type { GitHubRepoSelection } from '../shared/github-repo-picker'
 import { ProjectDetailsCard } from './project-details-card'
 import { SourceCodeCard } from '../shared/source-code-card'
 import { KnowledgeSourcesCard, type KnowledgeSourceInput } from './knowledge-sources-card'
@@ -22,8 +24,18 @@ import {
 } from '@/components/ui'
 import { canProceedToNextStep } from './validation'
 
+const FORM_STATE_KEY = 'project-create-form-state'
+
+type PersistedFormState = {
+  name: string
+  description: string
+  codebaseMode: CodebaseMode
+  currentStep: number
+}
+
 export function ProjectCreateForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [codebaseMode, setCodebaseMode] = useState<CodebaseMode>('upload-folder')
@@ -36,6 +48,13 @@ export function ProjectCreateForm() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const gitignoreInputRef = useRef<HTMLInputElement | null>(null)
 
+  // GitHub integration state
+  const [hasGitHubIntegration, setHasGitHubIntegration] = useState(false)
+  const [isCheckingGitHub, setIsCheckingGitHub] = useState(true)
+  const [isConnectingGitHub, setIsConnectingGitHub] = useState(false)
+  const [selectedRepo, setSelectedRepo] = useState<GitHubRepoSelection | null>(null)
+  const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
+
   // Knowledge sources state
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceInput[]>([])
   const [skipKnowledgeAnalysis, setSkipKnowledgeAnalysis] = useState(false)
@@ -43,6 +62,86 @@ export function ProjectCreateForm() {
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1)
   const [validationError, setValidationError] = useState<string | null>(null)
+
+  // Check GitHub integration status on mount
+  const checkGitHubIntegration = useCallback(async () => {
+    try {
+      const response = await fetch('/api/integrations/github')
+      if (response.ok) {
+        const data = await response.json()
+        setHasGitHubIntegration(data.connected)
+      }
+    } catch (err) {
+      console.error('Failed to check GitHub integration:', err)
+    } finally {
+      setIsCheckingGitHub(false)
+    }
+  }, [])
+
+  // Restore form state from sessionStorage after OAuth redirect
+  useEffect(() => {
+    const restored = searchParams.get('restored')
+    if (restored === 'true') {
+      const savedState = sessionStorage.getItem(FORM_STATE_KEY)
+      if (savedState) {
+        try {
+          const parsed: PersistedFormState = JSON.parse(savedState)
+          setName(parsed.name)
+          setDescription(parsed.description)
+          setCodebaseMode(parsed.codebaseMode)
+          setCurrentStep(parsed.currentStep)
+          sessionStorage.removeItem(FORM_STATE_KEY)
+        } catch (err) {
+          console.error('Failed to restore form state:', err)
+        }
+      }
+      // Clean up URL
+      router.replace('/projects/new', { scroll: false })
+    }
+  }, [searchParams, router])
+
+  useEffect(() => {
+    void checkGitHubIntegration()
+  }, [checkGitHubIntegration])
+
+  // Save form state before OAuth redirect
+  const saveFormState = useCallback(() => {
+    const state: PersistedFormState = {
+      name,
+      description,
+      codebaseMode,
+      currentStep,
+    }
+    sessionStorage.setItem(FORM_STATE_KEY, JSON.stringify(state))
+  }, [name, description, codebaseMode, currentStep])
+
+  const handleConnectGitHub = async () => {
+    setIsConnectingGitHub(true)
+    saveFormState()
+
+    try {
+      const supabase = createClient()
+      
+      const { error: linkError } = await supabase.auth.linkIdentity({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/projects/new?restored=true`,
+          scopes: 'user:email read:user repo',
+        },
+      })
+
+      if (linkError) {
+        console.error('Failed to connect GitHub:', linkError)
+        setCodebaseError(linkError.message)
+        setIsConnectingGitHub(false)
+      }
+      // User will be redirected to GitHub
+    } catch (err) {
+      console.error('Failed to connect GitHub:', err)
+      setCodebaseError(err instanceof Error ? err.message : 'Failed to connect GitHub')
+      setIsConnectingGitHub(false)
+    }
+  }
 
   const enableDirectorySelection = (input: HTMLInputElement) => {
     input.multiple = true
@@ -114,6 +213,10 @@ export function ProjectCreateForm() {
     if (nextMode !== 'upload-folder') {
       resetFolderSelection()
     }
+    if (nextMode !== 'github') {
+      setSelectedRepo(null)
+      setSelectedBranch(null)
+    }
   }
 
   const folderSummary = useMemo(() => summarizeFiles(codebaseFiles), [codebaseFiles])
@@ -123,7 +226,7 @@ export function ProjectCreateForm() {
   )
 
   // Check if source code step should show "Link Later"
-  const hasSourceCode = codebaseFiles.length > 0
+  const hasSourceCode = codebaseFiles.length > 0 || (selectedRepo && selectedBranch)
 
   // Compute wizard steps
   const wizardSteps = useMemo<WizardStepMetadata[]>(() => {
@@ -145,6 +248,8 @@ export function ProjectCreateForm() {
       name,
       codebaseMode,
       codebaseFiles,
+      githubRepo: selectedRepo,
+      githubBranch: selectedBranch,
     }
 
     const validation = canProceedToNextStep(currentStepId, formState)
@@ -185,18 +290,17 @@ export function ProjectCreateForm() {
     setCodebaseError(null)
 
     try {
-      if (codebaseMode === 'github') {
-        setCodebaseError('GitHub integration is coming soon.')
-        setIsSubmitting(false)
-        setPhase('idle')
-        return
-      }
-
       const formData = new FormData()
       formData.append('name', name.trim())
       if (description.trim()) formData.append('description', description.trim())
 
-      if (codebaseFiles.length > 0) {
+      if (codebaseMode === 'github' && selectedRepo && selectedBranch) {
+        // GitHub source code
+        formData.append('codebaseSource', 'github')
+        formData.append('repositoryUrl', `https://github.com/${selectedRepo.fullName}`)
+        formData.append('repositoryBranch', selectedBranch)
+      } else if (codebaseFiles.length > 0) {
+        // Upload folder source code
         formData.append('codebaseSource', 'upload-folder')
 
         const { kept } = await filterFilesForUpload(codebaseFiles, gitignoreSelection)
@@ -279,6 +383,15 @@ export function ProjectCreateForm() {
               onGitignoreChange: handleGitignoreChange,
               onClearGitignoreSelection: clearGitignoreSelection,
               onResetFolderSelection: resetFolderSelection,
+            }}
+            githubProps={{
+              selectedRepo,
+              selectedBranch,
+              onRepoChange: setSelectedRepo,
+              onBranchChange: setSelectedBranch,
+              hasGitHubIntegration,
+              onConnectGitHub: handleConnectGitHub,
+              isConnecting: isConnectingGitHub,
             }}
             codebaseError={codebaseError}
           />

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
-import { createCodebase } from '@/lib/codebase'
+import { createCodebase, createGitHubCodebase } from '@/lib/codebase'
 import { selectGitignore } from '@/lib/projects/source-code-utils'
 import { UnauthorizedError } from '@/lib/auth/server'
 import type { Database } from '@/types/supabase'
@@ -67,6 +67,11 @@ export async function POST(request: Request) {
   const description = formData.get('description')?.toString().trim() || null
   const codebaseSource = formData.get('codebaseSource')?.toString().trim() || 'none'
 
+  // GitHub source params
+  const repositoryUrl = formData.get('repositoryUrl')?.toString().trim() || null
+  const repositoryBranch = formData.get('repositoryBranch')?.toString().trim() || null
+
+  // Upload folder source params
   const codebaseFiles = formData
     .getAll('codebase')
     .filter((entry): entry is File => entry instanceof File && entry.size > 0)
@@ -76,11 +81,8 @@ export async function POST(request: Request) {
   const gitignoreSelection = selectGitignore(codebaseFiles, explicitGitignore)
   const gitignoreFile = gitignoreSelection?.file ?? null
 
-  if (codebaseSource === 'github') {
-    return NextResponse.json({ error: 'GitHub integration is coming soon.' }, { status: 501 })
-  }
-
   const hasFilesToUpload = codebaseFiles.length > 0
+  const hasGitHubSource = codebaseSource === 'github' && repositoryUrl && repositoryBranch
   const id = randomUUID()
 
   if (!isSupabaseConfigured()) {
@@ -93,8 +95,17 @@ export async function POST(request: Request) {
 
     let codebaseId: string | null = null
 
-    // Create codebase if files were provided
-    if (hasFilesToUpload) {
+    // Create GitHub codebase if provided
+    if (hasGitHubSource) {
+      const { codebase } = await createGitHubCodebase({
+        repositoryUrl,
+        repositoryBranch,
+        userId: user.id,
+      })
+      codebaseId = codebase.id
+    }
+    // Create codebase from uploaded files if provided
+    else if (hasFilesToUpload) {
       const { codebase } = await createCodebase({
         files: codebaseFiles,
         gitignore: gitignoreFile,

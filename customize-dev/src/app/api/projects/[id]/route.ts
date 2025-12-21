@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { deleteCodebaseVersion } from '@/lib/codebase'
+import { deleteCodebaseVersion, updateGitHubCodebase } from '@/lib/codebase'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
@@ -76,20 +76,33 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: 'Invalid payload.' }, { status: 400 })
   }
 
-  const updates: Record<string, unknown> = {}
+  const projectUpdates: Record<string, unknown> = {}
+  const sourceCodeUpdates: { repositoryUrl?: string; repositoryBranch?: string } = {}
+
   if (typeof payload.name === 'string') {
     const trimmed = payload.name.trim()
     if (trimmed.length === 0) {
       return NextResponse.json({ error: 'Name cannot be empty.' }, { status: 400 })
     }
-    updates.name = trimmed
+    projectUpdates.name = trimmed
   }
   if (typeof payload.description === 'string') {
     const trimmed = payload.description.trim()
-    updates.description = trimmed.length > 0 ? trimmed : null
+    projectUpdates.description = trimmed.length > 0 ? trimmed : null
   }
 
-  if (Object.keys(updates).length === 0) {
+  // Handle source code updates (for GitHub repos)
+  if (typeof payload.repositoryUrl === 'string') {
+    sourceCodeUpdates.repositoryUrl = payload.repositoryUrl.trim()
+  }
+  if (typeof payload.repositoryBranch === 'string') {
+    sourceCodeUpdates.repositoryBranch = payload.repositoryBranch.trim()
+  }
+
+  const hasProjectUpdates = Object.keys(projectUpdates).length > 0
+  const hasSourceCodeUpdates = Object.keys(sourceCodeUpdates).length > 0
+
+  if (!hasProjectUpdates && !hasSourceCodeUpdates) {
     return NextResponse.json({ error: 'No supported fields provided.' }, { status: 400 })
   }
 
@@ -103,16 +116,53 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     await assertUserOwnsProject(supabase, user.id, id)
 
-    const { data, error } = await supabase
+    // Get the current project with source code to update
+    const { data: currentProject, error: fetchError } = await supabase
       .from('projects')
-      .update(updates)
+      .select('*, source_code:source_codes(*)')
       .eq('id', id)
       .eq('user_id', user.id)
+      .single()
+
+    if (fetchError || !currentProject) {
+      console.error('[projects.id.patch] failed to fetch project', id, fetchError)
+      return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
+    }
+
+    // Update source code if needed (only for GitHub kind)
+    if (hasSourceCodeUpdates && currentProject.source_code?.kind === 'github') {
+      await updateGitHubCodebase(
+        supabase,
+        currentProject.source_code.id,
+        user.id,
+        sourceCodeUpdates
+      )
+    }
+
+    // Update project if needed
+    if (hasProjectUpdates) {
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update(projectUpdates)
+        .eq('id', id)
+        .eq('user_id', user.id)
+
+      if (updateError) {
+        console.error('[projects.id.patch] failed to update project', id, updateError)
+        return NextResponse.json({ error: 'Failed to update project.' }, { status: 500 })
+      }
+    }
+
+    // Fetch the updated project
+    const { data, error } = await supabase
+      .from('projects')
       .select('*, source_code:source_codes(*)')
+      .eq('id', id)
+      .eq('user_id', user.id)
       .single()
 
     if (error) {
-      console.error('[projects.id.patch] failed to update project', id, error)
+      console.error('[projects.id.patch] failed to fetch updated project', id, error)
       return NextResponse.json({ error: 'Failed to update project.' }, { status: 500 })
     }
 

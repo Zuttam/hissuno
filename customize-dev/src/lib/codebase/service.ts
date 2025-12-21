@@ -155,6 +155,76 @@ export async function getCodebaseById(
   return data
 }
 
+/**
+ * Creates a codebase record for a GitHub repository.
+ * No file upload needed - just stores the repository URL and branch.
+ */
+export async function createGitHubCodebase(params: {
+  repositoryUrl: string
+  repositoryBranch: string
+  userId: string
+}): Promise<{ codebase: CodebaseRecord }> {
+  const { repositoryUrl, repositoryBranch, userId } = params
+
+  const supabase = await createClient()
+
+  const { data: codebase, error: insertError } = await supabase
+    .from('source_codes')
+    .insert({
+      kind: 'github',
+      repository_url: repositoryUrl,
+      repository_branch: repositoryBranch,
+      user_id: userId,
+    })
+    .select()
+    .single()
+
+  if (insertError || !codebase) {
+    console.error('[codebase.service] Failed to create GitHub codebase record:', insertError)
+    throw new Error('Failed to create GitHub codebase record.')
+  }
+
+  return { codebase }
+}
+
+/**
+ * Updates a GitHub codebase record with new repository URL and/or branch.
+ */
+export async function updateGitHubCodebase(
+  supabase: SupabaseClient<Database>,
+  codebaseId: string,
+  userId: string,
+  updates: { repositoryUrl?: string; repositoryBranch?: string }
+): Promise<CodebaseRecord> {
+  const updateData: Record<string, string> = {}
+  
+  if (updates.repositoryUrl) {
+    updateData.repository_url = updates.repositoryUrl
+  }
+  if (updates.repositoryBranch) {
+    updateData.repository_branch = updates.repositoryBranch
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error('No updates provided.')
+  }
+
+  const { data, error } = await supabase
+    .from('source_codes')
+    .update(updateData)
+    .eq('id', codebaseId)
+    .eq('user_id', userId)
+    .select()
+    .single()
+
+  if (error || !data) {
+    console.error('[codebase.service] Failed to update GitHub codebase:', codebaseId, error)
+    throw new Error('Failed to update GitHub codebase.')
+  }
+
+  return data
+}
+
 // ============================================================================
 // INTERNAL HELPERS
 // ============================================================================

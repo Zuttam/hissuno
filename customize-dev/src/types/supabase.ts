@@ -34,6 +34,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      user_github_tokens: {
+        Row: {
+          id: string
+          user_id: string
+          access_token: string
+          github_username: string | null
+          github_user_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          access_token: string
+          github_username?: string | null
+          github_user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          access_token?: string
+          github_username?: string | null
+          github_user_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_github_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_packages: {
         Row: {
           category: string

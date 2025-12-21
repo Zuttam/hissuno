@@ -25,14 +25,8 @@ export function validateMetadataStep(formState: FormState): ValidationResult {
  * Always valid - source code is optional (user can "Link Later")
  */
 export function validateSourceCodeStep(formState: FormState): ValidationResult {
-  // GitHub integration is coming soon
-  if (formState.codebaseMode === 'github') {
-    return {
-      isValid: false,
-      error: 'GitHub integration is coming soon',
-    }
-  }
-
+  // For GitHub mode, repo and branch selection is optional (can link later)
+  // For upload mode, folder selection is optional (can link later)
   // Source code is optional - user can skip and link later
   return { isValid: true }
 }

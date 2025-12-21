@@ -1,9 +1,9 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useState } from 'react'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { updateProject } from '@/lib/projects/client'
-import { Alert, Button, FormField, Input, SectionHeader, Textarea } from '@/components/ui'
+import { Alert, Button, FormField, Input, SectionHeader, Select, Spinner, Textarea } from '@/components/ui'
 
 interface EditProjectDialogProps {
   project: ProjectWithCodebase
@@ -11,11 +11,60 @@ interface EditProjectDialogProps {
   onSaved: () => Promise<void>
 }
 
+type BranchOption = {
+  name: string
+  sha: string
+  protected: boolean
+}
+
 export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDialogProps) {
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description ?? '')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // GitHub-specific state
+  const isGitHubSource = project.source_code?.kind === 'github'
+  const [repositoryBranch, setRepositoryBranch] = useState(project.source_code?.repository_branch ?? '')
+  const [branches, setBranches] = useState<BranchOption[]>([])
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false)
+
+  // Parse owner/repo from repository URL
+  const parseRepoInfo = useCallback(() => {
+    const url = project.source_code?.repository_url
+    if (!url) return null
+    
+    // Parse https://github.com/owner/repo
+    const match = url.match(/github\.com\/([^/]+)\/([^/]+)/)
+    if (!match) return null
+    
+    return { owner: match[1], repo: match[2].replace(/\.git$/, '') }
+  }, [project.source_code?.repository_url])
+
+  // Fetch branches for the repository
+  const fetchBranches = useCallback(async () => {
+    const repoInfo = parseRepoInfo()
+    if (!repoInfo) return
+
+    setIsLoadingBranches(true)
+    try {
+      const response = await fetch(`/api/integrations/github/repos/${repoInfo.owner}/${repoInfo.repo}/branches`)
+      if (response.ok) {
+        const data = await response.json()
+        setBranches(data.branches || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch branches:', err)
+    } finally {
+      setIsLoadingBranches(false)
+    }
+  }, [parseRepoInfo])
+
+  useEffect(() => {
+    if (isGitHubSource) {
+      void fetchBranches()
+    }
+  }, [isGitHubSource, fetchBranches])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -34,6 +83,11 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
         projectPayload.description = trimmedDescription
       }
 
+      // Handle GitHub source code updates
+      if (isGitHubSource && repositoryBranch !== project.source_code?.repository_branch) {
+        projectPayload.repositoryBranch = repositoryBranch
+      }
+
       if (Object.keys(projectPayload).length === 0) {
         setIsSaving(false)
         onClose()
@@ -50,6 +104,8 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
     }
   }
 
+  const repoInfo = parseRepoInfo()
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm max-h-screen overflow-y-auto">
       <form
@@ -58,7 +114,7 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
       >
         <SectionHeader
           title="Edit project"
-          description="Update your project name and description."
+          description="Update your project name, description, and source code settings."
         />
 
         <div className="grid gap-5">
@@ -80,7 +136,7 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
           </FormField>
 
           {project.source_code && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
+            <div className="space-y-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
               <div className="space-y-1 text-sm">
                 <p className="font-semibold text-slate-700 dark:text-slate-100">Source Code</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -92,6 +148,42 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
                   </p>
                 )}
               </div>
+
+              {isGitHubSource && repoInfo && (
+                <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+                  <div>
+                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      Repository
+                    </p>
+                    <p className="text-sm text-slate-900 dark:text-slate-100">
+                      {repoInfo.owner}/{repoInfo.repo}
+                    </p>
+                  </div>
+
+                  <FormField label="Branch">
+                    {isLoadingBranches ? (
+                      <div className="flex items-center gap-2 py-2">
+                        <Spinner size="sm" />
+                        <span className="text-sm text-slate-500">Loading branches…</span>
+                      </div>
+                    ) : (
+                      <Select
+                        value={repositoryBranch}
+                        onChange={(e) => setRepositoryBranch(e.target.value)}
+                      >
+                        {branches.length === 0 && repositoryBranch && (
+                          <option value={repositoryBranch}>{repositoryBranch}</option>
+                        )}
+                        {branches.map((branch) => (
+                          <option key={branch.name} value={branch.name}>
+                            {branch.name} {branch.protected ? '🛡️' : ''}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </FormField>
+                </div>
+              )}
             </div>
           )}
         </div>
