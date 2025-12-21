@@ -15,12 +15,14 @@ export const compileKnowledge = createStep({
   description: 'Compile all analysis into categorized knowledge packages',
   inputSchema: analyzeSourcesOutputSchema,
   outputSchema: compiledKnowledgeSchema,
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, writer }) => {
     const logger = mastra?.getLogger()
 
     if (!inputData) {
       throw new Error('Input data not found')
     }
+
+    await writer?.write({ type: 'progress', message: 'Compiling knowledge packages...' })
 
     const { analysisResults, codebaseAnalysis, hasCodebase } = inputData
     const agent = mastra?.getAgent('knowledgeCompilerAgent')
@@ -57,6 +59,8 @@ export const compileKnowledge = createStep({
       }
     }
 
+    await writer?.write({ type: 'progress', message: 'Categorizing into business, product, and technical...' })
+
     // Use agent to compile and categorize with structured output
     const prompt = `You have the following analyzed content from multiple sources. 
 Please compile this into THREE separate knowledge packages:
@@ -85,6 +89,8 @@ For each category, provide a complete markdown document.`
           schema: compiledKnowledgeSchema,
         },
       })
+
+      await writer?.write({ type: 'progress', message: 'Knowledge packages compiled successfully' })
 
       return (
         response.object ?? {

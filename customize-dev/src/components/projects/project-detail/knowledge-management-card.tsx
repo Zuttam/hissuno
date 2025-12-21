@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useState, useRef, type ChangeEvent } from 'react'
 import { Card, Button, Badge, Alert, Spinner, Collapsible, FormField, Input, Textarea } from '@/components/ui'
 import { KnowledgeViewer } from './knowledge-viewer'
+import { AnalysisProgressBar, type AnalysisEvent } from './analysis-progress-bar'
 import {
   getSourceTypeLabel,
   type KnowledgeSourceRecord,
@@ -16,7 +17,14 @@ interface KnowledgeManagementCardProps {
 }
 
 interface AnalysisStatus {
-  status: 'idle' | 'processing' | 'completed' | 'failed' | 'partial'
+  status: 'idle' | 'processing' | 'completed' | 'failed' | 'partial' | 'cancelled'
+  isRunning?: boolean
+  analysisId?: string | null
+  runId?: string | null
+  startedAt?: string | null
+  completedAt?: string | null
+  lastAnalysisStatus?: string | null
+  lastAnalysisError?: string | null
   sources: {
     total: number
     pending: number
@@ -46,6 +54,10 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
   const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // SSE stream state
+  const [analysisEvents, setAnalysisEvents] = useState<AnalysisEvent[]>([])
+  const eventSourceRef = useRef<EventSource | null>(null)
 
   // Add source form state
   const [showAddForm, setShowAddForm] = useState(false)
@@ -88,33 +100,145 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
     try {
       const response = await fetch(`/api/projects/${projectId}/knowledge/analyze`)
       if (!response.ok) throw new Error('Failed to load status')
-      const data = await response.json()
+      const data = await response.json() as AnalysisStatus
       setAnalysisStatus(data)
-      return data.status
+      
+      // If analysis is already running, set state and add synthetic event for progress bar
+      if (data.isRunning) {
+        setIsAnalyzing(true)
+        // Add a synthetic event if we don't have any events yet
+        setAnalysisEvents((prev) => {
+          if (prev.length === 0) {
+            return [{
+              type: 'workflow-start',
+              message: 'Knowledge analysis in progress...',
+              timestamp: data.startedAt ?? new Date().toISOString(),
+            }]
+          }
+          return prev
+        })
+      }
+      
+      return data
     } catch (err) {
       console.error('[knowledge] Failed to fetch status:', err)
       return null
     }
   }, [projectId])
 
+  // Connect to SSE stream for real-time updates
+  const connectToStream = useCallback(() => {
+    // Close existing connection if any
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+    }
+
+    // Clear previous events
+    setAnalysisEvents([])
+
+    // Add a synthetic "started" event
+    setAnalysisEvents([{
+      type: 'workflow-start',
+      message: 'Knowledge analysis started',
+      timestamp: new Date().toISOString(),
+    }])
+
+    try {
+      const eventSource = new EventSource(`/api/projects/${projectId}/knowledge/analyze/stream`)
+      eventSourceRef.current = eventSource
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as AnalysisEvent
+          setAnalysisEvents((prev) => [...prev, data])
+
+          // Check for workflow completion
+          if (data.type === 'workflow-finish' || data.type === 'error') {
+            eventSource.close()
+            eventSourceRef.current = null
+            
+            // Give a small delay then refresh data
+            setTimeout(() => {
+              setIsAnalyzing(false)
+              void fetchPackages()
+              void fetchSources()
+              void fetchAnalysisStatus()
+            }, 1000)
+          }
+        } catch (err) {
+          console.error('[knowledge] Failed to parse SSE event:', err)
+        }
+      }
+
+      eventSource.onerror = (err) => {
+        // SSE connection failed - this is expected if the stream endpoint has issues
+        // The fallback polling will still work
+        console.warn('[knowledge] SSE connection error, falling back to polling', err)
+        eventSource.close()
+        eventSourceRef.current = null
+        // Don't set isAnalyzing to false - let the polling handle completion
+      }
+    } catch (err) {
+      // EventSource creation failed
+      console.warn('[knowledge] Failed to create EventSource, falling back to polling', err)
+    }
+  }, [projectId, fetchPackages, fetchSources, fetchAnalysisStatus])
+
+  // Check for running analysis on mount and connect to stream if needed
   useEffect(() => {
+    const init = async () => {
+      const status = await fetchAnalysisStatus()
+      if (status?.isRunning) {
+        connectToStream()
+      }
+    }
+    
     void fetchSources()
     void fetchPackages()
-    void fetchAnalysisStatus()
-  }, [fetchSources, fetchPackages, fetchAnalysisStatus])
+    void init()
+    
+    // Cleanup SSE connection on unmount
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+    }
+  }, [fetchSources, fetchPackages, fetchAnalysisStatus, connectToStream])
 
-  // Poll for status while analyzing
+  // Fallback polling for status while analyzing (in case SSE fails)
   useEffect(() => {
     if (!isAnalyzing) return
 
     const interval = setInterval(async () => {
       const status = await fetchAnalysisStatus()
-      if (status && status !== 'processing') {
+      if (status && !status.isRunning && status.status !== 'processing') {
+        // Add a synthetic finish event
+        setAnalysisEvents((prev) => [
+          ...prev,
+          {
+            type: 'workflow-finish',
+            message: 'Knowledge analysis completed',
+            timestamp: new Date().toISOString(),
+          },
+        ])
+        
         setIsAnalyzing(false)
         void fetchPackages()
         void fetchSources()
+        
+        // Close SSE if still open
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close()
+          eventSourceRef.current = null
+        }
+        
+        // Clear events after a delay so the user can see "completed" briefly
+        setTimeout(() => {
+          setAnalysisEvents([])
+        }, 5000)
       }
-    }, 3000)
+    }, 5000) // Poll less frequently since we have SSE
 
     return () => clearInterval(interval)
   }, [isAnalyzing, fetchAnalysisStatus, fetchPackages, fetchSources])
@@ -122,6 +246,7 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
   const handleRunAnalysis = async () => {
     setError(null)
     setIsAnalyzing(true)
+    setAnalysisEvents([]) // Clear previous events
 
     try {
       const response = await fetch(`/api/projects/${projectId}/knowledge/analyze`, {
@@ -130,12 +255,53 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
 
       if (!response.ok) {
         const data = await response.json()
+        // Handle 409 Conflict (already running)
+        if (response.status === 409) {
+          // Already running - just connect to stream
+          connectToStream()
+          return
+        }
         throw new Error(data.error ?? 'Failed to start analysis')
       }
+
+      // Connect to SSE stream for real-time updates
+      connectToStream()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start analysis'
       setError(message)
       setIsAnalyzing(false)
+    }
+  }
+
+  const handleCancelAnalysis = async () => {
+    setError(null)
+    
+    try {
+      const cancelResponse = await fetch(`/api/projects/${projectId}/knowledge/analyze/cancel`, {
+        method: 'POST',
+      })
+
+      if (!cancelResponse.ok) {
+        const data = await cancelResponse.json()
+        throw new Error(data.error ?? 'Failed to cancel analysis')
+      }
+
+      // Clear events
+      setAnalysisEvents([])
+      setIsAnalyzing(false)
+      
+      // Close existing SSE connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+
+      // Refresh status and data
+      await fetchAnalysisStatus()
+      await fetchSources()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to cancel analysis'
+      setError(message)
     }
   }
 
@@ -220,13 +386,23 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
               Manage knowledge sources and compiled documentation for the support agent.
             </p>
           </div>
-          <Button
-            onClick={handleRunAnalysis}
-            loading={isAnalyzing}
-            disabled={isAnalyzing}
-          >
-            {isAnalyzing ? 'Analyzing...' : hasKnowledge ? 'Re-run Analysis' : 'Run Analysis'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {isAnalyzing && (
+              <Button
+                onClick={handleCancelAnalysis}
+                variant="secondary"
+              >
+                Cancel
+              </Button>
+            )}
+            <Button
+              onClick={handleRunAnalysis}
+              loading={isAnalyzing}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? 'Analyzing...' : hasKnowledge ? 'Re-run Analysis' : 'Run Analysis'}
+            </Button>
+          </div>
         </div>
 
         {/* Alerts */}
@@ -236,18 +412,18 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
           </Alert>
         )}
 
-        {analysisStatus && analysisStatus.status === 'processing' && (
-          <Alert variant="info" className="mb-4">
-            <div className="flex items-center gap-2">
-              <Spinner size="sm" />
-              <span>Analysis in progress...</span>
-            </div>
+        {/* Analysis Progress Bar */}
+        <AnalysisProgressBar events={analysisEvents} isProcessing={isAnalyzing} />
+
+        {analysisStatus && analysisStatus.status === 'failed' && !isAnalyzing && (
+          <Alert variant="warning" className="mb-4">
+            Some sources failed to analyze. Check the sources below for details.
           </Alert>
         )}
 
-        {analysisStatus && analysisStatus.status === 'failed' && (
-          <Alert variant="warning" className="mb-4">
-            Some sources failed to analyze. Check the sources below for details.
+        {analysisStatus && analysisStatus.status === 'cancelled' && !isAnalyzing && (
+          <Alert variant="info" className="mb-4">
+            Previous analysis was cancelled. Click &quot;Run Analysis&quot; to try again.
           </Alert>
         )}
 

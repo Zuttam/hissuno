@@ -13,7 +13,7 @@ export const analyzeCodebase = createStep({
   description: 'Analyze source code to extract product and technical knowledge using agent tools',
   inputSchema: workflowInputSchema,
   outputSchema: analyzeCodebaseOutputSchema,
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, writer }) => {
     const logger = mastra?.getLogger()
 
     if (!inputData) {
@@ -23,9 +23,13 @@ export const analyzeCodebase = createStep({
     const { projectId, sources, sourceCodePath } = inputData
     logger?.info('[analyze-codebase] Starting', { projectId, sourceCodePath })
 
+    // Emit progress event
+    await writer?.write({ type: 'progress', message: 'Starting codebase analysis...' })
+
     // No codebase to analyze
     if (!sourceCodePath) {
       logger?.info('[analyze-codebase] No sourceCodePath, skipping')
+      await writer?.write({ type: 'progress', message: 'No codebase configured, skipping...' })
       return {
         projectId,
         sources,
@@ -37,6 +41,7 @@ export const analyzeCodebase = createStep({
     const agent = mastra?.getAgent('codebaseAnalyzerAgent')
     if (!agent) {
       logger?.warn('[analyze-codebase] Agent not found, skipping codebase analysis')
+      await writer?.write({ type: 'progress', message: 'Codebase analyzer not configured' })
       return {
         projectId,
         sources,
@@ -47,6 +52,7 @@ export const analyzeCodebase = createStep({
 
     try {
       logger?.debug('[analyze-codebase] Calling agent.generate')
+      await writer?.write({ type: 'progress', message: 'Exploring project structure...' })
       // The agent now uses tools to intelligently explore the codebase
       const prompt = `Analyze the codebase stored at path: ${sourceCodePath}
 
@@ -69,17 +75,22 @@ Be efficient with your tool usage - you don't need to read every file. Focus on 
 
       const response = await agent.generate([{ role: 'user', content: prompt }], {
         maxSteps: 15, // Allow multiple tool iterations for thorough analysis
-        onStepFinish: ({ text, toolCalls, finishReason }) => {
+        onStepFinish: async ({ text, toolCalls, finishReason }) => {
           logger?.info('[analyze-codebase] Agent step finished', {
             hasText: !!text,
             toolCallCount: toolCalls?.length ?? 0,
             finishReason,
           })
+          // Emit progress for each agent step
+          if (toolCalls && toolCalls.length > 0) {
+            await writer?.write({ type: 'progress', message: `Using ${toolCalls.length} tool(s)...` })
+          }
         },
       })
 
       const analysis = response.text || '[No analysis generated]'
       logger?.info('[analyze-codebase] Completed', { analysisLength: analysis.length })
+      await writer?.write({ type: 'progress', message: 'Codebase analysis complete' })
 
       return {
         projectId,

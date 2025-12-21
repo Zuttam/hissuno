@@ -19,7 +19,7 @@ export const analyzeSources = createStep({
   description: 'Analyze websites, docs, and other knowledge sources',
   inputSchema: analyzeCodebaseOutputSchema,
   outputSchema: analyzeSourcesOutputSchema,
-  execute: async ({ inputData, mastra }) => {
+  execute: async ({ inputData, mastra, writer }) => {
     if (!inputData) {
       throw new Error('Input data not found')
     }
@@ -27,9 +27,17 @@ export const analyzeSources = createStep({
     const { sources, codebaseAnalysis, hasCodebase } = inputData
     const results: AnalysisResult[] = []
 
+    await writer?.write({ type: 'progress', message: `Analyzing ${sources.length} knowledge source(s)...` })
+
     const webAgent = mastra?.getAgent('webScraperAgent')
+    let processedCount = 0
 
     for (const source of sources) {
+      processedCount++
+      await writer?.write({ 
+        type: 'progress', 
+        message: `Processing source ${processedCount}/${sources.length}: ${source.type}` 
+      })
       try {
         switch (source.type) {
           case 'website':
@@ -134,6 +142,12 @@ Please extract:
         })
       }
     }
+
+    const successCount = results.filter(r => !r.error).length
+    await writer?.write({ 
+      type: 'progress', 
+      message: `Completed analyzing ${successCount}/${sources.length} sources` 
+    })
 
     return {
       analysisResults: results,

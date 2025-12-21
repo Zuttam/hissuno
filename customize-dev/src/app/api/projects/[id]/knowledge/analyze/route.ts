@@ -33,10 +33,11 @@ async function resolveUser() {
  * Trigger knowledge analysis workflow for a project
  * 
  * This will:
- * 1. Fetch all pending/failed knowledge sources
- * 2. Update their status to 'processing'
- * 3. Execute the knowledge analysis workflow
- * 4. Update statuses based on results
+ * 1. Check if analysis is already running
+ * 2. Fetch all pending/failed knowledge sources
+ * 3. Update their status to 'processing'
+ * 4. Execute the knowledge analysis workflow
+ * 5. Update statuses based on results
  */
 export async function POST(_request: Request, context: RouteContext) {
   const { id: projectId } = await context.params
@@ -61,6 +62,25 @@ export async function POST(_request: Request, context: RouteContext) {
     if (projectError || !project) {
       console.error('[knowledge.analyze] failed to load project', projectId, projectError)
       return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
+    }
+
+    // Check if analysis is already running by querying project_analyses table
+    const { data: runningAnalysis } = await supabase
+      .from('project_analyses')
+      .select('*')
+      .eq('project_id', projectId)
+      .eq('status', 'running')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (runningAnalysis) {
+      // Analysis is already running - user must cancel it first
+      return NextResponse.json({
+        error: 'Analysis is already in progress. Cancel it first to start a new one.',
+        runId: runningAnalysis.run_id,
+        analysisId: runningAnalysis.id,
+      }, { status: 409 })
     }
 
     // Fetch all knowledge sources for the project
@@ -142,9 +162,37 @@ export async function POST(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Analysis workflow not configured.' }, { status: 500 })
     }
 
-    // Prepare workflow input
+    // Generate a unique run ID
+    const runId = `knowledge-${projectId}-${Date.now()}`
+
+    // Create analysis record in project_analyses table
+    const { data: analysisRecord, error: insertError } = await supabase
+      .from('project_analyses')
+      .insert({
+        project_id: projectId,
+        run_id: runId,
+        status: 'running',
+        started_at: new Date().toISOString(),
+        metadata: {
+          sourceCount: allSources.length,
+          hasCodebase,
+          sourceIds: allSources.map((s) => s.id),
+        },
+      })
+      .select()
+      .single()
+
+    if (insertError || !analysisRecord) {
+      console.error('[knowledge.analyze] Failed to create analysis record', insertError)
+      return NextResponse.json({ error: 'Failed to start analysis.' }, { status: 500 })
+    }
+
+    console.log('[knowledge.analyze] Created analysis record:', analysisRecord.id)
+
+    // Prepare workflow input - include analysisId so workflow can update it on completion
     const workflowInput = {
       projectId,
+      analysisId: analysisRecord.id,
       sourceCodePath,
       sources: allSources.map((s) => ({
         id: s.id,
@@ -155,21 +203,35 @@ export async function POST(_request: Request, context: RouteContext) {
       })),
     }
 
-    // Execute workflow asynchronously
+    // Execute workflow asynchronously using stream() to enable observeStream() in SSE route
     // We don't await the full execution - just return immediately
     // The workflow will update statuses as it progresses
-    const run = await workflow.createRunAsync({
-      runId: `knowledge-${projectId}-${Date.now()}`,
-    })
+    const run = await workflow.createRunAsync({ runId })
 
-    // Start the workflow in the background
-    run.start({ inputData: workflowInput }).catch((error: Error) => {
+    // Start the workflow with stream() - this enables observeStream() for the SSE endpoint
+    // The stream starts immediately and runs in the background
+    const workflowStream = await run.streamAsync({ inputData: workflowInput })
+
+    // Handle errors by consuming the result promise in the background
+    workflowStream.result.catch(async (error: Error) => {
       console.error('[knowledge.analyze] workflow execution failed', error)
+      
+      // Mark the analysis as failed
+      await supabase
+        .from('project_analyses')
+        .update({
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          error_message: error.message,
+        })
+        .eq('id', analysisRecord.id)
     })
 
     return NextResponse.json({
       message: 'Knowledge analysis started.',
       status: 'processing',
+      runId,
+      analysisId: analysisRecord.id,
       sourceCount: allSources.length,
       hasCodebase,
     })
@@ -200,6 +262,18 @@ export async function GET(_request: Request, context: RouteContext) {
 
     await assertUserOwnsProject(supabase, user.id, projectId)
 
+    // Fetch the latest analysis from project_analyses table
+    const { data: latestAnalysis } = await supabase
+      .from('project_analyses')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    // Determine if analysis is running
+    const isRunning = latestAnalysis?.status === 'running'
+
     // Fetch all knowledge sources to determine status
     const { data: sources, error } = await supabase
       .from('knowledge_sources')
@@ -217,14 +291,20 @@ export async function GET(_request: Request, context: RouteContext) {
     const completed = allSources.filter((s) => s.status === 'completed')
     const pending = allSources.filter((s) => s.status === 'pending')
 
-    let overallStatus: 'idle' | 'processing' | 'completed' | 'failed' | 'partial'
-    if (processing.length > 0) {
+    // Determine overall status based on latest analysis and sources
+    let overallStatus: 'idle' | 'processing' | 'completed' | 'failed' | 'partial' | 'cancelled'
+    
+    if (isRunning || processing.length > 0) {
       overallStatus = 'processing'
+    } else if (latestAnalysis?.status === 'cancelled') {
+      overallStatus = 'cancelled'
+    } else if (latestAnalysis?.status === 'failed') {
+      overallStatus = 'failed'
     } else if (failed.length > 0 && completed.length > 0) {
       overallStatus = 'partial'
     } else if (failed.length > 0) {
       overallStatus = 'failed'
-    } else if (completed.length > 0) {
+    } else if (completed.length > 0 || latestAnalysis?.status === 'completed') {
       overallStatus = 'completed'
     } else {
       overallStatus = 'idle'
@@ -232,6 +312,13 @@ export async function GET(_request: Request, context: RouteContext) {
 
     return NextResponse.json({
       status: overallStatus,
+      isRunning,
+      analysisId: latestAnalysis?.id ?? null,
+      runId: latestAnalysis?.run_id ?? null,
+      startedAt: latestAnalysis?.started_at ?? null,
+      completedAt: latestAnalysis?.completed_at ?? null,
+      lastAnalysisStatus: latestAnalysis?.status ?? null,
+      lastAnalysisError: latestAnalysis?.error_message ?? null,
       sources: {
         total: allSources.length,
         pending: pending.length,

@@ -13,14 +13,21 @@ export const saveKnowledgePackages = createStep({
   description: 'Save compiled knowledge to storage and update database',
   inputSchema: compiledKnowledgeSchema,
   outputSchema: workflowOutputSchema,
-  execute: async ({ inputData, getInitData }) => {
+  execute: async ({ inputData, getInitData, writer }) => {
     if (!inputData) {
       throw new Error('Input data not found')
     }
 
+    await writer?.write({ type: 'progress', message: 'Saving knowledge packages...' })
+
     const { business, product, technical } = inputData
-    const initData = getInitData?.() as { projectId: string; sources: unknown[] } | undefined
+    const initData = getInitData?.() as { 
+      projectId: string
+      analysisId?: string
+      sources: unknown[] 
+    } | undefined
     const projectId = initData?.projectId
+    const analysisId = initData?.analysisId
 
     if (!projectId) {
       return {
@@ -46,6 +53,7 @@ export const saveKnowledgePackages = createStep({
       ]
 
       for (const { key, content } of categories) {
+        await writer?.write({ type: 'progress', message: `Saving ${key} knowledge package...` })
         try {
           // Get current version
           const { data: existing } = await supabase
@@ -113,6 +121,35 @@ export const saveKnowledgePackages = createStep({
           .in('id', sourceIds)
       }
 
+      // Update project_analyses record to mark completion
+      if (analysisId) {
+        const analysisStatus = packages.length > 0 ? 'completed' : 'failed'
+        const { error: analysisUpdateError } = await supabase
+          .from('project_analyses')
+          .update({
+            status: analysisStatus,
+            completed_at: new Date().toISOString(),
+            error_message: errors.length > 0 ? errors.join('; ') : null,
+            metadata: {
+              packagesCount: packages.length,
+              sourcesCount: sourceIds.length,
+              errors: errors.length > 0 ? errors : undefined,
+            },
+          })
+          .eq('id', analysisId)
+
+        if (analysisUpdateError) {
+          console.error('[save-packages] Failed to update analysis record:', analysisUpdateError)
+        } else {
+          console.log('[save-packages] Updated analysis record:', analysisId, 'status:', analysisStatus)
+        }
+      }
+
+      await writer?.write({ 
+        type: 'progress', 
+        message: `Analysis complete! Saved ${packages.length} knowledge packages.` 
+      })
+
       return {
         saved: packages.length > 0,
         packages,
@@ -120,6 +157,25 @@ export const saveKnowledgePackages = createStep({
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
+      
+      // Mark analysis as failed if we have an analysisId
+      if (analysisId) {
+        try {
+          const { createAdminClient } = await import('@/lib/supabase/server')
+          const supabase = createAdminClient()
+          await supabase
+            .from('project_analyses')
+            .update({
+              status: 'failed',
+              completed_at: new Date().toISOString(),
+              error_message: message,
+            })
+            .eq('id', analysisId)
+        } catch (updateError) {
+          console.error('[save-packages] Failed to mark analysis as failed:', updateError)
+        }
+      }
+      
       return {
         saved: false,
         packages: [],
