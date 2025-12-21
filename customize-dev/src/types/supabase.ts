@@ -34,44 +34,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      user_github_tokens: {
-        Row: {
-          id: string
-          user_id: string
-          access_token: string
-          github_username: string | null
-          github_user_id: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          access_token: string
-          github_username?: string | null
-          github_user_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          access_token?: string
-          github_username?: string | null
-          github_user_id?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_github_tokens_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       knowledge_packages: {
         Row: {
           category: string
@@ -210,35 +172,124 @@ export type Database = {
           },
         ]
       }
+      sessions: {
+        Row: {
+          created_at: string
+          first_message_at: string | null
+          id: string
+          last_activity_at: string | null
+          message_count: number | null
+          page_title: string | null
+          page_url: string | null
+          project_id: string
+          status: string | null
+          updated_at: string
+          user_id: string | null
+          user_metadata: Json | null
+        }
+        Insert: {
+          created_at?: string
+          first_message_at?: string | null
+          id: string
+          last_activity_at?: string | null
+          message_count?: number | null
+          page_title?: string | null
+          page_url?: string | null
+          project_id: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string | null
+          user_metadata?: Json | null
+        }
+        Update: {
+          created_at?: string
+          first_message_at?: string | null
+          id?: string
+          last_activity_at?: string | null
+          message_count?: number | null
+          page_title?: string | null
+          page_url?: string | null
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+          user_id?: string | null
+          user_metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       source_codes: {
         Row: {
+          commit_sha: string | null
           created_at: string
           id: string
           kind: string | null
           repository_branch: string | null
           repository_url: string | null
           storage_uri: string | null
+          synced_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          commit_sha?: string | null
           created_at?: string
           id?: string
           kind?: string | null
           repository_branch?: string | null
           repository_url?: string | null
           storage_uri?: string | null
+          synced_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          commit_sha?: string | null
           created_at?: string
           id?: string
           kind?: string | null
           repository_branch?: string | null
           repository_url?: string | null
           storage_uri?: string | null
+          synced_at?: string | null
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_github_tokens: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          github_user_id: string | null
+          github_username: string | null
+          id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          github_user_id?: string | null
+          github_username?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          github_user_id?: string | null
+          github_username?: string | null
+          id?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -248,7 +299,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_project_key: {
+        Args: { prefix: string; random_length: number }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

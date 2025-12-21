@@ -7,7 +7,7 @@
  * - User-facing document operations REQUIRE an authenticated client
  */
 
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, isServiceRoleConfigured } from '@/lib/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { KnowledgeCategory } from './types'
 
@@ -36,6 +36,7 @@ export function getDocumentPath(projectId: string, filename: string): string {
 /**
  * Uploads a knowledge package markdown file to Supabase Storage.
  * Defaults to admin client for workflow use (no user context).
+ * Automatically ensures the storage bucket exists before uploading.
  */
 export async function uploadKnowledgePackage(
   projectId: string,
@@ -44,6 +45,12 @@ export async function uploadKnowledgePackage(
   version: number,
   supabase?: SupabaseClient
 ): Promise<{ path: string; error: Error | null }> {
+  // Ensure bucket exists before uploading
+  const { error: bucketError } = await ensureStorageBuckets()
+  if (bucketError) {
+    return { path: '', error: bucketError }
+  }
+
   // Default to admin client for workflow context (no user session)
   const client = supabase ?? createAdminClient()
   const storagePath = getKnowledgePackagePath(projectId, category, version)
@@ -212,9 +219,15 @@ export async function getKnowledgePackageUrl(
 }
 
 /**
- * Ensures the required storage buckets exist (admin operation)
+ * Ensures the required storage buckets exist (admin operation).
+ * If service role key is not configured, this is a no-op (assumes buckets were pre-created).
  */
 export async function ensureStorageBuckets(): Promise<{ error: Error | null }> {
+  // Skip if service role isn't configured - assume buckets were pre-created via Supabase dashboard or config.toml
+  if (!isServiceRoleConfigured()) {
+    return { error: null }
+  }
+
   try {
     const client = createAdminClient()
 

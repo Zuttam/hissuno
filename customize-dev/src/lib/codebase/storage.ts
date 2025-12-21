@@ -68,6 +68,37 @@ export async function uploadCodebaseFile(
 }
 
 /**
+ * Uploads a codebase file from a buffer (for GitHub sync).
+ * Uses admin client for background operations.
+ */
+export async function uploadCodebaseBuffer(
+  storagePath: string,
+  buffer: Uint8Array,
+  contentType: string = 'application/octet-stream',
+  supabase?: SupabaseClient
+): Promise<{ path: string; error: Error | null }> {
+  const client = supabase ?? createAdminClient()
+
+  const { error } = await client.storage
+    .from(CODEBASE_BUCKET)
+    .upload(storagePath, buffer, {
+      contentType,
+      upsert: false,
+    })
+
+  if (error) {
+    if (error.message === 'Bucket not found') {
+      console.error('[codebase.storage] Bucket "codebases" not found.')
+      return { path: storagePath, error: new Error('Storage bucket "codebases" not found.') }
+    }
+    console.error('[codebase.storage] Failed to upload buffer:', storagePath, error)
+    return { path: storagePath, error: new Error(error.message) }
+  }
+
+  return { path: storagePath, error: null }
+}
+
+/**
  * Deletes all codebase files for a project.
  * Defaults to admin client (typically called during project cleanup).
  */

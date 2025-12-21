@@ -31,6 +31,7 @@
     "react-dom": "19.2.0",
     "react-markdown": "^9.0.1",
     "rehype-highlight": "^7.0.0",
+    "tar-stream": "^3.1.7",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -39,6 +40,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/tar-stream": "^3.1.4",
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
     "tailwindcss": "^4",

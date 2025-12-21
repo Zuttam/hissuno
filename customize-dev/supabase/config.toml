@@ -113,12 +113,20 @@ enabled = true
 # [storage.image_transformation]
 # enabled = true
 
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+# Configure local storage buckets
+[storage.buckets.codebases]
+public = false
+file_size_limit = "100MiB"
+
+[storage.buckets.knowledge]
+public = false
+file_size_limit = "10MiB"
+allowed_mime_types = ["text/markdown", "text/plain"]
+
+[storage.buckets.documents]
+public = false
+file_size_limit = "50MiB"
+allowed_mime_types = ["application/pdf", "text/markdown", "text/plain", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
 
 # Store vector embeddings in S3 for large and durable datasets
 # This feature is only available on the hosted platform.

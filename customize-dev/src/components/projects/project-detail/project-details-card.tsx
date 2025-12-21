@@ -1,8 +1,50 @@
+'use client'
+
+import { useState } from 'react'
 import type { ProjectDetailsCardProps } from './types'
 import { formatTimestamp } from './utils'
 
-export function ProjectDetailsCard({ project, isLoading }: ProjectDetailsCardProps) {
+export function ProjectDetailsCard({ project, isLoading, onRefresh }: ProjectDetailsCardProps) {
   const source = project.source_code
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [syncSuccess, setSyncSuccess] = useState<string | null>(null)
+
+  const handleSync = async () => {
+    if (isSyncing || !source) return
+
+    setIsSyncing(true)
+    setSyncError(null)
+    setSyncSuccess(null)
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}/source-code/sync`, {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to sync codebase')
+      }
+
+      if (data.status === 'already_up_to_date') {
+        setSyncSuccess('Already up to date')
+      } else if (data.status === 'synced') {
+        setSyncSuccess(`Synced ${data.fileCount} files`)
+      }
+
+      // Refresh project data to show updated sync info
+      if (onRefresh) {
+        await onRefresh()
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sync failed'
+      setSyncError(message)
+    } finally {
+      setIsSyncing(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -43,6 +85,40 @@ export function ProjectDetailsCard({ project, isLoading }: ProjectDetailsCardPro
               <>
                 <DetailRow label="Repository URL" value={source.repository_url ?? '—'} />
                 <DetailRow label="Repository branch" value={source.repository_branch ?? '—'} />
+                <DetailRow 
+                  label="Last synced" 
+                  value={source.synced_at ? formatTimestamp(source.synced_at) : 'Not synced yet'} 
+                />
+                {source.commit_sha && (
+                  <DetailRow 
+                    label="Commit" 
+                    value={source.commit_sha.substring(0, 7)} 
+                  />
+                )}
+                
+                {/* Sync button and status */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSync}
+                    disabled={isSyncing}
+                    className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-4 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--foreground)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isSyncing ? 'Syncing...' : 'Sync from GitHub'}
+                  </button>
+                  
+                  {syncError && (
+                    <p className="mt-2 text-xs text-red-500 dark:text-red-400">
+                      {syncError}
+                    </p>
+                  )}
+                  
+                  {syncSuccess && (
+                    <p className="mt-2 text-xs text-green-600 dark:text-green-400">
+                      {syncSuccess}
+                    </p>
+                  )}
+                </div>
               </>
             )}
             <DetailRow label="Source created" value={formatTimestamp(source.created_at)} />

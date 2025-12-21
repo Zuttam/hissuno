@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { syncGitHubCodebase } from '@/lib/codebase'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { mastra } from '@/mastra'
 import type { KnowledgeSourceRecord } from '@/lib/knowledge/types'
@@ -76,13 +77,52 @@ export async function POST(_request: Request, context: RouteContext) {
     const allSources = (sources ?? []) as KnowledgeSourceRecord[]
 
     // Check if there's anything to analyze
-    const hasCodebase = Boolean(project.source_code?.storage_uri)
+    // Consider both storage_uri (uploaded folders) and github kind
+    const hasCodebase = Boolean(
+      project.source_code?.storage_uri || 
+      (project.source_code?.kind === 'github' && project.source_code?.repository_url && project.source_code?.repository_branch)
+    )
     const hasOtherSources = allSources.length > 0
 
     if (!hasCodebase && !hasOtherSources) {
       return NextResponse.json({
         error: 'No knowledge sources to analyze. Add a codebase or other sources first.',
       }, { status: 400 })
+    }
+
+    // Auto-sync GitHub codebases before analysis
+    let sourceCodePath = project.source_code?.storage_uri ?? null
+    
+    if (project.source_code?.kind === 'github') {
+      console.log('[knowledge.analyze] Syncing GitHub codebase before analysis')
+      
+      const syncResult = await syncGitHubCodebase({
+        codebaseId: project.source_code.id,
+        userId: user.id,
+        projectId,
+      })
+
+      if (syncResult.status === 'error') {
+        console.error('[knowledge.analyze] GitHub sync failed:', syncResult.error)
+        return NextResponse.json({
+          error: `Failed to sync GitHub repository: ${syncResult.error}`,
+        }, { status: 500 })
+      }
+
+      // Re-fetch project to get updated storage_uri after sync
+      const { data: refreshedProject, error: refreshError } = await supabase
+        .from('projects')
+        .select('*, source_code:source_codes(*)')
+        .eq('id', projectId)
+        .single()
+
+      if (refreshError || !refreshedProject) {
+        console.error('[knowledge.analyze] Failed to refresh project after sync', refreshError)
+      } else {
+        sourceCodePath = refreshedProject.source_code?.storage_uri ?? null
+      }
+
+      console.log('[knowledge.analyze] GitHub sync completed:', syncResult.status, 'SHA:', syncResult.commitSha)
     }
 
     // Update sources to 'processing' status
@@ -105,7 +145,7 @@ export async function POST(_request: Request, context: RouteContext) {
     // Prepare workflow input
     const workflowInput = {
       projectId,
-      sourceCodePath: project.source_code?.storage_uri ?? null,
+      sourceCodePath,
       sources: allSources.map((s) => ({
         id: s.id,
         type: s.type,

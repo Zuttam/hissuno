@@ -67,7 +67,11 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
         </header>
 
         <section className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-          <ProjectDetailsCard project={project ?? initialProject} isLoading={isLoading} />
+          <ProjectDetailsCard 
+            project={project ?? initialProject} 
+            isLoading={isLoading} 
+            onRefresh={refresh}
+          />
           <ProjectKeysCard project={project ?? initialProject} isLoading={isLoading} />
         </section>
 
