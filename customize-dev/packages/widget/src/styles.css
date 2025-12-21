@@ -1,0 +1,42 @@
+/**
+ * Customize Widget Styles
+ * 
+ * These styles extend the default CopilotKit styles with Customize branding.
+ * Import this file in your app for consistent styling:
+ * 
+ * import '@customize/widget/styles.css';
+ */
+
+/* Customize branding overrides */
+.copilot-kit-popup {
+  --copilot-kit-primary-color: #6366f1;
+  --copilot-kit-background-color: #ffffff;
+  --copilot-kit-text-color: #1f2937;
+  --copilot-kit-border-radius: 12px;
+}
+
+/* Dark theme */
+.copilot-kit-popup[data-theme="dark"] {
+  --copilot-kit-background-color: #1f2937;
+  --copilot-kit-text-color: #f9fafb;
+}
+
+/* Position variants */
+.copilot-kit-popup[data-position="bottom-right"] {
+  right: 20px;
+  bottom: 20px;
+}
+
+.copilot-kit-popup[data-position="bottom-left"] {
+  left: 20px;
+  bottom: 20px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .copilot-kit-popup {
+    width: calc(100vw - 40px);
+    max-height: 70vh;
+  }
+}
+

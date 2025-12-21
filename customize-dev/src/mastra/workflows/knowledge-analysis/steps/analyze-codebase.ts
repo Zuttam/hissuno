@@ -1,0 +1,101 @@
+/**
+ * Step 1: Analyze Codebase
+ *
+ * Uses the codebaseAnalyzerAgent with storage tools to intelligently explore
+ * and analyze the codebase stored in Supabase Storage.
+ */
+
+import { createStep } from '@mastra/core/workflows'
+import { workflowInputSchema, analyzeCodebaseOutputSchema } from '../schemas'
+
+export const analyzeCodebase = createStep({
+  id: 'analyze-codebase',
+  description: 'Analyze source code to extract product and technical knowledge using agent tools',
+  inputSchema: workflowInputSchema,
+  outputSchema: analyzeCodebaseOutputSchema,
+  execute: async ({ inputData, mastra }) => {
+    const logger = mastra?.getLogger()
+
+    if (!inputData) {
+      throw new Error('Input data not found')
+    }
+
+    const { projectId, sources, sourceCodePath } = inputData
+    logger?.info('[analyze-codebase] Starting', { projectId, sourceCodePath })
+
+    // No codebase to analyze
+    if (!sourceCodePath) {
+      logger?.info('[analyze-codebase] No sourceCodePath, skipping')
+      return {
+        projectId,
+        sources,
+        codebaseAnalysis: '',
+        hasCodebase: false,
+      }
+    }
+
+    const agent = mastra?.getAgent('codebaseAnalyzerAgent')
+    if (!agent) {
+      logger?.warn('[analyze-codebase] Agent not found, skipping codebase analysis')
+      return {
+        projectId,
+        sources,
+        codebaseAnalysis: '[Codebase analysis skipped: Agent not configured]',
+        hasCodebase: true,
+      }
+    }
+
+    try {
+      logger?.debug('[analyze-codebase] Calling agent.generate')
+      // The agent now uses tools to intelligently explore the codebase
+      const prompt = `Analyze the codebase stored at path: ${sourceCodePath}
+
+Use your tools to explore and understand this codebase:
+
+1. First, list the files at the root level to understand the project structure
+2. Read key configuration files (package.json, README.md, tsconfig.json)
+3. Explore the main source directories (src/, app/, pages/, etc.)
+4. Search for important patterns like API routes, components, and data models
+
+After exploring, provide a comprehensive analysis covering:
+- Product Overview: What does this product do?
+- Key Features: Main features and capabilities
+- Technical Architecture: Tech stack and structure
+- API Reference: Any API endpoints found
+- Data Models: Key data structures
+- Common Use Cases: How the product is typically used
+
+Be efficient with your tool usage - you don't need to read every file. Focus on the most important ones that reveal the product's purpose and architecture.`
+
+      const response = await agent.generate([{ role: 'user', content: prompt }], {
+        maxSteps: 15, // Allow multiple tool iterations for thorough analysis
+        onStepFinish: ({ text, toolCalls, finishReason }) => {
+          logger?.info('[analyze-codebase] Agent step finished', {
+            hasText: !!text,
+            toolCallCount: toolCalls?.length ?? 0,
+            finishReason,
+          })
+        },
+      })
+
+      const analysis = response.text || '[No analysis generated]'
+      logger?.info('[analyze-codebase] Completed', { analysisLength: analysis.length })
+
+      return {
+        projectId,
+        sources,
+        codebaseAnalysis: analysis,
+        hasCodebase: true,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      logger?.error('[analyze-codebase] Error', { error: message })
+      return {
+        projectId,
+        sources,
+        codebaseAnalysis: `[Codebase analysis error: ${message}]`,
+        hasCodebase: true,
+      }
+    }
+  },
+})

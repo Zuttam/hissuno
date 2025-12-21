@@ -1,0 +1,125 @@
+/* Markdown viewer styles - Wireframe aesthetic */
+.markdownViewer {
+  line-height: 1.7;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.markdownViewer h1,
+.markdownViewer h2,
+.markdownViewer h3,
+.markdownViewer h4 {
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+  font-weight: 600;
+  font-family: ui-monospace, 'Courier New', monospace;
+  letter-spacing: -0.02em;
+}
+
+.markdownViewer h1 {
+  font-size: 2em;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.3em;
+}
+
+.markdownViewer h2 {
+  font-size: 1.5em;
+  border-bottom: 2px solid var(--border-subtle);
+  padding-bottom: 0.3em;
+}
+
+.markdownViewer h3 {
+  font-size: 1.25em;
+}
+
+.markdownViewer pre {
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 1rem;
+  border: 2px solid var(--border-subtle);
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 1em 0;
+  font-family: ui-monospace, 'Courier New', monospace;
+}
+
+.markdownViewer code {
+  background: var(--surface);
+  color: var(--foreground);
+  padding: 0.2em 0.4em;
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  font-size: 0.875em;
+  font-family: ui-monospace, 'Courier New', monospace;
+}
+
+.markdownViewer pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.markdownViewer table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  border: 2px solid var(--border-subtle);
+}
+
+.markdownViewer th,
+.markdownViewer td {
+  border: 1px solid var(--border-subtle);
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.markdownViewer th {
+  background: var(--surface);
+  font-weight: 600;
+  font-family: ui-monospace, 'Courier New', monospace;
+  text-transform: uppercase;
+  font-size: 0.75em;
+  letter-spacing: 0.05em;
+}
+
+/* Syntax highlighting - Minimal wireframe colors */
+.markdownViewer :global(.hljs) {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.markdownViewer :global(.hljs-comment) {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.markdownViewer :global(.hljs-keyword),
+.markdownViewer :global(.hljs-selector-tag),
+.markdownViewer :global(.hljs-subst) {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.markdownViewer :global(.hljs-string),
+.markdownViewer :global(.hljs-title),
+.markdownViewer :global(.hljs-name),
+.markdownViewer :global(.hljs-type),
+.markdownViewer :global(.hljs-attribute) {
+  color: var(--accent-success);
+}
+
+.markdownViewer :global(.hljs-number),
+.markdownViewer :global(.hljs-literal),
+.markdownViewer :global(.hljs-variable),
+.markdownViewer :global(.hljs-template-variable) {
+  color: var(--foreground);
+  font-weight: 500;
+}
+
+.markdownViewer :global(.hljs-function),
+.markdownViewer :global(.hljs-params) {
+  color: var(--accent-warning);
+}
+

@@ -1,0 +1,416 @@
+---
+description: Conventions for the customize-dev Next.js application
+globs:
+  - customize-dev/**/*
+---
+
+# Customize Dev Conventions
+
+## Stack Overview
+
+- **Framework**: Next.js 16 (App Router)
+- **React**: 19.2 (use `useActionState`, `useFormStatus` from React 19)
+- **TypeScript**: Strict mode enabled
+- **Styling**: Tailwind CSS v4 with CSS custom properties
+- **Database/Auth**: Supabase with `@supabase/ssr`
+- **AI**: Mastra (`@mastra/core`) for agents
+- **Validation**: Zod
+- **Testing**: Vitest + React Testing Library
+
+## Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── (auth)/            # Auth route group (login, sign-up)
+│   ├── (authenticated)/   # Protected route group
+│   └── api/               # API routes
+├── components/
+│   ├── ui/                # Base UI components (Button, Card, Input, etc.)
+│   ├── layout/            # Layout components (navigation, menus)
+│   ├── auth/              # Auth-specific components
+│   ├── projects/          # Project feature components
+│   └── sessions/          # Session feature components
+├── hooks/                 # Custom React hooks
+├── lib/                   # Utilities and services
+│   ├── auth/              # Auth actions and utilities
+│   ├── config/            # Environment and config
+│   ├── supabase/          # Supabase client utilities
+│   └── utils/             # General utilities
+├── mastra/                # Mastra AI agents and tools
+└── types/                 # TypeScript type definitions
+```
+
+## Naming Conventions
+
+### Files
+- **kebab-case** for all files: `use-projects.ts`, `form-field.tsx`, `source-code-service.ts`
+- **Test files**: Co-located with source, suffix `.test.ts` or `.test.tsx`
+- **Index exports**: Use `index.ts` for barrel exports in component folders
+
+### Components
+- **PascalCase** for component names: `ProjectCard`, `SessionsTable`
+- **Named exports** (not default exports):
+  ```tsx
+  export function ProjectCard({ project }: ProjectCardProps) { ... }
+  ```
+- **Props interface**: `ComponentNameProps` suffix, defined above component
+
+### Hooks
+- **use-** prefix with kebab-case filename: `use-projects.ts`, `use-sessions.ts`
+- **camelCase** for hook function: `useProjects`, `useSessions`
+
+### Types
+- **PascalCase** for interfaces and types: `SessionWithProject`, `AuthActionState`
+- **Interface** for object shapes, **type** for unions/primitives
+
+## Component Patterns
+
+### Client Components
+Always add `'use client'` directive at the top of client components:
+```tsx
+'use client'
+
+import { useState } from 'react'
+```
+
+### UI Components (Base Components)
+Use `forwardRef` pattern for components that wrap native elements:
+```tsx
+import { forwardRef, ButtonHTMLAttributes } from 'react'
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  size?: 'sm' | 'md' | 'lg'
+  loading?: boolean
+}
+
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant = 'primary', size = 'md', ...props }, ref) => {
+    return <button ref={ref} className={cn(baseClasses, className)} {...props} />
+  }
+)
+Button.displayName = 'Button'
+
+export { Button }
+```
+
+### Feature Components
+Define props interface, then component:
+```tsx
+interface SessionsPageProps {
+  initialSessions: SessionWithProject[]
+  projects: ProjectWithSourceCode[]
+}
+
+export function SessionsPage({ initialSessions, projects }: SessionsPageProps) {
+  // ...
+}
+```
+
+### Import UI Components from Barrel
+```tsx
+import { Alert, Button, FormField, Input } from '@/components/ui'
+```
+
+## Hooks Pattern
+
+Custom hooks follow a consistent state tuple pattern:
+```tsx
+'use client'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+
+interface UseProjectsState {
+  projects: ProjectWithSourceCode[]
+  isLoading: boolean
+  error: string | null
+  refresh: () => Promise<void>
+}
+
+export function useProjects(initialProjects: ProjectWithSourceCode[] = []): UseProjectsState {
+  const [projects, setProjects] = useState<ProjectWithSourceCode[]>(initialProjects)
+  const [isLoading, setIsLoading] = useState<boolean>(initialProjects.length === 0)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchProjects = useCallback(async () => {
+    // fetch logic...
+  }, [])
+
+  useEffect(() => {
+    void fetchProjects()
+  }, [fetchProjects])
+
+  return useMemo(
+    () => ({ projects, isLoading, error, refresh: fetchProjects }),
+    [projects, isLoading, error, fetchProjects]
+  )
+}
+```
+
+## API Routes
+
+### Structure
+```tsx
+import { NextResponse } from 'next/server'
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { UnauthorizedError } from '@/lib/auth/server'
+
+export const runtime = 'nodejs'
+
+async function resolveUser() {
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+
+  if (error || !user) {
+    throw new UnauthorizedError('User not authenticated')
+  }
+
+  return { supabase, user }
+}
+
+export async function GET() {
+  if (!isSupabaseConfigured()) {
+    console.error('[route.get] Supabase must be configured')
+    return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
+  }
+
+  try {
+    const { supabase, user } = await resolveUser()
+    // ...
+    return NextResponse.json({ data })
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    console.error('[route.get] unexpected error', error)
+    return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
+  }
+}
+```
+
+### Logging Convention
+Use `[route.method]` prefix for console logs:
+```tsx
+console.error('[projects.get] failed to list projects', error)
+console.error('[projects.id.patch] unexpected error', error)
+```
+
+## Server Actions
+
+```tsx
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+
+export type AuthActionState = {
+  error?: string
+  success?: string
+}
+
+export async function loginAction(
+  _prevState: AuthActionState | undefined,
+  formData: FormData
+): Promise<AuthActionState> {
+  const email = formData.get('email')?.toString().trim().toLowerCase() ?? ''
+  // validation and logic...
+  
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/projects')
+}
+```
+
+### Using Actions in Components
+```tsx
+'use client'
+
+import { useActionState } from 'react'
+import { useFormStatus } from 'react-dom'
+import { loginAction, type AuthActionState } from '@/lib/auth/actions'
+
+const initialState: AuthActionState = {}
+
+export function LoginForm() {
+  const [state, formAction] = useActionState(loginAction, initialState)
+
+  return (
+    <form action={formAction}>
+      {state?.error && <Alert variant="warning">{state.error}</Alert>}
+      <SubmitButton />
+    </form>
+  )
+}
+
+function SubmitButton() {
+  const { pending } = useFormStatus()
+  return <Button type="submit" loading={pending}>Submit</Button>
+}
+```
+
+## Styling
+
+### CSS Custom Properties
+Theme colors are defined in `globals.css` with light/dark mode:
+```css
+:root {
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --border: #2a2a2a;
+  --border-subtle: #e5e5e5;
+  --surface: #fafafa;
+  --surface-hover: #f5f5f5;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --accent-primary: #3a3a3a;
+  --accent-selected: #2563eb;
+  --accent-success: #10b981;
+  --accent-warning: #ff9900;
+  --accent-danger: #ff3333;
+}
+
+.dark {
+  --background: #0f0f0f;
+  --foreground: #e5e5e5;
+  /* ... */
+}
+```
+
+### Using CSS Variables in Tailwind
+```tsx
+// Preferred for complex values
+className="text-[color:var(--foreground)]"
+className="bg-[color:var(--surface)]"
+className="border-[color:var(--border-subtle)]"
+
+// Short form also works
+className="text-[--text-secondary]"
+className="bg-[--surface-hover]"
+```
+
+### Design Tokens
+- **Border radius**: `rounded-[4px]` (consistent 4px corners)
+- **Font**: `font-mono` for labels, buttons, headers
+- **Text transforms**: `uppercase tracking-wide` for labels/buttons
+- **Borders**: `border-2` (2px borders are standard)
+
+### Common Patterns
+```tsx
+// Card pattern
+className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-6"
+
+// Button base
+className="rounded-[4px] border-2 font-mono font-semibold uppercase tracking-wide transition"
+
+// Section header
+className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]"
+```
+
+## Validation
+
+Use Zod for schema validation:
+```tsx
+import { z } from 'zod'
+
+export const envSchema = z.object({
+  CUSTOMIZE_CODEBASE_STORAGE_MODE: z
+    .preprocess((value) => {
+      if (typeof value !== 'string') return undefined
+      return value.trim().toLowerCase() || undefined
+    }, z.enum(['local', 's3']).optional())
+    .default('local'),
+})
+
+const parsed = envSchema.parse(process.env)
+```
+
+For form validation, use pure functions with `ValidationResult`:
+```tsx
+export type ValidationResult = {
+  isValid: boolean
+  error?: string
+}
+
+export function validateMetadataStep(formState: FormState): ValidationResult {
+  if (!formState.name?.trim()) {
+    return { isValid: false, error: 'Project name is required' }
+  }
+  return { isValid: true }
+}
+```
+
+## Testing
+
+### Unit Tests
+```tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+describe('ComponentName', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should do something', () => {
+    expect(result).toBe(expected)
+  })
+})
+```
+
+### Component Tests
+```tsx
+import { render, screen, waitFor } from '@testing-library/react'
+
+describe('MarkdownViewer', () => {
+  it('should render markdown content', async () => {
+    render(<MarkdownViewer url="https://example.com/test.md" />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Test Markdown/)).toBeInTheDocument()
+    })
+  })
+})
+```
+
+## Path Aliases
+
+Use `@/` for imports from `src/`:
+```tsx
+import { Button } from '@/components/ui'
+import { useProjects } from '@/hooks/use-projects'
+import { createClient } from '@/lib/supabase/server'
+import type { SessionWithProject } from '@/types/session'
+```
+
+## Utility Functions
+
+### Class Name Utility
+Use `cn()` for merging class names:
+```tsx
+import { cn } from '@/lib/utils/class'
+
+className={cn(
+  'base-classes',
+  variant && variantClasses[variant],
+  className
+)}
+```
+
+## Mastra AI Agents
+
+Agents are defined in `src/mastra/agents/`:
+```tsx
+import { Agent } from '@mastra/core/agent'
+import { Memory } from '@mastra/memory'
+
+export const supportAgent = new Agent({
+  name: 'Support Agent',
+  instructions: `Your instructions here...`,
+  model: 'openai/gpt-5',
+  memory: new Memory(),
+})
+```
