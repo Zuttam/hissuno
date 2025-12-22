@@ -194,6 +194,7 @@ export async function POST(_request: Request, context: RouteContext) {
       projectId,
       analysisId: analysisRecord.id,
       sourceCodePath,
+      analysisScope: project.source_code?.analysis_scope ?? null,
       sources: allSources.map((s) => ({
         id: s.id,
         type: s.type,

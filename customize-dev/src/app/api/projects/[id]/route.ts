@@ -77,7 +77,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const projectUpdates: Record<string, unknown> = {}
-  const sourceCodeUpdates: { repositoryUrl?: string; repositoryBranch?: string } = {}
+  const sourceCodeUpdates: { 
+    repositoryUrl?: string
+    repositoryBranch?: string
+    analysisScope?: string | null
+  } = {}
 
   if (typeof payload.name === 'string') {
     const trimmed = payload.name.trim()
@@ -97,6 +101,13 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
   if (typeof payload.repositoryBranch === 'string') {
     sourceCodeUpdates.repositoryBranch = payload.repositoryBranch.trim()
+  }
+  // Handle analysis scope (applies to all source code types)
+  if (typeof payload.analysisScope === 'string') {
+    const trimmed = payload.analysisScope.trim()
+    sourceCodeUpdates.analysisScope = trimmed.length > 0 ? trimmed : null
+  } else if (payload.analysisScope === null) {
+    sourceCodeUpdates.analysisScope = null
   }
 
   const hasProjectUpdates = Object.keys(projectUpdates).length > 0
@@ -129,14 +140,33 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
     }
 
-    // Update source code if needed (only for GitHub kind)
-    if (hasSourceCodeUpdates && currentProject.source_code?.kind === 'github') {
-      await updateGitHubCodebase(
-        supabase,
-        currentProject.source_code.id,
-        user.id,
-        sourceCodeUpdates
-      )
+    // Update source code if needed
+    if (hasSourceCodeUpdates && currentProject.source_code) {
+      const { repositoryUrl, repositoryBranch, analysisScope } = sourceCodeUpdates
+
+      // GitHub-specific updates (url and branch)
+      if ((repositoryUrl || repositoryBranch) && currentProject.source_code.kind === 'github') {
+        await updateGitHubCodebase(
+          supabase,
+          currentProject.source_code.id,
+          user.id,
+          { repositoryUrl, repositoryBranch }
+        )
+      }
+
+      // Analysis scope applies to all source code types
+      if (analysisScope !== undefined) {
+        const { error: scopeError } = await supabase
+          .from('source_codes')
+          .update({ analysis_scope: analysisScope })
+          .eq('id', currentProject.source_code.id)
+          .eq('user_id', user.id)
+
+        if (scopeError) {
+          console.error('[projects.id.patch] failed to update analysis scope', id, scopeError)
+          return NextResponse.json({ error: 'Failed to update analysis scope.' }, { status: 500 })
+        }
+      }
     }
 
     // Update project if needed

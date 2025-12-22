@@ -12,7 +12,6 @@ CREATE TABLE IF NOT EXISTS public.source_codes (
   description text,
   kind text CHECK (kind IN ('path', 'upload')),
   storage_uri text,
-  archive_temp_path text,
   repository_url text,
   repository_branch text,
   created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
@@ -23,7 +22,6 @@ ALTER TABLE public.source_codes OWNER TO postgres;
 
 COMMENT ON TABLE public.source_codes IS 'Stored source code references that can be shared across projects.';
 COMMENT ON COLUMN public.source_codes.storage_uri IS 'Remote or logical pointer to the uploaded code (e.g. S3 URI or absolute path).';
-COMMENT ON COLUMN public.source_codes.archive_temp_path IS 'Local path to the extracted or referenced code.';
 
 CREATE INDEX IF NOT EXISTS source_codes_user_id_idx ON public.source_codes (user_id);
 
@@ -53,6 +51,9 @@ CREATE TRIGGER handle_projects_updated_at
   BEFORE UPDATE ON public.projects
   FOR EACH ROW
   EXECUTE PROCEDURE extensions.moddatetime(updated_at);
+
+
+
 
 
 

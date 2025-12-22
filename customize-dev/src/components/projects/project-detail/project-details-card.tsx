@@ -121,6 +121,9 @@ export function ProjectDetailsCard({ project, isLoading, onRefresh }: ProjectDet
                 </div>
               </>
             )}
+            {source.analysis_scope && (
+              <DetailRow label="Analysis scope" value={source.analysis_scope} />
+            )}
             <DetailRow label="Source created" value={formatTimestamp(source.created_at)} />
             <DetailRow label="Source updated" value={formatTimestamp(source.updated_at)} />
           </div>

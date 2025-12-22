@@ -23,6 +23,9 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Source code settings
+  const [analysisScope, setAnalysisScope] = useState(project.source_code?.analysis_scope ?? '')
+  
   // GitHub-specific state
   const isGitHubSource = project.source_code?.kind === 'github'
   const [repositoryBranch, setRepositoryBranch] = useState(project.source_code?.repository_branch ?? '')
@@ -86,6 +89,13 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
       // Handle GitHub source code updates
       if (isGitHubSource && repositoryBranch !== project.source_code?.repository_branch) {
         projectPayload.repositoryBranch = repositoryBranch
+      }
+
+      // Handle analysis scope updates (applies to all source code types)
+      const currentScope = project.source_code?.analysis_scope ?? ''
+      const trimmedScope = analysisScope.trim()
+      if (trimmedScope !== currentScope) {
+        projectPayload.analysisScope = trimmedScope || null
       }
 
       if (Object.keys(projectPayload).length === 0) {
@@ -184,6 +194,21 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
                   </FormField>
                 </div>
               )}
+
+              {/* Analysis Scope - applies to all source code types */}
+              <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+                <FormField 
+                  label="Analysis Scope"
+                  description="Limit analysis to a specific path (e.g., packages/my-app for monorepos)"
+                >
+                  <Input
+                    type="text"
+                    value={analysisScope}
+                    onChange={(e) => setAnalysisScope(e.target.value)}
+                    placeholder="Leave empty to analyze entire codebase"
+                  />
+                </FormField>
+              </div>
             </div>
           )}
         </div>

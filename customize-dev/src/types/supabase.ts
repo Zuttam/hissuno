@@ -271,6 +271,7 @@ export type Database = {
       }
       source_codes: {
         Row: {
+          analysis_scope: string | null
           commit_sha: string | null
           created_at: string
           id: string
@@ -283,6 +284,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          analysis_scope?: string | null
           commit_sha?: string | null
           created_at?: string
           id?: string
@@ -295,6 +297,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          analysis_scope?: string | null
           commit_sha?: string | null
           created_at?: string
           id?: string

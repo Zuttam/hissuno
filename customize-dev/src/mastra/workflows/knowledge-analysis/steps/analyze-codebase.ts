@@ -20,8 +20,8 @@ export const analyzeCodebase = createStep({
       throw new Error('Input data not found')
     }
 
-    const { projectId, sources, sourceCodePath } = inputData
-    logger?.info('[analyze-codebase] Starting', { projectId, sourceCodePath })
+    const { projectId, sources, sourceCodePath, analysisScope } = inputData
+    logger?.info('[analyze-codebase] Starting', { projectId, sourceCodePath, analysisScope })
 
     // Emit progress event
     await writer?.write({ type: 'progress', message: 'Starting codebase analysis...' })
@@ -52,13 +52,28 @@ export const analyzeCodebase = createStep({
 
     try {
       logger?.debug('[analyze-codebase] Calling agent.generate')
-      await writer?.write({ type: 'progress', message: 'Exploring project structure...' })
+      const scopeMessage = analysisScope 
+        ? `Exploring scoped path: ${analysisScope}...` 
+        : 'Exploring project structure...'
+      await writer?.write({ type: 'progress', message: scopeMessage })
+      
+      // Build scope instruction for the prompt
+      const scopeInstruction = analysisScope
+        ? `\n\nIMPORTANT: This is a SCOPED analysis. Focus your analysis ONLY on the path: "${analysisScope}"
+When listing files, start with this path as the prefix. Ignore files outside this path.
+This project is part of a larger repository (monorepo), so only analyze the specified subdirectory.`
+        : ''
+      
       // The agent now uses tools to intelligently explore the codebase
-      const prompt = `Analyze the codebase stored at path: ${sourceCodePath}
+      const startPath = analysisScope 
+        ? `Use prefix "${analysisScope}" when listing files to start from the scoped directory.`
+        : '1. First, list the files at the root level to understand the project structure'
+      
+      const prompt = `Analyze the codebase stored at path: ${sourceCodePath}${scopeInstruction}
 
 Use your tools to explore and understand this codebase:
 
-1. First, list the files at the root level to understand the project structure
+${startPath}
 2. Read key configuration files (package.json, README.md, tsconfig.json)
 3. Explore the main source directories (src/, app/, pages/, etc.)
 4. Search for important patterns like API routes, components, and data models

@@ -11,3 +11,6 @@ ALTER TABLE public.source_codes
   CHECK (kind IN ('path', 'github'));
 
 COMMENT ON COLUMN public.source_codes.kind IS 'Type of source code: path (folder upload to storage) or github (GitHub repository).';
+
+
+
