@@ -19,6 +19,7 @@ export interface CreateCodebaseParams {
   gitignore: File | null
   projectId: string
   userId: string
+  analysisScope?: string | null
 }
 
 /** Result from creating a codebase */

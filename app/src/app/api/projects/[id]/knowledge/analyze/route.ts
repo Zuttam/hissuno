@@ -165,34 +165,11 @@ export async function POST(_request: Request, context: RouteContext) {
     // Generate a unique run ID
     const runId = `knowledge-${projectId}-${Date.now()}`
 
-    // Create analysis record in project_analyses table
-    const { data: analysisRecord, error: insertError } = await supabase
-      .from('project_analyses')
-      .insert({
-        project_id: projectId,
-        run_id: runId,
-        status: 'running',
-        started_at: new Date().toISOString(),
-        metadata: {
-          sourceCount: allSources.length,
-          hasCodebase,
-          sourceIds: allSources.map((s) => s.id),
-        },
-      })
-      .select()
-      .single()
-
-    if (insertError || !analysisRecord) {
-      console.error('[knowledge.analyze] Failed to create analysis record', insertError)
-      return NextResponse.json({ error: 'Failed to start analysis.' }, { status: 500 })
-    }
-
-    console.log('[knowledge.analyze] Created analysis record:', analysisRecord.id)
-
     // Prepare workflow input - include analysisId so workflow can update it on completion
+    // We store this in the analysis record so the SSE route can retrieve it
     const workflowInput = {
       projectId,
-      analysisId: analysisRecord.id,
+      analysisId: '', // Will be set after record creation
       sourceCodePath,
       analysisScope: project.source_code?.analysis_scope ?? null,
       sources: allSources.map((s) => ({
@@ -204,29 +181,55 @@ export async function POST(_request: Request, context: RouteContext) {
       })),
     }
 
-    // Execute workflow asynchronously using stream() to enable observeStream() in SSE route
-    // We don't await the full execution - just return immediately
-    // The workflow will update statuses as it progresses
-    const run = await workflow.createRunAsync({ runId })
+    // Create analysis record in project_analyses table with workflow input stored in metadata
+    // The SSE route will use this input to execute the workflow
+    const { data: analysisRecord, error: insertError } = await supabase
+      .from('project_analyses')
+      .insert({
+        project_id: projectId,
+        run_id: runId,
+        status: 'running',
+        started_at: new Date().toISOString(),
+        metadata: {
+          sourceCount: allSources.length,
+          hasCodebase,
+          sourceIds: allSources.map((s) => s.id),
+          // Store workflow input for SSE route to use
+          workflowInput: {
+            ...workflowInput,
+            analysisId: '', // Placeholder - will be updated below
+          },
+        },
+      })
+      .select()
+      .single()
 
-    // Start the workflow with stream() - this enables observeStream() for the SSE endpoint
-    // The stream starts immediately and runs in the background
-    const workflowStream = await run.streamAsync({ inputData: workflowInput })
+    if (insertError || !analysisRecord) {
+      console.error('[knowledge.analyze] Failed to create analysis record', insertError)
+      return NextResponse.json({ error: 'Failed to start analysis.' }, { status: 500 })
+    }
 
-    // Handle errors by consuming the result promise in the background
-    workflowStream.result.catch(async (error: Error) => {
-      console.error('[knowledge.analyze] workflow execution failed', error)
-      
-      // Mark the analysis as failed
-      await supabase
-        .from('project_analyses')
-        .update({
-          status: 'failed',
-          completed_at: new Date().toISOString(),
-          error_message: error.message,
-        })
-        .eq('id', analysisRecord.id)
-    })
+    // Update the workflow input with the actual analysisId
+    const { error: updateError } = await supabase
+      .from('project_analyses')
+      .update({
+        metadata: {
+          ...analysisRecord.metadata,
+          workflowInput: {
+            ...workflowInput,
+            analysisId: analysisRecord.id,
+          },
+        },
+      })
+      .eq('id', analysisRecord.id)
+
+    if (updateError) {
+      console.error('[knowledge.analyze] Failed to update analysis record with workflow input', updateError)
+    }
+
+    console.log('[knowledge.analyze] Created analysis record:', analysisRecord.id)
+    // NOTE: Workflow execution is now handled by the SSE stream route
+    // The client should connect to /api/projects/[id]/knowledge/analyze/stream to start the workflow
 
     return NextResponse.json({
       message: 'Knowledge analysis started.',

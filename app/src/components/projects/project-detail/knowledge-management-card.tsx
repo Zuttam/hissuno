@@ -146,7 +146,7 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
     try {
       const eventSource = new EventSource(`/api/projects/${projectId}/knowledge/analyze/stream`)
       eventSourceRef.current = eventSource
-
+      
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as AnalysisEvent
@@ -170,13 +170,12 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
         }
       }
 
-      eventSource.onerror = (err) => {
-        // SSE connection failed - this is expected if the stream endpoint has issues
-        // The fallback polling will still work
-        console.warn('[knowledge] SSE connection error, falling back to polling', err)
-        eventSource.close()
-        eventSourceRef.current = null
-        // Don't set isAnalyzing to false - let the polling handle completion
+      eventSource.onerror = () => {
+        // Only clean up if the connection is actually closed
+        // EventSource will automatically reconnect for transient errors
+        if (eventSource.readyState === EventSource.CLOSED) {
+          eventSourceRef.current = null
+        }
       }
     } catch (err) {
       // EventSource creation failed
@@ -205,43 +204,6 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
       }
     }
   }, [fetchSources, fetchPackages, fetchAnalysisStatus, connectToStream])
-
-  // Fallback polling for status while analyzing (in case SSE fails)
-  useEffect(() => {
-    if (!isAnalyzing) return
-
-    const interval = setInterval(async () => {
-      const status = await fetchAnalysisStatus()
-      if (status && !status.isRunning && status.status !== 'processing') {
-        // Add a synthetic finish event
-        setAnalysisEvents((prev) => [
-          ...prev,
-          {
-            type: 'workflow-finish',
-            message: 'Knowledge analysis completed',
-            timestamp: new Date().toISOString(),
-          },
-        ])
-        
-        setIsAnalyzing(false)
-        void fetchPackages()
-        void fetchSources()
-        
-        // Close SSE if still open
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close()
-          eventSourceRef.current = null
-        }
-        
-        // Clear events after a delay so the user can see "completed" briefly
-        setTimeout(() => {
-          setAnalysisEvents([])
-        }, 5000)
-      }
-    }, 5000) // Poll less frequently since we have SSE
-
-    return () => clearInterval(interval)
-  }, [isAnalyzing, fetchAnalysisStatus, fetchPackages, fetchSources])
 
   const handleRunAnalysis = async () => {
     setError(null)

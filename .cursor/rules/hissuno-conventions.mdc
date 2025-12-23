@@ -1,10 +1,8 @@
 ---
-description: Conventions for the customize-dev Next.js application
-globs:
-  - customize-dev/**/*
+description: Conventions for the Hissuno App Next.js application
+alwaysApply: false
 ---
-
-# Customize Dev Conventions
+# Hissino Conventions
 
 ## Stack Overview
 

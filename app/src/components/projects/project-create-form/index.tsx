@@ -55,6 +55,9 @@ export function ProjectCreateForm() {
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepoSelection | null>(null)
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null)
 
+  // Analysis scope state (for monorepos)
+  const [analysisScope, setAnalysisScope] = useState('')
+
   // Knowledge sources state
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceInput[]>([])
   const [skipKnowledgeAnalysis, setSkipKnowledgeAnalysis] = useState(false)
@@ -293,6 +296,7 @@ export function ProjectCreateForm() {
       const formData = new FormData()
       formData.append('name', name.trim())
       if (description.trim()) formData.append('description', description.trim())
+      if (analysisScope.trim()) formData.append('analysisScope', analysisScope.trim())
 
       if (codebaseMode === 'github' && selectedRepo && selectedBranch) {
         // GitHub source code
@@ -394,6 +398,8 @@ export function ProjectCreateForm() {
               isConnecting: isConnectingGitHub,
             }}
             codebaseError={codebaseError}
+            analysisScope={analysisScope}
+            onAnalysisScopeChange={setAnalysisScope}
           />
         </WizardStep>
 

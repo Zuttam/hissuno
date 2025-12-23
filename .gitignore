@@ -50,3 +50,4 @@ yarn-error.log*
 .vscode
 .mastra
 _bmad
+.cursor/debug.log

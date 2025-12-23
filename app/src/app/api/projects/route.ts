@@ -71,6 +71,9 @@ export async function POST(request: Request) {
   const repositoryUrl = formData.get('repositoryUrl')?.toString().trim() || null
   const repositoryBranch = formData.get('repositoryBranch')?.toString().trim() || null
 
+  // Analysis scope (for monorepos)
+  const analysisScope = formData.get('analysisScope')?.toString().trim() || null
+
   // Upload folder source params
   const codebaseFiles = formData
     .getAll('codebase')
@@ -101,6 +104,7 @@ export async function POST(request: Request) {
         repositoryUrl,
         repositoryBranch,
         userId: user.id,
+        analysisScope,
       })
       codebaseId = codebase.id
     }
@@ -111,6 +115,7 @@ export async function POST(request: Request) {
         gitignore: gitignoreFile,
         projectId: id,
         userId: user.id,
+        analysisScope,
       })
 
       codebaseId = codebase.id

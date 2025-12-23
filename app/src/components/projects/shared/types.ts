@@ -51,4 +51,7 @@ export type SourceCodeCardProps = {
   uploadProps: UploadFolderProps
   githubProps?: GitHubPickerProps
   codebaseError: string | null
+  // Analysis scope props
+  analysisScope?: string
+  onAnalysisScopeChange?: (value: string) => void
 }
