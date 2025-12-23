@@ -1,29 +1,28 @@
 'use client';
 
-import React from 'react';
-import { CopilotKit } from '@copilotkit/react-core';
-import { CopilotPopup } from '@copilotkit/react-ui';
-import '@copilotkit/react-ui/styles.css';
+import React, { useState, useCallback, useEffect } from 'react';
+import { ChatBubble } from './ChatBubble';
+import { ChatPopup } from './ChatPopup';
+import { useHissunoChat } from './useHissunoChat';
 import type { HissunoWidgetProps } from './types';
 
-const DEFAULT_API_URL = 'https://api.hissuno.com/copilotkit';
-const COPILOTKIT_PUBLIC_KEY = 'ck_pub_b890d279409a8d1feb8207c8b3a12837';
+const DEFAULT_API_URL = '/api/agent';
 
 /**
  * HissunoWidget - Embeddable support agent widget
- * 
+ *
  * Add this component to your app to enable AI-powered support.
- * 
+ *
  * @example
  * ```tsx
  * import { HissunoWidget } from '@hissuno/widget';
- * 
+ * import '@hissuno/widget/styles.css';
+ *
  * function App() {
  *   return (
  *     <div>
  *       <YourApp />
- *       <HissunoWidget 
- *         projectId="proj_xxx" 
+ *       <HissunoWidget
  *         publicKey="pk_live_xxx"
  *         userId={currentUser.id}
  *         userMetadata={{ name: currentUser.name, email: currentUser.email }}
@@ -34,13 +33,15 @@ const COPILOTKIT_PUBLIC_KEY = 'ck_pub_b890d279409a8d1feb8207c8b3a12837';
  * ```
  */
 export function HissunoWidget({
-  projectId,
   publicKey,
   userId,
   userMetadata,
   apiUrl = DEFAULT_API_URL,
   theme = 'light',
-  position = 'bottom-right',
+  showBubble = true,
+  bubblePosition = 'bottom-right',
+  bubbleOffset,
+  renderTrigger,
   title = 'Support',
   placeholder = 'Ask a question or report an issue...',
   initialMessage = "Hi! 👋 How can I help you today?",
@@ -50,61 +51,130 @@ export function HissunoWidget({
   className,
   headers = {},
 }: HissunoWidgetProps) {
-  // Validate required props
-  if (!projectId) {
-    console.error('[HissunoWidget] projectId is required');
-    return null;
-  }
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
+  // Validate required props
   if (!publicKey) {
     console.error('[HissunoWidget] publicKey is required');
     return null;
   }
 
   if (!publicKey.startsWith('pk_')) {
-    console.warn('[HissunoWidget] publicKey should start with "pk_". Make sure you\'re using the public key, not the secret key.');
+    console.warn(
+      '[HissunoWidget] publicKey should start with "pk_". Make sure you\'re using the public key, not the secret key.'
+    );
   }
 
-  // Capture page context
-  const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
-  const pageTitle = typeof window !== 'undefined' ? document.title : '';
+  const {
+    messages,
+    input,
+    setInput,
+    handleSubmit,
+    isLoading,
+    error,
+    clearHistory,
+  } = useHissunoChat({
+    publicKey,
+    apiUrl,
+    initialMessage,
+    headers,
+    userId,
+    userMetadata,
+  });
 
-  // Merge custom headers with required auth headers and session context
-  const requestHeaders = {
-    ...headers,
-    'X-Public-Key': publicKey,
-    'X-Project-ID': projectId,
-    ...(userId && { 'X-User-ID': userId }),
-    ...(userMetadata && { 'X-User-Metadata': JSON.stringify(userMetadata) }),
-    ...(pageUrl && { 'X-Page-URL': pageUrl }),
-    ...(pageTitle && { 'X-Page-Title': pageTitle }),
-  };
+  const open = useCallback(() => {
+    setIsOpen(true);
+    onOpen?.();
+  }, [onOpen]);
+
+  const close = useCallback(() => {
+    setIsOpen(false);
+    onClose?.();
+  }, [onClose]);
+
+  const toggle = useCallback(() => {
+    if (isOpen) {
+      close();
+    } else {
+      open();
+    }
+  }, [isOpen, open, close]);
+
+  // Handle defaultOpen changes
+  useEffect(() => {
+    if (defaultOpen && !isOpen) {
+      setIsOpen(true);
+    }
+  }, [defaultOpen]);
+
+  // Resolve theme based on system preference if 'auto'
+  const resolvedTheme = useResolvedTheme(theme);
 
   return (
-    <CopilotKit
-      runtimeUrl={apiUrl}
-      headers={requestHeaders}
-      agent="supportAgent"
-      publicApiKey={COPILOTKIT_PUBLIC_KEY}
-    >
-      <CopilotPopup
-        labels={{
-          title,
-          initial: initialMessage,
-          placeholder,
-        }}
-        defaultOpen={defaultOpen}
-        onSetOpen={(open) => {
-          if (open) {
-            onOpen?.();
-          } else {
-            onClose?.();
-          }
-        }}
-        className={className}
+    <div className={`hissuno-widget ${className ?? ''}`}>
+      {/* Custom trigger or default bubble */}
+      {renderTrigger ? (
+        renderTrigger({ open, close, toggle, isOpen })
+      ) : showBubble ? (
+        <ChatBubble
+          isOpen={isOpen}
+          onClick={toggle}
+          position={bubblePosition}
+          offset={bubbleOffset}
+          theme={resolvedTheme}
+        />
+      ) : null}
+
+      {/* Chat popup */}
+      <ChatPopup
+        isOpen={isOpen}
+        onClose={close}
+        messages={messages}
+        input={input}
+        setInput={setInput}
+        handleSubmit={handleSubmit}
+        isLoading={isLoading}
+        error={error}
+        title={title}
+        placeholder={placeholder}
+        theme={resolvedTheme}
+        position={bubblePosition}
+        offset={bubbleOffset}
+        onClearHistory={clearHistory}
       />
-    </CopilotKit>
+    </div>
   );
+}
+
+/**
+ * Hook to resolve 'auto' theme to 'light' or 'dark' based on system preference
+ */
+function useResolvedTheme(theme: 'light' | 'dark' | 'auto'): 'light' | 'dark' {
+  const [resolved, setResolved] = useState<'light' | 'dark'>(() => {
+    if (theme !== 'auto') return theme;
+    if (typeof window === 'undefined') return 'light';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
+  });
+
+  useEffect(() => {
+    if (theme !== 'auto') {
+      setResolved(theme);
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setResolved(e.matches ? 'dark' : 'light');
+    };
+
+    setResolved(mediaQuery.matches ? 'dark' : 'light');
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme]);
+
+  return resolved;
 }
 
 /**

@@ -44,3 +44,24 @@ export async function deleteProject(projectId: string) {
 
   return response.json()
 }
+
+export async function rotateKeys(
+  projectId: string,
+  keyType: 'public' | 'secret' | 'both'
+) {
+  const response = await fetch(`/api/projects/${projectId}/rotate-keys`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ keyType }),
+  })
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null)
+    const errorMessage = typeof data?.error === 'string' ? data.error : 'Failed to rotate keys.'
+    throw new Error(errorMessage)
+  }
+
+  return response.json()
+}

@@ -297,6 +297,7 @@ export function ProjectCreateForm() {
       formData.append('name', name.trim())
       if (description.trim()) formData.append('description', description.trim())
       if (analysisScope.trim()) formData.append('analysisScope', analysisScope.trim())
+      formData.append('skipAnalysis', skipKnowledgeAnalysis ? 'true' : 'false')
 
       if (codebaseMode === 'github' && selectedRepo && selectedBranch) {
         // GitHub source code

@@ -1,41 +1,150 @@
 /**
  * Hissuno Widget Styles
- * 
- * These styles extend the default CopilotKit styles with Hissuno branding.
- * Import this file in your app for consistent styling:
- * 
+ *
+ * These styles provide animations and enhancements for the widget.
+ * Import this file in your app for full widget functionality:
+ *
  * import '@hissuno/widget/styles.css';
  */
 
-/* Hissuno branding overrides */
-.copilot-kit-popup {
-  --copilot-kit-primary-color: #6366f1;
-  --copilot-kit-background-color: #ffffff;
-  --copilot-kit-text-color: #1f2937;
-  --copilot-kit-border-radius: 12px;
+/* Animation keyframes */
+@keyframes hissuno-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-6px);
+  }
 }
 
-/* Dark theme */
-.copilot-kit-popup[data-theme="dark"] {
-  --copilot-kit-background-color: #1f2937;
-  --copilot-kit-text-color: #f9fafb;
+@keyframes hissuno-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-/* Position variants */
-.copilot-kit-popup[data-position="bottom-right"] {
-  right: 20px;
-  bottom: 20px;
+@keyframes hissuno-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.copilot-kit-popup[data-position="bottom-left"] {
-  left: 20px;
-  bottom: 20px;
+@keyframes hissuno-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Widget container */
+.hissuno-widget {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Bubble button */
+.hissuno-bubble {
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.hissuno-bubble:hover {
+  transform: scale(1.05) !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2) !important;
+}
+
+.hissuno-bubble:active {
+  transform: scale(0.98) !important;
+}
+
+/* Popup container */
+.hissuno-popup {
+  animation: hissuno-scale-in 0.2s ease-out;
+}
+
+/* Messages container */
+.hissuno-messages {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+}
+
+.hissuno-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hissuno-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hissuno-messages::-webkit-scrollbar-thumb {
+  background-color: rgba(155, 155, 155, 0.5);
+  border-radius: 3px;
+}
+
+.hissuno-messages::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(155, 155, 155, 0.7);
+}
+
+/* Loading dots animation */
+.hissuno-loading-dot {
+  animation: hissuno-bounce 1s infinite;
+}
+
+/* Input focus states */
+.hissuno-popup input:focus {
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
+}
+
+/* Button hover states */
+.hissuno-popup button[type='submit']:not(:disabled):hover {
+  background-color: #1d4ed8 !important;
+}
+
+/* Close/clear button hover states */
+.hissuno-popup button[aria-label]:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Dark theme hover states */
+.hissuno-popup[data-theme='dark'] button[aria-label]:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Responsive adjustments */
-@media (max-width: 640px) {
-  .copilot-kit-popup {
-    width: calc(100vw - 40px);
-    max-height: 70vh;
+@media (max-width: 440px) {
+  .hissuno-popup {
+    width: calc(100vw - 32px) !important;
+    left: 16px !important;
+    right: 16px !important;
+  }
+}
+
+@media (max-height: 600px) {
+  .hissuno-popup {
+    height: calc(100vh - 100px) !important;
+    max-height: 480px !important;
+  }
+}
+
+/* Print styles - hide widget */
+@media print {
+  .hissuno-widget {
+    display: none !important;
   }
 }

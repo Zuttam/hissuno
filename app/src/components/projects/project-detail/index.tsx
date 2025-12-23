@@ -4,12 +4,15 @@ import Link from 'next/link'
 import { useState } from 'react'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { useProjectDetail } from '@/hooks/use-projects'
+import { Button, KeyField } from '@/components/ui'
 import { ProjectDetailsCard } from './project-details-card'
-import { ProjectKeysCard } from './project-keys-card'
+import { SupportAgentCard } from './support-agent-card'
 import { ProjectSessionsCard } from './project-sessions-card'
+import { ProjectIssuesCard } from './project-issues-card'
 import { KnowledgeManagementCard } from './knowledge-management-card'
 import { EditProjectDialog } from './edit-project-dialog'
 import { TestAgentDialog } from './test-agent-dialog'
+import { formatTimestamp } from './utils'
 
 interface ProjectDetailProps {
   projectId: string
@@ -23,6 +26,7 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
   })
   const [isEditing, setIsEditing] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
+  const [settingsVersion, setSettingsVersion] = useState(0)
 
   return (
     <div className="min-h-screen bg-[color:var(--background)] px-6 py-5">
@@ -39,30 +43,67 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
           </div>
         )}
 
-        <header className="flex flex-col gap-5 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-2">
-            <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-              {project?.name ?? initialProject.name}
-            </h1>
-            <p className="max-w-xl text-sm text-[color:var(--text-secondary)]">
-              View project details and manage source code.
-            </p>
+        <header className="flex flex-col gap-5 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+                {project?.name ?? initialProject.name}
+              </h1>
+              {(project?.description ?? initialProject.description) && (
+                <p className="max-w-xl text-sm text-[color:var(--text-secondary)]">
+                  {project?.description ?? initialProject.description}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-4 text-xs text-[color:var(--text-tertiary)]">
+              <span>
+                <span className="uppercase tracking-wide text-[color:var(--text-secondary)]">Created:</span>{' '}
+                {formatTimestamp((project ?? initialProject).created_at)}
+              </span>
+              <span>
+                <span className="uppercase tracking-wide text-[color:var(--text-secondary)]">Updated:</span>{' '}
+                {formatTimestamp((project ?? initialProject).updated_at)}
+              </span>
+            </div>
+            
+            {/* Project Keys */}
+            <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
+              <KeyField 
+                label="Project ID" 
+                value={(project ?? initialProject).id} 
+                compact 
+              />
+              <KeyField 
+                label="Public Key" 
+                value={(project ?? initialProject).public_key ?? 'Not generated'} 
+                disabled={!(project ?? initialProject).public_key}
+                compact 
+              />
+              <KeyField 
+                label="Secret Key" 
+                value={(project ?? initialProject).secret_key ?? 'Not generated'} 
+                disabled={!(project ?? initialProject).secret_key}
+                isSecret
+                compact 
+              />
+            </div>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              selected
+              className="whitespace-nowrap"
               onClick={() => setIsTesting(true)}
-              className="rounded-[4px] border-2 border-[color:var(--accent-selected)] bg-[color:var(--accent-selected)] px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-white transition hover:opacity-90"
             >
               Test agent
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              className="whitespace-nowrap"
               onClick={() => setIsEditing(true)}
-              className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--foreground)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
             >
               Edit project
-            </button>
+            </Button>
           </div>
         </header>
 
@@ -72,13 +113,15 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
             isLoading={isLoading} 
             onRefresh={refresh}
           />
-          <ProjectKeysCard project={project ?? initialProject} isLoading={isLoading} />
+          <SupportAgentCard project={project ?? initialProject} isLoading={isLoading} />
         </section>
 
         <KnowledgeManagementCard
           projectId={projectId}
           hasCodebase={Boolean((project ?? initialProject).source_code)}
         />
+
+        <ProjectIssuesCard projectId={projectId} settingsVersion={settingsVersion} />
 
         <ProjectSessionsCard projectId={projectId} />
       </div>
@@ -89,6 +132,7 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
           onClose={() => setIsEditing(false)}
           onSaved={async () => {
             await refresh()
+            setSettingsVersion((v) => v + 1)
             setIsEditing(false)
           }}
         />
