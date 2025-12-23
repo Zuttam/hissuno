@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600" role="img" aria-label="Hissuno icon">
+  <defs>
+    <style>
+      .s { fill: none; stroke: #111; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+
+  <!-- Top-left rounded card (column 1) -->
+  <rect class="s" x="40" y="40" width="220" height="180" rx="24" ry="24"/>
+  <rect class="s" x="84" y="72" width="132" height="28" rx="6" ry="6"/>
+  <line class="s" x1="84" y1="116" x2="150" y2="116"/>
+
+  <!-- Top-right rounded button-like (column 2) - centered at x = 450 -->
+  <rect class="s" x="340" y="40" width="220" height="120" rx="24" ry="24"/>
+  <!-- inner rect centered in the top-right box -->
+  <rect class="s" x="380" y="70" width="140" height="36" rx="10" ry="10"/>
+
+  <!-- Bottom-left rounded square / window (column 1) -->
+  <rect class="s" x="40" y="320" width="220" height="200" rx="24" ry="24"/>
+  <rect class="s" x="84" y="364" width="56" height="56" rx="8" ry="8"/>
+  <rect class="s" x="84" y="444" width="140" height="20" rx="8" ry="8"/>
+
+  <!-- Bottom-right organic / device-like piece (column 2) - now aligned in same column as top-right -->
+  <!-- The path lives inside x=340..560 so its center aligns at x=450 -->
+  <path class="s" d="
+    M 360 350
+    C 380 330, 420 320, 460 320
+    C 520 320, 540 350, 540 380
+    L 540 430
+    C 540 460, 520 480, 490 480
+    L 460 480
+    C 440 480, 420 500, 400 510
+    C 385 516, 370 515, 360 505
+    C 350 495, 352 480, 352 468
+    L 352 430
+    C 352 410, 370 390, 390 380
+    L 360 350
+    Z
+  "/>
+
+  <!-- Circular control inside bottom-right piece centered at x=450 -->
+  <circle class="s" cx="450" cy="405" r="26"/>
+</svg>

@@ -1,0 +1,52 @@
+{
+  "name": "@hissuno/widget",
+  "version": "0.1.0",
+  "description": "Embeddable support agent widget for Hissuno platform",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./styles.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --external react",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --external react --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "dependencies": {
+    "@copilotkit/react-core": "^1.8.14",
+    "@copilotkit/react-ui": "^1.8.14"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "tsup": "^8.0.0",
+    "typescript": "^5"
+  },
+  "keywords": [
+    "hissuno",
+    "widget",
+    "support",
+    "copilot",
+    "ai",
+    "chat"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hissuno/widget"
+  }
+}
+
