@@ -8,7 +8,8 @@
  * 1. Analyze Codebase - Uses agent with tools to explore source code in Supabase Storage
  * 2. Analyze Sources - Fetches and analyzes websites, docs, and other sources
  * 3. Compile Knowledge - Categorizes findings into business, product, and technical
- * 4. Save Packages - Persists knowledge packages to storage and database
+ * 4. Sanitize Knowledge - Scans and redacts sensitive information from knowledge packages
+ * 5. Save Packages - Persists knowledge packages to storage and database
  */
 
 import { createWorkflow } from '@mastra/core/workflows'
@@ -16,6 +17,7 @@ import { workflowInputSchema, workflowOutputSchema } from './schemas'
 import { analyzeCodebase } from './steps/analyze-codebase'
 import { analyzeSources } from './steps/analyze-sources'
 import { compileKnowledge } from './steps/compile-knowledge'
+import { sanitizeKnowledge } from './steps/sanitize-knowledge'
 import { saveKnowledgePackages } from './steps/save-packages'
 
 export const knowledgeAnalysisWorkflow = createWorkflow({
@@ -26,6 +28,7 @@ export const knowledgeAnalysisWorkflow = createWorkflow({
   .then(analyzeCodebase)
   .then(analyzeSources)
   .then(compileKnowledge)
+  .then(sanitizeKnowledge)
   .then(saveKnowledgePackages)
 
 knowledgeAnalysisWorkflow.commit()

@@ -65,3 +65,25 @@ export async function rotateKeys(
 
   return response.json()
 }
+
+export async function connectSourceCode(
+  projectId: string,
+  repositoryUrl: string,
+  repositoryBranch: string
+) {
+  const response = await fetch(`/api/projects/${projectId}/source-code`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ repositoryUrl, repositoryBranch }),
+  })
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null)
+    const errorMessage = typeof data?.error === 'string' ? data.error : 'Failed to connect source code.'
+    throw new Error(errorMessage)
+  }
+
+  return response.json()
+}

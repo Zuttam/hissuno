@@ -6,6 +6,8 @@ import type { ChatMessage } from './types';
 interface ChatMessagesProps {
   messages: ChatMessage[];
   isLoading: boolean;
+  isStreaming?: boolean;
+  streamingContent?: string;
   theme?: 'light' | 'dark' | 'auto';
 }
 
@@ -103,18 +105,29 @@ function LoadingIndicator({ theme = 'light' }: { theme?: 'light' | 'dark' | 'aut
   );
 }
 
-export function ChatMessages({ messages, isLoading, theme = 'light' }: ChatMessagesProps) {
+export function ChatMessages({
+  messages,
+  isLoading,
+  isStreaming = false,
+  streamingContent = '',
+  theme = 'light',
+}: ChatMessagesProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when messages change
+  // Auto-scroll to bottom when messages change or streaming content updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, streamingContent]);
 
+  // Show loading dots only when waiting for stream to start (not during streaming)
   const showLoading =
     isLoading &&
+    !isStreaming &&
     messages.length > 0 &&
     messages[messages.length - 1].role === 'user';
+
+  // Show streaming content as a live message bubble
+  const showStreamingBubble = isStreaming && streamingContent;
 
   return (
     <div
@@ -129,6 +142,16 @@ export function ChatMessages({ messages, isLoading, theme = 'light' }: ChatMessa
         <MessageBubble key={message.id} message={message} theme={theme} />
       ))}
       {showLoading && <LoadingIndicator theme={theme} />}
+      {showStreamingBubble && (
+        <MessageBubble
+          message={{
+            id: 'streaming',
+            role: 'assistant',
+            content: streamingContent,
+          }}
+          theme={theme}
+        />
+      )}
       <div ref={messagesEndRef} />
     </div>
   );

@@ -40,10 +40,14 @@ export { HissunoWidget, SupportWidget } from './HissunoWidget';
 // Sub-components for advanced usage
 export { ChatBubble } from './ChatBubble';
 export { ChatPopup } from './ChatPopup';
+export { ChatSidepanel } from './ChatSidepanel';
 export { ChatMessages } from './ChatMessages';
 
 // Hook for custom implementations
 export { useHissunoChat } from './useHissunoChat';
+
+// Re-export Message type from ai-sdk for loadSession usage
+export type { Message } from '@ai-sdk/react';
 
 // Types
 export type {
@@ -53,4 +57,6 @@ export type {
   BubbleOffset,
   TriggerRenderProps,
   ChatMessage,
+  WidgetVariant,
+  WidgetSettings,
 } from './types';

@@ -12,6 +12,8 @@ interface ChatPopupProps {
   setInput: (value: string) => void;
   handleSubmit: (e?: FormEvent) => void;
   isLoading: boolean;
+  isStreaming?: boolean;
+  streamingContent?: string;
   error?: Error;
   title?: string;
   placeholder?: string;
@@ -19,6 +21,7 @@ interface ChatPopupProps {
   position?: BubblePosition;
   offset?: BubbleOffset;
   onClearHistory?: () => void;
+  onCancelChat?: () => void;
 }
 
 function getPopupPositionStyles(
@@ -50,6 +53,8 @@ export function ChatPopup({
   setInput,
   handleSubmit,
   isLoading,
+  isStreaming = false,
+  streamingContent = '',
   error,
   title = 'Support',
   placeholder = 'Ask a question or report an issue...',
@@ -57,6 +62,7 @@ export function ChatPopup({
   position = 'bottom-right',
   offset = {},
   onClearHistory,
+  onCancelChat,
 }: ChatPopupProps) {
   if (!isOpen) return null;
 
@@ -165,7 +171,13 @@ export function ChatPopup({
       </div>
 
       {/* Messages */}
-      <ChatMessages messages={messages} isLoading={isLoading} theme={theme} />
+      <ChatMessages
+        messages={messages}
+        isLoading={isLoading}
+        isStreaming={isStreaming}
+        streamingContent={streamingContent}
+        theme={theme}
+      />
 
       {/* Error */}
       {error && (
@@ -213,28 +225,52 @@ export function ChatPopup({
             fontFamily: 'system-ui, -apple-system, sans-serif',
           }}
         />
-        <button
-          type="submit"
-          disabled={isLoading || !input.trim()}
-          style={{
-            padding: '10px 16px',
-            borderRadius: 8,
-            border: 'none',
-            backgroundColor: '#2563eb',
-            color: '#ffffff',
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer',
-            opacity: isLoading || !input.trim() ? 0.5 : 1,
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: 60,
-          }}
-        >
-          {isLoading ? <SpinnerIcon /> : 'Send'}
-        </button>
+        {isStreaming && onCancelChat ? (
+          <button
+            type="button"
+            onClick={onCancelChat}
+            style={{
+              padding: '10px 16px',
+              borderRadius: 8,
+              border: 'none',
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 60,
+            }}
+          >
+            Cancel
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            style={{
+              padding: '10px 16px',
+              borderRadius: 8,
+              border: 'none',
+              backgroundColor: '#2563eb',
+              color: '#ffffff',
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer',
+              opacity: isLoading || !input.trim() ? 0.5 : 1,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 60,
+            }}
+          >
+            {isLoading ? <SpinnerIcon /> : 'Send'}
+          </button>
+        )}
       </form>
     </div>
   );

@@ -9,6 +9,7 @@ interface IssuesPageParams {
 export default async function IssuesPage({ searchParams }: IssuesPageParams) {
   const params = await searchParams
   const projectId = typeof params.project === 'string' ? params.project : undefined
+  const issueId = typeof params.issue === 'string' ? params.issue : undefined
 
   const [issues, projects] = await Promise.all([
     listIssues({ projectId, limit: 50 }),
@@ -20,6 +21,7 @@ export default async function IssuesPage({ searchParams }: IssuesPageParams) {
       initialIssues={issues}
       projects={projects}
       initialProjectFilter={projectId}
+      initialIssueId={issueId}
     />
   )
 }

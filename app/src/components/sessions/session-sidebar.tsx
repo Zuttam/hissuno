@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+import Link from 'next/link'
 import { Badge, Spinner } from '@/components/ui'
 import type { SessionWithProject, ChatMessage } from '@/types/session'
-import { usePMReview } from '@/hooks/use-issues'
-import { SessionChat } from './session-chat'
+import { usePMReview } from '@/hooks/use-pm-review'
+import { MessagesPanel } from './messages-panel'
 
 interface SessionSidebarProps {
   session: SessionWithProject | null
@@ -21,15 +22,27 @@ export function SessionSidebar({
   onClose,
   onSessionUpdated,
 }: SessionSidebarProps) {
-  const { isReviewing, result: pmResult, triggerReview } = usePMReview()
+  const {
+    isReviewing,
+    result: pmResult,
+    currentStep,
+    triggerReview,
+  } = usePMReview({ sessionId: session?.id ?? null })
   const [showPMResult, setShowPMResult] = useState(false)
+  const [showMessagesPanel, setShowMessagesPanel] = useState(false)
+
+  // Refresh session data when review completes
+  useEffect(() => {
+    if (pmResult && !isReviewing) {
+      onSessionUpdated?.()
+    }
+  }, [pmResult, isReviewing, onSessionUpdated])
 
   const handlePMReview = useCallback(async () => {
     if (!session) return
     setShowPMResult(true)
-    await triggerReview(session.id)
-    onSessionUpdated?.()
-  }, [session, triggerReview, onSessionUpdated])
+    await triggerReview()
+  }, [session, triggerReview])
 
   return (
     <>
@@ -88,13 +101,17 @@ export function SessionSidebar({
                 isReviewing={isReviewing}
                 result={pmResult}
                 showResult={showPMResult}
+                currentStep={currentStep}
                 onTriggerReview={handlePMReview}
               />
             </div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-hidden">
-              <SessionChat messages={messages} />
+            {/* Messages Preview */}
+            <div className="p-4">
+              <MessagesPreview
+                messages={messages}
+                onExpand={() => setShowMessagesPanel(true)}
+              />
             </div>
           </>
         ) : (
@@ -103,6 +120,14 @@ export function SessionSidebar({
           </div>
         )}
       </aside>
+
+      {/* Messages Panel */}
+      {showMessagesPanel && (
+        <MessagesPanel
+          messages={messages}
+          onClose={() => setShowMessagesPanel(false)}
+        />
+      )}
     </>
   )
 }
@@ -206,16 +231,6 @@ function SessionDetails({ session }: SessionDetailsProps) {
           </p>
         </div>
       </div>
-
-      {/* Message Count */}
-      <div className="flex items-center justify-between rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
-        <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-          Total Messages
-        </span>
-        <span className="font-mono text-lg font-bold text-[color:var(--foreground)]">
-          {session.message_count}
-        </span>
-      </div>
     </div>
   )
 }
@@ -228,11 +243,53 @@ function formatDateTime(dateString: string): string {
   })
 }
 
+interface MessagesPreviewProps {
+  messages: ChatMessage[]
+  onExpand: () => void
+}
+
+function MessagesPreview({ messages, onExpand }: MessagesPreviewProps) {
+  const latestMessage = messages[messages.length - 1]
+  const previewText = latestMessage?.content
+    ? latestMessage.content.slice(0, 100) + (latestMessage.content.length > 100 ? '...' : '')
+    : null
+
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      className="w-full rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 text-left transition hover:border-[color:var(--accent-primary)] hover:bg-[color:var(--surface-hover)]"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+          Messages ({messages.length})
+        </span>
+        <span className="text-xs text-[color:var(--accent-primary)]">View all →</span>
+      </div>
+      {latestMessage ? (
+        <div className="space-y-1">
+          <p className="line-clamp-2 text-sm text-[color:var(--foreground)]">
+            {previewText}
+          </p>
+          <p className="text-xs text-[color:var(--text-tertiary)]">
+            {latestMessage.role === 'user' ? 'User' : 'Assistant'} · {formatDateTime(latestMessage.createdAt)}
+          </p>
+        </div>
+      ) : (
+        <p className="text-sm text-[color:var(--text-secondary)]">
+          No messages yet
+        </p>
+      )}
+    </button>
+  )
+}
+
 interface PMReviewSectionProps {
   session: SessionWithProject
   isReviewing: boolean
   result: import('@/types/issue').PMReviewResult | null
   showResult: boolean
+  currentStep: string | null
   onTriggerReview: () => void
 }
 
@@ -241,9 +298,16 @@ function PMReviewSection({
   isReviewing,
   result,
   showResult,
+  currentStep,
   onTriggerReview,
 }: PMReviewSectionProps) {
   const wasReviewed = Boolean(session.pm_reviewed_at)
+  const linkedIssues = session.linked_issues ?? []
+  const hasLinkedIssues = linkedIssues.length > 0
+
+  // Show fresh result if available, otherwise show persisted linked issues
+  const showFreshResult = showResult && result && !isReviewing
+  const showPersistedResult = !showFreshResult && !isReviewing && wasReviewed
 
   return (
     <div className="space-y-3">
@@ -272,14 +336,77 @@ function PMReviewSection({
         <div className="flex items-center gap-2 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
           <Spinner />
           <span className="text-sm text-[color:var(--text-secondary)]">
-            Analyzing session for actionable feedback...
+            {currentStep || 'Analyzing session for actionable feedback...'}
           </span>
         </div>
       )}
 
-      {showResult && result && !isReviewing && (
+      {/* Show fresh result from current analysis */}
+      {showFreshResult && (
         <PMReviewResult result={result} />
       )}
+
+      {/* Show persisted result from database */}
+      {showPersistedResult && (
+        hasLinkedIssues ? (
+          <LinkedIssuesDisplay issues={linkedIssues} />
+        ) : (
+          <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg text-[color:var(--text-tertiary)]">—</span>
+              <div>
+                <p className="font-medium text-[color:var(--foreground)]">Marked as irrelevant</p>
+                <p className="text-xs text-[color:var(--text-secondary)]">
+                  Session does not contain actionable feedback
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  )
+}
+
+interface LinkedIssuesDisplayProps {
+  issues: import('@/types/session').SessionLinkedIssue[]
+}
+
+function LinkedIssuesDisplay({ issues }: LinkedIssuesDisplayProps) {
+  const typeLabels = {
+    bug: 'Bug',
+    feature_request: 'Feature',
+    change_request: 'Change',
+  }
+
+  return (
+    <div className="space-y-2">
+      {issues.map((issue) => (
+        <div
+          key={issue.id}
+          className="rounded-[4px] border border-[color:var(--accent-primary)] bg-[color:var(--accent-primary)]/10 p-3"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-lg text-[color:var(--accent-primary)]">✓</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="rounded bg-[color:var(--accent-primary)]/20 px-1.5 py-0.5 font-mono text-[10px] uppercase text-[color:var(--accent-primary)]">
+                  {typeLabels[issue.type]}
+                </span>
+                <span className="text-xs text-[color:var(--text-secondary)]">
+                  {issue.upvote_count} upvote{issue.upvote_count !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <Link
+                href={`/issues?issue=${issue.id}`}
+                className="mt-1 block truncate text-sm text-[color:var(--accent-primary)] hover:underline"
+              >
+                {issue.title}
+              </Link>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -293,9 +420,9 @@ function PMReviewResult({ result }: PMReviewResultProps) {
     return (
       <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
         <div className="flex items-center gap-2">
-          <span className="text-lg">—</span>
+          <span className="text-lg text-[color:var(--text-tertiary)]">—</span>
           <div>
-            <p className="font-medium text-[color:var(--foreground)]">No issue created</p>
+            <p className="font-medium text-[color:var(--foreground)]">Marked as irrelevant</p>
             <p className="text-xs text-[color:var(--text-secondary)]">
               {result.skipReason || 'Session does not contain actionable feedback'}
             </p>
@@ -313,7 +440,16 @@ function PMReviewResult({ result }: PMReviewResultProps) {
           <div>
             <p className="font-medium text-[color:var(--foreground)]">Issue created</p>
             {result.issueTitle && (
-              <p className="text-xs text-[color:var(--text-secondary)]">{result.issueTitle}</p>
+              result.issueId ? (
+                <Link
+                  href={`/issues?issue=${result.issueId}`}
+                  className="text-xs text-[color:var(--accent-primary)] hover:underline"
+                >
+                  {result.issueTitle}
+                </Link>
+              ) : (
+                <p className="text-xs text-[color:var(--text-secondary)]">{result.issueTitle}</p>
+              )
             )}
           </div>
         </div>
@@ -334,7 +470,16 @@ function PMReviewResult({ result }: PMReviewResultProps) {
           <div>
             <p className="font-medium text-[color:var(--foreground)]">Existing issue upvoted</p>
             {result.issueTitle && (
-              <p className="text-xs text-[color:var(--text-secondary)]">{result.issueTitle}</p>
+              result.issueId ? (
+                <Link
+                  href={`/issues?issue=${result.issueId}`}
+                  className="text-xs text-[color:var(--accent-primary)] hover:underline"
+                >
+                  {result.issueTitle}
+                </Link>
+              ) : (
+                <p className="text-xs text-[color:var(--text-secondary)]">{result.issueTitle}</p>
+              )
             )}
           </div>
         </div>

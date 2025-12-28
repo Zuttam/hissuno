@@ -10,7 +10,7 @@ import { z } from 'zod'
 
 export const sourceInputSchema = z.object({
   id: z.string(),
-  type: z.enum(['website', 'docs_portal', 'uploaded_doc', 'raw_text']),
+  type: z.enum(['website', 'docs_portal', 'uploaded_doc', 'raw_text', 'codebase']),
   url: z.string().nullable().optional(),
   storagePath: z.string().nullable().optional(),
   content: z.string().nullable().optional(),
@@ -64,6 +64,27 @@ export const compiledKnowledgeSchema = z.object({
 })
 
 export type CompiledKnowledge = z.infer<typeof compiledKnowledgeSchema>
+
+export const redactionSummarySchema = z.object({
+  totalRedactions: z.number(),
+  byCategory: z.object({
+    business: z.number(),
+    product: z.number(),
+    technical: z.number(),
+  }),
+  types: z.array(z.string()),
+})
+
+export type RedactionSummary = z.infer<typeof redactionSummarySchema>
+
+export const sanitizedKnowledgeSchema = z.object({
+  business: z.string(),
+  product: z.string(),
+  technical: z.string(),
+  redactionSummary: redactionSummarySchema,
+})
+
+export type SanitizedKnowledge = z.infer<typeof sanitizedKnowledgeSchema>
 
 export const knowledgePackageSchema = z.object({
   category: z.string(),

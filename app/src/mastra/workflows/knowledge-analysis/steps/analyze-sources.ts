@@ -123,6 +123,9 @@ Please extract:
             })
             break
           }
+          case 'codebase': {
+            break
+          }
 
           default:
             results.push({

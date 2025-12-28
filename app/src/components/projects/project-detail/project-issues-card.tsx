@@ -15,6 +15,12 @@ const DEFAULT_SETTINGS: Omit<ProjectSettingsRecord, 'project_id' | 'created_at' 
   issue_spec_threshold: 3,
   issue_tracking_enabled: true,
   spec_guidelines: null,
+  // Widget defaults (not displayed in this component)
+  widget_variant: 'popup',
+  widget_theme: 'light',
+  widget_position: 'bottom-right',
+  widget_title: 'Support',
+  widget_initial_message: 'Hi! How can I help you today?',
 }
 
 export function ProjectIssuesCard({ projectId, settingsVersion }: ProjectIssuesCardProps) {

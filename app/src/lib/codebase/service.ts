@@ -20,7 +20,7 @@ import type { Database } from '@/types/supabase'
 export async function createCodebase(
   params: CreateCodebaseParams
 ): Promise<CreateCodebaseResult> {
-  const { files, gitignore, projectId, userId, analysisScope } = params
+  const { files, gitignore, projectId, userId } = params
 
   if (!files || files.length === 0) {
     throw new Error('No files provided for folder upload.')
@@ -76,7 +76,6 @@ export async function createCodebase(
       kind: 'path',
       storage_uri: storagePath,
       user_id: userId,
-      analysis_scope: analysisScope || null,
     })
     .select()
     .single()
@@ -168,9 +167,8 @@ export async function createGitHubCodebase(params: {
   repositoryUrl: string
   repositoryBranch: string
   userId: string
-  analysisScope?: string | null
 }): Promise<{ codebase: CodebaseRecord }> {
-  const { repositoryUrl, repositoryBranch, userId, analysisScope } = params
+  const { repositoryUrl, repositoryBranch, userId } = params
 
   const supabase = await createClient()
 
@@ -181,7 +179,6 @@ export async function createGitHubCodebase(params: {
       repository_url: repositoryUrl,
       repository_branch: repositoryBranch,
       user_id: userId,
-      analysis_scope: analysisScope || null,
     })
     .select()
     .single()

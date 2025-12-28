@@ -12,17 +12,19 @@ interface SessionsPageProps {
   initialSessions: SessionWithProject[]
   projects: ProjectWithCodebase[]
   initialProjectFilter?: string
+  initialSessionId?: string
 }
 
 export function SessionsPage({
   initialSessions,
   projects,
   initialProjectFilter,
+  initialSessionId,
 }: SessionsPageProps) {
   const [filters, setFilters] = useState<SessionFilters>({
     projectId: initialProjectFilter,
   })
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId ?? null)
 
   const { sessions, isLoading, error, refresh } = useSessions({
     initialSessions,

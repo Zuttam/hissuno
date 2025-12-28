@@ -13,6 +13,7 @@ import {
 
 interface KnowledgeManagementCardProps {
   projectId: string
+  /** @deprecated No longer needed - codebase comes from knowledge_sources */
   hasCodebase?: boolean
 }
 
@@ -330,10 +331,33 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
     }
   }
 
+  const handleUpdateSource = async (sourceId: string, updates: { enabled?: boolean; analysis_scope?: string }) => {
+    try {
+      const response = await fetch(
+        `/api/projects/${projectId}/knowledge-sources?sourceId=${sourceId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updates),
+        }
+      )
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error ?? 'Failed to update source')
+      }
+
+      void fetchSources()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update source'
+      setError(message)
+    }
+  }
+
   const isLoading = isLoadingSources || isLoadingPackages
 
-  // Calculate total sources count (including codebase if present)
-  const totalSourcesCount = sources.length + (hasCodebase ? 1 : 0)
+  // Calculate total sources count (codebase is now included in sources)
+  const totalSourcesCount = sources.length
 
   return (
     <Card>
@@ -416,7 +440,6 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
           >
             <SourcesSection
               sources={sources}
-              hasCodebase={hasCodebase}
               isLoading={isLoading}
               showAddForm={showAddForm}
               onShowAddForm={() => setShowAddForm(true)}
@@ -430,6 +453,8 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
               isAddingSource={isAddingSource}
               onAddSource={handleAddSource}
               onDeleteSource={handleDeleteSource}
+              onUpdateSource={handleUpdateSource}
+              projectId={projectId}
             />
           </Collapsible>
         </div>
@@ -625,7 +650,6 @@ function KnowledgeSection({ packages, isLoading, projectId, onPackageUpdated }: 
 
 interface SourcesSectionProps {
   sources: KnowledgeSourceRecord[]
-  hasCodebase: boolean
   isLoading: boolean
   showAddForm: boolean
   onShowAddForm: () => void
@@ -639,11 +663,12 @@ interface SourcesSectionProps {
   isAddingSource: boolean
   onAddSource: () => void
   onDeleteSource: (id: string) => void
+  onUpdateSource: (id: string, updates: { enabled?: boolean; analysis_scope?: string }) => void
+  projectId: string
 }
 
 function SourcesSection({
   sources,
-  hasCodebase,
   isLoading,
   showAddForm,
   onHideAddForm,
@@ -656,7 +681,12 @@ function SourcesSection({
   isAddingSource,
   onAddSource,
   onDeleteSource,
+  onUpdateSource,
 }: SourcesSectionProps) {
+  // Separate codebase source from other sources
+  const codebaseSource = sources.find((s) => s.type === 'codebase')
+  const otherSources = sources.filter((s) => s.type !== 'codebase')
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -738,16 +768,21 @@ function SourcesSection({
 
       {/* Sources List */}
       <div className="space-y-2">
-        {/* Codebase - Mandatory first source */}
-        {hasCodebase && <CodebaseSourceItem />}
+        {/* Codebase source (if exists) */}
+        {codebaseSource && (
+          <CodebaseSourceItem
+            source={codebaseSource}
+            onUpdate={(updates) => onUpdateSource(codebaseSource.id, updates)}
+          />
+        )}
 
         {/* Other sources */}
-        {sources.map((source) => (
+        {otherSources.map((source) => (
           <SourceItem key={source.id} source={source} onDelete={() => onDeleteSource(source.id)} />
         ))}
 
-        {/* Empty state when no additional sources */}
-        {!hasCodebase && sources.length === 0 && (
+        {/* Empty state when no sources */}
+        {!codebaseSource && otherSources.length === 0 && (
           <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] p-6 text-center">
             <p className="text-sm text-[color:var(--text-secondary)]">
               No knowledge sources configured. Add sources like your website, documentation, or custom notes.
@@ -763,20 +798,105 @@ function SourcesSection({
 // Source Items
 // ============================================================================
 
-function CodebaseSourceItem() {
+interface CodebaseSourceItemProps {
+  source: KnowledgeSourceRecord
+  onUpdate: (updates: { enabled?: boolean; analysis_scope?: string }) => void
+}
+
+function CodebaseSourceItem({ source, onUpdate }: CodebaseSourceItemProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [localScope, setLocalScope] = useState(source.analysis_scope ?? '')
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleToggle = async () => {
+    setIsSaving(true)
+    await onUpdate({ enabled: !source.enabled })
+    setIsSaving(false)
+  }
+
+  const handleSaveScope = async () => {
+    setIsSaving(true)
+    await onUpdate({ analysis_scope: localScope.trim() || undefined })
+    setIsSaving(false)
+    setIsExpanded(false)
+  }
+
+  const statusColors: Record<string, 'default' | 'success' | 'warning' | 'info'> = {
+    pending: 'default',
+    processing: 'info',
+    completed: 'success',
+    failed: 'warning',
+  }
+
   return (
-    <div className="flex items-center justify-between rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-4 py-3">
-      <div className="flex items-center gap-3 min-w-0">
-        <Badge variant="default">Codebase</Badge>
-        <span className="text-sm text-[color:var(--foreground)]">Project source code</span>
-        <Badge variant="success">active</Badge>
+    <div className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)]">
+      <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Badge variant="default">Codebase</Badge>
+          <span className="text-sm text-[color:var(--foreground)]">
+            {source.analysis_scope ? `Project source code (${source.analysis_scope})` : 'Project source code'}
+          </span>
+          <Badge variant={source.enabled ? statusColors[source.status] ?? 'default' : 'default'}>
+            {source.enabled ? source.status : 'disabled'}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Toggle switch */}
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input
+              type="checkbox"
+              checked={source.enabled}
+              onChange={handleToggle}
+              disabled={isSaving}
+              className="peer sr-only"
+            />
+            <div className={`
+              h-6 w-11 rounded-full border-2 transition-colors
+              ${source.enabled 
+                ? 'border-[color:var(--accent-selected)] bg-[color:var(--accent-selected)]' 
+                : 'border-[color:var(--border)] bg-[color:var(--surface)]'
+              }
+              after:content-[''] after:absolute after:left-[4px] after:top-[4px] after:h-4 after:w-4 after:rounded-full after:transition-transform
+              ${source.enabled ? 'after:translate-x-5 after:bg-white' : 'after:bg-[color:var(--text-tertiary)]'}
+            `} />
+          </label>
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-[color:var(--accent-selected)] hover:underline font-mono"
+          >
+            {isExpanded ? 'Hide' : 'Settings'}
+          </button>
+        </div>
       </div>
-      <div className="flex items-center gap-2 text-[color:var(--text-tertiary)]">
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
-        <span className="text-xs">Required</span>
-      </div>
+
+      {/* Expandable settings */}
+      {isExpanded && (
+        <div className="border-t border-[color:var(--border-subtle)] px-4 py-3">
+          <FormField
+            label="Analysis Scope"
+            description="Limit analysis to a specific path (e.g., packages/my-app for monorepos)"
+          >
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={localScope}
+                onChange={(e) => setLocalScope(e.target.value)}
+                placeholder="Leave empty to analyze entire codebase"
+                className="flex-1 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] px-3 py-2 font-mono text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent-primary)] focus:ring-0"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveScope}
+                loading={isSaving}
+                disabled={localScope === (source.analysis_scope ?? '')}
+              >
+                Save
+              </Button>
+            </div>
+          </FormField>
+        </div>
+      )}
     </div>
   )
 }

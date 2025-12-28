@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { mastra } from '@/mastra'
-import type { PMReviewResult } from '@/types/issue'
+import type { PMReviewStatusResponse, PMReviewResult } from '@/types/issue'
 
 export const runtime = 'nodejs'
 
@@ -10,14 +9,58 @@ interface RouteParams {
 }
 
 /**
- * POST /api/sessions/[id]/pm-review
- * Manually trigger PM agent analysis on a session.
- *
- * Response:
- * - success: boolean
- * - result: PMReviewResult - the analysis result
+ * GET /api/sessions/[id]/pm-review
+ * Get the current PM review status for a session
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
+  if (!isSupabaseConfigured()) {
+    console.error('[sessions.pm-review.status] Supabase must be configured')
+    return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
+  }
+
+  try {
+    const { id: sessionId } = await params
+    const supabase = createAdminClient()
+
+    // Get latest review for this session
+    const { data: latestReview, error: reviewError } = await supabase
+      .from('pm_reviews')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (reviewError && reviewError.code !== 'PGRST116') {
+      console.error('[sessions.pm-review.status] Failed to fetch review:', reviewError)
+      return NextResponse.json({ error: 'Failed to fetch review status.' }, { status: 500 })
+    }
+
+    const response: PMReviewStatusResponse = {
+      isRunning: latestReview?.status === 'running',
+      reviewId: latestReview?.id ?? null,
+      runId: latestReview?.run_id ?? null,
+      status: latestReview?.status ?? null,
+      startedAt: latestReview?.started_at ?? null,
+      completedAt: latestReview?.completed_at ?? null,
+      result: (latestReview?.result as PMReviewResult) ?? null,
+      error: latestReview?.error_message ?? null,
+    }
+
+    return NextResponse.json(response)
+  } catch (error) {
+    console.error('[sessions.pm-review.status] unexpected error', error)
+    return NextResponse.json({ error: 'Failed to fetch review status.' }, { status: 500 })
+  }
+}
+
+/**
+ * POST /api/sessions/[id]/pm-review
+ * Trigger async PM review analysis on a session.
+ * Creates a pm_reviews record and returns immediately.
+ * The actual analysis runs in the SSE stream endpoint.
+ */
+export async function POST(_request: NextRequest, { params }: RouteParams) {
   if (!isSupabaseConfigured()) {
     console.error('[sessions.pm-review] Supabase must be configured')
     return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
@@ -25,7 +68,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   try {
     const { id: sessionId } = await params
-
     const supabase = createAdminClient()
 
     // Get session to verify it exists and get project ID
@@ -39,102 +81,65 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
     }
 
-    // Run PM review
-    const result = await runPMReview(sessionId, session.project_id)
+    // Check for existing running review
+    const { data: runningReview, error: runningError } = await supabase
+      .from('pm_reviews')
+      .select('id, run_id')
+      .eq('session_id', sessionId)
+      .eq('status', 'running')
+      .single()
+
+    if (runningError && runningError.code !== 'PGRST116') {
+      console.error('[sessions.pm-review] Error checking for running review:', runningError)
+      return NextResponse.json({ error: 'Failed to check review status.' }, { status: 500 })
+    }
+
+    if (runningReview) {
+      return NextResponse.json({
+        error: 'Review is already in progress',
+        runId: runningReview.run_id,
+        reviewId: runningReview.id,
+      }, { status: 409 })
+    }
+
+    // Generate run ID and create review record
+    const runId = `pm-review-${sessionId}-${Date.now()}`
+
+    const { data: reviewRecord, error: insertError } = await supabase
+      .from('pm_reviews')
+      .insert({
+        session_id: sessionId,
+        project_id: session.project_id,
+        run_id: runId,
+        status: 'running',
+        metadata: {
+          triggeredBy: 'manual',
+          sessionId,
+          projectId: session.project_id,
+        },
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      // Check if it's a unique constraint violation (concurrent request)
+      if (insertError.code === '23505') {
+        return NextResponse.json({
+          error: 'Review is already in progress',
+        }, { status: 409 })
+      }
+      console.error('[sessions.pm-review] Failed to create review record:', insertError)
+      return NextResponse.json({ error: 'Failed to start review.' }, { status: 500 })
+    }
 
     return NextResponse.json({
-      success: true,
-      result,
+      message: 'PM review started',
+      status: 'processing',
+      runId,
+      reviewId: reviewRecord.id,
     })
   } catch (error) {
     console.error('[sessions.pm-review] unexpected error', error)
-    return NextResponse.json({ error: 'Unable to run PM review.' }, { status: 500 })
-  }
-}
-
-/**
- * Run PM agent to analyze a session
- */
-async function runPMReview(
-  sessionId: string,
-  projectId: string
-): Promise<PMReviewResult> {
-  const pmAgent = mastra.getAgent('productManagerAgent')
-
-  if (!pmAgent) {
-    throw new Error('Product Manager agent not found')
-  }
-
-  // Create a runtime context with projectId
-  const { RuntimeContext } = await import('@mastra/core/runtime-context')
-  const runtimeContext = new RuntimeContext()
-  runtimeContext.set('projectId', projectId)
-
-  // Ask the PM agent to analyze this session
-  const prompt = `Analyze session ${sessionId} for actionable feedback.
-
-1. First, use get-session-context to retrieve the conversation
-2. Determine if the session contains actionable feedback (bug, feature request, or change request)
-3. If actionable, check for similar issues using find-similar-issues
-4. Either upvote an existing issue or create a new one
-5. If upvoting and threshold is met, generate a product spec
-
-Return your analysis results including:
-- Whether an issue was created, upvoted, or skipped
-- The issue ID and title if applicable
-- If skipped, explain why
-- If threshold was met, whether a spec was generated`
-
-  const response = await pmAgent.generate(prompt, {
-    runtimeContext,
-  })
-
-  // Parse the response to extract the result
-  const text = typeof response.text === 'string' ? response.text : ''
-  const textLower = text.toLowerCase()
-
-  // Determine the action from the response text
-  let action: 'created' | 'upvoted' | 'skipped' = 'skipped'
-  let issueId: string | undefined
-  let issueTitle: string | undefined
-  let skipReason: string | undefined
-  let thresholdMet = false
-  let specGenerated = false
-
-  // Parse from response text
-  if (textLower.includes('created') && textLower.includes('issue')) {
-    action = 'created'
-  } else if (textLower.includes('upvoted') || textLower.includes('upvote')) {
-    action = 'upvoted'
-  }
-
-  // Check for threshold and spec generation
-  if (textLower.includes('threshold') && (textLower.includes('met') || textLower.includes('reached'))) {
-    thresholdMet = true
-  }
-  if (textLower.includes('spec') && (textLower.includes('generated') || textLower.includes('saved'))) {
-    specGenerated = true
-  }
-
-  // Extract skip reason
-  if (action === 'skipped') {
-    if (textLower.includes('skip') || textLower.includes('not actionable')) {
-      skipReason = 'Session does not contain actionable feedback'
-    } else if (textLower.includes('q&a') || textLower.includes('resolved')) {
-      skipReason = 'Session was a simple Q&A with resolution'
-    } else if (textLower.includes('few messages') || textLower.includes('short')) {
-      skipReason = 'Session has too few messages for analysis'
-    } else {
-      skipReason = 'No actionable feedback identified'
-    }
-  }
-
-  return {
-    action,
-    issueId,
-    issueTitle,
-    skipReason,
-    thresholdMet,
-    specGenerated,
+    return NextResponse.json({ error: 'Unable to start PM review.' }, { status: 500 })
   }
 }

@@ -18,6 +18,17 @@ export interface SessionRecord {
 }
 
 /**
+ * Linked issue from PM review
+ */
+export interface SessionLinkedIssue {
+  id: string
+  title: string
+  type: 'bug' | 'feature_request' | 'change_request'
+  status: string
+  upvote_count: number
+}
+
+/**
  * Session with project details for display
  */
 export interface SessionWithProject extends SessionRecord {
@@ -25,6 +36,8 @@ export interface SessionWithProject extends SessionRecord {
     id: string
     name: string
   } | null
+  /** Issues linked to this session from PM review */
+  linked_issues?: SessionLinkedIssue[]
 }
 
 /**

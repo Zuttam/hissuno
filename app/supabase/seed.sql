@@ -156,5 +156,45 @@ BEGIN
   END IF;
 
   RAISE NOTICE 'Seed admin credentials -> email: %, password: %', admin_email, admin_password;
+
+  -- ============================================
+  -- Hissuno Support Project (internal)
+  -- ============================================
+  -- Create an internal support project for the Hissuno app itself
+  -- This allows developers using Hissuno to get support via the widget
+  DECLARE
+    hissuno_support_project_id uuid;
+    hissuno_support_public_key CONSTANT text := 'pk_live_hissuno_internal_support';
+  BEGIN
+    -- Check if project already exists (by public key)
+    SELECT id INTO hissuno_support_project_id
+    FROM public.projects
+    WHERE public_key = hissuno_support_public_key
+    LIMIT 1;
+
+    IF hissuno_support_project_id IS NULL THEN
+      INSERT INTO public.projects (
+        user_id,
+        name,
+        description,
+        public_key,
+        secret_key,
+        allowed_origins
+      ) VALUES (
+        admin_user_id,
+        'Hissuno Support',
+        'Internal support agent for the Hissuno platform. Get help with using Hissuno features, report bugs, or request new features.',
+        hissuno_support_public_key,
+        generate_project_key('sk_live_', 32),
+        ARRAY['http://localhost:3000', 'https://hissuno.com', 'https://*.hissuno.com']::text[]
+      )
+      RETURNING id INTO hissuno_support_project_id;
+
+      RAISE NOTICE 'Created Hissuno Support project with id: %, public_key: %',
+        hissuno_support_project_id, hissuno_support_public_key;
+    ELSE
+      RAISE NOTICE 'Hissuno Support project already exists with id: %', hissuno_support_project_id;
+    END IF;
+  END;
 END
 $$;

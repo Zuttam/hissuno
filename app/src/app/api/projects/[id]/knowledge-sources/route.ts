@@ -28,6 +28,15 @@ async function resolveUser() {
 }
 
 const VALID_SOURCE_TYPES: KnowledgeSourceType[] = [
+  'codebase',
+  'website',
+  'docs_portal',
+  'uploaded_doc',
+  'raw_text',
+]
+
+/** Source types that users can manually add */
+const USER_ADDABLE_TYPES: KnowledgeSourceType[] = [
   'website',
   'docs_portal',
   'uploaded_doc',
@@ -36,6 +45,10 @@ const VALID_SOURCE_TYPES: KnowledgeSourceType[] = [
 
 function isValidSourceType(type: string): type is KnowledgeSourceType {
   return VALID_SOURCE_TYPES.includes(type as KnowledgeSourceType)
+}
+
+function isUserAddableType(type: string): type is KnowledgeSourceType {
+  return USER_ADDABLE_TYPES.includes(type as KnowledgeSourceType)
 }
 
 /**
@@ -109,7 +122,7 @@ export async function POST(request: Request, context: RouteContext) {
       const content = formData.get('content')?.toString()
       const file = formData.get('file') as File | null
 
-      if (!type || !isValidSourceType(type)) {
+      if (!type || !isUserAddableType(type)) {
         return NextResponse.json({ error: 'Invalid or missing source type.' }, { status: 400 })
       }
 
@@ -120,6 +133,7 @@ export async function POST(request: Request, context: RouteContext) {
         content: content || null,
         storage_path: null,
         status: 'pending',
+        enabled: true,
       }
 
       // Handle file upload for uploaded_doc type
@@ -146,7 +160,7 @@ export async function POST(request: Request, context: RouteContext) {
 
       const { type, url, content } = payload
 
-      if (!type || !isValidSourceType(type)) {
+      if (!type || !isUserAddableType(type)) {
         return NextResponse.json({ error: 'Invalid or missing source type.' }, { status: 400 })
       }
 
@@ -166,6 +180,7 @@ export async function POST(request: Request, context: RouteContext) {
         content: content || null,
         storage_path: null,
         status: 'pending',
+        enabled: true,
       }
     }
 
@@ -226,6 +241,14 @@ export async function DELETE(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Knowledge source not found.' }, { status: 404 })
     }
 
+    // Prevent deletion of codebase sources
+    if (source.type === 'codebase') {
+      return NextResponse.json(
+        { error: 'Codebase sources cannot be deleted. Use the toggle to disable instead.' },
+        { status: 403 }
+      )
+    }
+
     // Delete from storage if it's an uploaded doc
     if (source.storage_path && source.type === 'uploaded_doc') {
       const { deleteDocument } = await import('@/lib/knowledge/storage')
@@ -252,5 +275,87 @@ export async function DELETE(request: Request, context: RouteContext) {
 
     console.error('[knowledge-sources.delete] unexpected error', error)
     return NextResponse.json({ error: 'Failed to delete knowledge source.' }, { status: 500 })
+  }
+}
+
+/**
+ * PATCH /api/projects/[id]/knowledge-sources
+ * Update a knowledge source (enable/disable, update analysis_scope)
+ * Requires sourceId in query params
+ */
+export async function PATCH(request: Request, context: RouteContext) {
+  const { id: projectId } = await context.params
+  const { searchParams } = new URL(request.url)
+  const sourceId = searchParams.get('sourceId')
+
+  if (!sourceId) {
+    return NextResponse.json({ error: 'sourceId query parameter is required.' }, { status: 400 })
+  }
+
+  if (!isSupabaseConfigured()) {
+    console.error('[knowledge-sources.patch] Supabase must be configured')
+    return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
+  }
+
+  try {
+    const { supabase, user } = await resolveUser()
+
+    await assertUserOwnsProject(supabase, user.id, projectId)
+
+    const payload = await request.json().catch(() => null)
+
+    if (!payload || typeof payload !== 'object') {
+      return NextResponse.json({ error: 'Invalid payload.' }, { status: 400 })
+    }
+
+    // First fetch the source to verify it exists and belongs to this project
+    const { data: source, error: fetchError } = await supabase
+      .from('knowledge_sources')
+      .select('*')
+      .eq('id', sourceId)
+      .eq('project_id', projectId)
+      .single()
+
+    if (fetchError || !source) {
+      return NextResponse.json({ error: 'Knowledge source not found.' }, { status: 404 })
+    }
+
+    // Build update object with only allowed fields
+    const updates: Record<string, unknown> = {}
+
+    if (typeof payload.enabled === 'boolean') {
+      updates.enabled = payload.enabled
+    }
+
+    // Only allow analysis_scope updates for codebase sources
+    if (source.type === 'codebase' && typeof payload.analysis_scope === 'string') {
+      updates.analysis_scope = payload.analysis_scope.trim() || null
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update.' }, { status: 400 })
+    }
+
+    const { data: updatedSource, error: updateError } = await supabase
+      .from('knowledge_sources')
+      .update(updates)
+      .eq('id', sourceId)
+      .eq('project_id', projectId)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('[knowledge-sources.patch] failed to update source', updateError)
+      return NextResponse.json({ error: 'Failed to update knowledge source.' }, { status: 500 })
+    }
+
+    return NextResponse.json({ source: updatedSource })
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+
+    console.error('[knowledge-sources.patch] unexpected error', error)
+    return NextResponse.json({ error: 'Failed to update knowledge source.' }, { status: 500 })
   }
 }

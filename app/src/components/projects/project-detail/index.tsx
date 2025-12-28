@@ -5,8 +5,8 @@ import { useState } from 'react'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { useProjectDetail } from '@/hooks/use-projects'
 import { Button, KeyField } from '@/components/ui'
-import { ProjectDetailsCard } from './project-details-card'
-import { SupportAgentCard } from './support-agent-card'
+import { CodebaseSection } from './codebase-section'
+import { IntegrationsSection } from './integrations-section'
 import { ProjectSessionsCard } from './project-sessions-card'
 import { ProjectIssuesCard } from './project-issues-card'
 import { KnowledgeManagementCard } from './knowledge-management-card'
@@ -43,78 +43,85 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
           </div>
         )}
 
-        <header className="flex flex-col gap-5 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-                {project?.name ?? initialProject.name}
-              </h1>
-              {(project?.description ?? initialProject.description) && (
-                <p className="max-w-xl text-sm text-[color:var(--text-secondary)]">
-                  {project?.description ?? initialProject.description}
-                </p>
-              )}
+        <header className="flex flex-col gap-5 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8">
+          {/* Top row: Info + Buttons */}
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+                  {project?.name ?? initialProject.name}
+                </h1>
+                {(project?.description ?? initialProject.description) && (
+                  <p className="max-w-xl text-sm text-[color:var(--text-secondary)]">
+                    {project?.description ?? initialProject.description}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-4 text-xs text-[color:var(--text-tertiary)]">
+                <span>
+                  <span className="uppercase tracking-wide text-[color:var(--text-secondary)]">Created:</span>{' '}
+                  {formatTimestamp((project ?? initialProject).created_at)}
+                </span>
+                <span>
+                  <span className="uppercase tracking-wide text-[color:var(--text-secondary)]">Updated:</span>{' '}
+                  {formatTimestamp((project ?? initialProject).updated_at)}
+                </span>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-4 text-xs text-[color:var(--text-tertiary)]">
-              <span>
-                <span className="uppercase tracking-wide text-[color:var(--text-secondary)]">Created:</span>{' '}
-                {formatTimestamp((project ?? initialProject).created_at)}
-              </span>
-              <span>
-                <span className="uppercase tracking-wide text-[color:var(--text-secondary)]">Updated:</span>{' '}
-                {formatTimestamp((project ?? initialProject).updated_at)}
-              </span>
-            </div>
-            
-            {/* Project Keys */}
-            <div className="flex flex-wrap gap-x-6 gap-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <KeyField 
-                label="Project ID" 
-                value={(project ?? initialProject).id} 
-                compact 
-              />
-              <KeyField 
-                label="Public Key" 
-                value={(project ?? initialProject).public_key ?? 'Not generated'} 
-                disabled={!(project ?? initialProject).public_key}
-                compact 
-              />
-              <KeyField 
-                label="Secret Key" 
-                value={(project ?? initialProject).secret_key ?? 'Not generated'} 
-                disabled={!(project ?? initialProject).secret_key}
-                isSecret
-                compact 
-              />
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                variant="primary"
+                selected
+                className="whitespace-nowrap"
+                onClick={() => setIsTesting(true)}
+              >
+                Test agent
+              </Button>
+              <Button
+                variant="ghost"
+                className="whitespace-nowrap"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit project
+              </Button>
             </div>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button
-              variant="primary"
-              selected
-              className="whitespace-nowrap"
-              onClick={() => setIsTesting(true)}
-            >
-              Test agent
-            </Button>
-            <Button
-              variant="ghost"
-              className="whitespace-nowrap"
-              onClick={() => setIsEditing(true)}
-            >
-              Edit project
-            </Button>
-          </div>
-        </header>
 
-        <section className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-          <ProjectDetailsCard 
-            project={project ?? initialProject} 
-            isLoading={isLoading} 
+          {/* Keys Section */}
+          <div className="flex flex-wrap gap-x-6 gap-y-2 pt-4 border-t border-[color:var(--border-subtle)]">
+            <KeyField
+              label="Project ID"
+              value={(project ?? initialProject).id}
+              compact
+            />
+            <KeyField
+              label="Public Key"
+              value={(project ?? initialProject).public_key ?? 'Not generated'}
+              disabled={!(project ?? initialProject).public_key}
+              compact
+            />
+            <KeyField
+              label="Secret Key"
+              value={(project ?? initialProject).secret_key ?? 'Not generated'}
+              disabled={!(project ?? initialProject).secret_key}
+              isSecret
+              compact
+            />
+          </div>
+
+          {/* Codebase Section */}
+          <CodebaseSection
+            project={project ?? initialProject}
+            isLoading={isLoading}
             onRefresh={refresh}
           />
-          <SupportAgentCard project={project ?? initialProject} isLoading={isLoading} />
-        </section>
+
+          {/* Integrations Section */}
+          <IntegrationsSection
+            project={project ?? initialProject}
+            isLoading={isLoading}
+          />
+        </header>
 
         <KnowledgeManagementCard
           projectId={projectId}
@@ -133,7 +140,6 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
           onSaved={async () => {
             await refresh()
             setSettingsVersion((v) => v + 1)
-            setIsEditing(false)
           }}
         />
       )}

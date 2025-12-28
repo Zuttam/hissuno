@@ -9,6 +9,7 @@ interface SessionsPageParams {
 export default async function SessionsRoute({ searchParams }: SessionsPageParams) {
   const params = await searchParams
   const projectId = typeof params.project === 'string' ? params.project : undefined
+  const sessionId = typeof params.session === 'string' ? params.session : undefined
 
   const [sessions, projects] = await Promise.all([
     listSessions({ projectId, limit: 50 }),
@@ -20,6 +21,7 @@ export default async function SessionsRoute({ searchParams }: SessionsPageParams
       initialSessions={sessions}
       projects={projects}
       initialProjectFilter={projectId}
+      initialSessionId={sessionId}
     />
   )
 }

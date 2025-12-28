@@ -23,7 +23,28 @@ export function ProductSpecView({ spec, generatedAt }: ProductSpecViewProps) {
           isExpanded ? '' : 'max-h-96'
         }`}
       >
-        <div className="p-4">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)]"
+          title={isExpanded ? 'Collapse' : 'Expand'}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        <div className="p-4 pr-12">
           <MarkdownContent content={spec} />
         </div>
 
@@ -31,14 +52,6 @@ export function ProductSpecView({ spec, generatedAt }: ProductSpecViewProps) {
           <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-[color:var(--surface)] to-transparent" />
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)]"
-      >
-        {isExpanded ? 'Collapse' : 'Expand Full Spec'}
-      </button>
     </div>
   )
 }

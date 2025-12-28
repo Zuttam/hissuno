@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { mastra } from '@/mastra'
-import type { PMReviewResult } from '@/types/issue'
 
 export const runtime = 'nodejs'
 
@@ -10,20 +8,49 @@ interface RouteParams {
 }
 
 /**
+ * Get CORS headers for response
+ */
+function getCorsHeaders(request: NextRequest) {
+  const origin = request.headers.get('Origin') || '*'
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Public-Key',
+  }
+}
+
+/**
+ * OPTIONS /api/sessions/[id]/close
+ * Handle CORS preflight requests
+ */
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: getCorsHeaders(request),
+  })
+}
+
+/**
  * POST /api/sessions/[id]/close
- * Closes a session and optionally triggers PM agent analysis.
+ * Closes a session and optionally triggers async PM agent analysis.
  *
  * Request body:
  * - triggerPMReview: boolean (default: true) - whether to run PM analysis
  *
  * Response:
  * - success: boolean
- * - pmReviewResult?: PMReviewResult - result of PM analysis if triggered
+ * - pmReviewTriggered?: boolean - whether PM review was triggered
+ * - runId?: string - PM review run ID if triggered
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
+  const corsHeaders = getCorsHeaders(request)
+
   if (!isSupabaseConfigured()) {
     console.error('[sessions.close] Supabase must be configured')
-    return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Supabase must be configured.' },
+      { status: 500, headers: corsHeaders }
+    )
   }
 
   try {
@@ -41,7 +68,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .single()
 
     if (sessionError || !session) {
-      return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Session not found.' },
+        { status: 404, headers: corsHeaders }
+      )
     }
 
     // Update session status to closed
@@ -55,114 +85,76 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (updateError) {
       console.error('[sessions.close] Failed to close session:', updateError)
-      return NextResponse.json({ error: 'Failed to close session.' }, { status: 500 })
+      return NextResponse.json(
+        { error: 'Failed to close session.' },
+        { status: 500, headers: corsHeaders }
+      )
     }
 
-    let pmReviewResult: PMReviewResult | undefined
+    let pmReviewTriggered = false
+    let runId: string | undefined
 
-    // Trigger PM review if requested
+    // Trigger async PM review if requested
     if (triggerPMReview) {
       try {
-        pmReviewResult = await runPMReview(sessionId, session.project_id)
+        // Check if a review is already running
+        const { data: existingReview } = await supabase
+          .from('pm_reviews')
+          .select('id, run_id')
+          .eq('session_id', sessionId)
+          .eq('status', 'running')
+          .single()
+
+        if (existingReview) {
+          // Review already in progress
+          pmReviewTriggered = true
+          runId = existingReview.run_id
+        } else {
+          // Create new pm_reviews record for async execution
+          runId = `pm-review-${sessionId}-${Date.now()}`
+
+          const { error: insertError } = await supabase
+            .from('pm_reviews')
+            .insert({
+              session_id: sessionId,
+              project_id: session.project_id,
+              run_id: runId,
+              status: 'running',
+              metadata: {
+                triggeredBy: 'session-close',
+                sessionId,
+                projectId: session.project_id,
+              },
+            })
+
+          if (insertError) {
+            // Check for unique constraint violation (race condition)
+            if (insertError.code === '23505') {
+              console.log('[sessions.close] PM review already in progress (race condition)')
+              pmReviewTriggered = true
+            } else {
+              console.error('[sessions.close] Failed to create PM review record:', insertError)
+              // Don't fail the close operation if PM review trigger fails
+            }
+          } else {
+            pmReviewTriggered = true
+          }
+        }
       } catch (pmError) {
-        console.error('[sessions.close] PM review failed:', pmError)
+        console.error('[sessions.close] Failed to trigger PM review:', pmError)
         // Don't fail the close operation if PM review fails
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      pmReviewResult,
-    })
+    return NextResponse.json(
+      { success: true, pmReviewTriggered, runId },
+      { headers: corsHeaders }
+    )
   } catch (error) {
     console.error('[sessions.close] unexpected error', error)
-    return NextResponse.json({ error: 'Unable to close session.' }, { status: 500 })
-  }
-}
-
-/**
- * Run PM agent to analyze a session
- */
-async function runPMReview(
-  sessionId: string,
-  projectId: string
-): Promise<PMReviewResult> {
-  const pmAgent = mastra.getAgent('productManagerAgent')
-
-  if (!pmAgent) {
-    throw new Error('Product Manager agent not found')
-  }
-
-  // Create a runtime context with projectId
-  const { RuntimeContext } = await import('@mastra/core/runtime-context')
-  const runtimeContext = new RuntimeContext()
-  runtimeContext.set('projectId', projectId)
-
-  // Ask the PM agent to analyze this session
-  const prompt = `Analyze session ${sessionId} for actionable feedback.
-
-1. First, use get-session-context to retrieve the conversation
-2. Determine if the session contains actionable feedback (bug, feature request, or change request)
-3. If actionable, check for similar issues using find-similar-issues
-4. Either upvote an existing issue or create a new one
-5. If upvoting and threshold is met, generate a product spec
-
-Return your analysis results including:
-- Whether an issue was created, upvoted, or skipped
-- The issue ID and title if applicable
-- If skipped, explain why
-- If threshold was met, whether a spec was generated`
-
-  const response = await pmAgent.generate(prompt, {
-    runtimeContext,
-  })
-
-  // Parse the response to extract the result
-  const text = typeof response.text === 'string' ? response.text : ''
-  const textLower = text.toLowerCase()
-
-  // Determine the action from the response text
-  let action: 'created' | 'upvoted' | 'skipped' = 'skipped'
-  let issueId: string | undefined
-  let issueTitle: string | undefined
-  let skipReason: string | undefined
-  let thresholdMet = false
-  let specGenerated = false
-
-  // Parse from response text
-  if (textLower.includes('created') && textLower.includes('issue')) {
-    action = 'created'
-  } else if (textLower.includes('upvoted') || textLower.includes('upvote')) {
-    action = 'upvoted'
-  }
-
-  // Check for threshold and spec generation
-  if (textLower.includes('threshold') && (textLower.includes('met') || textLower.includes('reached'))) {
-    thresholdMet = true
-  }
-  if (textLower.includes('spec') && (textLower.includes('generated') || textLower.includes('saved'))) {
-    specGenerated = true
-  }
-
-  // Extract skip reason
-  if (action === 'skipped') {
-    if (textLower.includes('skip') || textLower.includes('not actionable')) {
-      skipReason = 'Session does not contain actionable feedback'
-    } else if (textLower.includes('q&a') || textLower.includes('resolved')) {
-      skipReason = 'Session was a simple Q&A with resolution'
-    } else if (textLower.includes('few messages') || textLower.includes('short')) {
-      skipReason = 'Session has too few messages for analysis'
-    } else {
-      skipReason = 'No actionable feedback identified'
-    }
-  }
-
-  return {
-    action,
-    issueId,
-    issueTitle,
-    skipReason,
-    thresholdMet,
-    specGenerated,
+    return NextResponse.json(
+      { error: 'Unable to close session.' },
+      { status: 500, headers: corsHeaders }
+    )
   }
 }

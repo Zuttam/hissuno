@@ -5,6 +5,7 @@ import { triggerKnowledgeAnalysis } from '@/lib/knowledge/analysis-service'
 import { selectGitignore } from '@/lib/projects/source-code-utils'
 import { UnauthorizedError } from '@/lib/auth/server'
 import type { Database } from '@/types/supabase'
+import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
 import {
   createClient,
   isSupabaseConfigured,
@@ -68,13 +69,27 @@ export async function POST(request: Request) {
   const description = formData.get('description')?.toString().trim() || null
   const codebaseSource = formData.get('codebaseSource')?.toString().trim() || 'none'
   const skipAnalysis = formData.get('skipAnalysis')?.toString() === 'true'
+  const includeCodebaseInAnalysis = formData.get('includeCodebaseInAnalysis')?.toString() !== 'false'
 
   // GitHub source params
   const repositoryUrl = formData.get('repositoryUrl')?.toString().trim() || null
   const repositoryBranch = formData.get('repositoryBranch')?.toString().trim() || null
 
-  // Analysis scope (for monorepos)
-  const analysisScope = formData.get('analysisScope')?.toString().trim() || null
+  // Analysis scope (for monorepos) - stored in knowledge_sources, not source_codes
+  const analysisScope = includeCodebaseInAnalysis 
+    ? (formData.get('analysisScope')?.toString().trim() || null)
+    : null
+
+  // Additional knowledge sources (JSON array)
+  const knowledgeSourcesJson = formData.get('knowledgeSources')?.toString()
+  let additionalSources: Array<{ type: KnowledgeSourceType; url?: string; content?: string }> = []
+  if (knowledgeSourcesJson) {
+    try {
+      additionalSources = JSON.parse(knowledgeSourcesJson)
+    } catch {
+      console.warn('[projects.post] Failed to parse knowledgeSources JSON')
+    }
+  }
 
   // Upload folder source params
   const codebaseFiles = formData
@@ -106,7 +121,6 @@ export async function POST(request: Request) {
         repositoryUrl,
         repositoryBranch,
         userId: user.id,
-        analysisScope,
       })
       codebaseId = codebase.id
 
@@ -130,7 +144,6 @@ export async function POST(request: Request) {
         gitignore: gitignoreFile,
         projectId: id,
         userId: user.id,
-        analysisScope,
       })
 
       codebaseId = codebase.id
@@ -155,8 +168,62 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create project.' }, { status: 500 })
     }
 
-    // Auto-trigger analysis if not skipped and there's a codebase
-    if (!skipAnalysis && codebaseId) {
+    // Create knowledge sources
+    const knowledgeSourcesToInsert: KnowledgeSourceInsert[] = []
+
+    // Auto-create codebase knowledge_source if project has a codebase
+    if (codebaseId) {
+      knowledgeSourcesToInsert.push({
+        project_id: id,
+        type: 'codebase',
+        status: 'pending',
+        analysis_scope: analysisScope,
+        enabled: includeCodebaseInAnalysis,
+      })
+    }
+
+    // Add additional knowledge sources (websites, docs, raw_text)
+    for (const source of additionalSources) {
+      if (source.type === 'website' || source.type === 'docs_portal') {
+        if (source.url) {
+          knowledgeSourcesToInsert.push({
+            project_id: id,
+            type: source.type,
+            url: source.url,
+            status: 'pending',
+            enabled: true,
+          })
+        }
+      } else if (source.type === 'raw_text') {
+        if (source.content) {
+          knowledgeSourcesToInsert.push({
+            project_id: id,
+            type: source.type,
+            content: source.content,
+            status: 'pending',
+            enabled: true,
+          })
+        }
+      }
+      // Note: uploaded_doc type is handled separately via file uploads
+    }
+
+    if (knowledgeSourcesToInsert.length > 0) {
+      const { error: sourcesError } = await supabase
+        .from('knowledge_sources')
+        .insert(knowledgeSourcesToInsert)
+
+      if (sourcesError) {
+        console.warn('[projects.post] Failed to create knowledge sources:', sourcesError)
+        // Don't fail project creation if knowledge source creation fails
+      } else {
+        console.log('[projects.post] Created', knowledgeSourcesToInsert.length, 'knowledge source(s) for project:', id)
+      }
+    }
+
+    // Auto-trigger analysis if not skipped and there are any knowledge sources
+    const hasKnowledgeSources = knowledgeSourcesToInsert.length > 0
+    if (!skipAnalysis && hasKnowledgeSources) {
       try {
         const analysisResult = await triggerKnowledgeAnalysis({
           projectId: id,
