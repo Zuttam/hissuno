@@ -8,10 +8,19 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:unit": "vitest run src/__tests__/unit/**",
+    "test:integration": "vitest run src/__tests__/integration/**",
+    "test:integration:pm-agent": "vitest run src/__tests__/integration/pm-agent/**",
+    "test:watch": "vitest",
+    "eval:pm-agent": "npx tsx src/evals/pm-agent.eval.ts",
+    "eval:pm-agent:dry": "npx tsx src/evals/pm-agent.eval.ts --dry-run",
+    "eval:pm-agent:verbose": "npx tsx src/evals/pm-agent.eval.ts --verbose",
     "dev:mastra": "npx mastra dev --dir src/mastra"
   },
   "dependencies": {
+    "@ai-sdk/react": "^1.2.12",
     "@ai-sdk/openai": "^2.0.65",
+    "@hissuno/widget": "file:./packages/widget",
     "@mastra/core": "^0.23.3",
     "@mastra/libsql": "^0.16.3",
     "@mastra/memory": "^0.15.12",
@@ -36,6 +45,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "dotenv": "^16.4.7",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
@@ -44,6 +54,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.1",
     "tailwindcss": "^4",
+    "tsx": "^4.19.2",
     "typescript": "^5",
     "vitest": "^4.0.15"
   }

@@ -6,6 +6,9 @@
  * - business: Company info, mission, values, policies, pricing
  * - product: Features, capabilities, user guides, FAQs
  * - technical: Architecture, APIs, integrations, technical specs
+ *
+ * NOTE: These tools expect `projectId` to be available in the RuntimeContext.
+ * The API route sets this automatically when handling widget requests.
  */
 
 import { createTool } from '@mastra/core/tools'
@@ -17,16 +20,30 @@ import type { KnowledgeCategory, KnowledgePackageRecord } from '@/lib/knowledge/
 const KNOWLEDGE_CATEGORIES: KnowledgeCategory[] = ['business', 'product', 'technical']
 
 /**
+ * Helper to get projectId from runtimeContext with validation
+ */
+function getProjectIdFromContext(runtimeContext: unknown): string | null {
+  if (!runtimeContext || typeof runtimeContext !== 'object') {
+    return null
+  }
+  const ctx = runtimeContext as { get?: (key: string) => unknown }
+  if (typeof ctx.get !== 'function') {
+    return null
+  }
+  const projectId = ctx.get('projectId')
+  return typeof projectId === 'string' ? projectId : null
+}
+
+/**
  * List available knowledge packages for a project
  */
 export const listProjectKnowledgeTool = createTool({
   id: 'list-project-knowledge',
-  description: `List all available knowledge packages for a project.
+  description: `List all available knowledge packages for the current project.
 Use this tool first to understand what knowledge is available before retrieving specific packages.
-Returns the categories (business, product, technical) that have been compiled, along with version info.`,
-  inputSchema: z.object({
-    projectId: z.string().uuid().describe('The project ID to list knowledge for'),
-  }),
+Returns the categories (business, product, technical) that have been compiled, along with version info.
+Note: The project is automatically determined from the conversation context.`,
+  inputSchema: z.object({}),
   outputSchema: z.object({
     packages: z.array(
       z.object({
@@ -39,8 +56,16 @@ Returns the categories (business, product, technical) that have been compiled, a
     hasKnowledge: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
-    const { projectId } = context
+  execute: async ({ runtimeContext }) => {
+    const projectId = getProjectIdFromContext(runtimeContext)
+
+    if (!projectId) {
+      return {
+        packages: [],
+        hasKnowledge: false,
+        error: 'Project context not available. Unable to retrieve knowledge.',
+      }
+    }
 
     try {
       const supabase = createAdminClient()
@@ -95,9 +120,9 @@ export const getKnowledgePackageTool = createTool({
 Use this when you know which category of knowledge is most relevant to the user's question:
 - business: Company info, mission, values, policies, pricing, business model
 - product: Features, capabilities, how-to guides, FAQs, user documentation
-- technical: Architecture, APIs, integrations, technical specifications, developer docs`,
+- technical: Architecture, APIs, integrations, technical specifications, developer docs
+Note: The project is automatically determined from the conversation context.`,
   inputSchema: z.object({
-    projectId: z.string().uuid().describe('The project ID'),
     category: z
       .enum(['business', 'product', 'technical'])
       .describe('The knowledge category to retrieve'),
@@ -110,8 +135,20 @@ Use this when you know which category of knowledge is most relevant to the user'
     found: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
-    const { projectId, category } = context
+  execute: async ({ context, runtimeContext }) => {
+    const { category } = context
+    const projectId = getProjectIdFromContext(runtimeContext)
+
+    if (!projectId) {
+      return {
+        category,
+        content: '',
+        version: 0,
+        generatedAt: '',
+        found: false,
+        error: 'Project context not available. Unable to retrieve knowledge.',
+      }
+    }
 
     try {
       const supabase = createAdminClient()
@@ -181,9 +218,9 @@ export const searchKnowledgeTool = createTool({
   description: `Search across all knowledge packages for content matching a query.
 Use this when you're not sure which category contains the relevant information,
 or when the question might span multiple categories.
-Returns matching snippets with their source category for context.`,
+Returns matching snippets with their source category for context.
+Note: The project is automatically determined from the conversation context.`,
   inputSchema: z.object({
-    projectId: z.string().uuid().describe('The project ID to search within'),
     query: z.string().describe('The search query or keywords to find'),
     categories: z
       .array(z.enum(['business', 'product', 'technical']))
@@ -202,9 +239,19 @@ Returns matching snippets with their source category for context.`,
     totalMatches: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
-    const { projectId, query, categories } = context
+  execute: async ({ context, runtimeContext }) => {
+    const { query, categories } = context
+    const projectId = getProjectIdFromContext(runtimeContext)
     const categoriesToSearch = categories ?? KNOWLEDGE_CATEGORIES
+
+    if (!projectId) {
+      return {
+        results: [],
+        searchedCategories: [],
+        totalMatches: 0,
+        error: 'Project context not available. Unable to search knowledge.',
+      }
+    }
 
     try {
       const supabase = createAdminClient()

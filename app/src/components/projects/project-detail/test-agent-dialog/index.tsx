@@ -1,8 +1,9 @@
 'use client'
 
-import { useRef, useEffect, type KeyboardEvent } from 'react'
+import { useRef, useEffect, type KeyboardEvent, type FormEvent } from 'react'
 import { Button, Input } from '@/components/ui'
-import { useChat, type ChatMessage } from '@/hooks/use-chat'
+import { useHissunoChat, type ChatMessage } from '@hissuno/widget'
+import { useUser } from '@/components/providers/auth-provider'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 
 interface TestAgentDialogProps {
@@ -45,24 +46,39 @@ function LoadingIndicator() {
 export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
   const publicKey = project.public_key
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { user } = useUser()
 
-  const { messages, input, setInput, sendMessage, isLoading, error } = useChat({
-    projectId: project.id,
-    publicKey: publicKey ?? '',
-    initialMessage: 'Hi! How can I help you today?',
-  })
+  const { messages, input, setInput, handleSubmit, isLoading, error, clearHistory } =
+    useHissunoChat({
+      publicKey: publicKey ?? '',
+      initialMessage: 'Hi! How can I help you today?',
+      userId: user?.id,
+      userMetadata: user ? {
+        email: user.email ?? '',
+        ...(user.user_metadata?.full_name && { name: user.user_metadata.full_name }),
+      } : undefined,
+    })
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, isLoading])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      void sendMessage()
+      handleSubmit()
     }
   }
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    handleSubmit(e)
+  }
+
+  // Show loading when the last message is from user (waiting for assistant response)
+  const showLoading =
+    isLoading && messages.length > 0 && messages[messages.length - 1].role === 'user'
 
   if (!publicKey) {
     return (
@@ -93,27 +109,51 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
           <h2 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--foreground)]">
             Test: {project.name}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-[4px] p-1 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
-            aria-label="Close"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={clearHistory}
+              className="rounded-[4px] p-1 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
+              aria-label="Clear chat history"
+              title="Clear chat history"
             >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="3,6 5,6 21,6" />
+                <path d="M19,6v14a2,2 0,0 1,-2,2H7a2,2 0,0 1,-2,-2V6m3,0V4a2,2 0,0 1,2,-2h4a2,2 0,0 1,2,2v2" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[4px] p-1 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
+              aria-label="Close"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -121,22 +161,24 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} />
           ))}
-          {isLoading &&
-            messages.length > 0 &&
-            messages[messages.length - 1].role === 'assistant' &&
-            messages[messages.length - 1].content === '' && <LoadingIndicator />}
+          {showLoading && <LoadingIndicator />}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Error message */}
         {error && (
           <div className="mx-6 mb-2 rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-[color:var(--accent-danger)]/10 px-4 py-2">
-            <p className="text-sm text-[color:var(--accent-danger)]">{error}</p>
+            <p className="text-sm text-[color:var(--accent-danger)]">
+              {error.message || 'Something went wrong. Please try again.'}
+            </p>
           </div>
         )}
 
         {/* Input */}
-        <div className="flex gap-3 border-t-2 border-[color:var(--border-subtle)] p-4">
+        <form
+          onSubmit={onSubmit}
+          className="flex gap-3 border-t-2 border-[color:var(--border-subtle)] p-4"
+        >
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -145,14 +187,10 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
             disabled={isLoading}
             className="flex-1"
           />
-          <Button
-            onClick={() => void sendMessage()}
-            disabled={isLoading || !input.trim()}
-            loading={isLoading}
-          >
+          <Button type="submit" disabled={isLoading || !input.trim()} loading={isLoading}>
             Send
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   )

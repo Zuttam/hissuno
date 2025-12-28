@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server'
 import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { syncGitHubCodebase } from '@/lib/codebase'
+import { triggerKnowledgeAnalysis } from '@/lib/knowledge/analysis-service'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { mastra } from '@/mastra'
-import type { KnowledgeSourceRecord } from '@/lib/knowledge/types'
 
 export const runtime = 'nodejs'
 
@@ -31,13 +29,6 @@ async function resolveUser() {
 /**
  * POST /api/projects/[id]/knowledge/analyze
  * Trigger knowledge analysis workflow for a project
- * 
- * This will:
- * 1. Check if analysis is already running
- * 2. Fetch all pending/failed knowledge sources
- * 3. Update their status to 'processing'
- * 4. Execute the knowledge analysis workflow
- * 5. Update statuses based on results
  */
 export async function POST(_request: Request, context: RouteContext) {
   const { id: projectId } = await context.params
@@ -52,192 +43,30 @@ export async function POST(_request: Request, context: RouteContext) {
 
     await assertUserOwnsProject(supabase, user.id, projectId)
 
-    // Fetch project with source code
-    const { data: project, error: projectError } = await supabase
-      .from('projects')
-      .select('*, source_code:source_codes(*)')
-      .eq('id', projectId)
-      .single()
-
-    if (projectError || !project) {
-      console.error('[knowledge.analyze] failed to load project', projectId, projectError)
-      return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
-    }
-
-    // Check if analysis is already running by querying project_analyses table
-    const { data: runningAnalysis } = await supabase
-      .from('project_analyses')
-      .select('*')
-      .eq('project_id', projectId)
-      .eq('status', 'running')
-      .order('started_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (runningAnalysis) {
-      // Analysis is already running - user must cancel it first
-      return NextResponse.json({
-        error: 'Analysis is already in progress. Cancel it first to start a new one.',
-        runId: runningAnalysis.run_id,
-        analysisId: runningAnalysis.id,
-      }, { status: 409 })
-    }
-
-    // Fetch all knowledge sources for the project
-    const { data: sources, error: sourcesError } = await supabase
-      .from('knowledge_sources')
-      .select('*')
-      .eq('project_id', projectId)
-
-    if (sourcesError) {
-      console.error('[knowledge.analyze] failed to load sources', projectId, sourcesError)
-      return NextResponse.json({ error: 'Failed to load knowledge sources.' }, { status: 500 })
-    }
-
-    const allSources = (sources ?? []) as KnowledgeSourceRecord[]
-
-    // Check if there's anything to analyze
-    // Consider both storage_uri (uploaded folders) and github kind
-    const hasCodebase = Boolean(
-      project.source_code?.storage_uri || 
-      (project.source_code?.kind === 'github' && project.source_code?.repository_url && project.source_code?.repository_branch)
-    )
-    const hasOtherSources = allSources.length > 0
-
-    if (!hasCodebase && !hasOtherSources) {
-      return NextResponse.json({
-        error: 'No knowledge sources to analyze. Add a codebase or other sources first.',
-      }, { status: 400 })
-    }
-
-    // Auto-sync GitHub codebases before analysis
-    let sourceCodePath = project.source_code?.storage_uri ?? null
-    
-    if (project.source_code?.kind === 'github') {
-      console.log('[knowledge.analyze] Syncing GitHub codebase before analysis')
-      
-      const syncResult = await syncGitHubCodebase({
-        codebaseId: project.source_code.id,
-        userId: user.id,
-        projectId,
-      })
-
-      if (syncResult.status === 'error') {
-        console.error('[knowledge.analyze] GitHub sync failed:', syncResult.error)
-        return NextResponse.json({
-          error: `Failed to sync GitHub repository: ${syncResult.error}`,
-        }, { status: 500 })
-      }
-
-      // Re-fetch project to get updated storage_uri after sync
-      const { data: refreshedProject, error: refreshError } = await supabase
-        .from('projects')
-        .select('*, source_code:source_codes(*)')
-        .eq('id', projectId)
-        .single()
-
-      if (refreshError || !refreshedProject) {
-        console.error('[knowledge.analyze] Failed to refresh project after sync', refreshError)
-      } else {
-        sourceCodePath = refreshedProject.source_code?.storage_uri ?? null
-      }
-
-      console.log('[knowledge.analyze] GitHub sync completed:', syncResult.status, 'SHA:', syncResult.commitSha)
-    }
-
-    // Update sources to 'processing' status
-    if (allSources.length > 0) {
-      const sourceIds = allSources.map((s) => s.id)
-      await supabase
-        .from('knowledge_sources')
-        .update({ status: 'processing', error_message: null })
-        .in('id', sourceIds)
-    }
-
-    // Get the workflow
-    const workflow = mastra.getWorkflow('knowledgeAnalysisWorkflow')
-
-    if (!workflow) {
-      console.error('[knowledge.analyze] workflow not found')
-      return NextResponse.json({ error: 'Analysis workflow not configured.' }, { status: 500 })
-    }
-
-    // Generate a unique run ID
-    const runId = `knowledge-${projectId}-${Date.now()}`
-
-    // Prepare workflow input - include analysisId so workflow can update it on completion
-    // We store this in the analysis record so the SSE route can retrieve it
-    const workflowInput = {
+    const result = await triggerKnowledgeAnalysis({
       projectId,
-      analysisId: '', // Will be set after record creation
-      sourceCodePath,
-      analysisScope: project.source_code?.analysis_scope ?? null,
-      sources: allSources.map((s) => ({
-        id: s.id,
-        type: s.type,
-        url: s.url,
-        storagePath: s.storage_path,
-        content: s.content,
-      })),
+      userId: user.id,
+      supabase,
+    })
+
+    if (!result.success) {
+      return NextResponse.json(
+        { 
+          error: result.error,
+          ...(result.runId && { runId: result.runId }),
+          ...(result.analysisId && { analysisId: result.analysisId }),
+        }, 
+        { status: result.statusCode }
+      )
     }
-
-    // Create analysis record in project_analyses table with workflow input stored in metadata
-    // The SSE route will use this input to execute the workflow
-    const { data: analysisRecord, error: insertError } = await supabase
-      .from('project_analyses')
-      .insert({
-        project_id: projectId,
-        run_id: runId,
-        status: 'running',
-        started_at: new Date().toISOString(),
-        metadata: {
-          sourceCount: allSources.length,
-          hasCodebase,
-          sourceIds: allSources.map((s) => s.id),
-          // Store workflow input for SSE route to use
-          workflowInput: {
-            ...workflowInput,
-            analysisId: '', // Placeholder - will be updated below
-          },
-        },
-      })
-      .select()
-      .single()
-
-    if (insertError || !analysisRecord) {
-      console.error('[knowledge.analyze] Failed to create analysis record', insertError)
-      return NextResponse.json({ error: 'Failed to start analysis.' }, { status: 500 })
-    }
-
-    // Update the workflow input with the actual analysisId
-    const { error: updateError } = await supabase
-      .from('project_analyses')
-      .update({
-        metadata: {
-          ...analysisRecord.metadata,
-          workflowInput: {
-            ...workflowInput,
-            analysisId: analysisRecord.id,
-          },
-        },
-      })
-      .eq('id', analysisRecord.id)
-
-    if (updateError) {
-      console.error('[knowledge.analyze] Failed to update analysis record with workflow input', updateError)
-    }
-
-    console.log('[knowledge.analyze] Created analysis record:', analysisRecord.id)
-    // NOTE: Workflow execution is now handled by the SSE stream route
-    // The client should connect to /api/projects/[id]/knowledge/analyze/stream to start the workflow
 
     return NextResponse.json({
       message: 'Knowledge analysis started.',
       status: 'processing',
-      runId,
-      analysisId: analysisRecord.id,
-      sourceCount: allSources.length,
-      hasCodebase,
+      runId: result.runId,
+      analysisId: result.analysisId,
+      sourceCount: result.sourceCount,
+      hasCodebase: result.hasCodebase,
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) {

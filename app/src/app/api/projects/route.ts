@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
-import { createCodebase, createGitHubCodebase } from '@/lib/codebase'
+import { createCodebase, createGitHubCodebase, syncGitHubCodebase } from '@/lib/codebase'
+import { triggerKnowledgeAnalysis } from '@/lib/knowledge/analysis-service'
 import { selectGitignore } from '@/lib/projects/source-code-utils'
 import { UnauthorizedError } from '@/lib/auth/server'
 import type { Database } from '@/types/supabase'
@@ -66,6 +67,7 @@ export async function POST(request: Request) {
 
   const description = formData.get('description')?.toString().trim() || null
   const codebaseSource = formData.get('codebaseSource')?.toString().trim() || 'none'
+  const skipAnalysis = formData.get('skipAnalysis')?.toString() === 'true'
 
   // GitHub source params
   const repositoryUrl = formData.get('repositoryUrl')?.toString().trim() || null
@@ -107,6 +109,19 @@ export async function POST(request: Request) {
         analysisScope,
       })
       codebaseId = codebase.id
+
+      // Sync GitHub codebase immediately to download files
+      const syncResult = await syncGitHubCodebase({
+        codebaseId: codebase.id,
+        userId: user.id,
+        projectId: id,
+      })
+
+      if (syncResult.status === 'error') {
+        console.warn('[projects.post] GitHub sync failed, but project will still be created:', syncResult.error)
+      } else {
+        console.log('[projects.post] GitHub sync completed:', syncResult.status, syncResult.commitSha)
+      }
     }
     // Create codebase from uploaded files if provided
     else if (hasFilesToUpload) {
@@ -138,6 +153,28 @@ export async function POST(request: Request) {
     if (projectInsertError || !createdProject) {
       console.error('[projects.post] failed to create project', projectInsertError)
       return NextResponse.json({ error: 'Failed to create project.' }, { status: 500 })
+    }
+
+    // Auto-trigger analysis if not skipped and there's a codebase
+    if (!skipAnalysis && codebaseId) {
+      try {
+        const analysisResult = await triggerKnowledgeAnalysis({
+          projectId: id,
+          userId: user.id,
+          supabase,
+          // Skip GitHub sync since we already synced above during project creation
+          skipGitHubSync: Boolean(hasGitHubSource),
+        })
+
+        if (analysisResult.success) {
+          console.log('[projects.post] Analysis triggered for project:', id, 'analysisId:', analysisResult.analysisId)
+        } else {
+          console.warn('[projects.post] Failed to trigger analysis:', analysisResult.error)
+        }
+      } catch (analyzeError) {
+        // Don't fail project creation if analysis trigger fails
+        console.warn('[projects.post] Error triggering analysis:', analyzeError)
+      }
     }
 
     return NextResponse.json({ project: createdProject })

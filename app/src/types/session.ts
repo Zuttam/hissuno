@@ -12,6 +12,7 @@ export interface SessionRecord {
   status: 'active' | 'closed'
   first_message_at: string | null
   last_activity_at: string
+  pm_reviewed_at: string | null
   created_at: string
   updated_at: string
 }

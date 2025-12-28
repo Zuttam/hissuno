@@ -64,19 +64,7 @@ export function ProjectDetailsCard({ project, isLoading, onRefresh }: ProjectDet
     <div className="space-y-6 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/80">
       <div className="space-y-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Project details
-        </h3>
-        <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
-          <DetailRow label="Name" value={project.name} />
-          <DetailRow label="Description" value={project.description ?? '—'} />
-          <DetailRow label="Created" value={formatTimestamp(project.created_at)} />
-          <DetailRow label="Updated" value={formatTimestamp(project.updated_at)} />
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          Source details
+          Codebase details
         </h3>
         {source ? (
           <div className="space-y-3 text-sm text-slate-600 dark:text-slate-300">
@@ -121,16 +109,20 @@ export function ProjectDetailsCard({ project, isLoading, onRefresh }: ProjectDet
                 </div>
               </>
             )}
+            {source.kind === 'upload' && (
+              <DetailRow 
+                label="Uploaded at" 
+                value={formatTimestamp(source.created_at)} 
+              />
+            )}
             <DetailRow 
               label="Analysis scope" 
               value={source.analysis_scope || 'Entire codebase'} 
             />
-            <DetailRow label="Source created" value={formatTimestamp(source.created_at)} />
-            <DetailRow label="Source updated" value={formatTimestamp(source.updated_at)} />
           </div>
         ) : (
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            No source code linked yet. Edit the project to attach shared code.
+            No source code linked yet. Edit the project to attach a codebase.
           </p>
         )}
       </div>

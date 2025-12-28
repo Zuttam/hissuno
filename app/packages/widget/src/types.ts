@@ -1,15 +1,35 @@
+import type { ReactNode } from 'react';
+
+/**
+ * Position options for the bubble
+ */
+export type BubblePosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+
+/**
+ * Offset configuration for bubble positioning
+ */
+export interface BubbleOffset {
+  x?: number;
+  y?: number;
+}
+
+/**
+ * Props passed to the custom trigger render function
+ */
+export interface TriggerRenderProps {
+  open: () => void;
+  close: () => void;
+  toggle: () => void;
+  isOpen: boolean;
+}
+
 /**
  * Props for the HissunoWidget component
  */
 export interface HissunoWidgetProps {
   /**
-   * The project ID from your Hissuno dashboard
-   */
-  projectId: string;
-
-  /**
    * The public key (pk_live_...) from your Hissuno dashboard
-   * This is safe to expose in frontend code
+   * This is safe to expose in frontend code and uniquely identifies your project
    */
   publicKey: string;
 
@@ -27,8 +47,7 @@ export interface HissunoWidgetProps {
 
   /**
    * The URL of your Hissuno API endpoint
-   * Defaults to the Hissuno cloud endpoint
-   * @default "https://api.hissuno.com/copilotkit"
+   * @default "/api/agent"
    */
   apiUrl?: string;
 
@@ -39,10 +58,29 @@ export interface HissunoWidgetProps {
   theme?: 'light' | 'dark' | 'auto';
 
   /**
-   * Position of the chat widget on the page
+   * Whether to show the floating bubble trigger
+   * Set to false when using a custom trigger
+   * @default true
+   */
+  showBubble?: boolean;
+
+  /**
+   * Position of the floating bubble on the page
    * @default "bottom-right"
    */
-  position?: 'bottom-right' | 'bottom-left';
+  bubblePosition?: BubblePosition;
+
+  /**
+   * Offset from the edge of the screen in pixels
+   * @default { x: 20, y: 20 }
+   */
+  bubbleOffset?: BubbleOffset;
+
+  /**
+   * Custom render function for the trigger element
+   * Use this to provide your own button/component to open the chat
+   */
+  renderTrigger?: (props: TriggerRenderProps) => ReactNode;
 
   /**
    * Custom title for the chat window
@@ -93,7 +131,16 @@ export interface HissunoWidgetProps {
  * Configuration for the Hissuno widget
  */
 export interface HissunoConfig {
-  projectId: string;
   publicKey: string;
   apiUrl: string;
+}
+
+/**
+ * Chat message structure
+ */
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt?: Date;
 }

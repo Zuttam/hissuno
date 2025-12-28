@@ -82,6 +82,14 @@ interface SessionRowProps {
 
 function SessionRow({ session }: SessionRowProps) {
   const truncatedId = session.id.length > 16 ? `${session.id.slice(0, 16)}...` : session.id
+  
+  // Get user display info from metadata or user_id
+  const userDisplayName = session.user_metadata?.name || 
+    session.user_metadata?.email || 
+    session.user_id
+  const truncatedUser = userDisplayName 
+    ? (userDisplayName.length > 20 ? `${userDisplayName.slice(0, 20)}...` : userDisplayName)
+    : null
 
   return (
     <Link
@@ -89,14 +97,19 @@ function SessionRow({ session }: SessionRowProps) {
       className="flex items-center justify-between rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3 transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
     >
       <div className="flex items-center gap-4">
-        <span className="font-mono text-sm text-[color:var(--foreground)]" title={session.id}>
-          {truncatedId}
-        </span>
-        {session.user_id && (
-          <span className="text-xs text-[color:var(--text-secondary)]">
-            User: {session.user_id}
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--surface)] border border-[color:var(--border-subtle)]">
+          <span className="text-xs font-medium text-[color:var(--text-secondary)]">
+            {truncatedUser ? truncatedUser.charAt(0).toUpperCase() : '?'}
           </span>
-        )}
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-[color:var(--foreground)]" title={userDisplayName || 'Anonymous'}>
+            {truncatedUser || 'Anonymous'}
+          </span>
+          <span className="font-mono text-xs text-[color:var(--text-tertiary)]" title={session.id}>
+            {truncatedId}
+          </span>
+        </div>
       </div>
       <div className="flex items-center gap-3">
         <span className="text-xs text-[color:var(--text-secondary)]">

@@ -23,11 +23,10 @@ export function DeveloperProjects({ initialProjects }: DeveloperDashboardProps) 
         <header className="flex flex-col justify-between gap-6 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8 md:flex-row md:items-center">
           <div className="space-y-2">
             <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-              Hissuno Dev
+              Hissuno
             </h1>
             <p className="max-w-2xl text-sm text-[color:var(--text-secondary)]">
-              Manage your projects and source code. Create a project, upload source code,
-              and keep everything organized.
+              Turn support into a product flywheel. Create a project, Connect your codebase and see your product velocity increases like never before.
             </p>
           </div>
           <div className="flex flex-col items-stretch gap-3 sm:flex-row">

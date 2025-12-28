@@ -9,6 +9,7 @@ import { supportAgent } from './agents/support-agent';
 import { codebaseAnalyzerAgent } from './agents/codebase-analyzer-agent';
 import { webScraperAgent } from './agents/web-scraper-agent';
 import { knowledgeCompilerAgent } from './agents/knowledge-compiler-agent';
+import { productManagerAgent } from './agents/product-manager-agent';
 
 const storage = new PostgresStore({
   connectionString: process.env.DATABASE_URL!,
@@ -24,6 +25,7 @@ export const mastra = new Mastra({
     codebaseAnalyzerAgent,
     webScraperAgent,
     knowledgeCompilerAgent,
+    productManagerAgent,
   },
   storage,
   logger: new PinoLogger({

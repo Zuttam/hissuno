@@ -95,6 +95,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     projectUpdates.description = trimmed.length > 0 ? trimmed : null
   }
 
+  // Handle allowed_origins array
+  if (Array.isArray(payload.allowed_origins)) {
+    // Validate that all entries are valid origin strings
+    const origins = payload.allowed_origins.filter(
+      (origin: unknown) => typeof origin === 'string' && origin.trim().length > 0
+    ).map((origin: string) => origin.trim())
+    projectUpdates.allowed_origins = origins.length > 0 ? origins : null
+  } else if (payload.allowed_origins === null) {
+    projectUpdates.allowed_origins = null
+  }
+
   // Handle source code updates (for GitHub repos)
   if (typeof payload.repositoryUrl === 'string') {
     sourceCodeUpdates.repositoryUrl = payload.repositoryUrl.trim()

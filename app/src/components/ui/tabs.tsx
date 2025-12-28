@@ -42,7 +42,7 @@ export function TabsList({ children, className }: TabsListProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-2 border-b-2 border-[--border-subtle] px-6 py-3',
+        'flex items-center gap-1 border-b border-[--border-subtle] px-6 py-2',
         className
       )}
     >
@@ -66,14 +66,23 @@ export function Tab({ value, children, className }: TabProps) {
       type="button"
       onClick={() => onChange(value)}
       className={cn(
-        'rounded-[4px] border-2 px-4 py-2 text-sm font-mono font-semibold uppercase tracking-wide transition',
+        'relative px-4 py-2 text-sm font-medium transition-all duration-200',
         isActive
-          ? 'border-[--border] bg-[--foreground] text-[--background]'
-          : 'border-[--border-subtle] bg-transparent text-[--text-secondary] hover:border-[--border] hover:bg-[--surface-hover]',
+          ? 'text-(--foreground)'
+          : 'text-(--text-tertiary) hover:text-(--text-secondary)',
         className
       )}
     >
       {children}
+      {/* Active indicator underline */}
+      <span
+        className={cn(
+          'absolute bottom-0 left-2 right-2 h-0.5 rounded-full transition-all duration-200',
+          isActive
+            ? 'bg-(--accent-primary) opacity-100'
+            : 'bg-transparent opacity-0'
+        )}
+      />
     </button>
   )
 }
@@ -93,4 +102,3 @@ export function TabsPanel({ value, children, className }: TabsPanelProps) {
 
   return <div className={cn('flex-1 overflow-y-auto px-6 py-4', className)}>{children}</div>
 }
-
