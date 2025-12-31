@@ -94,25 +94,38 @@ export async function triggerKnowledgeAnalysis(
 
   const allSources = (sources ?? []) as KnowledgeSourceRecord[]
 
-  // Check if there's anything to analyze
+  // Filter to only enabled sources
+  const enabledSources = allSources.filter((s) => s.enabled !== false)
+
+  // Find the codebase source (if any and enabled)
+  const codebaseSource = enabledSources.find((s) => s.type === 'codebase')
+  
+  // Check if project has source code configured AND the codebase source is enabled
   const hasCodebase = Boolean(
-    project.source_code?.storage_uri || 
-    (project.source_code?.kind === 'github' && project.source_code?.repository_url && project.source_code?.repository_branch)
+    codebaseSource && (
+      project.source_code?.storage_uri || 
+      (project.source_code?.kind === 'github' && project.source_code?.repository_url && project.source_code?.repository_branch)
+    )
   )
-  const hasOtherSources = allSources.length > 0
+
+  // Filter out codebase from other sources for the count
+  const nonCodebaseSources = enabledSources.filter((s) => s.type !== 'codebase')
+  const hasOtherSources = nonCodebaseSources.length > 0
 
   if (!hasCodebase && !hasOtherSources) {
     return {
       success: false,
-      error: 'No knowledge sources to analyze. Add a codebase or other sources first.',
+      error: 'No enabled knowledge sources to analyze. Enable sources or add new ones first.',
       statusCode: 400,
     }
   }
 
   // Auto-sync GitHub codebases before analysis (unless already synced)
-  let sourceCodePath = project.source_code?.storage_uri ?? null
+  // Only sync if codebase source is enabled
+  let sourceCodePath = hasCodebase ? (project.source_code?.storage_uri ?? null) : null
+  const analysisScope = codebaseSource?.analysis_scope ?? null
   
-  if (!skipGitHubSync && project.source_code?.kind === 'github') {
+  if (hasCodebase && !skipGitHubSync && project.source_code?.kind === 'github') {
     console.log('[analysis-service] Syncing GitHub codebase before analysis')
     
     const syncResult = await syncGitHubCodebase({
@@ -146,9 +159,9 @@ export async function triggerKnowledgeAnalysis(
     console.log('[analysis-service] GitHub sync completed:', syncResult.status, 'SHA:', syncResult.commitSha)
   }
 
-  // Update sources to 'processing' status
-  if (allSources.length > 0) {
-    const sourceIds = allSources.map((s) => s.id)
+  // Update enabled sources to 'processing' status
+  if (enabledSources.length > 0) {
+    const sourceIds = enabledSources.map((s) => s.id)
     await supabase
       .from('knowledge_sources')
       .update({ status: 'processing', error_message: null })
@@ -166,18 +179,20 @@ export async function triggerKnowledgeAnalysis(
   // Generate a unique run ID
   const runId = `knowledge-${projectId}-${Date.now()}`
 
-  // Prepare workflow input
+  // Prepare workflow input - only include enabled sources
   const workflowInput = {
     projectId,
     analysisId: '', // Will be set after record creation
     sourceCodePath,
-    analysisScope: project.source_code?.analysis_scope ?? null,
-    sources: allSources.map((s) => ({
+    analysisScope,
+    sources: enabledSources.map((s) => ({
       id: s.id,
       type: s.type,
       url: s.url,
       storagePath: s.storage_path,
       content: s.content,
+      analysisScope: s.analysis_scope,
+      enabled: s.enabled,
     })),
   }
 
@@ -190,9 +205,9 @@ export async function triggerKnowledgeAnalysis(
       status: 'running',
       started_at: new Date().toISOString(),
       metadata: {
-        sourceCount: allSources.length,
+        sourceCount: enabledSources.length,
         hasCodebase,
-        sourceIds: allSources.map((s) => s.id),
+        sourceIds: enabledSources.map((s) => s.id),
         workflowInput: {
           ...workflowInput,
           analysisId: '', // Placeholder - will be updated below
@@ -231,7 +246,7 @@ export async function triggerKnowledgeAnalysis(
     success: true,
     runId,
     analysisId: analysisRecord.id,
-    sourceCount: allSources.length,
+    sourceCount: enabledSources.length,
     hasCodebase,
   }
 }

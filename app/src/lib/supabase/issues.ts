@@ -407,6 +407,12 @@ export async function getProjectSettingsWithAuth(projectId: string): Promise<Pro
     issue_spec_threshold: 3,
     issue_tracking_enabled: true,
     spec_guidelines: null,
+    // Widget defaults
+    widget_variant: 'popup',
+    widget_theme: 'light',
+    widget_position: 'bottom-right',
+    widget_title: 'Support',
+    widget_initial_message: 'Hi! How can I help you today?',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -461,7 +467,16 @@ export async function getProjectSettingsWithAuth(projectId: string): Promise<Pro
  */
 export async function upsertProjectSettings(
   projectId: string,
-  settings: Partial<Pick<ProjectSettingsRecord, 'issue_spec_threshold' | 'issue_tracking_enabled' | 'spec_guidelines'>>
+  settings: Partial<Pick<ProjectSettingsRecord,
+    | 'issue_spec_threshold'
+    | 'issue_tracking_enabled'
+    | 'spec_guidelines'
+    | 'widget_variant'
+    | 'widget_theme'
+    | 'widget_position'
+    | 'widget_title'
+    | 'widget_initial_message'
+  >>
 ): Promise<ProjectSettingsRecord | null> {
   if (!isSupabaseConfigured()) {
     throw new Error('Supabase must be configured.')

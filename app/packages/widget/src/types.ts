@@ -6,6 +6,11 @@ import type { ReactNode } from 'react';
 export type BubblePosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
 /**
+ * Widget display variant
+ */
+export type WidgetVariant = 'popup' | 'sidepanel';
+
+/**
  * Offset configuration for bubble positioning
  */
 export interface BubbleOffset {
@@ -32,6 +37,20 @@ export interface HissunoWidgetProps {
    * This is safe to expose in frontend code and uniquely identifies your project
    */
   publicKey: string;
+
+  /**
+   * Widget display variant
+   * @default "popup"
+   */
+  variant?: WidgetVariant;
+
+  /**
+   * Whether to fetch default settings from the server
+   * When true, the widget will fetch settings using the publicKey and use them as defaults.
+   * Explicit props will always override fetched defaults.
+   * @default true
+   */
+  fetchDefaults?: boolean;
 
   /**
    * Optional identifier for the end-user using the widget
@@ -143,4 +162,15 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt?: Date;
+}
+
+/**
+ * Widget settings fetched from server
+ */
+export interface WidgetSettings {
+  variant: WidgetVariant;
+  theme: 'light' | 'dark' | 'auto';
+  position: BubblePosition;
+  title: string;
+  initialMessage: string;
 }

@@ -9,15 +9,9 @@ type SourceCodesTable = Database['public']['Tables']['source_codes']
 export type ProjectRecord = ProjectsTable['Row']
 export type CodebaseRecord = SourceCodesTable['Row']
 
-/** @deprecated Use CodebaseRecord instead */
-export type SourceCodeRecord = CodebaseRecord
-
 export type ProjectWithCodebase = ProjectRecord & {
   source_code: CodebaseRecord | null
 }
-
-/** @deprecated Use ProjectWithCodebase instead */
-export type ProjectWithSourceCode = ProjectWithCodebase
 
 const selectProjectWithCodebase = '*, source_code:source_codes(*)'
 

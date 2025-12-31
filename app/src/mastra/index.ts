@@ -2,14 +2,13 @@
 import { Mastra } from '@mastra/core/mastra';
 import { PinoLogger } from '@mastra/loggers';
 import { PostgresStore } from '@mastra/pg';
-import { weatherWorkflow } from './workflows/weather-workflow';
 import { knowledgeAnalysisWorkflow } from './workflows/knowledge-analysis';
-import { weatherAgent } from './agents/weather-agent';
 import { supportAgent } from './agents/support-agent';
 import { codebaseAnalyzerAgent } from './agents/codebase-analyzer-agent';
 import { webScraperAgent } from './agents/web-scraper-agent';
 import { knowledgeCompilerAgent } from './agents/knowledge-compiler-agent';
 import { productManagerAgent } from './agents/product-manager-agent';
+import { securityScannerAgent } from './agents/security-scanner-agent';
 
 const storage = new PostgresStore({
   connectionString: process.env.DATABASE_URL!,
@@ -18,14 +17,14 @@ const storage = new PostgresStore({
 });
 
 export const mastra = new Mastra({
-  workflows: { weatherWorkflow, knowledgeAnalysisWorkflow },
+  workflows: { knowledgeAnalysisWorkflow },
   agents: {
-    weatherAgent,
     supportAgent,
     codebaseAnalyzerAgent,
     webScraperAgent,
     knowledgeCompilerAgent,
     productManagerAgent,
+    securityScannerAgent,
   },
   storage,
   logger: new PinoLogger({

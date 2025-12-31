@@ -1,17 +1,17 @@
 /**
- * Step 4: Save Knowledge Packages
+ * Step 5: Save Knowledge Packages
  *
- * Saves compiled knowledge to Supabase Storage and updates the database
- * with package metadata.
+ * Saves sanitized knowledge to Supabase Storage and updates the database
+ * with package metadata, including redaction summary from security scanning.
  */
 
 import { createStep } from '@mastra/core/workflows'
-import { compiledKnowledgeSchema, workflowOutputSchema, type KnowledgePackage } from '../schemas'
+import { sanitizedKnowledgeSchema, workflowOutputSchema, type KnowledgePackage } from '../schemas'
 
 export const saveKnowledgePackages = createStep({
   id: 'save-knowledge-packages',
   description: 'Save compiled knowledge to storage and update database',
-  inputSchema: compiledKnowledgeSchema,
+  inputSchema: sanitizedKnowledgeSchema,
   outputSchema: workflowOutputSchema,
   execute: async ({ inputData, getInitData, writer }) => {
     if (!inputData) {
@@ -20,7 +20,7 @@ export const saveKnowledgePackages = createStep({
 
     await writer?.write({ type: 'progress', message: 'Saving knowledge packages...' })
 
-    const { business, product, technical } = inputData
+    const { business, product, technical, redactionSummary } = inputData
     const initData = getInitData?.() as { 
       projectId: string
       analysisId?: string
@@ -134,6 +134,7 @@ export const saveKnowledgePackages = createStep({
               packagesCount: packages.length,
               sourcesCount: sourceIds.length,
               errors: errors.length > 0 ? errors : undefined,
+              redactionSummary: redactionSummary.totalRedactions > 0 ? redactionSummary : undefined,
             },
           })
           .eq('id', analysisId)

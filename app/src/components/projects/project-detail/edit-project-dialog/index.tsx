@@ -1,8 +1,9 @@
 'use client'
 
-import { FormEvent, useCallback, useEffect, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
-import { updateProject, rotateKeys } from '@/lib/projects/client'
+import { updateProject, rotateKeys, connectSourceCode } from '@/lib/projects/client'
+import { createClient } from '@/lib/supabase/client'
 import {
   Alert,
   Button,
@@ -14,9 +15,9 @@ import {
 } from '@/components/ui'
 
 import { GeneralTabPanel } from './GeneralTabPanel'
-import { CodebaseTabPanel } from './CodebaseTabPanel'
+import { CodebaseTabPanel, type PendingSourceCode } from './CodebaseTabPanel'
 import { PmAgentTabPanel, type ProjectSettings } from './PmAgentTabPanel'
-import { SupportAgentTabPanel } from './SupportAgentTabPanel'
+import { SupportAgentTabPanel, type WidgetSettings } from './SupportAgentTabPanel'
 import { KeysTabPanel } from './KeysTabPanel'
 
 interface EditProjectDialogProps {
@@ -41,6 +42,14 @@ const DEFAULT_SETTINGS: ProjectSettings = {
   spec_guidelines: null,
 }
 
+const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
+  widget_variant: 'popup',
+  widget_theme: 'light',
+  widget_position: 'bottom-right',
+  widget_title: 'Support',
+  widget_initial_message: 'Hi! How can I help you today?',
+}
+
 export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDialogProps) {
   const [activeTab, setActiveTab] = useState('general')
   const [isSaving, setIsSaving] = useState(false)
@@ -52,7 +61,6 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
   const [description, setDescription] = useState(project.description ?? '')
 
   // Source code settings
-  const [analysisScope, setAnalysisScope] = useState(project.source_code?.analysis_scope ?? '')
   const isGitHubSource = project.source_code?.kind === 'github'
   const [repositoryBranch, setRepositoryBranch] = useState(project.source_code?.repository_branch ?? '')
   const [branches, setBranches] = useState<BranchOption[]>([])
@@ -63,13 +71,35 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
   const [originalSettings, setOriginalSettings] = useState<ProjectSettings>(DEFAULT_SETTINGS)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
 
-  // Support Agent settings
+  // Support Agent / Widget settings
   const [allowedOrigins, setAllowedOrigins] = useState<string[]>(project.allowed_origins ?? [])
+  const [widgetSettings, setWidgetSettings] = useState<WidgetSettings>(DEFAULT_WIDGET_SETTINGS)
+  const [originalWidgetSettings, setOriginalWidgetSettings] = useState<WidgetSettings>(DEFAULT_WIDGET_SETTINGS)
 
   // Keys state
   const [isRotating, setIsRotating] = useState<'public' | 'secret' | 'both' | null>(null)
   const [currentPublicKey, setCurrentPublicKey] = useState(project.public_key ?? '')
   const [currentSecretKey, setCurrentSecretKey] = useState(project.secret_key ?? '')
+
+  // GitHub integration state for connecting/changing codebase
+  const [hasGitHubIntegration, setHasGitHubIntegration] = useState(false)
+  const [isConnectingGitHub, setIsConnectingGitHub] = useState(false)
+  const [pendingSourceCode, setPendingSourceCode] = useState<PendingSourceCode | null>(null)
+
+  // Disable background scrolling when dialog is open
+  const originalOverflowRef = useRef<string>('')
+  useEffect(() => {
+    originalOverflowRef.current = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = originalOverflowRef.current
+    }
+  }, [])
+
+  // Sync state when project prop changes (e.g., after connecting codebase)
+  useEffect(() => {
+    setRepositoryBranch(project.source_code?.repository_branch ?? '')
+  }, [project.source_code?.repository_branch])
 
   // Parse owner/repo from repository URL
   const parseRepoInfo = useCallback(() => {
@@ -99,7 +129,7 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
     }
   }, [parseRepoInfo])
 
-  // Fetch PM Agent settings
+  // Fetch PM Agent and Widget settings
   const fetchSettings = useCallback(async () => {
     setIsLoadingSettings(true)
     try {
@@ -107,6 +137,7 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
       if (response.ok) {
         const data = await response.json()
         if (data.settings) {
+          // PM Agent settings
           const fetchedSettings = {
             issue_tracking_enabled: data.settings.issue_tracking_enabled ?? DEFAULT_SETTINGS.issue_tracking_enabled,
             issue_spec_threshold: data.settings.issue_spec_threshold ?? DEFAULT_SETTINGS.issue_spec_threshold,
@@ -114,6 +145,17 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
           }
           setSettings(fetchedSettings)
           setOriginalSettings(fetchedSettings)
+
+          // Widget settings
+          const fetchedWidgetSettings: WidgetSettings = {
+            widget_variant: data.settings.widget_variant ?? DEFAULT_WIDGET_SETTINGS.widget_variant,
+            widget_theme: data.settings.widget_theme ?? DEFAULT_WIDGET_SETTINGS.widget_theme,
+            widget_position: data.settings.widget_position ?? DEFAULT_WIDGET_SETTINGS.widget_position,
+            widget_title: data.settings.widget_title ?? DEFAULT_WIDGET_SETTINGS.widget_title,
+            widget_initial_message: data.settings.widget_initial_message ?? DEFAULT_WIDGET_SETTINGS.widget_initial_message,
+          }
+          setWidgetSettings(fetchedWidgetSettings)
+          setOriginalWidgetSettings(fetchedWidgetSettings)
         }
       }
     } catch (err) {
@@ -123,12 +165,52 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
     }
   }, [project.id])
 
+  // Check GitHub integration status
+  const checkGitHubIntegration = useCallback(async () => {
+    try {
+      const response = await fetch('/api/integrations/github')
+      if (response.ok) {
+        const data = await response.json()
+        setHasGitHubIntegration(data.connected)
+      }
+    } catch (err) {
+      console.error('Failed to check GitHub integration:', err)
+    }
+  }, [])
+
+  // Handle connecting GitHub via OAuth
+  const handleConnectGitHub = async () => {
+    setIsConnectingGitHub(true)
+    try {
+      const supabase = createClient()
+      const { error: linkError } = await supabase.auth.linkIdentity({
+        provider: 'github',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?next=/projects/${project.id}`,
+          scopes: 'user:email read:user repo',
+        },
+      })
+
+      if (linkError) {
+        console.error('Failed to initiate GitHub OAuth:', linkError)
+        setError('Failed to connect GitHub. Please try again.')
+        setIsConnectingGitHub(false)
+      }
+      // If no error, the page will redirect to GitHub for authentication
+    } catch (err) {
+      console.error('Failed to connect GitHub:', err)
+      setError('Failed to connect GitHub. Please try again.')
+      setIsConnectingGitHub(false)
+    }
+  }
+
   useEffect(() => {
     if (isGitHubSource) {
       void fetchBranches()
     }
     void fetchSettings()
-  }, [isGitHubSource, fetchBranches, fetchSettings])
+    void checkGitHubIntegration()
+  }, [isGitHubSource, fetchBranches, fetchSettings, checkGitHubIntegration])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -153,11 +235,6 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
       if (isGitHubSource && repositoryBranch !== project.source_code?.repository_branch) {
         projectPayload.repositoryBranch = repositoryBranch
       }
-      const currentScope = project.source_code?.analysis_scope ?? ''
-      const trimmedScope = analysisScope.trim()
-      if (trimmedScope !== currentScope) {
-        projectPayload.analysisScope = trimmedScope || null
-      }
 
       // Allowed origins
       const originsChanged = JSON.stringify(allowedOrigins) !== JSON.stringify(project.allowed_origins ?? [])
@@ -176,6 +253,23 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
         settingsPayload.spec_guidelines = settings.spec_guidelines
       }
 
+      // Widget settings - compare against original fetched values
+      if (widgetSettings.widget_variant !== originalWidgetSettings.widget_variant) {
+        settingsPayload.widget_variant = widgetSettings.widget_variant
+      }
+      if (widgetSettings.widget_theme !== originalWidgetSettings.widget_theme) {
+        settingsPayload.widget_theme = widgetSettings.widget_theme
+      }
+      if (widgetSettings.widget_position !== originalWidgetSettings.widget_position) {
+        settingsPayload.widget_position = widgetSettings.widget_position
+      }
+      if (widgetSettings.widget_title !== originalWidgetSettings.widget_title) {
+        settingsPayload.widget_title = widgetSettings.widget_title
+      }
+      if (widgetSettings.widget_initial_message !== originalWidgetSettings.widget_initial_message) {
+        settingsPayload.widget_initial_message = widgetSettings.widget_initial_message
+      }
+
       // Update project if there are changes
       if (Object.keys(projectPayload).length > 0) {
         await updateProject(project.id, projectPayload)
@@ -188,6 +282,19 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(settingsPayload),
         })
+      }
+
+      // Connect or replace source code if pending
+      if (pendingSourceCode) {
+        await connectSourceCode(
+          project.id,
+          pendingSourceCode.repositoryUrl,
+          pendingSourceCode.repositoryBranch
+        )
+        setPendingSourceCode(null)
+        setSuccessMessage('Codebase connected successfully. Syncing in progress...')
+      } else {
+        setSuccessMessage('Changes saved successfully.')
       }
 
       await onSaved()
@@ -225,9 +332,19 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[5vh] bg-slate-900/40 backdrop-blur-sm overflow-y-auto">
       <form
         onSubmit={handleSubmit}
-        className="flex flex-col w-full max-w-2xl max-h-[90vh] mb-[5vh] rounded-3xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+        className="flex flex-col w-full mx-10 max-h-[90vh] rounded-3xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
       >
-        <div className="px-8 pt-8 pb-4">
+        <div className="px-8 pt-8 pb-4 relative">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+            aria-label="Close dialog"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
           <SectionHeader
             title="Edit project"
             description="Update your project settings across different categories."
@@ -238,8 +355,8 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
           <TabsList className="border-b-0 px-8 shrink-0">
             <Tab value="general">General</Tab>
             <Tab value="codebase">Codebase</Tab>
-            <Tab value="pm-agent">PM Agent</Tab>
             <Tab value="support-agent">Support Agent</Tab>
+            <Tab value="pm-agent">PM Agent</Tab>
             <Tab value="keys">Keys</Tab>
           </TabsList>
 
@@ -262,8 +379,11 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
                 setRepositoryBranch={setRepositoryBranch}
                 branches={branches}
                 isLoadingBranches={isLoadingBranches}
-                analysisScope={analysisScope}
-                setAnalysisScope={setAnalysisScope}
+                hasGitHubIntegration={hasGitHubIntegration}
+                onConnectGitHub={handleConnectGitHub}
+                isConnectingGitHub={isConnectingGitHub}
+                pendingSourceCode={pendingSourceCode}
+                onPendingSourceCodeChange={setPendingSourceCode}
               />
             </TabsPanel>
 
@@ -279,6 +399,9 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
               <SupportAgentTabPanel
                 allowedOrigins={allowedOrigins}
                 setAllowedOrigins={setAllowedOrigins}
+                widgetSettings={widgetSettings}
+                setWidgetSettings={setWidgetSettings}
+                isLoadingSettings={isLoadingSettings}
               />
             </TabsPanel>
 

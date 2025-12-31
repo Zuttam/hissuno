@@ -28,7 +28,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
-              Sign in to Hissuno
+              Sign In
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Access your projects and preferences.

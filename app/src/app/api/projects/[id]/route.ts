@@ -80,7 +80,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   const sourceCodeUpdates: { 
     repositoryUrl?: string
     repositoryBranch?: string
-    analysisScope?: string | null
   } = {}
 
   if (typeof payload.name === 'string') {
@@ -113,13 +112,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (typeof payload.repositoryBranch === 'string') {
     sourceCodeUpdates.repositoryBranch = payload.repositoryBranch.trim()
   }
-  // Handle analysis scope (applies to all source code types)
-  if (typeof payload.analysisScope === 'string') {
-    const trimmed = payload.analysisScope.trim()
-    sourceCodeUpdates.analysisScope = trimmed.length > 0 ? trimmed : null
-  } else if (payload.analysisScope === null) {
-    sourceCodeUpdates.analysisScope = null
-  }
+  // Note: analysis_scope is now managed via knowledge_sources table, not source_codes
 
   const hasProjectUpdates = Object.keys(projectUpdates).length > 0
   const hasSourceCodeUpdates = Object.keys(sourceCodeUpdates).length > 0
@@ -153,7 +146,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     // Update source code if needed
     if (hasSourceCodeUpdates && currentProject.source_code) {
-      const { repositoryUrl, repositoryBranch, analysisScope } = sourceCodeUpdates
+      const { repositoryUrl, repositoryBranch } = sourceCodeUpdates
 
       // GitHub-specific updates (url and branch)
       if ((repositoryUrl || repositoryBranch) && currentProject.source_code.kind === 'github') {
@@ -163,20 +156,6 @@ export async function PATCH(request: Request, context: RouteContext) {
           user.id,
           { repositoryUrl, repositoryBranch }
         )
-      }
-
-      // Analysis scope applies to all source code types
-      if (analysisScope !== undefined) {
-        const { error: scopeError } = await supabase
-          .from('source_codes')
-          .update({ analysis_scope: analysisScope })
-          .eq('id', currentProject.source_code.id)
-          .eq('user_id', user.id)
-
-        if (scopeError) {
-          console.error('[projects.id.patch] failed to update analysis scope', id, scopeError)
-          return NextResponse.json({ error: 'Failed to update analysis scope.' }, { status: 500 })
-        }
       }
     }
 

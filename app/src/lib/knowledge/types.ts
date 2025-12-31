@@ -2,8 +2,9 @@
  * Knowledge source and package types for the support agent knowledge system
  */
 
-/** Types of knowledge sources that can be analyzed (user-addable sources only) */
+/** Types of knowledge sources that can be analyzed */
 export type KnowledgeSourceType =
+  | 'codebase'
   | 'website'
   | 'docs_portal'
   | 'uploaded_doc'
@@ -30,6 +31,10 @@ export interface KnowledgeSourceRecord {
   analyzed_at: string | null
   created_at: string
   updated_at: string
+  /** Optional path prefix to scope codebase analysis (only for codebase type) */
+  analysis_scope: string | null
+  /** Whether this source is enabled for analysis */
+  enabled: boolean
 }
 
 /**
@@ -47,6 +52,8 @@ export interface KnowledgeSourceInsert {
   analyzed_at?: string | null
   created_at?: string
   updated_at?: string
+  analysis_scope?: string | null
+  enabled?: boolean
 }
 
 /**
@@ -64,6 +71,8 @@ export interface KnowledgeSourceUpdate {
   analyzed_at?: string | null
   created_at?: string
   updated_at?: string
+  analysis_scope?: string | null
+  enabled?: boolean
 }
 
 /**
@@ -143,6 +152,7 @@ export interface KnowledgePackageContent {
  */
 export interface KnowledgeAnalysisInput {
   projectId: string
+  /** @deprecated Use codebase source in sources array instead */
   sourceCodePath?: string
   sources: Array<{
     id: string
@@ -150,6 +160,8 @@ export interface KnowledgeAnalysisInput {
     url?: string
     storagePath?: string
     content?: string
+    analysisScope?: string
+    enabled?: boolean
   }>
 }
 
@@ -167,6 +179,7 @@ export interface KnowledgeAnalysisOutput {
  */
 export function getSourceTypeLabel(type: KnowledgeSourceType): string {
   const labels: Record<KnowledgeSourceType, string> = {
+    codebase: 'Codebase',
     website: 'Website',
     docs_portal: 'Documentation Portal',
     uploaded_doc: 'Uploaded Document',
@@ -180,6 +193,10 @@ export function getSourceTypeLabel(type: KnowledgeSourceType): string {
  */
 export function getSourceDisplayValue(source: KnowledgeSourceRecord): string {
   switch (source.type) {
+    case 'codebase':
+      return source.analysis_scope
+        ? `Project source code (scope: ${source.analysis_scope})`
+        : 'Project source code'
     case 'website':
     case 'docs_portal':
       return source.url ?? 'No URL'

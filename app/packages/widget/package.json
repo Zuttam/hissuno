@@ -17,7 +17,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --external react",
+    "build": "tsup src/index.ts --format cjs,esm --dts --external react && cp src/styles.css dist/styles.css",
     "dev": "tsup src/index.ts --format cjs,esm --dts --external react --watch",
     "prepublishOnly": "npm run build"
   },

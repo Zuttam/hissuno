@@ -3,10 +3,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { ChatBubble } from './ChatBubble';
 import { ChatPopup } from './ChatPopup';
+import { ChatSidepanel } from './ChatSidepanel';
 import { useHissunoChat } from './useHissunoChat';
-import type { HissunoWidgetProps } from './types';
+import type { HissunoWidgetProps, WidgetSettings, WidgetVariant, BubblePosition } from './types';
 
 const DEFAULT_API_URL = '/api/agent';
+const WIDGET_SETTINGS_API = '/api/widget-settings';
 
 /**
  * HissunoWidget - Embeddable support agent widget
@@ -34,17 +36,19 @@ const DEFAULT_API_URL = '/api/agent';
  */
 export function HissunoWidget({
   publicKey,
+  variant: propVariant,
+  fetchDefaults = true,
   userId,
   userMetadata,
   apiUrl = DEFAULT_API_URL,
-  theme = 'light',
+  theme: propTheme,
   showBubble = true,
-  bubblePosition = 'bottom-right',
+  bubblePosition: propBubblePosition,
   bubbleOffset,
   renderTrigger,
-  title = 'Support',
+  title: propTitle,
   placeholder = 'Ask a question or report an issue...',
-  initialMessage = "Hi! 👋 How can I help you today?",
+  initialMessage: propInitialMessage,
   defaultOpen = false,
   onOpen,
   onClose,
@@ -65,14 +69,28 @@ export function HissunoWidget({
     );
   }
 
+  // Fetch widget settings from server if enabled
+  const serverSettings = useWidgetSettings(publicKey, fetchDefaults, apiUrl);
+
+  // Merge props with server defaults (props always win)
+  const variant: WidgetVariant = propVariant ?? serverSettings?.variant ?? 'popup';
+  const theme = propTheme ?? serverSettings?.theme ?? 'light';
+  const bubblePosition: BubblePosition = propBubblePosition ?? serverSettings?.position ?? 'bottom-right';
+  const title = propTitle ?? serverSettings?.title ?? 'Support';
+  const initialMessage = propInitialMessage ?? serverSettings?.initialMessage ?? "Hi! 👋 How can I help you today?";
+
   const {
     messages,
     input,
     setInput,
     handleSubmit,
     isLoading,
+    isStreaming,
+    streamingContent,
     error,
     clearHistory,
+    closeSession,
+    cancelChat,
   } = useHissunoChat({
     publicKey,
     apiUrl,
@@ -89,8 +107,9 @@ export function HissunoWidget({
 
   const close = useCallback(() => {
     setIsOpen(false);
+    closeSession(); // Close session and trigger PM review
     onClose?.();
-  }, [onClose]);
+  }, [onClose, closeSession]);
 
   const toggle = useCallback(() => {
     if (isOpen) {
@@ -125,23 +144,46 @@ export function HissunoWidget({
         />
       ) : null}
 
-      {/* Chat popup */}
-      <ChatPopup
-        isOpen={isOpen}
-        onClose={close}
-        messages={messages}
-        input={input}
-        setInput={setInput}
-        handleSubmit={handleSubmit}
-        isLoading={isLoading}
-        error={error}
-        title={title}
-        placeholder={placeholder}
-        theme={resolvedTheme}
-        position={bubblePosition}
-        offset={bubbleOffset}
-        onClearHistory={clearHistory}
-      />
+      {/* Chat popup or sidepanel */}
+      {variant === 'sidepanel' ? (
+        <ChatSidepanel
+          isOpen={isOpen}
+          onClose={close}
+          messages={messages}
+          input={input}
+          setInput={setInput}
+          handleSubmit={handleSubmit}
+          isLoading={isLoading}
+          isStreaming={isStreaming}
+          streamingContent={streamingContent}
+          error={error}
+          title={title}
+          placeholder={placeholder}
+          theme={resolvedTheme}
+          onClearHistory={clearHistory}
+          onCancelChat={cancelChat}
+        />
+      ) : (
+        <ChatPopup
+          isOpen={isOpen}
+          onClose={close}
+          messages={messages}
+          input={input}
+          setInput={setInput}
+          handleSubmit={handleSubmit}
+          isLoading={isLoading}
+          isStreaming={isStreaming}
+          streamingContent={streamingContent}
+          error={error}
+          title={title}
+          placeholder={placeholder}
+          theme={resolvedTheme}
+          position={bubblePosition}
+          offset={bubbleOffset}
+          onClearHistory={clearHistory}
+          onCancelChat={cancelChat}
+        />
+      )}
     </div>
   );
 }
@@ -175,6 +217,51 @@ function useResolvedTheme(theme: 'light' | 'dark' | 'auto'): 'light' | 'dark' {
   }, [theme]);
 
   return resolved;
+}
+
+/**
+ * Hook to fetch widget settings from the server
+ */
+function useWidgetSettings(
+  publicKey: string,
+  enabled: boolean,
+  apiUrl: string
+): WidgetSettings | null {
+  const [settings, setSettings] = useState<WidgetSettings | null>(null);
+
+  useEffect(() => {
+    if (!enabled || !publicKey) return;
+
+    // Derive the base URL from apiUrl (which defaults to /api/agent)
+    // The widget-settings endpoint is at the same base path level
+    const baseUrl = apiUrl.replace(/\/agent$/, '');
+    const settingsUrl = `${baseUrl}/widget-settings?publicKey=${encodeURIComponent(publicKey)}`;
+
+    const controller = new AbortController();
+
+    fetch(settingsUrl, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) {
+          console.warn('[HissunoWidget] Failed to fetch widget settings:', res.status);
+          return null;
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (data) {
+          setSettings(data as WidgetSettings);
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          console.warn('[HissunoWidget] Failed to fetch widget settings:', err);
+        }
+      });
+
+    return () => controller.abort();
+  }, [publicKey, enabled, apiUrl]);
+
+  return settings;
 }
 
 /**

@@ -1,9 +1,16 @@
 import { cache } from 'react'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
-import type { SessionRecord, SessionWithProject, SessionFilters } from '@/types/session'
+import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue } from '@/types/session'
 
 const selectSessionWithProject = '*, project:projects(id, name)'
+const selectSessionWithLinkedIssues = `
+  *,
+  project:projects(id, name),
+  issue_sessions(
+    issue:issues(id, title, type, status, upvote_count)
+  )
+`
 
 /**
  * Upserts a session record. Uses admin client since this is called
@@ -177,6 +184,7 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
 /**
  * Gets a session by ID. Requires authenticated user context.
  * Only returns the session if it belongs to a project owned by the current user.
+ * Includes linked issues from PM review.
  */
 export const getSessionById = cache(async (sessionId: string): Promise<SessionWithProject | null> => {
   if (!isSupabaseConfigured()) {
@@ -199,10 +207,10 @@ export const getSessionById = cache(async (sessionId: string): Promise<SessionWi
       throw new UnauthorizedError()
     }
 
-    // Get session with project info
+    // Get session with project info and linked issues
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select(selectSessionWithProject)
+      .select(selectSessionWithLinkedIssues)
       .eq('id', sessionId)
       .single()
 
@@ -227,7 +235,20 @@ export const getSessionById = cache(async (sessionId: string): Promise<SessionWi
       return null
     }
 
-    return session as SessionWithProject
+    // Transform the nested issue_sessions to flat linked_issues array
+    const issueSessionsData = (session as { issue_sessions?: Array<{ issue: unknown }> }).issue_sessions ?? []
+    const linked_issues: SessionLinkedIssue[] = issueSessionsData
+      .map((is) => {
+        const issue = Array.isArray(is.issue) ? is.issue[0] : is.issue
+        return issue as SessionLinkedIssue | null
+      })
+      .filter((issue): issue is SessionLinkedIssue => issue !== null)
+
+    return {
+      ...session,
+      linked_issues,
+      issue_sessions: undefined,
+    } as unknown as SessionWithProject
   } catch (error) {
     console.error('[supabase.sessions] unexpected error getting session', sessionId, error)
     throw error

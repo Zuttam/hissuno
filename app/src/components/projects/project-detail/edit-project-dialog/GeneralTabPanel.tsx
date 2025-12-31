@@ -16,7 +16,7 @@ export function GeneralTabPanel({
   setDescription,
 }: GeneralTabPanelProps) {
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col gap-6">
       <FormField label="Name">
         <Input
           type="text"

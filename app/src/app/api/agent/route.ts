@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { CoreMessage } from 'ai'
-import { RuntimeContext } from '@mastra/core/runtime-context'
-import { mastra } from '@/mastra'
 import { getProjectByPublicKey } from '@/lib/projects/keys'
-import { upsertSession, updateSessionActivity } from '@/lib/supabase/sessions'
+import { upsertSession } from '@/lib/supabase/sessions'
+import { triggerChatRun, getChatRunStatus } from '@/lib/agent/chat-run-service'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
@@ -19,6 +18,7 @@ interface AgentRequestBody {
   userMetadata?: Record<string, string>
   pageUrl?: string
   pageTitle?: string
+  sessionId?: string
 }
 
 /**
@@ -32,54 +32,112 @@ export type SupportAgentContext = {
 }
 
 /**
- * Generate a deterministic session ID based on publicKey and userId
- * This ensures the same user on the same project always gets the same session
+ * Generate a unique session ID
+ * Each new session gets a unique ID based on timestamp and random string
  */
-function generateSessionId(publicKey: string, userId?: string): string {
-  const base = userId ? `${publicKey}:${userId}` : `${publicKey}:anonymous`
-  // Create a simple hash for the session ID
-  let hash = 0
-  for (let i = 0; i < base.length; i++) {
-    const char = base.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash // Convert to 32bit integer
-  }
-  return `session_${Math.abs(hash).toString(36)}`
+function generateUniqueSessionId(): string {
+  const timestamp = Date.now().toString(36)
+  const random = Math.random().toString(36).slice(2, 9)
+  return `session_${timestamp}_${random}`
 }
 
+/**
+ * Add CORS headers to response
+ */
+function addCorsHeaders(response: NextResponse, origin: string): NextResponse {
+  response.headers.set('Access-Control-Allow-Origin', origin)
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type')
+  return response
+}
+
+/**
+ * GET /api/agent?publicKey=xxx&sessionId=xxx
+ * Get the current status of a chat run
+ */
+export async function GET(request: NextRequest) {
+  const origin = request.headers.get('Origin') || '*'
+
+  try {
+    const publicKey = request.nextUrl.searchParams.get('publicKey')
+    const sessionId = request.nextUrl.searchParams.get('sessionId')
+
+    if (!publicKey) {
+      return addCorsHeaders(
+        NextResponse.json({ error: 'publicKey is required' }, { status: 400 }),
+        origin
+      )
+    }
+
+    if (!sessionId) {
+      return addCorsHeaders(
+        NextResponse.json({ error: 'sessionId is required' }, { status: 400 }),
+        origin
+      )
+    }
+
+    // Validate public key
+    const project = await getProjectByPublicKey(publicKey)
+    if (!project) {
+      return addCorsHeaders(
+        NextResponse.json({ error: 'Invalid public key' }, { status: 401 }),
+        origin
+      )
+    }
+
+    // Use admin client since this is public-facing (no user auth)
+    const supabase = createAdminClient()
+    const status = await getChatRunStatus({ sessionId, supabase })
+
+    return addCorsHeaders(NextResponse.json(status), origin)
+  } catch (error) {
+    console.error('[agent.get] unexpected error', error)
+    return addCorsHeaders(
+      NextResponse.json({ error: 'Failed to get status' }, { status: 500 }),
+      origin
+    )
+  }
+}
+
+/**
+ * POST /api/agent
+ * Trigger a new chat run (creates chat_run record, returns runId for SSE streaming)
+ */
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get('Origin') || '*'
+
   try {
     const body = (await request.json()) as AgentRequestBody
-    const { messages, publicKey, userId, userMetadata, pageUrl, pageTitle } = body
+    const { messages, publicKey, userId, userMetadata, pageUrl, pageTitle, sessionId: clientSessionId } = body
 
     // Validate required fields
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json(
-        { error: 'Messages array is required' },
-        { status: 400 }
+      return addCorsHeaders(
+        NextResponse.json({ error: 'Messages array is required' }, { status: 400 }),
+        origin
       )
     }
 
     if (!publicKey) {
-      return NextResponse.json(
-        { error: 'publicKey is required' },
-        { status: 400 }
+      return addCorsHeaders(
+        NextResponse.json({ error: 'publicKey is required' }, { status: 400 }),
+        origin
       )
     }
 
     // Derive project from publicKey
     const project = await getProjectByPublicKey(publicKey)
     if (!project) {
-      return NextResponse.json(
-        { error: 'Invalid public key' },
-        { status: 401 }
+      return addCorsHeaders(
+        NextResponse.json({ error: 'Invalid public key' }, { status: 401 }),
+        origin
       )
     }
 
     const projectId = project.id
 
-    // Generate session ID for this user/project combination
-    const sessionId = generateSessionId(publicKey, userId)
+    // Use client-provided sessionId if available, otherwise generate a unique one
+    const sessionId = clientSessionId || generateUniqueSessionId()
 
     // Upsert session for tracking (fire and forget - don't block the response)
     upsertSession({
@@ -93,70 +151,44 @@ export async function POST(request: NextRequest) {
       console.error('[agent.post] failed to upsert session', error)
     })
 
-    // Get the support agent
-    const agent = mastra.getAgent('supportAgent')
-    if (!agent) {
-      console.error('[agent.post] supportAgent not found')
-      return NextResponse.json(
-        { error: 'Agent not available' },
-        { status: 500 }
+    // Use admin client since this is public-facing (no user auth)
+    const supabase = createAdminClient()
+
+    // Trigger chat run (creates record, returns runId)
+    const result = await triggerChatRun({
+      projectId,
+      sessionId,
+      messages,
+      userId,
+      userMetadata,
+      supabase,
+    })
+
+    if (!result.success) {
+      return addCorsHeaders(
+        NextResponse.json(
+          { error: result.error, runId: result.runId, chatRunId: result.chatRunId },
+          { status: result.statusCode }
+        ),
+        origin
       )
     }
 
-    // Build RuntimeContext with project and user info
-    const runtimeContext = new RuntimeContext<SupportAgentContext>()
-    runtimeContext.set('projectId', projectId)
-    runtimeContext.set('userId', userId || null)
-    runtimeContext.set('userMetadata', userMetadata || null)
-    runtimeContext.set('sessionId', sessionId)
-
-    // Convert messages to the format expected by Mastra (CoreMessage from AI SDK)
-    const mastraMessages: CoreMessage[] = messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }))
-
-    // Stream the agent response with RuntimeContext and memory
-    const stream = await agent.stream(mastraMessages, {
-      runtimeContext,
-      memory: {
-        thread: sessionId,
-        resource: userId || 'anonymous',
-      },
-    })
-
-    // Update session activity (fire and forget)
-    updateSessionActivity(sessionId).catch((error) => {
-      console.error('[agent.post] failed to update session activity', error)
-    })
-
-    // Create a readable stream for the response
-    const readableStream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of stream.textStream) {
-            controller.enqueue(new TextEncoder().encode(chunk))
-          }
-          controller.close()
-        } catch (error) {
-          console.error('[agent.post] streaming error', error)
-          controller.error(error)
-        }
-      },
-    })
-
-    return new Response(readableStream, {
-      headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    })
+    return addCorsHeaders(
+      NextResponse.json({
+        message: 'Chat started.',
+        status: 'processing',
+        sessionId,
+        runId: result.runId,
+        chatRunId: result.chatRunId,
+      }, { status: 201 }),
+      origin
+    )
   } catch (error) {
     console.error('[agent.post] unexpected error', error)
-    return NextResponse.json(
-      { error: 'Failed to process request' },
-      { status: 500 }
+    return addCorsHeaders(
+      NextResponse.json({ error: 'Failed to process request' }, { status: 500 }),
+      request.headers.get('Origin') || '*'
     )
   }
 }
@@ -169,7 +201,7 @@ export async function OPTIONS(request: NextRequest) {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
     },

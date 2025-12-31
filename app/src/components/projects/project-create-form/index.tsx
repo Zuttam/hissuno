@@ -12,9 +12,9 @@ import {
   type GitignoreSelection,
 } from '@/lib/projects/source-code-utils'
 import type { CodebaseMode, StepId } from '../shared/types'
-import type { GitHubRepoSelection } from '../shared/github-repo-picker'
+import type { GitHubRepoSelection } from './github-repo-picker'
 import { ProjectDetailsCard } from './project-details-card'
-import { SourceCodeCard } from '../shared/source-code-card'
+import { SourceCodeCard } from './source-code-card'
 import { KnowledgeSourcesCard, type KnowledgeSourceInput } from './knowledge-sources-card'
 import {
   WizardContainer,
@@ -61,6 +61,7 @@ export function ProjectCreateForm() {
   // Knowledge sources state
   const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeSourceInput[]>([])
   const [skipKnowledgeAnalysis, setSkipKnowledgeAnalysis] = useState(false)
+  const [includeCodebaseInAnalysis, setIncludeCodebaseInAnalysis] = useState(true)
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(1)
@@ -229,7 +230,7 @@ export function ProjectCreateForm() {
   )
 
   // Check if source code step should show "Link Later"
-  const hasSourceCode = codebaseFiles.length > 0 || (selectedRepo && selectedBranch)
+  const hasSourceCode = codebaseFiles.length > 0 || Boolean(selectedRepo && selectedBranch)
 
   // Compute wizard steps
   const wizardSteps = useMemo<WizardStepMetadata[]>(() => {
@@ -296,8 +297,26 @@ export function ProjectCreateForm() {
       const formData = new FormData()
       formData.append('name', name.trim())
       if (description.trim()) formData.append('description', description.trim())
-      if (analysisScope.trim()) formData.append('analysisScope', analysisScope.trim())
+      // Only include analysisScope if codebase is being included in analysis
+      if (includeCodebaseInAnalysis && analysisScope.trim()) {
+        formData.append('analysisScope', analysisScope.trim())
+      }
       formData.append('skipAnalysis', skipKnowledgeAnalysis ? 'true' : 'false')
+      formData.append('includeCodebaseInAnalysis', includeCodebaseInAnalysis ? 'true' : 'false')
+
+      // Add knowledge sources (websites, docs, raw_text) to form data
+      if (knowledgeSources.length > 0) {
+        const sourcesToSend = knowledgeSources
+          .filter(s => s.type !== 'uploaded_doc') // File uploads handled separately
+          .map(s => ({
+            type: s.type,
+            url: s.url,
+            content: s.content,
+          }))
+        if (sourcesToSend.length > 0) {
+          formData.append('knowledgeSources', JSON.stringify(sourcesToSend))
+        }
+      }
 
       if (codebaseMode === 'github' && selectedRepo && selectedBranch) {
         // GitHub source code
@@ -399,8 +418,6 @@ export function ProjectCreateForm() {
               isConnecting: isConnectingGitHub,
             }}
             codebaseError={codebaseError}
-            analysisScope={analysisScope}
-            onAnalysisScopeChange={setAnalysisScope}
           />
         </WizardStep>
 
@@ -410,6 +427,12 @@ export function ProjectCreateForm() {
             onSourcesChange={setKnowledgeSources}
             skipAnalysis={skipKnowledgeAnalysis}
             onSkipAnalysisChange={setSkipKnowledgeAnalysis}
+            hasCodebase={hasSourceCode}
+            codebaseType={codebaseMode === 'github' && selectedRepo ? 'github' : codebaseFiles.length > 0 ? 'upload-folder' : null}
+            includeCodebaseInAnalysis={includeCodebaseInAnalysis}
+            onIncludeCodebaseChange={setIncludeCodebaseInAnalysis}
+            analysisScope={analysisScope}
+            onAnalysisScopeChange={setAnalysisScope}
           />
         </WizardStep>
 

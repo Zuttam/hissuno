@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Badge, Spinner, Select } from '@/components/ui'
-import type { IssueWithSessions, IssueStatus, IssuePriority } from '@/types/issue'
+import { useCallback } from 'react'
+import Link from 'next/link'
+import { Spinner, Select } from '@/components/ui'
+import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType } from '@/types/issue'
 import { useIssueDetail } from '@/hooks/use-issues'
+import { useSpecGeneration } from '@/hooks/use-spec-generation'
 import { ProductSpecView } from './product-spec-view'
+import { SpecGenerationProgress } from './spec-generation-progress'
 
 interface IssueSidebarProps {
   projectId: string
@@ -23,10 +26,22 @@ export function IssueSidebar({
     issue,
     isLoading,
     updateIssue,
-    generateSpec,
+    refresh: refreshIssue,
   } = useIssueDetail({ projectId, issueId })
 
-  const [isGeneratingSpec, setIsGeneratingSpec] = useState(false)
+  const {
+    isGenerating: isGeneratingSpec,
+    events: specEvents,
+    startGeneration: handleGenerateSpec,
+    cancelGeneration: handleCancelSpec,
+  } = useSpecGeneration({
+    projectId,
+    issueId,
+    onComplete: () => {
+      refreshIssue()
+      onIssueUpdated?.()
+    },
+  })
 
   const handleStatusChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value as IssueStatus
@@ -40,15 +55,11 @@ export function IssueSidebar({
     onIssueUpdated?.()
   }, [updateIssue, onIssueUpdated])
 
-  const handleGenerateSpec = useCallback(async () => {
-    setIsGeneratingSpec(true)
-    try {
-      await generateSpec()
-      onIssueUpdated?.()
-    } finally {
-      setIsGeneratingSpec(false)
-    }
-  }, [generateSpec, onIssueUpdated])
+  const handleTypeChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newType = e.target.value as IssueType
+    await updateIssue({ type: newType })
+    onIssueUpdated?.()
+  }, [updateIssue, onIssueUpdated])
 
   return (
     <>
@@ -101,6 +112,7 @@ export function IssueSidebar({
                 issue={issue}
                 onStatusChange={handleStatusChange}
                 onPriorityChange={handlePriorityChange}
+                onTypeChange={handleTypeChange}
               />
             </div>
 
@@ -122,9 +134,10 @@ export function IssueSidebar({
               {issue.sessions && issue.sessions.length > 0 ? (
                 <div className="space-y-2">
                   {issue.sessions.map((session) => (
-                    <div
+                    <Link
                       key={session.id}
-                      className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3"
+                      href={`/sessions?session=${session.id}`}
+                      className="block rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 transition hover:border-[color:var(--accent-primary)] hover:bg-[color:var(--surface-hover)]"
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-xs text-[color:var(--foreground)]">
@@ -135,16 +148,11 @@ export function IssueSidebar({
                         </span>
                       </div>
                       {session.page_url && (
-                        <a
-                          href={session.page_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-1 block truncate text-xs text-[color:var(--accent-primary)] hover:underline"
-                        >
+                        <span className="mt-1 block truncate text-xs text-[color:var(--text-secondary)]">
                           {session.page_url}
-                        </a>
+                        </span>
                       )}
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : (
@@ -160,32 +168,40 @@ export function IssueSidebar({
                 <h3 className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
                   Product Specification
                 </h3>
-                {!issue.product_spec && (
+                {!issue.product_spec && !isGeneratingSpec && (
                   <button
                     type="button"
                     onClick={handleGenerateSpec}
-                    disabled={isGeneratingSpec}
-                    className="rounded-[4px] border-2 border-[color:var(--accent-primary)] bg-transparent px-3 py-1 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--accent-primary)] transition hover:bg-[color:var(--accent-primary)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-[4px] border-2 border-[color:var(--accent-primary)] bg-transparent px-3 py-1 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--accent-primary)] transition hover:bg-[color:var(--accent-primary)] hover:text-white"
                   >
-                    {isGeneratingSpec ? 'Generating...' : 'Generate Spec'}
+                    Generate Spec
                   </button>
                 )}
               </div>
+
+              {/* Progress indicator when generating */}
+              {isGeneratingSpec && (
+                <div className="mb-4">
+                  <SpecGenerationProgress
+                    events={specEvents}
+                    isProcessing={isGeneratingSpec}
+                    onCancel={handleCancelSpec}
+                  />
+                </div>
+              )}
 
               {issue.product_spec ? (
                 <ProductSpecView
                   spec={issue.product_spec}
                   generatedAt={issue.product_spec_generated_at}
                 />
-              ) : (
+              ) : !isGeneratingSpec ? (
                 <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-6 text-center">
                   <p className="text-sm text-[color:var(--text-secondary)]">
-                    {isGeneratingSpec
-                      ? 'Generating product specification...'
-                      : 'No product specification yet. Click "Generate Spec" to create one.'}
+                    No product specification yet. Click "Generate Spec" to create one.
                   </p>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         ) : (
@@ -202,38 +218,34 @@ interface IssueHeaderProps {
   issue: IssueWithSessions
   onStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
   onPriorityChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
+  onTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
 }
 
-function IssueHeader({ issue, onStatusChange, onPriorityChange }: IssueHeaderProps) {
-  const typeLabels = {
-    bug: 'Bug',
-    feature_request: 'Feature Request',
-    change_request: 'Change Request',
-  }
-
-  const typeVariants = {
-    bug: 'danger' as const,
-    feature_request: 'info' as const,
-    change_request: 'warning' as const,
-  }
-
+function IssueHeader({ issue, onStatusChange, onPriorityChange, onTypeChange }: IssueHeaderProps) {
   return (
     <div className="space-y-4">
-      {/* Title and Type */}
+      {/* Title and Project */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Badge variant={typeVariants[issue.type]}>{typeLabels[issue.type]}</Badge>
-          <span className="font-mono text-sm text-[color:var(--text-secondary)]">
-            {issue.project?.name || 'Unknown Project'}
-          </span>
-        </div>
+        <span className="font-mono text-sm text-[color:var(--text-secondary)]">
+          {issue.project?.name || 'Unknown Project'}
+        </span>
         <h3 className="text-lg font-semibold text-[color:var(--foreground)]">
           {issue.title}
         </h3>
       </div>
 
-      {/* Status and Priority Controls */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Type, Status, and Priority Controls */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="space-y-1">
+          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+            Type
+          </label>
+          <Select value={issue.type} onChange={onTypeChange} className="w-full">
+            <option value="bug">Bug</option>
+            <option value="feature_request">Feature Request</option>
+            <option value="change_request">Change Request</option>
+          </Select>
+        </div>
         <div className="space-y-1">
           <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
             Status

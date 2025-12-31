@@ -78,8 +78,10 @@ export type Database = {
       knowledge_sources: {
         Row: {
           analyzed_at: string | null
+          analysis_scope: string | null
           content: string | null
           created_at: string
+          enabled: boolean
           error_message: string | null
           id: string
           project_id: string
@@ -91,8 +93,10 @@ export type Database = {
         }
         Insert: {
           analyzed_at?: string | null
+          analysis_scope?: string | null
           content?: string | null
           created_at?: string
+          enabled?: boolean
           error_message?: string | null
           id?: string
           project_id: string
@@ -104,8 +108,10 @@ export type Database = {
         }
         Update: {
           analyzed_at?: string | null
+          analysis_scope?: string | null
           content?: string | null
           created_at?: string
+          enabled?: boolean
           error_message?: string | null
           id?: string
           project_id?: string
@@ -165,6 +171,63 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pm_reviews: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          metadata: Json | null
+          project_id: string
+          result: Json | null
+          run_id: string
+          session_id: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          project_id: string
+          result?: Json | null
+          run_id: string
+          session_id: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          metadata?: Json | null
+          project_id?: string
+          result?: Json | null
+          run_id?: string
+          session_id?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pm_reviews_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pm_reviews_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -271,7 +334,6 @@ export type Database = {
       }
       source_codes: {
         Row: {
-          analysis_scope: string | null
           commit_sha: string | null
           created_at: string
           id: string
@@ -284,7 +346,6 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          analysis_scope?: string | null
           commit_sha?: string | null
           created_at?: string
           id?: string
@@ -297,7 +358,6 @@ export type Database = {
           user_id: string
         }
         Update: {
-          analysis_scope?: string | null
           commit_sha?: string | null
           created_at?: string
           id?: string

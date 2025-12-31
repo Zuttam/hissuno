@@ -1,6 +1,6 @@
 import type { ChangeEvent, RefObject } from 'react'
 import type { FileSummary, GitignoreSelection } from '@/lib/projects/source-code-utils'
-import type { GitHubRepoSelection } from '@/components/projects/shared/github-repo-picker'
+import type { GitHubRepoSelection } from '@/components/projects/project-create-form/github-repo-picker'
 
 export type CodebaseMode = 'upload-folder' | 'github'
 
@@ -51,7 +51,4 @@ export type SourceCodeCardProps = {
   uploadProps: UploadFolderProps
   githubProps?: GitHubPickerProps
   codebaseError: string | null
-  // Analysis scope props
-  analysisScope?: string
-  onAnalysisScopeChange?: (value: string) => void
 }

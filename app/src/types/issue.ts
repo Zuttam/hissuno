@@ -65,6 +65,21 @@ export interface IssueSessionRecord {
 }
 
 /**
+ * Widget display variants
+ */
+export type WidgetVariant = 'popup' | 'sidepanel'
+
+/**
+ * Widget theme options
+ */
+export type WidgetTheme = 'light' | 'dark' | 'auto'
+
+/**
+ * Widget position options
+ */
+export type WidgetPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
+
+/**
  * Project settings record
  */
 export interface ProjectSettingsRecord {
@@ -72,6 +87,12 @@ export interface ProjectSettingsRecord {
   issue_spec_threshold: number
   issue_tracking_enabled: boolean
   spec_guidelines: string | null
+  // Widget settings
+  widget_variant: WidgetVariant
+  widget_theme: WidgetTheme
+  widget_position: WidgetPosition
+  widget_title: string
+  widget_initial_message: string
   created_at: string
   updated_at: string
 }
@@ -158,4 +179,65 @@ export interface PMReviewResult {
   skipReason?: string
   thresholdMet?: boolean
   specGenerated?: boolean
+}
+
+/**
+ * PM Review status values
+ */
+export type PMReviewStatus = 'running' | 'completed' | 'failed'
+
+/**
+ * PM Review record from database
+ */
+export interface PMReviewRecord {
+  id: string
+  session_id: string
+  project_id: string
+  run_id: string
+  status: PMReviewStatus
+  started_at: string
+  completed_at: string | null
+  error_message: string | null
+  result: PMReviewResult | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
+/**
+ * PM Review status response from API
+ */
+export interface PMReviewStatusResponse {
+  isRunning: boolean
+  reviewId: string | null
+  runId: string | null
+  status: PMReviewStatus | null
+  startedAt: string | null
+  completedAt: string | null
+  result: PMReviewResult | null
+  error: string | null
+}
+
+/**
+ * SSE event types for PM review streaming
+ */
+export type PMReviewSSEEventType =
+  | 'connected'
+  | 'review-start'
+  | 'step-start'
+  | 'step-progress'
+  | 'step-finish'
+  | 'review-finish'
+  | 'error'
+
+/**
+ * SSE event for PM review streaming
+ */
+export interface PMReviewSSEEvent {
+  type: PMReviewSSEEventType
+  stepId?: string
+  stepName?: string
+  message?: string
+  data?: Record<string, unknown>
+  result?: PMReviewResult
+  timestamp: string
 }

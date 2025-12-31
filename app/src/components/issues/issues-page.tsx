@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { IssueWithProject, IssueFilters } from '@/types/issue'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { useIssues } from '@/hooks/use-issues'
@@ -12,22 +12,66 @@ interface IssuesPageContentProps {
   initialIssues: IssueWithProject[]
   projects: ProjectWithCodebase[]
   initialProjectFilter?: string
+  initialIssueId?: string
 }
 
 export function IssuesPageContent({
   initialIssues,
   projects,
   initialProjectFilter,
+  initialIssueId,
 }: IssuesPageContentProps) {
   const [filters, setFilters] = useState<IssueFilters>({
     projectId: initialProjectFilter,
   })
-  const [selectedIssue, setSelectedIssue] = useState<{ id: string; projectId: string } | null>(null)
+
+  // Find initial issue from list to get projectId
+  const initialSelectedIssue = initialIssueId
+    ? (() => {
+        const issue = initialIssues.find(i => i.id === initialIssueId)
+        return issue ? { id: issue.id, projectId: issue.project_id } : null
+      })()
+    : null
+
+  const [selectedIssue, setSelectedIssue] = useState<{ id: string; projectId: string } | null>(initialSelectedIssue)
 
   const { issues, isLoading, error, refresh } = useIssues({
     initialIssues,
     filters,
   })
+
+  // Update URL when selectedIssue changes
+  useEffect(() => {
+    if (selectedIssue) {
+      window.history.pushState(null, '', `/issues/${selectedIssue.id}`)
+    } else {
+      // Only push if we're not already on /issues
+      if (window.location.pathname !== '/issues') {
+        window.history.pushState(null, '', '/issues')
+      }
+    }
+  }, [selectedIssue])
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const match = window.location.pathname.match(/^\/issues\/([^/]+)$/)
+      if (match) {
+        const issueId = match[1]
+        const issue = issues.find(i => i.id === issueId)
+        if (issue) {
+          setSelectedIssue({ id: issue.id, projectId: issue.project_id })
+        } else {
+          setSelectedIssue(null)
+        }
+      } else {
+        setSelectedIssue(null)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [issues])
 
   const handleFilterChange = useCallback((newFilters: IssueFilters) => {
     setFilters(newFilters)

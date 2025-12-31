@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
 import { mastra } from '@/mastra'
 
 export const runtime = 'nodejs'
@@ -11,6 +12,25 @@ type RouteParams = { id: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
+}
+
+const LOG_PREFIX = '[knowledge.analyze.stream]'
+
+/**
+ * SSE event types for knowledge analysis
+ */
+type KnowledgeSSEEventType =
+  | 'connected'
+  | 'workflow-start'
+  | 'step-start'
+  | 'step-progress'
+  | 'step-finish'
+  | 'step-error'
+  | 'workflow-finish'
+  | 'error'
+
+interface KnowledgeSSEEvent extends BaseSSEEvent {
+  type: KnowledgeSSEEventType
 }
 
 async function resolveUser() {
@@ -25,37 +45,6 @@ async function resolveUser() {
   }
 
   return { supabase, user }
-}
-
-/**
- * SSE event types emitted to the client
- */
-type SSEEventType = 
-  | 'connected'
-  | 'workflow-start'
-  | 'step-start'
-  | 'step-progress'
-  | 'step-finish'
-  | 'step-error'
-  | 'workflow-finish'
-  | 'error'
-
-interface SSEEvent {
-  type: SSEEventType
-  stepId?: string
-  stepName?: string
-  message?: string
-  data?: Record<string, unknown>
-  timestamp: string
-}
-
-/**
- * Format an SSE message
- * Uses explicit event type for better browser compatibility
- */
-function formatSSE(event: SSEEvent): string {
-  // SSE format: event type (optional), data, and double newline to end
-  return `event: message\ndata: ${JSON.stringify(event)}\n\n`
 }
 
 /**
@@ -79,7 +68,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { id: projectId } = await context.params
 
   if (!isSupabaseConfigured()) {
-    console.error('[knowledge.analyze.stream] Supabase must be configured')
+    console.error(`${LOG_PREFIX} Supabase must be configured`)
     return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
   }
 
@@ -99,7 +88,7 @@ export async function GET(_request: Request, context: RouteContext) {
       .single()
 
     if (analysisError && analysisError.code !== 'PGRST116') {
-      console.error('[knowledge.analyze.stream] failed to load analysis', projectId, analysisError)
+      console.error(`${LOG_PREFIX} failed to load analysis`, projectId, analysisError)
       return NextResponse.json({ error: 'Failed to load analysis.' }, { status: 500 })
     }
 
@@ -112,170 +101,126 @@ export async function GET(_request: Request, context: RouteContext) {
     // Get the workflow
     const workflow = mastra.getWorkflow('knowledgeAnalysisWorkflow')
     if (!workflow) {
-      console.error('[knowledge.analyze.stream] workflow not found')
+      console.error(`${LOG_PREFIX} workflow not found`)
       return NextResponse.json({ error: 'Workflow not configured.' }, { status: 500 })
     }
 
-    // Create a ReadableStream for SSE
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream({
-      async start(controller) {
-        // Track if controller is closed to prevent writing after close
-        let isClosed = false
-
-        // Safe enqueue that checks if controller is still open
-        const safeEnqueue = (data: Uint8Array, eventType?: string) => {
-          if (!isClosed) {
-            try {
-              controller.enqueue(data)
-              console.log('[knowledge.analyze.stream] Enqueued event:', eventType ?? 'unknown')
-            } catch (enqueueError) {
-              // Controller was closed, mark as closed
-              console.error('[knowledge.analyze.stream] Failed to enqueue:', enqueueError)
-              isClosed = true
-            }
-          } else {
-            console.log('[knowledge.analyze.stream] Skipped (closed):', eventType ?? 'unknown')
-          }
-        }
-
-        // Safe close that only closes once
-        const safeClose = () => {
-          if (!isClosed) {
-            isClosed = true
-            try {
-              controller.close()
-            } catch {
-              // Already closed, ignore
-            }
-          }
+    return createSSEStreamWithExecutor<KnowledgeSSEEvent>({
+      logPrefix: LOG_PREFIX,
+      executor: async ({ emit, close, isClosed }) => {
+        // Helper to create typed events
+        const emitEvent = (
+          type: KnowledgeSSEEventType,
+          options: Partial<Omit<KnowledgeSSEEvent, 'type' | 'timestamp'>> = {}
+        ) => {
+          emit(createSSEEvent(type, options) as KnowledgeSSEEvent)
         }
 
         // Send initial connected event
-        console.log('[knowledge.analyze.stream] Sending connected event...')
-        safeEnqueue(encoder.encode(formatSSE({
-          type: 'connected',
-          message: 'Connected to analysis stream',
-          timestamp: new Date().toISOString(),
-        })), 'connected')
+        console.log(`${LOG_PREFIX} Sending connected event...`)
+        emitEvent('connected', { message: 'Connected to analysis stream' })
 
         try {
           // Get workflow input from analysis record metadata
-          console.log('[knowledge.analyze.stream] Analysis record metadata:', JSON.stringify(latestAnalysis.metadata, null, 2))
+          console.log(`${LOG_PREFIX} Analysis record metadata:`, JSON.stringify(latestAnalysis.metadata, null, 2))
           const workflowInput = latestAnalysis.metadata?.workflowInput
-          
+
           if (!workflowInput) {
-            console.error('[knowledge.analyze.stream] No workflow input found in analysis record. Metadata keys:', Object.keys(latestAnalysis.metadata ?? {}))
-            safeEnqueue(encoder.encode(formatSSE({
-              type: 'error',
-              message: 'Analysis configuration not found. Please restart the analysis.',
-              timestamp: new Date().toISOString(),
-            })), 'error')
-            safeClose()
+            console.error(`${LOG_PREFIX} No workflow input found in analysis record. Metadata keys:`, Object.keys(latestAnalysis.metadata ?? {}))
+            emitEvent('error', { message: 'Analysis configuration not found. Please restart the analysis.' })
+            close()
             return
           }
-          
-          console.log('[knowledge.analyze.stream] Found workflow input with projectId:', workflowInput.projectId)
+
+          console.log(`${LOG_PREFIX} Found workflow input with projectId:`, workflowInput.projectId)
 
           // Create a new run and execute the workflow directly with streamVNext
-          // This is the proper way to stream workflow events - executing it here in the SSE route
-          console.log('[knowledge.analyze.stream] Creating run with runId:', runId)
+          console.log(`${LOG_PREFIX} Creating run with runId:`, runId)
           const run = await workflow.createRunAsync({ runId })
-          
-          // Execute the workflow with streamVNext - this actually runs the workflow and streams events
-          console.log('[knowledge.analyze.stream] Calling streamVNext to execute workflow...')
+
+          // Execute the workflow with streamVNext
+          console.log(`${LOG_PREFIX} Calling streamVNext to execute workflow...`)
           const workflowStream = run.streamVNext({ inputData: workflowInput })
-          console.log('[knowledge.analyze.stream] streamVNext started, iterating events...')
+          console.log(`${LOG_PREFIX} streamVNext started, iterating events...`)
 
           let eventCount = 0
-          
+
           // Process stream events from the workflow execution
           for await (const event of workflowStream) {
             eventCount++
-            
-            // Stop processing if controller is closed (client disconnected)
-            if (isClosed) break
 
-            let sseEvent: SSEEvent | null = null
+            // Stop processing if controller is closed (client disconnected)
+            if (isClosed()) break
 
             // Log event for debugging
-            console.log('[knowledge.analyze.stream] Event:', JSON.stringify(event, null, 2))
+            console.log(`${LOG_PREFIX} Event:`, JSON.stringify(event, null, 2))
 
             // Extract step name from payload - Mastra uses 'stepName' in event payloads
             const payload = 'payload' in event ? (event.payload as Record<string, unknown>) : undefined
             const stepId = payload?.stepName as string | undefined
-            
+
             switch (event.type) {
               case 'workflow-start':
-                sseEvent = {
-                  type: 'workflow-start',
-                  message: 'Knowledge analysis started',
-                  timestamp: new Date().toISOString(),
-                }
+                emitEvent('workflow-start', { message: 'Knowledge analysis started' })
                 break
 
               case 'workflow-step-start':
-                sseEvent = {
-                  type: 'step-start',
+                emitEvent('step-start', {
                   stepId,
                   stepName: getStepDisplayName(stepId ?? ''),
                   message: `Starting: ${getStepDisplayName(stepId ?? '')}`,
-                  timestamp: new Date().toISOString(),
-                }
+                })
                 break
 
               case 'workflow-step-output': {
                 // Custom progress events from workflow steps via writer.write()
-                // The payload for step-output events contains the data written by writer.write()
-                // Check both payload.output (nested) and payload directly (if data is at root level)
-                const output = (payload?.output as { type?: string; message?: string }) 
+                const output = (payload?.output as { type?: string; message?: string })
                   ?? (payload as { type?: string; message?: string })
-                
+
                 if (output?.type === 'progress') {
-                  sseEvent = {
-                    type: 'step-progress',
+                  emitEvent('step-progress', {
                     stepId,
                     message: output?.message ?? 'Processing...',
                     data: output as Record<string, unknown>,
-                    timestamp: new Date().toISOString(),
-                  }
+                  })
                 }
                 break
               }
 
               case 'workflow-step-result':
               case 'workflow-step-finish':
-                sseEvent = {
-                  type: 'step-finish',
+                emitEvent('step-finish', {
                   stepId,
                   stepName: getStepDisplayName(stepId ?? ''),
                   message: `Completed: ${getStepDisplayName(stepId ?? '')}`,
-                  timestamp: new Date().toISOString(),
-                }
+                })
                 break
 
               case 'workflow-finish':
-              case 'workflow-canceled':
-                sseEvent = {
-                  type: 'workflow-finish',
-                  message: 'Knowledge analysis completed',
-                  timestamp: new Date().toISOString(),
+              case 'workflow-canceled': {
+                // Check if the workflow finished with an error
+                const workflowStatus = payload?.workflowStatus as string | undefined
+                const isError = workflowStatus === 'error' || workflowStatus === 'failed'
+
+                if (isError) {
+                  // Throw to let the catch block handle error logging, DB update, and SSE error event
+                  const errorDetails = payload?.error as string | undefined
+                  throw new Error(errorDetails || 'Workflow failed during execution')
+                } else {
+                  emitEvent('workflow-finish', { message: 'Knowledge analysis completed' })
                 }
                 break
-            }
-
-            if (sseEvent) {
-              safeEnqueue(encoder.encode(formatSSE(sseEvent)), sseEvent.type)
+              }
             }
           }
 
-          console.log('[knowledge.analyze.stream] Workflow stream completed, total events:', eventCount)
-          
+          console.log(`${LOG_PREFIX} Workflow stream completed, total events:`, eventCount)
+
           // Stream ended - close the connection
-          safeClose()
+          close()
         } catch (error) {
-          console.error('[knowledge.analyze.stream] stream error', error)
-          
+          console.error(`${LOG_PREFIX} stream error`, error)
+
           // Mark the analysis as failed in the database
           try {
             const supabaseForError = await createClient()
@@ -288,28 +233,16 @@ export async function GET(_request: Request, context: RouteContext) {
               })
               .eq('id', latestAnalysis.id)
           } catch (dbError) {
-            console.error('[knowledge.analyze.stream] Failed to update analysis record:', dbError)
+            console.error(`${LOG_PREFIX} Failed to update analysis record:`, dbError)
           }
-          
-          // Send error event before closing (if controller still open)
-          safeEnqueue(encoder.encode(formatSSE({
-            type: 'error',
-            message: error instanceof Error ? error.message : 'Stream error',
-            timestamp: new Date().toISOString(),
-          })), 'error')
-          
-          safeClose()
-        }
-      },
-    })
 
-    console.log('[knowledge.analyze.stream] Returning SSE response for runId:', runId)
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-        'X-Accel-Buffering': 'no',
+          // Send user-friendly error event
+          emitEvent('error', {
+            message: 'Analysis encountered an issue. Please try again or contact support if the problem persists.',
+          })
+
+          close()
+        }
       },
     })
   } catch (error) {
@@ -317,7 +250,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
 
-    console.error('[knowledge.analyze.stream] unexpected error', error)
+    console.error(`${LOG_PREFIX} unexpected error`, error)
     return NextResponse.json({ error: 'Failed to stream analysis.' }, { status: 500 })
   }
 }

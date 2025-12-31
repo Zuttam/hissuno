@@ -50,6 +50,24 @@
   }
 }
 
+@keyframes hissuno-slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes hissuno-fade-in-backdrop {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Widget container */
 .hissuno-widget {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
@@ -75,6 +93,16 @@
 /* Popup container */
 .hissuno-popup {
   animation: hissuno-scale-in 0.2s ease-out;
+}
+
+/* Sidepanel container */
+.hissuno-sidepanel {
+  animation: hissuno-slide-in-right 0.3s ease-out;
+}
+
+/* Sidepanel backdrop */
+.hissuno-backdrop {
+  animation: hissuno-fade-in-backdrop 0.2s ease-out;
 }
 
 /* Messages container */
@@ -106,23 +134,27 @@
 }
 
 /* Input focus states */
-.hissuno-popup input:focus {
+.hissuno-popup input:focus,
+.hissuno-sidepanel input:focus {
   border-color: #2563eb !important;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2) !important;
 }
 
 /* Button hover states */
-.hissuno-popup button[type='submit']:not(:disabled):hover {
+.hissuno-popup button[type='submit']:not(:disabled):hover,
+.hissuno-sidepanel button[type='submit']:not(:disabled):hover {
   background-color: #1d4ed8 !important;
 }
 
 /* Close/clear button hover states */
-.hissuno-popup button[aria-label]:hover {
+.hissuno-popup button[aria-label]:hover,
+.hissuno-sidepanel button[aria-label]:hover {
   background-color: rgba(0, 0, 0, 0.05);
 }
 
 /* Dark theme hover states */
-.hissuno-popup[data-theme='dark'] button[aria-label]:hover {
+.hissuno-popup[data-theme='dark'] button[aria-label]:hover,
+.hissuno-sidepanel[data-theme='dark'] button[aria-label]:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -132,6 +164,10 @@
     width: calc(100vw - 32px) !important;
     left: 16px !important;
     right: 16px !important;
+  }
+
+  .hissuno-sidepanel {
+    width: 100vw !important;
   }
 }
 

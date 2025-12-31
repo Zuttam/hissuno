@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { AppNavigation, type NavItem } from '@/components/layout/app-navigation'
 import { UserAccountMenu } from '@/components/layout/user-account-menu'
 import { AuthProvider } from '@/components/providers/auth-provider'
+import { SupportWidget } from '@/components/layout/support-widget'
 import { getSessionUser } from '@/lib/auth/server'
 
 const NAV_ITEMS: NavItem[] = [
@@ -36,6 +37,7 @@ export default async function AuthenticatedLayout({
           </div>
         </header>
         <main className="mx-auto w-full px-12 py-10">{children}</main>
+        <SupportWidget />
       </div>
     </AuthProvider>
   )
