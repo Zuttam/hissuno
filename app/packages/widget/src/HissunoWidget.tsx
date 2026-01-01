@@ -4,7 +4,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { ChatBubble } from './ChatBubble';
 import { ChatPopup } from './ChatPopup';
 import { ChatSidepanel } from './ChatSidepanel';
+import { ConversationHistory } from './ConversationHistory';
 import { useHissunoChat } from './useHissunoChat';
+import type { SessionEntry } from './useHissunoChat';
 import type { HissunoWidgetProps, WidgetSettings, WidgetVariant, BubblePosition } from './types';
 
 const DEFAULT_API_URL = '/api/agent';
@@ -56,6 +58,8 @@ export function HissunoWidget({
   headers = {},
 }: HissunoWidgetProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [sessionHistory, setSessionHistory] = useState<SessionEntry[]>([]);
 
   // Validate required props
   if (!publicKey) {
@@ -91,6 +95,10 @@ export function HissunoWidget({
     clearHistory,
     closeSession,
     cancelChat,
+    currentSessionId,
+    loadSession,
+    getSessionHistory,
+    deleteSession,
   } = useHissunoChat({
     publicKey,
     apiUrl,
@@ -99,6 +107,32 @@ export function HissunoWidget({
     userId,
     userMetadata,
   });
+
+  // History is only available if userId is provided
+  const canShowHistory = !!userId;
+
+  // Handlers for history panel
+  const handleOpenHistory = useCallback(() => {
+    if (!canShowHistory) return;
+    // Refresh session history when opening
+    setSessionHistory(getSessionHistory());
+    setIsHistoryOpen(true);
+  }, [canShowHistory, getSessionHistory]);
+
+  const handleCloseHistory = useCallback(() => {
+    setIsHistoryOpen(false);
+  }, []);
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    loadSession(sessionId);
+    setIsHistoryOpen(false);
+  }, [loadSession]);
+
+  const handleDeleteSession = useCallback((sessionId: string) => {
+    deleteSession(sessionId);
+    // Refresh the list after deletion
+    setSessionHistory(getSessionHistory());
+  }, [deleteSession, getSessionHistory]);
 
   const open = useCallback(() => {
     setIsOpen(true);
@@ -125,6 +159,34 @@ export function HissunoWidget({
       setIsOpen(true);
     }
   }, [defaultOpen]);
+
+  // Inject critical CSS keyframes on mount (ensures animations work without manual style import)
+  useEffect(() => {
+    const styleId = 'hissuno-widget-styles';
+    if (document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      @keyframes hissuno-bounce {
+        0%, 80%, 100% { transform: translateY(0); }
+        40% { transform: translateY(-6px); }
+      }
+      @keyframes hissuno-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes hissuno-scale-in {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @keyframes hissuno-slide-in-right {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
 
   // Resolve theme based on system preference if 'auto'
   const resolvedTheme = useResolvedTheme(theme);
@@ -162,6 +224,13 @@ export function HissunoWidget({
           theme={resolvedTheme}
           onClearHistory={clearHistory}
           onCancelChat={cancelChat}
+          onOpenHistory={canShowHistory ? handleOpenHistory : undefined}
+          isHistoryOpen={isHistoryOpen}
+          sessionHistory={sessionHistory}
+          currentSessionId={currentSessionId}
+          onCloseHistory={handleCloseHistory}
+          onSelectSession={handleSelectSession}
+          onDeleteSession={handleDeleteSession}
         />
       ) : (
         <ChatPopup
@@ -182,6 +251,13 @@ export function HissunoWidget({
           offset={bubbleOffset}
           onClearHistory={clearHistory}
           onCancelChat={cancelChat}
+          onOpenHistory={canShowHistory ? handleOpenHistory : undefined}
+          isHistoryOpen={isHistoryOpen}
+          sessionHistory={sessionHistory}
+          currentSessionId={currentSessionId}
+          onCloseHistory={handleCloseHistory}
+          onSelectSession={handleSelectSession}
+          onDeleteSession={handleDeleteSession}
         />
       )}
     </div>

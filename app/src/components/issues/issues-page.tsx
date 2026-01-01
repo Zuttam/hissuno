@@ -7,6 +7,9 @@ import { useIssues } from '@/hooks/use-issues'
 import { IssuesFilters } from './issues-filters'
 import { IssuesTable } from './issues-table'
 import { IssueSidebar } from './issue-sidebar'
+import { IconButton } from '@/components/ui/icon-button'
+import { RefreshIcon } from '@/components/ui/refresh-icon'
+import { Card } from '../ui/card'
 
 interface IssuesPageContentProps {
   initialIssues: IssueWithProject[]
@@ -25,32 +28,24 @@ export function IssuesPageContent({
     projectId: initialProjectFilter,
   })
 
-  // Find initial issue from list to get projectId
-  const initialSelectedIssue = initialIssueId
-    ? (() => {
-        const issue = initialIssues.find(i => i.id === initialIssueId)
-        return issue ? { id: issue.id, projectId: issue.project_id } : null
-      })()
-    : null
-
-  const [selectedIssue, setSelectedIssue] = useState<{ id: string; projectId: string } | null>(initialSelectedIssue)
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(initialIssueId ?? null)
 
   const { issues, isLoading, error, refresh } = useIssues({
     initialIssues,
     filters,
   })
 
-  // Update URL when selectedIssue changes
+  // Update URL when selectedIssueId changes
   useEffect(() => {
-    if (selectedIssue) {
-      window.history.pushState(null, '', `/issues/${selectedIssue.id}`)
+    if (selectedIssueId) {
+      window.history.pushState(null, '', `/issues/${selectedIssueId}`)
     } else {
       // Only push if we're not already on /issues
       if (window.location.pathname !== '/issues') {
         window.history.pushState(null, '', '/issues')
       }
     }
-  }, [selectedIssue])
+  }, [selectedIssueId])
 
   // Handle browser back/forward navigation
   useEffect(() => {
@@ -60,12 +55,12 @@ export function IssuesPageContent({
         const issueId = match[1]
         const issue = issues.find(i => i.id === issueId)
         if (issue) {
-          setSelectedIssue({ id: issue.id, projectId: issue.project_id })
+          setSelectedIssueId(issue.id)
         } else {
-          setSelectedIssue(null)
+          setSelectedIssueId(null)
         }
       } else {
-        setSelectedIssue(null)
+        setSelectedIssueId(null)
       }
     }
 
@@ -78,14 +73,11 @@ export function IssuesPageContent({
   }, [])
 
   const handleIssueSelect = useCallback((issue: IssueWithProject) => {
-    setSelectedIssue({
-      id: issue.id,
-      projectId: issue.project_id,
-    })
+    setSelectedIssueId(issue.id)
   }, [])
 
   const handleCloseSidebar = useCallback(() => {
-    setSelectedIssue(null)
+    setSelectedIssueId(null)
   }, [])
 
   const handleIssueUpdated = useCallback(() => {
@@ -93,27 +85,20 @@ export function IssuesPageContent({
   }, [refresh])
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[color:var(--background)] px-8 py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex flex-col justify-between gap-6 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8 md:flex-row md:items-center">
-          <div className="space-y-2">
-            <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-              Issues
-            </h1>
-            <p className="max-w-2xl text-sm text-[color:var(--text-secondary)]">
-              View and manage issues, feature requests, and bugs identified from user sessions. 
-              Issues are automatically created when the PM Agent detects actionable feedback.
-            </p>
-          </div>
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--foreground)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
-            >
-              Refresh
-            </button>
-          </div>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+      <Card className="flex flex-col gap-8 border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)]">
+        <header className="flex items-center gap-3">
+          <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+            Issues
+          </h1>
+          <IconButton
+            aria-label="Refresh issues"
+            variant="ghost"
+            size="md"
+            onClick={() => void refresh()}
+          >
+            <RefreshIcon />
+          </IconButton>
         </header>
 
         <IssuesFilters
@@ -135,16 +120,15 @@ export function IssuesPageContent({
         ) : (
           <IssuesTable
             issues={issues}
-            selectedIssueId={selectedIssue?.id ?? null}
+            selectedIssueId={selectedIssueId}
             onSelectIssue={handleIssueSelect}
           />
         )}
-      </div>
+      </Card>
 
-      {selectedIssue && (
+      {selectedIssueId && (
         <IssueSidebar
-          projectId={selectedIssue.projectId}
-          issueId={selectedIssue.id}
+          issueId={selectedIssueId}
           onClose={handleCloseSidebar}
           onIssueUpdated={handleIssueUpdated}
         />

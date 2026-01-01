@@ -23,6 +23,13 @@
   --accent-success: #10b981;
   --accent-warning: #ff9900;
   --accent-danger: #ff3333;
+
+  /* Water colors */
+  --water-base: #ecf8ff;
+  --water-deep: #c7e8ff;
+  --water-ripple: #ffffff;
+  --water-caustic: #ffffff;
+  --water-caustic-intensity: 0.7;
 }
 
 .dark {
@@ -45,6 +52,13 @@
   --accent-success: #34d399;
   --accent-warning: #ffaa33;
   --accent-danger: #ff5555;
+
+  /* Water colors */
+  --water-base: #08090f;
+  --water-deep: #0c0e18;
+  --water-ripple: #1a2030;
+  --water-caustic: #1a4060;
+  --water-caustic-intensity: 0.25;
 }
 
 @theme inline {
@@ -54,8 +68,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
-body {
+html {
   background: var(--background);
+}
+
+body {
+  background: transparent;
   color: var(--foreground);
   font-family: system-ui, -apple-system, sans-serif;
   line-height: 1.5;
@@ -74,4 +92,84 @@ body {
 
 .animate-fade-in {
   animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Water theme animations */
+@keyframes water-float {
+  0%, 100% {
+    transform: translate3d(var(--nudge-x, 0), var(--nudge-y, 0), 0) translateY(0);
+  }
+  50% {
+    transform: translate3d(var(--nudge-x, 0), var(--nudge-y, 0), 0) translateY(-3px);
+  }
+}
+
+
+@keyframes water-blob-drift {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(20px, -15px) scale(1.02);
+  }
+  50% {
+    transform: translate(-10px, 10px) scale(0.98);
+  }
+  75% {
+    transform: translate(15px, 5px) scale(1.01);
+  }
+}
+
+/* Simple expanding ripple */
+@keyframes ripple-simple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* 3D ripple rings with perspective effect */
+@keyframes ripple-ring {
+  0% {
+    transform: rotateX(60deg) scale(0);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: rotateX(60deg) scale(1);
+    opacity: 0;
+  }
+}
+
+.water-float {
+  animation: water-float 3.5s ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+}
+
+.water-float:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+}
+
+.water-blob {
+  animation: water-blob-drift 20s ease-in-out infinite;
+}
+
+.animate-ripple-ring-1 {
+  animation: ripple-ring 1.8s ease-out both;
+}
+
+.animate-ripple-ring-2 {
+  animation: ripple-ring 1.8s ease-out 0.15s both;
+}
+
+.animate-ripple-ring-3 {
+  animation: ripple-ring 1.8s ease-out 0.3s both;
 }

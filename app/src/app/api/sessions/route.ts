@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { listSessions } from '@/lib/supabase/sessions'
+import { listSessions, getProjectIntegrationStats } from '@/lib/supabase/sessions'
 import { isSupabaseConfigured } from '@/lib/supabase/server'
 import type { SessionFilters } from '@/types/session'
 
@@ -9,6 +9,9 @@ export const runtime = 'nodejs'
 /**
  * GET /api/sessions
  * Lists sessions with optional filters. Only returns sessions for projects owned by the authenticated user.
+ *
+ * Query params:
+ * - stats=true&projectId={id} - Returns integration stats instead of sessions list
  */
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
@@ -18,6 +21,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url)
+
+    // Stats mode - return integration stats for a project
+    if (searchParams.get('stats') === 'true') {
+      const projectId = searchParams.get('projectId')
+      if (!projectId) {
+        return NextResponse.json({ error: 'projectId required for stats' }, { status: 400 })
+      }
+      const stats = await getProjectIntegrationStats(projectId)
+      return NextResponse.json({ stats })
+    }
 
     const filters: SessionFilters = {
       projectId: searchParams.get('projectId') || undefined,

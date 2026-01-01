@@ -100,7 +100,6 @@ export function UserAccountMenu({ user }: UserAccountMenuProps) {
                       className="flex items-center justify-between"
                     >
                       <span>{option.label}</span>
-                      {isActive ? <span className="text-xs">Active</span> : null}
                     </Button>
                   )
                 })}

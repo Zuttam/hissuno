@@ -12,6 +12,8 @@ export type TriggerSpecGenerationParams = {
   projectId: string
   issueId: string
   supabase: AnySupabaseClient
+  /** When true, allows regenerating an existing spec */
+  regenerate?: boolean
 }
 
 export type TriggerSpecGenerationResult = {

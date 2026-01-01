@@ -227,19 +227,66 @@ export async function GET(request: NextRequest) {
           return
         }
 
-        // Update chat run as completed
-        await updateChatRunStatus({
-          chatRunId: chatRun.id,
-          status: 'completed',
-          supabase,
-        })
-
+        // Send message-complete IMMEDIATELY to release UI
         emitEvent('message-complete', {
           message: 'Response complete',
           data: { contentLength: fullContent.length },
         })
 
         safeClose()
+
+        // Do post-completion DB updates in background (don't block the client)
+        const postCompletionTasks = async () => {
+          try {
+            // Check for goodbye marker and handle session lifecycle
+            const GOODBYE_MARKER = '[SESSION_GOODBYE]'
+            if (fullContent.includes(GOODBYE_MARKER)) {
+              console.log(`${LOG_PREFIX} Goodbye marker detected, scheduling session close`)
+
+              // Get project settings for goodbye delay
+              const { data: session } = await supabase
+                .from('sessions')
+                .select('project_id')
+                .eq('id', sessionId)
+                .single()
+
+              let goodbyeDelaySeconds = 90 // Default 90 seconds
+              if (session?.project_id) {
+                const { data: settings } = await supabase
+                  .from('project_settings')
+                  .select('session_goodbye_delay_seconds')
+                  .eq('project_id', session.project_id)
+                  .single()
+                if (settings?.session_goodbye_delay_seconds) {
+                  goodbyeDelaySeconds = settings.session_goodbye_delay_seconds
+                }
+              }
+
+              const scheduledCloseAt = new Date(Date.now() + goodbyeDelaySeconds * 1000).toISOString()
+
+              await supabase
+                .from('sessions')
+                .update({
+                  status: 'closing_soon',
+                  goodbye_detected_at: new Date().toISOString(),
+                  scheduled_close_at: scheduledCloseAt,
+                })
+                .eq('id', sessionId)
+            }
+
+            // Update chat run as completed
+            await updateChatRunStatus({
+              chatRunId: chatRun.id,
+              status: 'completed',
+              supabase,
+            })
+          } catch (err) {
+            console.error(`${LOG_PREFIX} Post-completion tasks error:`, err)
+          }
+        }
+
+        // Fire and forget - don't await
+        postCompletionTasks()
       } catch (error) {
         console.error(`${LOG_PREFIX} stream error`, error)
 

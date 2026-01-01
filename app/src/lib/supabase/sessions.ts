@@ -1,7 +1,7 @@
 import { cache } from 'react'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
-import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue } from '@/types/session'
+import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource } from '@/types/session'
 
 const selectSessionWithProject = '*, project:projects(id, name)'
 const selectSessionWithLinkedIssues = `
@@ -23,6 +23,7 @@ export async function upsertSession(params: {
   userMetadata?: Record<string, string> | null
   pageUrl?: string | null
   pageTitle?: string | null
+  source?: SessionSource | null
 }): Promise<void> {
   if (!isServiceRoleConfigured()) {
     console.warn('[supabase.sessions] Service role not configured, skipping session upsert')
@@ -31,7 +32,7 @@ export async function upsertSession(params: {
 
   try {
     const supabase = createAdminClient()
-    
+
     const { error } = await supabase
       .from('sessions')
       .upsert(
@@ -42,6 +43,7 @@ export async function upsertSession(params: {
           user_metadata: params.userMetadata || {},
           page_url: params.pageUrl || null,
           page_title: params.pageTitle || null,
+          source: params.source || 'widget',
           last_activity_at: new Date().toISOString(),
         },
         {
@@ -153,6 +155,9 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     }
     if (filters.status) {
       query = query.eq('status', filters.status)
+    }
+    if (filters.tags && filters.tags.length > 0) {
+      query = query.overlaps('tags', filters.tags)
     }
     if (filters.dateFrom) {
       query = query.gte('created_at', filters.dateFrom)
@@ -302,5 +307,111 @@ export const getProjectSessions = cache(async (projectId: string, limit = 5): Pr
   } catch (error) {
     console.error('[supabase.sessions] unexpected error getting project sessions', projectId, error)
     throw error
+  }
+})
+
+/**
+ * Updates tags for a session. Uses admin client for workflow/API use.
+ */
+export async function updateSessionTags(
+  sessionId: string,
+  tags: SessionTag[],
+  autoApplied = false
+): Promise<{ success: boolean; error?: string }> {
+  if (!isServiceRoleConfigured()) {
+    return { success: false, error: 'Service role not configured' }
+  }
+
+  try {
+    const supabase = createAdminClient()
+
+    const updates: Record<string, unknown> = {
+      tags,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (autoApplied) {
+      updates.tags_auto_applied_at = new Date().toISOString()
+    }
+
+    const { error } = await supabase
+      .from('sessions')
+      .update(updates)
+      .eq('id', sessionId)
+
+    if (error) {
+      console.error('[supabase.sessions] failed to update session tags', sessionId, error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('[supabase.sessions] unexpected error updating session tags', sessionId, error)
+    return { success: false, error: 'Unexpected error' }
+  }
+}
+
+/**
+ * Gets integration stats for a project (for widget status indicator).
+ * Returns last activity timestamp and whether there's been recent activity.
+ */
+export interface IntegrationStats {
+  lastActivityAt: string | null
+  isActive: boolean // Has sessions in last 7 days
+}
+
+export const getProjectIntegrationStats = cache(async (projectId: string): Promise<IntegrationStats> => {
+  if (!isSupabaseConfigured()) {
+    return { lastActivityAt: null, isActive: false }
+  }
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return { lastActivityAt: null, isActive: false }
+    }
+
+    // Verify user owns this project
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', projectId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!project) {
+      return { lastActivityAt: null, isActive: false }
+    }
+
+    // Get most recent session
+    const { data: latest } = await supabase
+      .from('sessions')
+      .select('last_activity_at')
+      .eq('project_id', projectId)
+      .order('last_activity_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    // Check for activity in last 7 days
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const { count } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('project_id', projectId)
+      .gte('last_activity_at', sevenDaysAgo.toISOString())
+
+    return {
+      lastActivityAt: latest?.last_activity_at ?? null,
+      isActive: (count ?? 0) > 0,
+    }
+  } catch {
+    return { lastActivityAt: null, isActive: false }
   }
 })

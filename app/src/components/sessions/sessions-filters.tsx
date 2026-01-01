@@ -2,8 +2,9 @@
 
 import { useCallback } from 'react'
 import { Input, Select } from '@/components/ui'
-import type { SessionFilters } from '@/types/session'
+import type { SessionFilters, SessionTag } from '@/types/session'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import { SessionTagFilter } from './session-tag-filter'
 
 interface SessionsFiltersProps {
   projects: ProjectWithCodebase[]
@@ -59,6 +60,13 @@ export function SessionsFilters({
     [filters, onFilterChange]
   )
 
+  const handleTagsChange = useCallback(
+    (tags: SessionTag[]) => {
+      onFilterChange({ ...filters, tags: tags.length > 0 ? tags : undefined })
+    },
+    [filters, onFilterChange]
+  )
+
   const handleClearFilters = useCallback(() => {
     onFilterChange({})
   }, [onFilterChange])
@@ -69,7 +77,8 @@ export function SessionsFilters({
     filters.sessionId ||
     filters.status ||
     filters.dateFrom ||
-    filters.dateTo
+    filters.dateTo ||
+    (filters.tags && filters.tags.length > 0)
 
   return (
     <div className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-4">
@@ -131,6 +140,16 @@ export function SessionsFilters({
             <option value="active">Active</option>
             <option value="closed">Closed</option>
           </Select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+            Tags
+          </label>
+          <SessionTagFilter
+            selectedTags={filters.tags ?? []}
+            onChange={handleTagsChange}
+          />
         </div>
 
         <div className="flex flex-col gap-1">

@@ -13,8 +13,6 @@ import {
 
 interface KnowledgeManagementCardProps {
   projectId: string
-  /** @deprecated No longer needed - codebase comes from knowledge_sources */
-  hasCodebase?: boolean
 }
 
 interface AnalysisStatus {
@@ -46,7 +44,7 @@ interface KnowledgePackage {
 
 type AddSourceType = 'website' | 'docs_portal' | 'raw_text'
 
-export function KnowledgeManagementCard({ projectId, hasCodebase = false }: KnowledgeManagementCardProps) {
+export function KnowledgeManagementCard({ projectId }: KnowledgeManagementCardProps) {
   const [sources, setSources] = useState<KnowledgeSourceRecord[]>([])
   const [packages, setPackages] = useState<KnowledgePackage[]>([])
   const [hasKnowledge, setHasKnowledge] = useState(false)
@@ -360,106 +358,104 @@ export function KnowledgeManagementCard({ projectId, hasCodebase = false }: Know
   const totalSourcesCount = sources.length
 
   return (
-    <Card>
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="font-mono text-xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-              Knowledge Base
-            </h2>
-            <p className="text-sm text-[color:var(--text-secondary)] mt-1">
-              Manage knowledge sources and compiled documentation for the support agent.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isAnalyzing && (
-              <Button
-                onClick={handleCancelAnalysis}
-                variant="secondary"
-              >
-                Cancel
-              </Button>
-            )}
-            <Button
-              onClick={handleRunAnalysis}
-              loading={isAnalyzing}
-              disabled={isAnalyzing}
-            >
-              {isAnalyzing ? 'Analyzing...' : hasKnowledge ? 'Re-run Analysis' : 'Run Analysis'}
-            </Button>
-          </div>
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-mono text-xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+            Knowledge Base
+          </h2>
+          <p className="text-sm text-[color:var(--text-secondary)] mt-1">
+            Manage knowledge sources and compiled documentation for the support agent.
+          </p>
         </div>
-
-        {/* Alerts */}
-        {error && (
-          <Alert variant="warning" className="mb-4">
-            {error}
-          </Alert>
-        )}
-
-        {/* Analysis Progress Bar */}
-        <AnalysisProgressBar events={analysisEvents} isProcessing={isAnalyzing} />
-
-        {analysisStatus && analysisStatus.status === 'failed' && !isAnalyzing && (
-          <Alert variant="warning" className="mb-4">
-            Some sources failed to analyze. Check the sources below for details.
-          </Alert>
-        )}
-
-        {analysisStatus && analysisStatus.status === 'cancelled' && !isAnalyzing && (
-          <Alert variant="info" className="mb-4">
-            Previous analysis was cancelled. Click &quot;Run Analysis&quot; to try again.
-          </Alert>
-        )}
-
-        {/* Primary: Knowledge Section */}
-        <KnowledgeSection
-          packages={packages}
-          isLoading={isLoading}
-          projectId={projectId}
-          onPackageUpdated={fetchPackages}
-        />
-
-        {/* Secondary: Collapsible Sources Section */}
-        <div className="mt-6 pt-6 border-t border-[color:var(--border-subtle)]">
-          <Collapsible
-            defaultOpen={false}
-            trigger={<span>Sources ({totalSourcesCount})</span>}
-            headerActions={
-              !showAddForm && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(true)}
-                  className="text-sm text-[color:var(--accent-selected)] hover:underline transition"
-                >
-                  + Add source
-                </button>
-              )
-            }
+        <div className="flex items-center gap-2">
+          {isAnalyzing && (
+            <Button
+              onClick={handleCancelAnalysis}
+              variant="secondary"
+            >
+              Cancel
+            </Button>
+          )}
+          <Button
+            onClick={handleRunAnalysis}
+            loading={isAnalyzing}
+            disabled={isAnalyzing}
           >
-            <SourcesSection
-              sources={sources}
-              isLoading={isLoading}
-              showAddForm={showAddForm}
-              onShowAddForm={() => setShowAddForm(true)}
-              onHideAddForm={() => setShowAddForm(false)}
-              addSourceType={addSourceType}
-              onAddSourceTypeChange={setAddSourceType}
-              addSourceUrl={addSourceUrl}
-              onAddSourceUrlChange={setAddSourceUrl}
-              addSourceContent={addSourceContent}
-              onAddSourceContentChange={setAddSourceContent}
-              isAddingSource={isAddingSource}
-              onAddSource={handleAddSource}
-              onDeleteSource={handleDeleteSource}
-              onUpdateSource={handleUpdateSource}
-              projectId={projectId}
-            />
-          </Collapsible>
+            {isAnalyzing ? 'Analyzing...' : hasKnowledge ? 'Re-run Analysis' : 'Run Analysis'}
+          </Button>
         </div>
       </div>
-    </Card>
+
+      {/* Alerts */}
+      {error && (
+        <Alert variant="warning" className="mb-4">
+          {error}
+        </Alert>
+      )}
+
+      {/* Analysis Progress Bar */}
+      <AnalysisProgressBar events={analysisEvents} isProcessing={isAnalyzing} />
+
+      {analysisStatus && analysisStatus.status === 'failed' && !isAnalyzing && (
+        <Alert variant="warning" className="mb-4">
+          Some sources failed to analyze. Check the sources below for details.
+        </Alert>
+      )}
+
+      {analysisStatus && analysisStatus.status === 'cancelled' && !isAnalyzing && (
+        <Alert variant="info" className="mb-4">
+          Previous analysis was cancelled. Click &quot;Run Analysis&quot; to try again.
+        </Alert>
+      )}
+
+      {/* Primary: Knowledge Section */}
+      <KnowledgeSection
+        packages={packages}
+        isLoading={isLoading}
+        projectId={projectId}
+        onPackageUpdated={fetchPackages}
+      />
+
+      {/* Secondary: Collapsible Sources Section */}
+      <div className="mt-6 pt-6 border-t border-[color:var(--border-subtle)]">
+        <Collapsible
+          defaultOpen={false}
+          trigger={<span>Sources ({totalSourcesCount})</span>}
+          headerActions={
+            !showAddForm && (
+              <button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                className="text-sm text-[color:var(--accent-selected)] hover:underline transition"
+              >
+                + Add source
+              </button>
+            )
+          }
+        >
+          <SourcesSection
+            sources={sources}
+            isLoading={isLoading}
+            showAddForm={showAddForm}
+            onShowAddForm={() => setShowAddForm(true)}
+            onHideAddForm={() => setShowAddForm(false)}
+            addSourceType={addSourceType}
+            onAddSourceTypeChange={setAddSourceType}
+            addSourceUrl={addSourceUrl}
+            onAddSourceUrlChange={setAddSourceUrl}
+            addSourceContent={addSourceContent}
+            onAddSourceContentChange={setAddSourceContent}
+            isAddingSource={isAddingSource}
+            onAddSource={handleAddSource}
+            onDeleteSource={handleDeleteSource}
+            onUpdateSource={handleUpdateSource}
+            projectId={projectId}
+          />
+        </Collapsible>
+      </div>
+    </div>
   )
 }
 

@@ -144,7 +144,7 @@ export function createSSEStream<T extends BaseSSEEvent = BaseSSEEvent>(
     if (!isClosed && controllerRef) {
       try {
         controllerRef.enqueue(data)
-        console.log(`${logPrefix} Enqueued event:`, eventType ?? 'unknown')
+        console.debug(`${logPrefix} Enqueued event:`, eventType ?? 'unknown')
       } catch (enqueueError) {
         console.error(`${logPrefix} Failed to enqueue:`, enqueueError)
         isClosed = true

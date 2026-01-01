@@ -1,9 +1,30 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { useProjects } from '@/hooks/use-projects'
+import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
+import { RefreshIcon } from '@/components/ui/refresh-icon'
+import { Card } from '@/components/ui/card'
+import { FloatingCard } from '../ui/floating-card'
+
+function PlusIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={2}
+      stroke="currentColor"
+      className="h-8 w-8"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+  )
+}
 
 interface ProjectsProps {
   initialProjects: ProjectWithCodebase[]
@@ -18,50 +39,37 @@ export function Projects({ initialProjects }: ProjectsProps) {
   }, [projects])
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[color:var(--background)] px-8 py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
-        <header className="flex flex-col justify-between gap-6 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8 md:flex-row md:items-center">
-          <div className="space-y-2">
-            <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-              Hissuno
-            </h1>
-            <p className="max-w-2xl text-sm text-[color:var(--text-secondary)]">
-              Turn support into a product flywheel. Create a project, Connect your codebase and see your product velocity increases like never before.
-            </p>
-          </div>
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row">
-            <Link
-              href="/projects/new"
-              className="whitespace-nowrap rounded-[4px] border-2 border-[color:var(--accent-primary)] bg-[color:var(--accent-primary)] px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[color:var(--accent-primary-hover)] hover:border-[color:var(--accent-primary-hover)]"
-            >
-              Start new project
-            </Link>
-            <button
-              type="button"
-              onClick={() => {
-                void refresh()
-              }}
-              className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--foreground)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
-            >
-              Refresh
-            </button>
-          </div>
-        </header>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+      <header className="flex items-center gap-3">
+        <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+          Projects
+        </h1>
+        <IconButton
+          aria-label="Refresh projects"
+          variant="ghost"
+          size="md"
+          onClick={() => void refresh()}
+        >
+          <RefreshIcon />
+        </IconButton>
+      </header>
 
-        {error && (
-          <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-4 font-mono text-sm text-[color:var(--foreground)]">
-            {error}
-          </div>
-        )}
+      {error && (
+        <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-4 font-mono text-sm text-[color:var(--foreground)]">
+          {error}
+        </div>
+      )}
 
-        {isLoading && projects.length === 0 ? (
-          <ProjectsSkeleton />
-        ) : projects.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{projectCards}</section>
-        )}
-      </div>
+      {isLoading && projects.length === 0 ? (
+        <ProjectsSkeleton />
+      ) : projects.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {projectCards}
+          <AddProjectCard />
+        </section>
+      )}
     </div>
   )
 }
@@ -71,11 +79,11 @@ interface ProjectCardProps {
 }
 
 function ProjectCard({ project }: ProjectCardProps) {
-  const hasSource = Boolean(project.source_code)
-  const sourceType = project.source_code?.kind ?? 'none'
+  const router = useRouter()
 
   return (
-    <article className="group relative flex h-full flex-col justify-between rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-6 transition-all duration-200 hover:border-[color:var(--border)] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] dark:hover:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.1)]">
+    <FloatingCard 
+        variant="elevated" floating="gentle">
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-mono text-lg font-bold uppercase text-[color:var(--foreground)]">
@@ -90,14 +98,33 @@ function ProjectCard({ project }: ProjectCardProps) {
       </div>
 
       <div className="mt-6 flex items-center justify-end font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-        <Link
-          href={`/projects/${project.id}`}
-          className="rounded-[4px] border-2 border-[color:var(--accent-primary)] bg-[color:var(--accent-primary)] px-4 py-2 font-mono text-[11px] font-semibold uppercase tracking-wide text-white transition hover:bg-[color:var(--accent-primary-hover)] hover:border-[color:var(--accent-primary-hover)]"
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => router.push(`/projects/${project.id}`)}
         >
           Open project
-        </Link>
+        </Button>
       </div>
-    </article>
+    </FloatingCard>
+  )
+}
+
+function AddProjectCard() {
+  return (
+    <Card className="group flex h-full min-h-[180px] flex-col items-center justify-center rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-transparent p-6 transition-all duration-200 hover:border-[color:var(--border)] hover:-translate-y-0.5">
+      <Link
+        href="/projects/new"
+        className="flex flex-col items-center gap-3 text-center"
+      >
+        <span className="text-[color:var(--text-tertiary)] transition-colors group-hover:text-[color:var(--text-secondary)]">
+          <PlusIcon />
+        </span>
+        <span className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition-colors group-hover:text-[color:var(--foreground)]">
+          Create Project
+        </span>
+      </Link>
+    </Card>
   )
 }
 
@@ -134,9 +161,3 @@ function EmptyState() {
   )
 }
 
-function getSourceStyles(hasSource: boolean) {
-  if (hasSource) {
-    return 'border-[color:var(--accent-success)] bg-transparent text-[color:var(--accent-success)]'
-  }
-  return 'border-[color:var(--border)] bg-transparent text-[color:var(--text-secondary)]'
-}

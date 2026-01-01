@@ -10,6 +10,10 @@ export interface WidgetSettings {
   widget_position: WidgetPosition
   widget_title: string
   widget_initial_message: string
+  // Session lifecycle settings
+  session_idle_timeout_minutes: number
+  session_goodbye_delay_seconds: number
+  session_idle_response_timeout_seconds: number
 }
 
 interface SupportAgentTabPanelProps {
@@ -138,6 +142,67 @@ export function SupportAgentTabPanel({
           disabled={isLoadingSettings}
         />
       </FormField>
+
+      <SectionHeader
+        title="Session Lifecycle"
+        description="Configure automatic session handling behaviors."
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <FormField
+          label="Idle Timeout"
+          description="Minutes of inactivity before asking if user is still there."
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={1}
+              max={60}
+              value={widgetSettings.session_idle_timeout_minutes}
+              onChange={(e) => updateSetting('session_idle_timeout_minutes', parseInt(e.target.value) || 5)}
+              disabled={isLoadingSettings}
+              className="w-20"
+            />
+            <span className="text-sm text-[color:var(--text-secondary)]">min</span>
+          </div>
+        </FormField>
+
+        <FormField
+          label="Goodbye Delay"
+          description="Seconds to keep session open after goodbye."
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={30}
+              max={300}
+              value={widgetSettings.session_goodbye_delay_seconds}
+              onChange={(e) => updateSetting('session_goodbye_delay_seconds', parseInt(e.target.value) || 90)}
+              disabled={isLoadingSettings}
+              className="w-20"
+            />
+            <span className="text-sm text-[color:var(--text-secondary)]">sec</span>
+          </div>
+        </FormField>
+
+        <FormField
+          label="Response Timeout"
+          description="Seconds to wait after idle prompt before auto-close."
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              min={30}
+              max={180}
+              value={widgetSettings.session_idle_response_timeout_seconds}
+              onChange={(e) => updateSetting('session_idle_response_timeout_seconds', parseInt(e.target.value) || 60)}
+              disabled={isLoadingSettings}
+              className="w-20"
+            />
+            <span className="text-sm text-[color:var(--text-secondary)]">sec</span>
+          </div>
+        </FormField>
+      </div>
     </div>
   )
 }

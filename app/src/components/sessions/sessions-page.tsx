@@ -1,18 +1,24 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { SessionWithProject, SessionFilters } from '@/types/session'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { useSessions, useSessionDetail } from '@/hooks/use-sessions'
 import { SessionsFilters } from './sessions-filters'
 import { SessionsTable } from './sessions-table'
 import { SessionSidebar } from './session-sidebar'
+import { IconButton } from '@/components/ui/icon-button'
+import { RefreshIcon } from '@/components/ui/refresh-icon'
+import { Card } from '@/components/ui/card'
+
+type SessionView = 'messages' | 'details'
 
 interface SessionsPageProps {
   initialSessions: SessionWithProject[]
   projects: ProjectWithCodebase[]
   initialProjectFilter?: string
   initialSessionId?: string
+  initialView?: SessionView
 }
 
 export function SessionsPage({
@@ -20,11 +26,45 @@ export function SessionsPage({
   projects,
   initialProjectFilter,
   initialSessionId,
+  initialView = 'messages',
 }: SessionsPageProps) {
   const [filters, setFilters] = useState<SessionFilters>({
     projectId: initialProjectFilter,
   })
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId ?? null)
+  const [view, setView] = useState<SessionView>(initialView)
+
+  // Update URL when selectedSessionId or view changes
+  useEffect(() => {
+    if (selectedSessionId) {
+      const path = view === 'messages'
+        ? `/sessions/${selectedSessionId}/messages`
+        : `/sessions/${selectedSessionId}`
+      if (window.location.pathname !== path) {
+        window.history.pushState(null, '', path)
+      }
+    } else {
+      if (window.location.pathname !== '/sessions') {
+        window.history.pushState(null, '', '/sessions')
+      }
+    }
+  }, [selectedSessionId, view])
+
+  // Handle browser back/forward navigation
+  useEffect(() => {
+    const handlePopState = () => {
+      const match = window.location.pathname.match(/^\/sessions\/([^/]+)(\/messages)?$/)
+      if (match) {
+        setSelectedSessionId(match[1])
+        setView(match[2] ? 'messages' : 'details')
+      } else {
+        setSelectedSessionId(null)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   const { sessions, isLoading, error, refresh } = useSessions({
     initialSessions,
@@ -41,6 +81,16 @@ export function SessionsPage({
 
   const handleSessionSelect = useCallback((session: SessionWithProject) => {
     setSelectedSessionId(session.id)
+    setView('details') // Open details view when clicking row
+  }, [])
+
+  const handleOpenMessages = useCallback((session: SessionWithProject) => {
+    setSelectedSessionId(session.id)
+    setView('messages') // Open messages view when clicking messages icon
+  }, [])
+
+  const handleViewChange = useCallback((newView: SessionView) => {
+    setView(newView)
   }, [])
 
   const handleCloseSidebar = useCallback(() => {
@@ -48,26 +98,20 @@ export function SessionsPage({
   }, [])
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[color:var(--background)] px-8 py-10">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <header className="flex flex-col justify-between gap-6 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8 md:flex-row md:items-center">
-          <div className="space-y-2">
-            <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-              Sessions
-            </h1>
-            <p className="max-w-2xl text-sm text-[color:var(--text-secondary)]">
-              View and analyze conversations from your support widget. Click on a session to see the full conversation.
-            </p>
-          </div>
-          <div className="flex flex-col items-stretch gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--foreground)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
-            >
-              Refresh
-            </button>
-          </div>
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
+      <Card className="flex flex-col gap-8 border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)]">
+        <header className="flex items-center gap-3">
+          <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+            Sessions
+          </h1>
+          <IconButton
+            aria-label="Refresh sessions"
+            variant="ghost"
+            size="md"
+            onClick={() => void refresh()}
+          >
+            <RefreshIcon />
+          </IconButton>
         </header>
 
         <SessionsFilters
@@ -91,9 +135,10 @@ export function SessionsPage({
             sessions={sessions}
             selectedSessionId={selectedSessionId}
             onSelectSession={handleSessionSelect}
+            onOpenMessages={handleOpenMessages}
           />
         )}
-      </div>
+      </Card>
 
       {selectedSessionId && (
         <SessionSidebar
@@ -101,6 +146,8 @@ export function SessionsPage({
           messages={messages}
           isLoading={isLoadingDetail}
           onClose={handleCloseSidebar}
+          view={view}
+          onViewChange={handleViewChange}
         />
       )}
     </div>

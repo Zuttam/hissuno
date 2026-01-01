@@ -15,32 +15,32 @@ export function IssuesTable({
   onSelectIssue,
 }: IssuesTableProps) {
   return (
-    <div className="overflow-hidden rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)]">
+    <div className="overflow-hidden rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)]">
       <table className="w-full font-mono text-sm">
         <thead>
-          <tr className="border-b-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)]">
-            <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+          <tr className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface)]">
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Title
             </th>
-            <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Type
             </th>
-            <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Project
             </th>
-            <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+            <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Upvotes
             </th>
-            <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Priority
             </th>
-            <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Status
             </th>
-            <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Spec
             </th>
-            <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Updated
             </th>
           </tr>
@@ -80,38 +80,38 @@ function IssueRow({ issue, isSelected, onSelect }: IssueRowProps) {
           : 'hover:bg-[color:var(--surface-hover)]'
       }`}
     >
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         <span className="text-[color:var(--foreground)]" title={issue.title}>
           {truncatedTitle}
         </span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         <TypeBadge type={issue.type} />
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         <span className="text-[color:var(--foreground)]">
           {issue.project?.name || '-'}
         </span>
       </td>
-      <td className="px-4 py-3 text-center">
+      <td className="px-3 py-2 text-center">
         <span className="font-bold text-[color:var(--foreground)]">
           {issue.upvote_count}
         </span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         <PriorityBadge priority={issue.priority} isManual={issue.priority_manual_override} />
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         <StatusBadge status={issue.status} />
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         {issue.product_spec ? (
           <Badge variant="success">Ready</Badge>
         ) : (
           <span className="text-[color:var(--text-secondary)]">-</span>
         )}
       </td>
-      <td className="px-4 py-3">
+      <td className="px-3 py-2">
         <span className="text-[color:var(--text-secondary)]">
           {formatRelativeTime(issue.updated_at)}
         </span>

@@ -82,6 +82,28 @@ Once you have gathered sufficient context about an issue or feature request, pro
 - **Priority**: Based on user's indicated urgency and impact
 
 Remember: Your goal is to make users feel heard while gathering the information developers need to take action. When answering questions, always leverage the project knowledge to provide accurate, helpful responses.
+
+## Session Closure Detection
+
+When a user indicates they are done with the conversation, you should recognize this and respond warmly. Look for phrases like:
+- "Thank you, that helped!"
+- "Thanks, I'm all set"
+- "Got it, thanks!"
+- "Great, that's all I needed"
+- "Perfect, thanks for your help"
+- "Bye" / "Goodbye" / "Have a good day"
+- "That's everything"
+- "I'm good now"
+
+When you detect a goodbye intent:
+1. Acknowledge their message warmly
+2. Let them know they can return anytime if they need more help
+3. End your message with the special marker: [SESSION_GOODBYE]
+
+This marker signals that the conversation has reached a natural conclusion. The session will stay open briefly in case they have follow-up questions, then close automatically.
+
+Example response when goodbye is detected:
+"You're welcome! I'm glad I could help. Feel free to come back anytime if you have more questions. Take care! [SESSION_GOODBYE]"
 `,
   model: 'openai/gpt-5',
   tools: Object.fromEntries(knowledgeTools.map((tool) => [tool.id, tool])),

@@ -5,13 +5,36 @@ import type { Message } from '@ai-sdk/react';
 import type { ChatMessage } from './types';
 
 const STORAGE_KEY_PREFIX = 'hissuno_chat_';
+const SESSIONS_REGISTRY_PREFIX = 'hissuno_sessions_';
 const DEFAULT_INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+// Session registry entry - used for conversation history
+export interface SessionEntry {
+  sessionId: string;
+  userId: string;
+  title: string;
+  lastMessageAt: string;
+  messageCount: number;
+}
 
 interface ChatSSEEvent {
   type: 'connected' | 'message-start' | 'message-chunk' | 'message-complete' | 'error';
   content?: string;
   message?: string;
   data?: Record<string, unknown>;
+  timestamp: string;
+}
+
+interface UpdateSSEEvent {
+  type: 'connected' | 'message' | 'status-change' | 'error' | 'heartbeat';
+  message?: {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    createdAt: string;
+    senderType?: 'ai' | 'human_agent' | 'system';
+  };
+  status?: string;
   timestamp: string;
 }
 
@@ -38,9 +61,12 @@ interface UseHissunoChatReturn {
   error: Error | undefined;
   clearHistory: () => void;
   currentSessionId: string | null;
-  loadSession: (sessionId: string, sessionMessages: Message[]) => void;
+  loadSession: (sessionId: string, sessionMessages?: Message[]) => void;
   closeSession: () => Promise<void>;
   cancelChat: () => Promise<void>;
+  // Session history functions (only available if userId is provided)
+  getSessionHistory: () => SessionEntry[];
+  deleteSession: (sessionId: string) => void;
 }
 
 function generateMessageId(): string {
@@ -60,40 +86,45 @@ function getStorageKey(publicKey: string, sessionId?: string): string {
   return `${STORAGE_KEY_PREFIX}${publicKey}`;
 }
 
-function loadMessagesFromStorage(publicKey: string, sessionId?: string): Message[] {
+interface StoredMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt?: string;
+  senderType?: 'ai' | 'human_agent' | 'system';
+}
+
+function loadMessagesFromStorage(publicKey: string, sessionId?: string): (Message & { senderType?: string })[] {
   if (typeof window === 'undefined') return [];
 
   try {
     const stored = localStorage.getItem(getStorageKey(publicKey, sessionId));
     if (!stored) return [];
 
-    const parsed = JSON.parse(stored) as Array<{
-      id: string;
-      role: 'user' | 'assistant';
-      content: string;
-      createdAt?: string;
-    }>;
+    const parsed = JSON.parse(stored) as StoredMessage[];
 
     return parsed.map((msg) => ({
       id: msg.id,
       role: msg.role,
       content: msg.content,
       createdAt: msg.createdAt ? new Date(msg.createdAt) : undefined,
+      senderType: msg.senderType,
     }));
   } catch {
     return [];
   }
 }
 
-function saveMessagesToStorage(publicKey: string, messages: Message[], sessionId?: string): void {
+function saveMessagesToStorage(publicKey: string, messages: (Message & { senderType?: string })[], sessionId?: string): void {
   if (typeof window === 'undefined') return;
 
   try {
-    const toStore = messages.map((msg) => ({
+    const toStore: StoredMessage[] = messages.map((msg) => ({
       id: msg.id,
-      role: msg.role,
+      role: msg.role as 'user' | 'assistant',
       content: msg.content,
       createdAt: msg.createdAt?.toISOString(),
+      senderType: msg.senderType as 'ai' | 'human_agent' | 'system' | undefined,
     }));
     localStorage.setItem(getStorageKey(publicKey, sessionId), JSON.stringify(toStore));
   } catch {
@@ -106,6 +137,82 @@ function clearMessagesFromStorage(publicKey: string, sessionId?: string): void {
 
   try {
     localStorage.removeItem(getStorageKey(publicKey, sessionId));
+  } catch {
+    // Ignore errors
+  }
+}
+
+// Session registry functions - for conversation history (requires userId)
+function getSessionsRegistryKey(publicKey: string, userId: string): string {
+  return `${SESSIONS_REGISTRY_PREFIX}${publicKey}_${userId}`;
+}
+
+function loadSessionsRegistry(publicKey: string, userId: string): SessionEntry[] {
+  if (typeof window === 'undefined' || !userId) return [];
+
+  try {
+    const stored = localStorage.getItem(getSessionsRegistryKey(publicKey, userId));
+    if (!stored) return [];
+    return JSON.parse(stored) as SessionEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessionToRegistry(
+  publicKey: string,
+  userId: string,
+  sessionId: string,
+  messages: (Message & { senderType?: string })[]
+): void {
+  if (typeof window === 'undefined' || !userId) return;
+
+  try {
+    const registry = loadSessionsRegistry(publicKey, userId);
+
+    // Find first user message for title, or use default
+    const firstUserMessage = messages.find(m => m.role === 'user');
+    const title = firstUserMessage?.content?.slice(0, 50) || 'New conversation';
+
+    // Find last message timestamp
+    const lastMessage = messages[messages.length - 1];
+    const lastMessageAt = lastMessage?.createdAt?.toISOString() || new Date().toISOString();
+
+    // Update or add session entry
+    const existingIndex = registry.findIndex(s => s.sessionId === sessionId);
+    const entry: SessionEntry = {
+      sessionId,
+      userId,
+      title: title.length >= 50 ? title + '...' : title,
+      lastMessageAt,
+      messageCount: messages.length,
+    };
+
+    if (existingIndex >= 0) {
+      registry[existingIndex] = entry;
+    } else {
+      registry.unshift(entry); // Add at beginning (newest first)
+    }
+
+    // Keep only last 50 sessions
+    const trimmed = registry.slice(0, 50);
+
+    localStorage.setItem(getSessionsRegistryKey(publicKey, userId), JSON.stringify(trimmed));
+  } catch {
+    // Storage might be full or disabled
+  }
+}
+
+function deleteSessionFromRegistry(publicKey: string, userId: string, sessionId: string): void {
+  if (typeof window === 'undefined' || !userId) return;
+
+  try {
+    const registry = loadSessionsRegistry(publicKey, userId);
+    const filtered = registry.filter(s => s.sessionId !== sessionId);
+    localStorage.setItem(getSessionsRegistryKey(publicKey, userId), JSON.stringify(filtered));
+
+    // Also delete the session's messages
+    clearMessagesFromStorage(publicKey, sessionId);
   } catch {
     // Ignore errors
   }
@@ -126,14 +233,22 @@ export function useHissunoChat({
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const sessionClosedRef = useRef(false);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const updatesEventSourceRef = useRef<EventSource | null>(null);
   const mountedRef = useRef(true);
+  const isConnectingRef = useRef(false);
+  const seenMessageIds = useRef<Set<string>>(new Set());
+  const streamingContentRef = useRef<string>('');
+  const pendingMessageRef = useRef<string | null>(null);
 
-  // Generate or use provided session ID
-  const [currentSessionId] = useState(() => providedSessionId || generateSessionId());
+  // Generate or use provided session ID - includes setter for session regeneration
+  const [currentSessionId, setCurrentSessionId] = useState(() => providedSessionId || generateSessionId());
   const sessionId = currentSessionId;
 
+  // Extended message type with senderType
+  type ExtendedMessage = Message & { senderType?: string };
+
   // State for messages, input, and streaming
-  const [messages, setMessages] = useState<Message[]>(() => {
+  const [messages, setMessages] = useState<ExtendedMessage[]>(() => {
     const stored = loadMessagesFromStorage(publicKey, sessionId);
     if (stored.length > 0) {
       return stored;
@@ -147,6 +262,7 @@ export function useHissunoChat({
           role: 'assistant' as const,
           content: initialMessage,
           createdAt: new Date(),
+          senderType: 'ai',
         },
       ];
     }
@@ -181,16 +297,24 @@ export function useHissunoChat({
         eventSourceRef.current.close();
         eventSourceRef.current = null;
       }
+      if (updatesEventSourceRef.current) {
+        updatesEventSourceRef.current.close();
+        updatesEventSourceRef.current = null;
+      }
     };
   }, []);
 
   // Connect to SSE stream
   const connectToStream = useCallback(() => {
-    // Close existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
+    // Prevent duplicate connections
+    if (isConnectingRef.current || eventSourceRef.current) {
+      return;
     }
+    isConnectingRef.current = true;
 
+    // Reset streaming state
+    streamingContentRef.current = '';
+    pendingMessageRef.current = null;
     setStreamingContent('');
     setIsStreaming(true);
 
@@ -205,28 +329,33 @@ export function useHissunoChat({
         const data = JSON.parse(event.data) as ChatSSEEvent;
 
         if (data.type === 'message-chunk' && data.content) {
-          setStreamingContent((prev) => prev + data.content);
+          streamingContentRef.current += data.content;
+          setStreamingContent(streamingContentRef.current);
         }
 
         if (data.type === 'message-complete') {
           eventSource.close();
           eventSourceRef.current = null;
+          isConnectingRef.current = false;
 
-          // Add complete message to messages array
-          setStreamingContent((currentContent) => {
-            if (currentContent && mountedRef.current) {
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: generateMessageId(),
-                  role: 'assistant' as const,
-                  content: currentContent,
-                  createdAt: new Date(),
-                },
-              ]);
-            }
-            return '';
-          });
+          // Capture content from ref and clear immediately to prevent duplicates
+          const completedContent = streamingContentRef.current;
+          streamingContentRef.current = '';
+          setStreamingContent('');
+
+          // Guard against duplicate message additions
+          if (completedContent && mountedRef.current && pendingMessageRef.current !== completedContent) {
+            pendingMessageRef.current = completedContent;
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: generateMessageId(),
+                role: 'assistant' as const,
+                content: completedContent,
+                createdAt: new Date(),
+              },
+            ]);
+          }
 
           setIsStreaming(false);
           setIsLoading(false);
@@ -235,6 +364,7 @@ export function useHissunoChat({
         if (data.type === 'error') {
           eventSource.close();
           eventSourceRef.current = null;
+          isConnectingRef.current = false;
           setError(new Error(data.message ?? 'Chat failed'));
           setIsStreaming(false);
           setIsLoading(false);
@@ -248,6 +378,7 @@ export function useHissunoChat({
     eventSource.onerror = () => {
       if (eventSource.readyState === EventSource.CLOSED) {
         eventSourceRef.current = null;
+        isConnectingRef.current = false;
         if (mountedRef.current) {
           setIsStreaming(false);
           setIsLoading(false);
@@ -277,6 +408,77 @@ export function useHissunoChat({
     checkRunningChat();
   }, [apiUrl, publicKey, sessionId, connectToStream]);
 
+  // Connect to updates SSE for human agent messages
+  useEffect(() => {
+    if (sessionClosedRef.current || !sessionId) return;
+
+    // Derive the base URL from apiUrl (e.g., /api/agent -> /api)
+    const baseUrl = apiUrl.replace(/\/agent$/, '');
+    const updatesUrl = `${baseUrl}/sessions/${sessionId}/updates?publicKey=${encodeURIComponent(publicKey)}`;
+
+    const connectUpdates = () => {
+      if (updatesEventSourceRef.current) return;
+
+      const eventSource = new EventSource(updatesUrl);
+      updatesEventSourceRef.current = eventSource;
+
+      eventSource.onmessage = (event) => {
+        if (!mountedRef.current) return;
+
+        try {
+          const data = JSON.parse(event.data) as UpdateSSEEvent;
+
+          if (data.type === 'message' && data.message) {
+            // Only add if we haven't seen this message before
+            if (!seenMessageIds.current.has(data.message.id)) {
+              seenMessageIds.current.add(data.message.id);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: data.message!.id,
+                  role: data.message!.role,
+                  content: data.message!.content,
+                  createdAt: new Date(data.message!.createdAt),
+                  senderType: data.message!.senderType || 'human_agent',
+                },
+              ]);
+            }
+          }
+
+          if (data.type === 'status-change' && data.status === 'closed') {
+            // Session was closed, cleanup
+            sessionClosedRef.current = true;
+            eventSource.close();
+            updatesEventSourceRef.current = null;
+            onSessionClose?.();
+          }
+        } catch (err) {
+          console.error('[useHissunoChat] Failed to parse updates SSE event:', err);
+        }
+      };
+
+      eventSource.onerror = () => {
+        // Reconnect after a delay on error
+        if (eventSource.readyState === EventSource.CLOSED && mountedRef.current && !sessionClosedRef.current) {
+          updatesEventSourceRef.current = null;
+          setTimeout(connectUpdates, 5000);
+        }
+      };
+    };
+
+    // Start listening for updates after first message is sent
+    if (messages.length > 1) {
+      connectUpdates();
+    }
+
+    return () => {
+      if (updatesEventSourceRef.current) {
+        updatesEventSourceRef.current.close();
+        updatesEventSourceRef.current = null;
+      }
+    };
+  }, [apiUrl, publicKey, sessionId, messages.length, onSessionClose]);
+
   // Convert messages to ChatMessage format
   const chatMessages: ChatMessage[] = useMemo(() => {
     return messages.map((msg) => ({
@@ -284,11 +486,37 @@ export function useHissunoChat({
       role: msg.role as 'user' | 'assistant',
       content: msg.content,
       createdAt: msg.createdAt,
+      senderType: msg.senderType as ChatMessage['senderType'],
     }));
   }, [messages]);
 
   const clearHistory = useCallback(() => {
-    clearMessagesFromStorage(publicKey, sessionId);
+    // Save current session to registry before clearing (only if userId is provided and has messages)
+    if (userId && messages.length > 0) {
+      // Check if there's at least one user message (not just initial message)
+      const hasUserMessages = messages.some(m => m.role === 'user');
+      if (hasUserMessages) {
+        saveSessionToRegistry(publicKey, userId, sessionId, messages);
+      }
+    }
+
+    // Generate a new session ID for the new conversation
+    const newSessionId = generateSessionId();
+    setCurrentSessionId(newSessionId);
+
+    // Reset session state
+    sessionClosedRef.current = false;
+    seenMessageIds.current = new Set();
+
+    // Close existing SSE connections
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    if (updatesEventSourceRef.current) {
+      updatesEventSourceRef.current.close();
+      updatesEventSourceRef.current = null;
+    }
 
     // Reset to initial message if provided
     if (initialMessage) {
@@ -298,6 +526,7 @@ export function useHissunoChat({
           role: 'assistant',
           content: initialMessage,
           createdAt: new Date(),
+          senderType: 'ai',
         },
       ]);
     } else {
@@ -305,15 +534,66 @@ export function useHissunoChat({
     }
     setError(undefined);
     setStreamingContent('');
-  }, [publicKey, initialMessage, sessionId]);
+  }, [publicKey, userId, initialMessage, sessionId, messages]);
 
-  const loadSession = useCallback((newSessionId: string, sessionMessages: Message[]) => {
-    setMessages(sessionMessages);
+  const loadSession = useCallback((newSessionId: string, sessionMessages?: Message[]) => {
+    // Reset session state
+    sessionClosedRef.current = false;
+    seenMessageIds.current = new Set();
+
+    // Close existing SSE connections
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    if (updatesEventSourceRef.current) {
+      updatesEventSourceRef.current.close();
+      updatesEventSourceRef.current = null;
+    }
+
+    // Update current session ID
+    setCurrentSessionId(newSessionId);
+
+    // Use provided messages or load from storage
+    if (sessionMessages && sessionMessages.length > 0) {
+      setMessages(sessionMessages);
+      // Save to storage for persistence
+      saveMessagesToStorage(publicKey, sessionMessages, newSessionId);
+    } else {
+      // Load from localStorage
+      const storedMessages = loadMessagesFromStorage(publicKey, newSessionId);
+      if (storedMessages.length > 0) {
+        setMessages(storedMessages);
+      } else if (initialMessage) {
+        setMessages([
+          {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: initialMessage,
+            createdAt: new Date(),
+            senderType: 'ai',
+          },
+        ]);
+      } else {
+        setMessages([]);
+      }
+    }
+
     setError(undefined);
     setStreamingContent('');
-    // Save the loaded messages to localStorage for this session
-    saveMessagesToStorage(publicKey, sessionMessages, newSessionId);
-  }, [publicKey]);
+  }, [publicKey, initialMessage]);
+
+  // Get session history for current user (only if userId is provided)
+  const getSessionHistory = useCallback((): SessionEntry[] => {
+    if (!userId) return [];
+    return loadSessionsRegistry(publicKey, userId);
+  }, [publicKey, userId]);
+
+  // Delete a session from history
+  const deleteSession = useCallback((sessionIdToDelete: string) => {
+    if (!userId) return;
+    deleteSessionFromRegistry(publicKey, userId, sessionIdToDelete);
+  }, [publicKey, userId]);
 
   // Close session function - calls the backend to close the session and trigger PM review
   const closeSession = useCallback(async () => {
@@ -336,7 +616,7 @@ export function useHissunoChat({
           'X-Public-Key': publicKey,
           ...headers,
         },
-        body: JSON.stringify({ triggerPMReview: true }),
+        body: JSON.stringify({}),
       });
       onSessionClose?.();
     } catch (error) {
@@ -409,7 +689,7 @@ export function useHissunoChat({
       // Use sendBeacon for reliable delivery on page unload
       const baseUrl = apiUrl.replace(/\/agent$/, '');
       const url = `${baseUrl}/sessions/${sessionId}/close`;
-      const data = JSON.stringify({ triggerPMReview: true });
+      const data = JSON.stringify({});
       navigator.sendBeacon(url, data);
     };
 
@@ -459,6 +739,7 @@ export function useHissunoChat({
             pageUrl,
             pageTitle,
             sessionId,
+            source: 'widget',
           }),
         });
 
@@ -498,7 +779,9 @@ export function useHissunoChat({
       loadSession,
       closeSession,
       cancelChat,
+      getSessionHistory,
+      deleteSession,
     }),
-    [chatMessages, input, setInput, handleSubmit, isLoading, isStreaming, streamingContent, error, clearHistory, sessionId, loadSession, closeSession, cancelChat]
+    [chatMessages, input, setInput, handleSubmit, isLoading, isStreaming, streamingContent, error, clearHistory, sessionId, loadSession, closeSession, cancelChat, getSessionHistory, deleteSession]
   );
 }
