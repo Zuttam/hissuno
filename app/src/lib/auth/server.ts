@@ -77,3 +77,59 @@ export async function requireSessionUser(headersLike?: HeadersInput | Promise<He
   return user
 }
 
+/**
+ * Default paths for post-authentication redirects.
+ */
+const DEFAULT_REDIRECT_PATH = '/projects'
+
+/**
+ * Validates and sanitizes a redirect path to prevent open redirect vulnerabilities.
+ *
+ * Security measures:
+ * - Only allows relative paths starting with /
+ * - Blocks protocol-relative URLs (//evil.com)
+ * - Blocks URLs with embedded credentials or protocols
+ * - Returns a safe default if validation fails
+ *
+ * @param path - The redirect path to validate (from user input)
+ * @param defaultPath - Fallback path if validation fails
+ * @returns A safe, relative redirect path
+ */
+export function getSafeRedirectPath(
+  path: string | null | undefined,
+  defaultPath: string = DEFAULT_REDIRECT_PATH
+): string {
+  if (!path || typeof path !== 'string') {
+    return defaultPath
+  }
+
+  const trimmed = path.trim()
+
+  // Must start with exactly one forward slash (relative path)
+  if (!trimmed.startsWith('/')) {
+    return defaultPath
+  }
+
+  // Block protocol-relative URLs (//evil.com)
+  if (trimmed.startsWith('//')) {
+    return defaultPath
+  }
+
+  // Block any URL that contains a protocol (javascript:, data:, etc.)
+  if (/^\/.*:/i.test(trimmed) || /[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+    return defaultPath
+  }
+
+  // Block backslash (can be normalized to forward slash by some browsers)
+  if (trimmed.includes('\\')) {
+    return defaultPath
+  }
+
+  // Block URLs with @ (could be interpreted as credentials)
+  if (trimmed.includes('@')) {
+    return defaultPath
+  }
+
+  return trimmed
+}
+

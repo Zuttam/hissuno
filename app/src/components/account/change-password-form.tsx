@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { updatePasswordAction, type AuthActionState } from '@/lib/auth/actions'
+import { FormField, Input, Button } from '@/components/ui'
 
 const initialState: AuthActionState = {}
 
@@ -10,13 +11,9 @@ function SubmitButton() {
   const { pending } = useFormStatus()
 
   return (
-    <button
-      type="submit"
-      className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 disabled:cursor-not-allowed disabled:bg-slate-700"
-      disabled={pending}
-    >
+    <Button type="submit" variant="primary" size="md" className="w-full" disabled={pending}>
       {pending ? 'Updating…' : 'Update password'}
-    </button>
+    </Button>
   )
 }
 
@@ -24,57 +21,45 @@ export function ChangePasswordForm() {
   const [state, formAction] = useActionState(updatePasswordAction, initialState)
 
   return (
-    <form className="space-y-4" action={formAction}>
-      <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-700" htmlFor="currentPassword">
-          Current password
-        </label>
-        <input
+    <form className="flex flex-col gap-4" action={formAction}>
+      <FormField label="Current Password">
+        <Input
           id="currentPassword"
           name="currentPassword"
           type="password"
           autoComplete="current-password"
           required
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
         />
-      </div>
+      </FormField>
 
-      <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-700" htmlFor="newPassword">
-          New password
-        </label>
-        <input
+      <FormField label="New Password">
+        <Input
           id="newPassword"
           name="newPassword"
           type="password"
           autoComplete="new-password"
           required
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
         />
-      </div>
+      </FormField>
 
-      <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-700" htmlFor="confirmPassword">
-          Confirm new password
-        </label>
-        <input
+      <FormField label="Confirm New Password">
+        <Input
           id="confirmPassword"
           name="confirmPassword"
           type="password"
           autoComplete="new-password"
           required
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
         />
-      </div>
+      </FormField>
 
       {state?.error ? (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div className="rounded-[4px] border-2 border-[--accent-danger] bg-transparent px-3 py-2 text-sm font-mono text-[--foreground]">
           {state.error}
         </div>
       ) : null}
 
       {state?.success ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+        <div className="rounded-[4px] border-2 border-[--accent-success] bg-transparent px-3 py-2 text-sm font-mono text-[--foreground]">
           {state.success}
         </div>
       ) : null}

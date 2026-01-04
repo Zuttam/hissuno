@@ -3,6 +3,8 @@ import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { uploadDocument } from '@/lib/knowledge/storage'
+import { createGitHubCodebase, syncGitHubCodebase, deleteCodebase, updateGitHubCodebase } from '@/lib/codebase'
+import { hasGitHubInstallation } from '@/lib/integrations/github'
 import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
 
 export const runtime = 'nodejs'
@@ -49,6 +51,133 @@ function isValidSourceType(type: string): type is KnowledgeSourceType {
 
 function isUserAddableType(type: string): type is KnowledgeSourceType {
   return USER_ADDABLE_TYPES.includes(type as KnowledgeSourceType)
+}
+
+/**
+ * Helper to create or replace a codebase knowledge source
+ */
+async function handleCodebaseCreate(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  projectId: string,
+  params: {
+    repositoryUrl?: string
+    repositoryBranch?: string
+    analysisScope?: string
+  }
+) {
+  const { repositoryUrl, repositoryBranch, analysisScope } = params
+
+  // 1. Validate required fields
+  if (!repositoryUrl || !repositoryBranch) {
+    return NextResponse.json(
+      { error: 'repositoryUrl and repositoryBranch are required for codebase type.' },
+      { status: 400 }
+    )
+  }
+
+  // 2. Check GitHub integration is connected
+  const githubStatus = await hasGitHubInstallation(supabase, projectId)
+  if (!githubStatus.connected) {
+    return NextResponse.json(
+      { error: 'GitHub integration not connected for this project.' },
+      { status: 400 }
+    )
+  }
+
+  // 3. Check for existing codebase (only one allowed per project)
+  const { data: existing } = await supabase
+    .from('knowledge_sources')
+    .select('*, source_code:source_codes(*)')
+    .eq('project_id', projectId)
+    .eq('type', 'codebase')
+    .single()
+
+  // 4. If exists, delete old source_codes record
+  if (existing?.source_code_id) {
+    console.log('[knowledge-sources.post] Replacing existing codebase:', existing.source_code_id)
+    try {
+      await deleteCodebase(supabase, existing.source_code_id, userId)
+    } catch (deleteError) {
+      console.error('[knowledge-sources.post] Failed to delete old codebase:', deleteError)
+      // Continue anyway - we'll create a new one
+    }
+  }
+
+  // 5. Create new source_codes record
+  console.log('[knowledge-sources.post] Creating new GitHub codebase:', repositoryUrl, repositoryBranch)
+  const { codebase } = await createGitHubCodebase({
+    repositoryUrl,
+    repositoryBranch,
+    userId,
+  })
+
+  let source
+
+  // 6. Create or update knowledge_source
+  if (existing) {
+    // Update existing knowledge_source with new source_code_id
+    const { data: updated, error: updateError } = await supabase
+      .from('knowledge_sources')
+      .update({
+        source_code_id: codebase.id,
+        analysis_scope: analysisScope?.trim() || null,
+        status: 'pending',
+        error_message: null,
+      })
+      .eq('id', existing.id)
+      .select()
+      .single()
+
+    if (updateError) {
+      console.error('[knowledge-sources.post] Failed to update knowledge source:', updateError)
+      return NextResponse.json({ error: 'Failed to update codebase source.' }, { status: 500 })
+    }
+    source = updated
+  } else {
+    // Insert new knowledge_source
+    const { data: inserted, error: insertError } = await supabase
+      .from('knowledge_sources')
+      .insert({
+        project_id: projectId,
+        type: 'codebase',
+        source_code_id: codebase.id,
+        analysis_scope: analysisScope?.trim() || null,
+        status: 'pending',
+        enabled: true,
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error('[knowledge-sources.post] Failed to create knowledge source:', insertError)
+      return NextResponse.json({ error: 'Failed to create codebase source.' }, { status: 500 })
+    }
+    source = inserted
+  }
+
+  // 7. Sync codebase (best-effort, don't fail if sync fails)
+  console.log('[knowledge-sources.post] Syncing codebase:', codebase.id)
+  const syncResult = await syncGitHubCodebase({
+    codebaseId: codebase.id,
+    userId,
+    projectId,
+  })
+
+  if (syncResult.status === 'error') {
+    console.warn('[knowledge-sources.post] Sync failed but codebase is linked:', syncResult.error)
+  } else {
+    console.log('[knowledge-sources.post] Sync completed:', syncResult.status, syncResult.commitSha)
+  }
+
+  return NextResponse.json({
+    source,
+    syncResult: {
+      status: syncResult.status,
+      commitSha: syncResult.commitSha,
+      localPath: syncResult.localPath,
+    },
+  }, { status: existing ? 200 : 201 })
 }
 
 /**
@@ -158,7 +287,16 @@ export async function POST(request: Request, context: RouteContext) {
         return NextResponse.json({ error: 'Invalid payload.' }, { status: 400 })
       }
 
-      const { type, url, content } = payload
+      const { type, url, content, repositoryUrl, repositoryBranch, analysis_scope } = payload
+
+      // Special handling for codebase type
+      if (type === 'codebase') {
+        return handleCodebaseCreate(supabase, user.id, projectId, {
+          repositoryUrl,
+          repositoryBranch,
+          analysisScope: analysis_scope,
+        })
+      }
 
       if (!type || !isUserAddableType(type)) {
         return NextResponse.json({ error: 'Invalid or missing source type.' }, { status: 400 })
@@ -244,7 +382,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     // Prevent deletion of codebase sources
     if (source.type === 'codebase') {
       return NextResponse.json(
-        { error: 'Codebase sources cannot be deleted. Use the toggle to disable instead.' },
+        { error: 'Codebase sources cannot be deleted directly.' },
         { status: 403 }
       )
     }
@@ -323,29 +461,82 @@ export async function PATCH(request: Request, context: RouteContext) {
     // Build update object with only allowed fields
     const updates: Record<string, unknown> = {}
 
-    if (typeof payload.enabled === 'boolean') {
+    // Only allow enabled updates for non-codebase sources
+    if (typeof payload.enabled === 'boolean' && source.type !== 'codebase') {
       updates.enabled = payload.enabled
     }
 
-    // Only allow analysis_scope updates for codebase sources
-    if (source.type === 'codebase' && typeof payload.analysis_scope === 'string') {
-      updates.analysis_scope = payload.analysis_scope.trim() || null
+    // Track if we're updating source_codes (for codebase)
+    let updatedSourceCode = false
+
+    // Handle codebase-specific updates
+    if (source.type === 'codebase') {
+      // Update analysis_scope
+      if (typeof payload.analysis_scope === 'string') {
+        updates.analysis_scope = payload.analysis_scope.trim() || null
+      }
+
+      // Update repositoryUrl and/or repositoryBranch via source_codes table
+      if (payload.repositoryUrl || payload.repositoryBranch) {
+        updatedSourceCode = true
+        if (!source.source_code_id) {
+          return NextResponse.json(
+            { error: 'Codebase source has no linked source_code record.' },
+            { status: 400 }
+          )
+        }
+
+        try {
+          await updateGitHubCodebase(
+            supabase,
+            source.source_code_id,
+            user.id,
+            {
+              repositoryUrl: payload.repositoryUrl,
+              repositoryBranch: payload.repositoryBranch,
+            }
+          )
+          console.log('[knowledge-sources.patch] Updated codebase:', source.source_code_id)
+        } catch (updateError) {
+          console.error('[knowledge-sources.patch] Failed to update codebase:', updateError)
+          return NextResponse.json({ error: 'Failed to update codebase.' }, { status: 500 })
+        }
+      }
     }
 
-    if (Object.keys(updates).length === 0) {
+    // Check if anything is being updated
+    if (Object.keys(updates).length === 0 && !updatedSourceCode) {
       return NextResponse.json({ error: 'No valid fields to update.' }, { status: 400 })
     }
 
-    const { data: updatedSource, error: updateError } = await supabase
+    // Update knowledge_source if there are field updates
+    if (Object.keys(updates).length > 0) {
+      const { error: updateError } = await supabase
+        .from('knowledge_sources')
+        .update(updates)
+        .eq('id', sourceId)
+        .eq('project_id', projectId)
+
+      if (updateError) {
+        console.error('[knowledge-sources.patch] failed to update source', updateError)
+        return NextResponse.json({ error: 'Failed to update knowledge source.' }, { status: 500 })
+      }
+    }
+
+    // Fetch and return updated source with source_code if codebase
+    const selectQuery = source.type === 'codebase'
+      ? '*, source_code:source_codes(*)'
+      : '*'
+
+    const { data: updatedSource, error: refetchError } = await supabase
       .from('knowledge_sources')
-      .update(updates)
+      .select(selectQuery)
       .eq('id', sourceId)
       .eq('project_id', projectId)
-      .select()
       .single()
 
-    if (updateError) {
-      console.error('[knowledge-sources.patch] failed to update source', updateError)
+    if (refetchError) {
+      console.error('[knowledge-sources.patch] failed to fetch updated source', refetchError)
       return NextResponse.json({ error: 'Failed to update knowledge source.' }, { status: 500 })
     }
 

@@ -1,87 +1,241 @@
 import type { ReactNode } from 'react'
 import type { WizardStepMetadata } from './types'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils/class'
+import { FloatingCard } from '@/components/ui/floating-card'
 
 export type WizardContainerProps = {
   currentStep: number
   steps: WizardStepMetadata[]
   children: ReactNode
+  // Mode determines button layout ('onboarding' behaves like 'create')
+  mode?: 'create' | 'edit' | 'onboarding'
+  // Navigation props (create mode)
+  onPrevious?: () => void
+  onNext?: () => void
+  onSubmit?: () => void
+  onCancel?: () => void
+  onStepClick?: (stepNumber: number) => void
+  isSubmitting?: boolean
+  submitLabel?: string
+  submittingLabel?: string
+  validationError?: string
+  // Edit mode props
+  onSave?: () => void
+  onClose?: () => void
+  saveLabel?: string
+  savingLabel?: string
+  saveSuccess?: boolean
 }
 
-export function WizardContainer({ currentStep, steps, children }: WizardContainerProps) {
-  return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 sm:px-0">
-      {/* Progress Indicator */}
-      <div className="flex items-center justify-center py-4">
-        <div className="flex items-center gap-2 sm:gap-4">
-          {steps.map((step, index) => {
-            const isCompleted = step.number < currentStep
-            const isCurrent = step.number === currentStep
+export function WizardContainer({
+  currentStep,
+  steps,
+  children,
+  mode = 'create',
+  onPrevious,
+  onNext,
+  onSubmit,
+  onCancel,
+  onStepClick,
+  isSubmitting = false,
+  submitLabel = 'Submit',
+  submittingLabel = 'Submitting…',
+  validationError,
+  onSave,
+  onClose,
+  saveLabel = 'Save',
+  savingLabel = 'Saving…',
+  saveSuccess = false,
+}: WizardContainerProps) {
+  const isLastStep = currentStep === steps.length
+  const isFirstStep = currentStep === 1
+  const isEditMode = mode === 'edit'
 
-            return (
-              <div key={step.id} className="flex items-center gap-2 sm:gap-4">
-                {/* Step Dot and Label */}
-                <div className="flex flex-col items-center gap-2">
-                  <div
-                    className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 font-mono text-xs sm:text-sm font-bold transition-all duration-300 ${
-                      isCompleted
-                        ? 'border-(--accent-success) bg-(--accent-success) text-white scale-100'
-                        : isCurrent
-                          ? 'border-(--accent-selected) bg-(--accent-selected) text-white shadow-[0_0_0_4px_rgba(37,99,235,0.2)] scale-110'
-                          : 'border-(--border-subtle) bg-(--surface) text-(--text-tertiary) scale-100'
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <svg
-                        className="h-4 w-4 sm:h-5 sm:w-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
+  return (
+    <FloatingCard
+      floating="none"
+      variant="elevated"
+      className="min-h-[calc(100vh-4rem)] flex flex-col overflow-hidden bg-[var(--background)]"
+    >
+      {/* Scrollable inner container */}
+      <div className="flex-1 flex flex-col overflow-y-auto">
+        {/* Sticky Navigation Bar - Glass Effect */}
+        <div
+          className={cn(
+            // Glass effect
+            'bg-[var(--background)]/80 backdrop-blur-xl backdrop-saturate-150',
+            // Border and shadow for depth when scrolled
+            'border-b border-[var(--border-subtle)]/50',
+            'shadow-[0_2px_8px_rgba(0,0,0,0.05)]',
+            'dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
+          )}
+        >
+          <div className="mx-auto max-w-6xl px-6 sm:px-12 py-4 flex items-center justify-between gap-4 sm:gap-6">
+            {/* Left Button: Close (edit mode) or Back/Cancel (create mode) */}
+            <div className="flex-shrink-0 min-w-[100px]">
+              {isEditMode ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onClose}
+                  disabled={isSubmitting}
+                >
+                  Close
+                </Button>
+              ) : !isFirstStep ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onPrevious}
+                  disabled={isSubmitting}
+                >
+                  ← Back
+                </Button>
+              ) : onCancel ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={onCancel}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+              ) : (
+                <div className="w-[100px]" />
+              )}
+            </div>
+
+            {/* Steps Indicator */}
+            <div className="flex items-start gap-2 sm:gap-3 overflow-x-auto py-1">
+              {steps.map((step, index) => {
+                const isCompleted = step.number < currentStep
+                const isCurrent = step.number === currentStep
+                const isClickable = onStepClick && !isSubmitting && !isCurrent
+
+                return (
+                  <div key={step.id} className="flex items-start gap-2 sm:gap-3 flex-shrink-0">
+                    {/* Step with Title */}
+                    <div className="flex flex-col items-center gap-1.5">
+                      {/* Step Dot */}
+                      <button
+                        type="button"
+                        onClick={() => isClickable && onStepClick(step.number)}
+                        disabled={!isClickable}
+                        className={cn(
+                          'flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border-2 font-mono text-sm font-bold transition-all duration-300',
+                          isCompleted &&
+                            'border-[var(--accent-success)] bg-[var(--accent-success)] text-white shadow-md shadow-[var(--accent-success)]/25',
+                          isCurrent &&
+                            'border-[var(--accent-selected)] bg-[var(--accent-selected)] text-white shadow-md shadow-[var(--accent-selected)]/25',
+                          !isCompleted &&
+                            !isCurrent &&
+                            'border-[var(--border-subtle)] bg-[var(--surface)]/80 text-[var(--text-tertiary)]',
+                          isClickable && 'cursor-pointer hover:scale-110 hover:opacity-80'
+                        )}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={3}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    ) : (
-                      step.number
+                        {isCompleted ? (
+                          <svg
+                            className="h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={3}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                        ) : (
+                          step.number
+                        )}
+                      </button>
+
+                      {/* Step Title - visible on large screens */}
+                      <span
+                        className={cn(
+                          'hidden lg:block text-xs font-medium max-w-[80px] text-center leading-tight transition-colors duration-300',
+                          isCurrent
+                            ? 'text-[var(--text-primary)]'
+                            : isCompleted
+                              ? 'text-[var(--text-secondary)]'
+                              : 'text-[var(--text-tertiary)]'
+                        )}
+                      >
+                        {step.title}
+                      </span>
+                    </div>
+
+                    {/* Connector Line */}
+                    {index < steps.length - 1 && (
+                      <div
+                        className={cn(
+                          'h-0.5 w-6 sm:w-10 rounded-full transition-all duration-500 mt-[18px] sm:mt-[20px]',
+                          isCompleted
+                            ? 'bg-[var(--accent-success)]'
+                            : 'bg-[var(--border-subtle)]/80'
+                        )}
+                      />
                     )}
                   </div>
-                  <div
-                    className={`font-mono text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-center transition-colors duration-300 max-w-[60px] sm:max-w-none ${
-                      isCurrent
-                        ? 'text-[--foreground]'
-                        : isCompleted
-                          ? 'text-[--text-secondary]'
-                          : 'text-[--text-tertiary]'
-                    }`}
-                  >
-                    {step.title}
-                  </div>
-                </div>
+                )
+              })}
+            </div>
 
-                {/* Connector Line */}
-                {index < steps.length - 1 && (
-                  <div
-                    className={`h-0.5 w-8 sm:w-16 transition-all duration-500 ${
-                      isCompleted
-                        ? 'bg-[var(--accent-success)]'
-                        : 'bg-[--border-subtle]'
-                    }`}
-                  />
-                )}
-              </div>
-            )
-          })}
+            {/* Right Button: Save (edit mode) or Next/Submit (create mode) */}
+            <div className="flex-shrink-0 flex items-center gap-3 min-w-[100px] justify-end">
+              {isEditMode ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={onSave}
+                  disabled={isSubmitting || saveSuccess}
+                  loading={isSubmitting}
+                >
+                  {saveSuccess ? '✓ Saved' : isSubmitting ? savingLabel : saveLabel}
+                </Button>
+              ) : isLastStep ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={onSubmit}
+                  disabled={isSubmitting}
+                  loading={isSubmitting}
+                >
+                  {isSubmitting ? submittingLabel : submitLabel}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={onNext}
+                  disabled={isSubmitting}
+                >
+                  Next →
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Validation Error */}
+        {validationError && (
+          <div className="border-b border-[var(--accent-danger)] bg-[var(--accent-danger)]/10">
+            <div className="mx-auto max-w-6xl px-6 py-2 sm:px-12 text-sm font-mono text-[var(--accent-danger)]">
+              {validationError}
+            </div>
+          </div>
+        )}
+
+        {/* Content Area */}
+        <div className="flex-1 py-6 ">
+          <div className="mx-auto max-w-6xl px-6 sm:px-12">
+            {children}
+          </div>
         </div>
       </div>
-
-      {/* Form Content */}
-      <div className="space-y-8">
-        {children}
-      </div>
-    </div>
+    </FloatingCard>
   )
 }
-

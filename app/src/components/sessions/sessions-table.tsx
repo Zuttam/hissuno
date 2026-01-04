@@ -9,6 +9,7 @@ interface SessionsTableProps {
   selectedSessionId: string | null
   onSelectSession: (session: SessionWithProject) => void
   onOpenMessages: (session: SessionWithProject) => void
+  onArchive: (session: SessionWithProject) => void
 }
 
 export function SessionsTable({
@@ -16,12 +17,13 @@ export function SessionsTable({
   selectedSessionId,
   onSelectSession,
   onOpenMessages,
+  onArchive,
 }: SessionsTableProps) {
   return (
     <div className="overflow-hidden rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)]">
       <table className="w-full font-mono text-sm">
         <thead>
-          <tr className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface)]">
+          <tr className="border-b border-[color:var(--border-subtle)]">
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Session
             </th>
@@ -59,6 +61,7 @@ export function SessionsTable({
               isSelected={selectedSessionId === session.id}
               onSelect={() => onSelectSession(session)}
               onOpenMessages={() => onOpenMessages(session)}
+              onArchive={() => onArchive(session)}
             />
           ))}
         </tbody>
@@ -72,9 +75,10 @@ interface SessionRowProps {
   isSelected: boolean
   onSelect: () => void
   onOpenMessages: () => void
+  onArchive: () => void
 }
 
-function SessionRow({ session, isSelected, onSelect, onOpenMessages }: SessionRowProps) {
+function SessionRow({ session, isSelected, onSelect, onOpenMessages, onArchive }: SessionRowProps) {
   const truncatedId = session.id.length > 12 ? `${session.id.slice(0, 12)}...` : session.id
   const truncatedPage = session.page_title
     ? session.page_title.length > 30
@@ -89,7 +93,7 @@ function SessionRow({ session, isSelected, onSelect, onOpenMessages }: SessionRo
         isSelected
           ? 'bg-[color:var(--accent-primary)]/10'
           : 'hover:bg-[color:var(--surface-hover)]'
-      }`}
+      } ${session.is_archived ? 'opacity-60' : ''}`}
     >
       <td className="px-3 py-2">
         <span className="text-[color:var(--foreground)]" title={session.id}>
@@ -127,9 +131,14 @@ function SessionRow({ session, isSelected, onSelect, onOpenMessages }: SessionRo
         )}
       </td>
       <td className="px-3 py-2">
-        <Badge variant={session.status === 'active' ? 'success' : 'default'}>
-          {session.status}
-        </Badge>
+        <span className="inline-flex items-center gap-1">
+          <Badge variant={session.status === 'active' ? 'success' : 'default'}>
+            {session.status}
+          </Badge>
+          {session.is_archived && (
+            <Badge variant="default">Archived</Badge>
+          )}
+        </span>
       </td>
       <td className="px-3 py-2">
         <span className="text-[color:var(--text-secondary)]">
@@ -137,30 +146,77 @@ function SessionRow({ session, isSelected, onSelect, onOpenMessages }: SessionRo
         </span>
       </td>
       <td className="px-3 py-2">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onOpenMessages()
-          }}
-          className="rounded-[4px] p-1.5 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--accent-primary)]"
-          aria-label="View messages"
-          title="View messages"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenMessages()
+            }}
+            className="rounded-[4px] p-1.5 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--accent-primary)]"
+            aria-label="View messages"
+            title="View messages"
           >
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onArchive()
+            }}
+            className="rounded-[4px] p-1.5 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--accent-primary)]"
+            aria-label={session.is_archived ? 'Unarchive session' : 'Archive session'}
+            title={session.is_archived ? 'Unarchive' : 'Archive'}
+          >
+            {session.is_archived ? (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="2" y="4" width="20" height="5" rx="2" />
+                <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+                <path d="M12 13v4" />
+                <path d="m9 16 3 3 3-3" />
+              </svg>
+            ) : (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="2" y="4" width="20" height="5" rx="2" />
+                <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+                <path d="M10 13h4" />
+              </svg>
+            )}
+          </button>
+        </div>
       </td>
     </tr>
   )

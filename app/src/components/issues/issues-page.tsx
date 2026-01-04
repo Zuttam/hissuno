@@ -7,9 +7,11 @@ import { useIssues } from '@/hooks/use-issues'
 import { IssuesFilters } from './issues-filters'
 import { IssuesTable } from './issues-table'
 import { IssueSidebar } from './issue-sidebar'
+import { CreateIssueDialog } from './create-issue-dialog'
 import { IconButton } from '@/components/ui/icon-button'
 import { RefreshIcon } from '@/components/ui/refresh-icon'
-import { Card } from '../ui/card'
+import { Button } from '@/components/ui/button'
+import { FloatingCard } from '@/components/ui/floating-card'
 
 interface IssuesPageContentProps {
   initialIssues: IssueWithProject[]
@@ -29,8 +31,9 @@ export function IssuesPageContent({
   })
 
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(initialIssueId ?? null)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
 
-  const { issues, isLoading, error, refresh } = useIssues({
+  const { issues, isLoading, error, refresh, createIssue, archiveIssue } = useIssues({
     initialIssues,
     filters,
   })
@@ -84,21 +87,34 @@ export function IssuesPageContent({
     void refresh()
   }, [refresh])
 
+  const handleArchiveIssue = useCallback(async (issue: IssueWithProject) => {
+    await archiveIssue(issue.id, !issue.is_archived)
+  }, [archiveIssue])
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-      <Card className="flex flex-col gap-8 border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)]">
-        <header className="flex items-center gap-3">
-          <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-            Issues
-          </h1>
-          <IconButton
-            aria-label="Refresh issues"
-            variant="ghost"
-            size="md"
-            onClick={() => void refresh()}
+      <FloatingCard floating="gentle" variant="default" className="flex flex-col gap-8">
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+              Issues
+            </h1>
+            <IconButton
+              aria-label="Refresh issues"
+              variant="ghost"
+              size="md"
+              onClick={() => void refresh()}
+            >
+              <RefreshIcon />
+            </IconButton>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowCreateDialog(true)}
           >
-            <RefreshIcon />
-          </IconButton>
+            Create
+          </Button>
         </header>
 
         <IssuesFilters
@@ -122,9 +138,10 @@ export function IssuesPageContent({
             issues={issues}
             selectedIssueId={selectedIssueId}
             onSelectIssue={handleIssueSelect}
+            onArchive={handleArchiveIssue}
           />
         )}
-      </Card>
+      </FloatingCard>
 
       {selectedIssueId && (
         <IssueSidebar
@@ -133,6 +150,13 @@ export function IssuesPageContent({
           onIssueUpdated={handleIssueUpdated}
         />
       )}
+
+      <CreateIssueDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        projects={projects}
+        onCreateIssue={createIssue}
+      />
     </div>
   )
 }

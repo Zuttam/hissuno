@@ -25,11 +25,10 @@ import {
   getKnowledgePackages,
   getKnowledgeSources,
   getLatestAnalysis,
-  mockCodebaseInStorage,
+  mockCodebaseInLocal,
   sampleCodebaseFiles,
   cleanupTestData,
   cleanupOrphanedTestData,
-  waitForAnalysisComplete,
   type TestContext,
 } from './test-utils'
 
@@ -219,20 +218,17 @@ describe('E2E: Full Analysis Pipeline', () => {
       testContext = await setupTestProject({
         name: 'E2E Codebase Test',
         withSourceCode: true,
+        repositoryBranch: 'main',
       })
 
-      const storagePath = await mockCodebaseInStorage(
+      // Create mock codebase files in local temp directory
+      await mockCodebaseInLocal(
         testContext.projectId,
+        'main',
         sampleCodebaseFiles
       )
 
-      // Update source_codes with storage URI
       const supabase = createAdminClient()
-      await supabase
-        .from('source_codes')
-        .update({ storage_uri: storagePath })
-        .eq('id', testContext.sourceCodeId!)
-
       await createCodebaseSource(testContext.projectId)
 
       // Run analysis
@@ -404,19 +400,17 @@ describe('E2E: Mixed Sources Analysis', () => {
       testContext = await setupTestProject({
         name: 'E2E Mixed Sources',
         withSourceCode: true,
+        repositoryBranch: 'main',
       })
 
-      // Setup codebase
-      const storagePath = await mockCodebaseInStorage(
+      // Setup codebase in local temp directory
+      await mockCodebaseInLocal(
         testContext.projectId,
+        'main',
         sampleCodebaseFiles
       )
 
       const supabase = createAdminClient()
-      await supabase
-        .from('source_codes')
-        .update({ storage_uri: storagePath })
-        .eq('id', testContext.sourceCodeId!)
 
       // Create both sources
       await createCodebaseSource(testContext.projectId)

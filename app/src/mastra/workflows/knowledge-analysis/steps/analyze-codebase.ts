@@ -1,8 +1,8 @@
 /**
  * Step 1: Analyze Codebase
  *
- * Uses the codebaseAnalyzerAgent with storage tools to intelligently explore
- * and analyze the codebase stored in Supabase Storage.
+ * Uses the codebaseAnalyzerAgent with local filesystem tools to intelligently explore
+ * and analyze the codebase cloned from GitHub into an ephemeral local directory.
  */
 
 import { createStep } from '@mastra/core/workflows'
@@ -20,15 +20,15 @@ export const analyzeCodebase = createStep({
       throw new Error('Input data not found')
     }
 
-    const { projectId, sources, sourceCodePath, analysisScope } = inputData
-    logger?.info('[analyze-codebase] Starting', { projectId, sourceCodePath, analysisScope })
+    const { projectId, sources, localCodePath, analysisScope } = inputData
+    logger?.info('[analyze-codebase] Starting', { projectId, localCodePath, analysisScope })
 
     // Emit progress event
     await writer?.write({ type: 'progress', message: 'Starting codebase analysis...' })
 
     // No codebase to analyze
-    if (!sourceCodePath) {
-      logger?.info('[analyze-codebase] No sourceCodePath, skipping')
+    if (!localCodePath) {
+      logger?.info('[analyze-codebase] No localCodePath, skipping')
       await writer?.write({ type: 'progress', message: 'No codebase configured, skipping...' })
       return {
         projectId,
@@ -69,7 +69,7 @@ This project is part of a larger repository (monorepo), so only analyze the spec
         ? `Use prefix "${analysisScope}" when listing files to start from the scoped directory.`
         : '1. First, list the files at the root level to understand the project structure'
       
-      const prompt = `Analyze the codebase stored at path: ${sourceCodePath}${scopeInstruction}
+      const prompt = `Analyze the codebase at local path: ${localCodePath}${scopeInstruction}
 
 Use your tools to explore and understand this codebase:
 

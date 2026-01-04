@@ -1,9 +1,11 @@
-import { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react'
+import { ComponentPropsWithoutRef, ReactNode } from 'react'
+
+type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
 
 type SectionHeaderProps = {
   title: ReactNode
   description?: ReactNode
-  titleAs?: ElementType
+  titleAs?: HeadingLevel
   className?: string
   titleClassName?: string
   descriptionClassName?: string

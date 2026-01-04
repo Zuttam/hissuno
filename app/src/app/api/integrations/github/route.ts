@@ -1,42 +1,66 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { hasGitHubIntegration, disconnectGitHub } from '@/lib/integrations/github'
+import { hasGitHubInstallation, disconnectGitHub } from '@/lib/integrations/github'
 
 export const runtime = 'nodejs'
 
-async function resolveUser() {
+async function resolveUserAndProject(projectId: string) {
   const supabase = await createClient()
   const {
     data: { user },
-    error,
+    error: authError,
   } = await supabase.auth.getUser()
 
-  if (error || !user) {
+  if (authError || !user) {
     throw new UnauthorizedError('User not authenticated')
   }
 
-  return { supabase, user }
+  // Verify user owns this project
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
+    .select('id, user_id')
+    .eq('id', projectId)
+    .single()
+
+  if (projectError || !project) {
+    throw new Error('Project not found')
+  }
+
+  if (project.user_id !== user.id) {
+    throw new UnauthorizedError('Not authorized to access this project')
+  }
+
+  return { supabase, user, project }
 }
 
 /**
- * GET /api/integrations/github
- * Check if user has GitHub integration connected
+ * GET /api/integrations/github?projectId=xxx
+ * Check if project has GitHub integration connected
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     console.error('[integrations.github.get] Supabase must be configured')
     return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    const status = await hasGitHubIntegration(supabase, user.id)
+    const projectId = request.nextUrl.searchParams.get('projectId')
+    if (!projectId) {
+      return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+    }
+
+    const { supabase } = await resolveUserAndProject(projectId)
+    const status = await hasGitHubInstallation(supabase, projectId)
 
     return NextResponse.json(status)
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+
+    if (error instanceof Error && error.message === 'Project not found') {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
     console.error('[integrations.github.get] unexpected error', error)
@@ -45,18 +69,23 @@ export async function GET() {
 }
 
 /**
- * DELETE /api/integrations/github
- * Disconnect GitHub integration
+ * DELETE /api/integrations/github?projectId=xxx
+ * Disconnect GitHub integration from project
  */
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     console.error('[integrations.github.delete] Supabase must be configured')
     return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    const result = await disconnectGitHub(supabase, user.id)
+    const projectId = request.nextUrl.searchParams.get('projectId')
+    if (!projectId) {
+      return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+    }
+
+    const { supabase } = await resolveUserAndProject(projectId)
+    const result = await disconnectGitHub(supabase, projectId)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 })
@@ -65,7 +94,11 @@ export async function DELETE() {
     return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+      return NextResponse.json({ error: error.message }, { status: 401 })
+    }
+
+    if (error instanceof Error && error.message === 'Project not found') {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
     console.error('[integrations.github.delete] unexpected error', error)

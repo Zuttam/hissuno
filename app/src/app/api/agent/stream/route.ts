@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { CoreMessage } from 'ai'
 import { RuntimeContext } from '@mastra/core/runtime-context'
-import { getProjectByPublicKey } from '@/lib/projects/keys'
+import { getProjectById } from '@/lib/projects/keys'
 import { createAdminClient } from '@/lib/supabase/server'
 import { updateSessionActivity } from '@/lib/supabase/sessions'
+import { saveSessionMessage } from '@/lib/supabase/session-messages'
 import { getRunningChatRun, updateChatRunStatus } from '@/lib/agent/chat-run-service'
 import { type BaseSSEEvent, SSE_HEADERS } from '@/lib/sse'
 import { mastra } from '@/mastra'
+import { isOriginAllowed } from '@/lib/utils/widget-auth'
 import type { SupportAgentContext } from '../route'
 
 export const runtime = 'nodejs'
@@ -30,6 +32,14 @@ interface ChatSSEEvent extends BaseSSEEvent {
 }
 
 /**
+ * Get the request origin from headers
+ * Uses Origin header if present, otherwise falls back to request URL origin
+ */
+function getRequestOrigin(request: NextRequest): string {
+  return request.headers.get('Origin') || request.nextUrl.origin
+}
+
+/**
  * Add CORS headers to SSE response
  */
 function addCorsToSSEHeaders(origin: string): Record<string, string> {
@@ -42,17 +52,17 @@ function addCorsToSSEHeaders(origin: string): Record<string, string> {
 }
 
 /**
- * GET /api/agent/stream?publicKey=xxx&sessionId=xxx
+ * GET /api/agent/stream?projectId=xxx&sessionId=xxx
  * SSE endpoint for real-time chat streaming
  */
 export async function GET(request: NextRequest) {
-  const origin = request.headers.get('Origin') || '*'
-  const publicKey = request.nextUrl.searchParams.get('publicKey')
+  const origin = getRequestOrigin(request)
+  const projectId = request.nextUrl.searchParams.get('projectId')
   const sessionId = request.nextUrl.searchParams.get('sessionId')
 
-  if (!publicKey) {
+  if (!projectId) {
     return NextResponse.json(
-      { error: 'publicKey is required' },
+      { error: 'projectId is required' },
       { status: 400, headers: { 'Access-Control-Allow-Origin': origin } }
     )
   }
@@ -64,16 +74,22 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Validate public key and get project
-  const project = await getProjectByPublicKey(publicKey)
+  // Validate project ID and get project
+  const project = await getProjectById(projectId)
   if (!project) {
     return NextResponse.json(
-      { error: 'Invalid public key' },
+      { error: 'Invalid project ID' },
       { status: 401, headers: { 'Access-Control-Allow-Origin': origin } }
     )
   }
 
-  const projectId = project.id
+  // Check origin
+  if (!isOriginAllowed(origin, project.allowed_origins)) {
+    return NextResponse.json(
+      { error: 'Origin not allowed' },
+      { status: 403, headers: { 'Access-Control-Allow-Origin': origin } }
+    )
+  }
 
   // Use admin client since this is public-facing (no user auth)
   const supabase = createAdminClient()
@@ -238,6 +254,14 @@ export async function GET(request: NextRequest) {
         // Do post-completion DB updates in background (don't block the client)
         const postCompletionTasks = async () => {
           try {
+            // Save AI response to session_messages
+            await saveSessionMessage({
+              sessionId,
+              projectId,
+              senderType: 'ai',
+              content: fullContent,
+            })
+
             // Check for goodbye marker and handle session lifecycle
             const GOODBYE_MARKER = '[SESSION_GOODBYE]'
             if (fullContent.includes(GOODBYE_MARKER)) {
@@ -312,7 +336,7 @@ export async function GET(request: NextRequest) {
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  const origin = request.headers.get('Origin') || '*'
+  const origin = getRequestOrigin(request)
 
   return new NextResponse(null, {
     status: 204,

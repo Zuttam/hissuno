@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { loginAction, type AuthActionState } from '@/lib/auth/actions'
-import { Alert, Button, FormField, Input } from '@/components/ui'
+import { Alert, Button, FormField, Input, Divider } from '@/components/ui'
 import { GoogleSignInButton } from './google-sign-in-button'
 
 const initialState: AuthActionState = {}
@@ -32,20 +32,11 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
       {/* Google Sign-In */}
       <GoogleSignInButton redirectTo={redirectTo} />
 
-      {/* Divider */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-[--border-subtle]" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="bg-[--background] px-4 font-mono uppercase tracking-wide text-[--text-secondary]">
-            or
-          </span>
-        </div>
-      </div>
+      <Divider className="my-4" />
+
 
       {/* Email/Password Form */}
-      <form className="space-y-4" action={formAction}>
+      <form className="flex flex-col gap-4" action={formAction}>
         <input type="hidden" name="redirectTo" value={redirectTo} />
 
         <FormField label="Email">

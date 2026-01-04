@@ -47,7 +47,8 @@ const VALID_WIDGET_POSITIONS: string[] = ['bottom-right', 'bottom-left', 'top-ri
  *
  * Update project settings.
  * Supports: issue_tracking_enabled, issue_spec_threshold, spec_guidelines,
- * widget_variant, widget_theme, widget_position, widget_title, widget_initial_message
+ * widget_variant, widget_theme, widget_position, widget_title, widget_initial_message,
+ * allowed_origins, widget_token_required
  */
 export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params
@@ -73,6 +74,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     widget_position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left'
     widget_title?: string
     widget_initial_message?: string
+    allowed_origins?: string[] | null
+    widget_token_required?: boolean
   } = {}
 
   if (typeof payload.issue_tracking_enabled === 'boolean') {
@@ -127,6 +130,21 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (trimmed.length > 0) {
       updates.widget_initial_message = trimmed
     }
+  }
+
+  // Handle allowed_origins array
+  if (Array.isArray(payload.allowed_origins)) {
+    const origins = payload.allowed_origins.filter(
+      (origin: unknown) => typeof origin === 'string' && origin.trim().length > 0
+    ).map((origin: string) => origin.trim())
+    updates.allowed_origins = origins.length > 0 ? origins : []
+  } else if (payload.allowed_origins === null) {
+    updates.allowed_origins = []
+  }
+
+  // Handle widget_token_required boolean
+  if (typeof payload.widget_token_required === 'boolean') {
+    updates.widget_token_required = payload.widget_token_required
   }
 
   if (Object.keys(updates).length === 0) {

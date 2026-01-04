@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
-import { Card, Badge, Spinner } from '@/components/ui'
+import { Badge, Spinner } from '@/components/ui'
 import { cn } from '@/lib/utils/class'
 import type { IssueWithProject, ProjectSettingsRecord } from '@/types/issue'
 
@@ -21,6 +21,9 @@ const DEFAULT_SETTINGS: Omit<ProjectSettingsRecord, 'project_id' | 'created_at' 
   widget_position: 'bottom-right',
   widget_title: 'Support',
   widget_initial_message: 'Hi! How can I help you today?',
+  // Widget security defaults
+  allowed_origins: [],
+  widget_token_required: false,
   // Session lifecycle defaults
   session_idle_timeout_minutes: 5,
   session_goodbye_delay_seconds: 90,

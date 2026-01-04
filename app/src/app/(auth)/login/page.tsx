@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { LoginForm } from '@/components/auth/login-form'
+import { getSafeRedirectPath } from '@/lib/auth/server'
 
 interface LoginPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
@@ -16,7 +17,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const resolvedSearchParams =
     await (searchParams ??
       Promise.resolve<Record<string, string | string[] | undefined>>({}))
-  const redirectTo = extractParam(resolvedSearchParams?.redirectTo) ?? '/'
+  const redirectTo = getSafeRedirectPath(extractParam(resolvedSearchParams?.redirectTo))
   const message = extractParam(resolvedSearchParams?.message)
 
   return (

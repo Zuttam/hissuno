@@ -85,6 +85,7 @@ export function createMockSession(
     user_metadata: testCase.session.userMetadata || null,
     page_url: testCase.session.pageUrl || null,
     page_title: testCase.session.title,
+    source: 'widget',
     message_count: testCase.session.messages.length,
     status: 'closed',
     first_message_at: new Date().toISOString(),
@@ -95,6 +96,8 @@ export function createMockSession(
     goodbye_detected_at: null,
     idle_prompt_sent_at: null,
     scheduled_close_at: null,
+    is_archived: false,
+    is_over_limit: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -131,6 +134,7 @@ export function createMockIssue(
     status: 'open',
     product_spec: null,
     product_spec_generated_at: null,
+    is_archived: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }

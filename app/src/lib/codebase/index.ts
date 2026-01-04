@@ -3,5 +3,5 @@
  */
 
 export * from './types'
-export * from './storage'
+export * from './git-operations'
 export * from './service'

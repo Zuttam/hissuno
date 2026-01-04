@@ -6,7 +6,6 @@ import type { SessionWithProject } from '@/types/session'
 
 interface SessionListSidebarProps {
   projectId: string
-  publicKey: string
   userId?: string
   currentSessionId: string | null
   isOpen: boolean

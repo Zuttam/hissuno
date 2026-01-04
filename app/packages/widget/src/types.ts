@@ -33,10 +33,17 @@ export interface TriggerRenderProps {
  */
 export interface HissunoWidgetProps {
   /**
-   * The public key (pk_live_...) from your Hissuno dashboard
-   * This is safe to expose in frontend code and uniquely identifies your project
+   * The project ID from your Hissuno dashboard
+   * This uniquely identifies your project
    */
-  publicKey: string;
+  projectId: string;
+
+  /**
+   * JWT token for secure widget authentication (optional)
+   * Generated on your backend using your project's secret key
+   * Required if widget_token_required is enabled on the project
+   */
+  widgetToken?: string;
 
   /**
    * Widget display variant
@@ -150,8 +157,9 @@ export interface HissunoWidgetProps {
  * Configuration for the Hissuno widget
  */
 export interface HissunoConfig {
-  publicKey: string;
+  projectId: string;
   apiUrl: string;
+  widgetToken?: string;
 }
 
 /**
@@ -179,4 +187,6 @@ export interface WidgetSettings {
   position: BubblePosition;
   title: string;
   initialMessage: string;
+  tokenRequired?: boolean;
+  blocked?: boolean;
 }

@@ -1,16 +1,15 @@
 /**
  * Codebase Tools for Mastra Agents
  *
- * These tools allow agents to explore and analyze codebases stored in Supabase Storage.
- * The codebase files are stored in the 'codebases' bucket with path format:
- * {userId}/{projectId}/{timestamp}/{relativePath}
+ * These tools allow agents to explore and analyze codebases from local git clones.
+ * The codebase files are stored in ephemeral directories under /tmp/hissuno/
+ * Path format: /tmp/hissuno/{projectId}-{branch}/{relativePath}
  */
 
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/server'
-
-const CODEBASE_BUCKET = 'codebases'
+import { readdir, readFile, stat } from 'fs/promises'
+import { join, relative } from 'path'
 
 // Common text file extensions for code analysis
 const TEXT_EXTENSIONS = new Set([
@@ -54,8 +53,22 @@ const TEXT_EXTENSIONS = new Set([
   '.prisma',
 ])
 
+// Directories to skip during exploration
+const SKIP_DIRECTORIES = new Set([
+  'node_modules',
+  '.git',
+  '__pycache__',
+  'dist',
+  'build',
+  '.next',
+  '.turbo',
+  '.cache',
+  'coverage',
+  '.nyc_output',
+])
+
 /**
- * List files in a codebase stored in Supabase Storage
+ * List files in a local codebase directory
  */
 export const listCodebaseFilesTool = createTool({
   id: 'list-codebase-files',
@@ -63,7 +76,7 @@ export const listCodebaseFilesTool = createTool({
 You can optionally provide a prefix to list files in a specific subdirectory.
 Returns file paths, sizes, and whether each item is a file or directory.`,
   inputSchema: z.object({
-    storagePath: z.string().describe('The base storage path of the codebase (e.g., userId/projectId/timestamp)'),
+    localPath: z.string().describe('The local filesystem path to the cloned repository'),
     prefix: z
       .string()
       .optional()
@@ -87,13 +100,11 @@ Returns file paths, sizes, and whether each item is a file or directory.`,
     error: z.string().optional(),
   }),
   execute: async ({ context }) => {
-    const { storagePath, prefix = '', recursive = false } = context
+    const { localPath, prefix = '', recursive = false } = context
 
     try {
-      const supabase = createAdminClient()
-      const fullPath = prefix ? `${storagePath}/${prefix}` : storagePath
-
-      const files = await listFilesRecursively(supabase, fullPath, storagePath, recursive)
+      const targetPath = prefix ? join(localPath, prefix) : localPath
+      const files = await listFilesLocal(targetPath, localPath, recursive)
 
       return {
         files,
@@ -119,7 +130,7 @@ export const readCodebaseFileTool = createTool({
 Use this after listing files to read important files like package.json, README.md, or source code files.
 Returns the file content as text. Only works with text-based files.`,
   inputSchema: z.object({
-    storagePath: z.string().describe('The base storage path of the codebase'),
+    localPath: z.string().describe('The local filesystem path to the cloned repository'),
     filePath: z.string().describe('The relative path to the file within the codebase (e.g., "package.json" or "src/index.ts")'),
   }),
   outputSchema: z.object({
@@ -129,29 +140,16 @@ Returns the file content as text. Only works with text-based files.`,
     error: z.string().optional(),
   }),
   execute: async ({ context }) => {
-    const { storagePath, filePath } = context
+    const { localPath, filePath } = context
 
     try {
-      const supabase = createAdminClient()
-      const fullPath = `${storagePath}/${filePath}`
-
-      const { data, error } = await supabase.storage.from(CODEBASE_BUCKET).download(fullPath)
-
-      if (error) {
-        return {
-          content: '',
-          path: filePath,
-          size: 0,
-          error: `Failed to download file: ${error.message}`,
-        }
-      }
-
-      const text = await data.text()
+      const fullPath = join(localPath, filePath)
+      const content = await readFile(fullPath, 'utf-8')
 
       return {
-        content: text,
+        content,
         path: filePath,
-        size: text.length,
+        size: content.length,
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to read file'
@@ -174,7 +172,7 @@ export const searchCodebaseFilesTool = createTool({
 Use this to find specific code patterns, function definitions, imports, or any text.
 Optionally filter by file extensions. Returns matching files with context snippets.`,
   inputSchema: z.object({
-    storagePath: z.string().describe('The base storage path of the codebase'),
+    localPath: z.string().describe('The local filesystem path to the cloned repository'),
     pattern: z.string().describe('The search pattern or text to find (case-insensitive)'),
     fileExtensions: z
       .array(z.string())
@@ -196,13 +194,11 @@ Optionally filter by file extensions. Returns matching files with context snippe
     error: z.string().optional(),
   }),
   execute: async ({ context }) => {
-    const { storagePath, pattern, fileExtensions, maxResults = 20 } = context
+    const { localPath, pattern, fileExtensions, maxResults = 20 } = context
 
     try {
-      const supabase = createAdminClient()
-
       // List all files recursively
-      const files = await listFilesRecursively(supabase, storagePath, storagePath, true)
+      const files = await listFilesLocal(localPath, localPath, true)
       const textFiles = files.filter((f) => {
         if (f.isDirectory) return false
         const ext = getFileExtension(f.name)
@@ -225,12 +221,8 @@ Optionally filter by file extensions. Returns matching files with context snippe
         if (matches.length >= maxResults) break
 
         try {
-          const fullPath = `${storagePath}/${file.path}`
-          const { data, error } = await supabase.storage.from(CODEBASE_BUCKET).download(fullPath)
-
-          if (error || !data) continue
-
-          const content = await data.text()
+          const fullPath = join(localPath, file.path)
+          const content = await readFile(fullPath, 'utf-8')
           const lines = content.split('\n')
 
           for (let i = 0; i < lines.length; i++) {
@@ -287,38 +279,63 @@ interface FileInfo {
   size?: number
 }
 
-async function listFilesRecursively(
-  supabase: ReturnType<typeof createAdminClient>,
+async function listFilesLocal(
   currentPath: string,
   basePath: string,
   recursive: boolean
 ): Promise<FileInfo[]> {
   const results: FileInfo[] = []
 
-  const { data: items, error } = await supabase.storage.from(CODEBASE_BUCKET).list(currentPath)
+  try {
+    const entries = await readdir(currentPath, { withFileTypes: true })
 
-  if (error || !items) {
-    return results
-  }
+    for (const entry of entries) {
+      // Skip hidden files except .gitignore, .env.example
+      if (entry.name.startsWith('.') && entry.name !== '.gitignore' && entry.name !== '.env.example') {
+        continue
+      }
 
-  for (const item of items) {
-    const itemPath = currentPath === basePath ? item.name : `${currentPath.replace(basePath + '/', '')}/${item.name}`
+      // Skip common non-essential directories
+      if (SKIP_DIRECTORIES.has(entry.name)) {
+        continue
+      }
 
-    // item.metadata exists for files, null for folders
-    const isDirectory = !item.metadata
+      const fullPath = join(currentPath, entry.name)
+      const relativePath = relative(basePath, fullPath)
 
-    results.push({
-      path: itemPath,
-      name: item.name,
-      isDirectory,
-      size: item.metadata?.size,
-    })
+      if (entry.isDirectory()) {
+        results.push({
+          path: relativePath,
+          name: entry.name,
+          isDirectory: true,
+        })
 
-    if (isDirectory && recursive) {
-      const subPath = `${currentPath}/${item.name}`
-      const subItems = await listFilesRecursively(supabase, subPath, basePath, true)
-      results.push(...subItems)
+        if (recursive) {
+          const subItems = await listFilesLocal(fullPath, basePath, true)
+          results.push(...subItems)
+        }
+      } else {
+        try {
+          const stats = await stat(fullPath)
+          results.push({
+            path: relativePath,
+            name: entry.name,
+            isDirectory: false,
+            size: stats.size,
+          })
+        } catch {
+          // If we can't stat, still include with no size
+          results.push({
+            path: relativePath,
+            name: entry.name,
+            isDirectory: false,
+          })
+        }
+      }
     }
+  } catch (error) {
+    // If directory doesn't exist or can't be read, return empty
+    console.error('[codebase-tools] Failed to list directory:', currentPath, error)
   }
 
   return results

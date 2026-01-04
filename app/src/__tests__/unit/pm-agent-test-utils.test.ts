@@ -238,6 +238,7 @@ describe('Utility Functions', () => {
         status: 'open' as const,
         product_spec: null,
         product_spec_generated_at: null,
+        is_archived: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -260,6 +261,7 @@ describe('Utility Functions', () => {
         status: 'open' as const,
         product_spec: null,
         product_spec_generated_at: null,
+        is_archived: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -284,6 +286,7 @@ describe('Utility Functions', () => {
         status: 'open' as const,
         product_spec: null,
         product_spec_generated_at: null,
+        is_archived: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

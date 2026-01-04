@@ -2,12 +2,34 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { USER_EMAIL_HEADER, USER_ID_HEADER } from '@/lib/auth/server'
 
-const PUBLIC_PATH_PREFIXES = ['/login', '/sign-up', '/auth/callback', '/api/auth']
+const PUBLIC_PATH_PREFIXES = [
+  '/login',
+  '/sign-up',
+  '/auth/callback',
+  '/api/auth',
+  '/api/agent',
+  '/api/integrations/github/callback',
+  '/api/integrations/slack/callback',
+
+  '/api/webhooks/lemon-squeezy',
+  '/api/webhooks/slack',
+  '/api/webhooks/supabase-auth',
+]
+
+// Paths that are public but should redirect authenticated users elsewhere
+const MARKETING_PATHS = ['/']
 
 function isPublicPath(pathname: string) {
+  if (MARKETING_PATHS.includes(pathname)) {
+    return true
+  }
   return PUBLIC_PATH_PREFIXES.some((prefix) =>
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   )
+}
+
+function isMarketingPath(pathname: string) {
+  return MARKETING_PATHS.includes(pathname)
 }
 
 export async function proxy(request: NextRequest) {
@@ -71,13 +93,13 @@ export async function proxy(request: NextRequest) {
   const isApiRoute = pathname.startsWith('/api')
   const requiresAuth = !isPublicPath(pathname)
 
-  if (!user && requiresAuth) {
-    const forwardCookies = (target: NextResponse) => {
-      supabaseResponse!.cookies.getAll().forEach(({ name, value, ...rest }) => {
-        target.cookies.set(name, value, rest)
-      })
-    }
+  const forwardCookies = (target: NextResponse) => {
+    supabaseResponse!.cookies.getAll().forEach(({ name, value, ...rest }) => {
+      target.cookies.set(name, value, rest)
+    })
+  }
 
+  if (!user && requiresAuth) {
     if (isApiRoute) {
       const unauthorized = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       forwardCookies(unauthorized)
@@ -94,6 +116,32 @@ export async function proxy(request: NextRequest) {
     const redirectResponse = NextResponse.redirect(redirectUrl)
     forwardCookies(redirectResponse)
     return redirectResponse
+  }
+
+  // Redirect authenticated users from marketing pages to projects
+  if (user && isMarketingPath(pathname)) {
+    const projectsUrl = new URL('/projects', request.url)
+    const redirectResponse = NextResponse.redirect(projectsUrl)
+    forwardCookies(redirectResponse)
+    return redirectResponse
+  }
+
+  // Check if authenticated user has completed onboarding
+  // Skip this check for the onboarding page itself to avoid redirect loops
+  const isOnboardingPath = pathname === '/onboarding' || pathname.startsWith('/onboarding/')
+  if (user && !isPublicPath(pathname) && !isApiRoute && !isOnboardingPath) {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('onboarding_completed')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!profile || !profile.onboarding_completed) {
+      const onboardingUrl = new URL('/onboarding', request.url)
+      const redirectResponse = NextResponse.redirect(onboardingUrl)
+      forwardCookies(redirectResponse)
+      return redirectResponse
+    }
   }
 
   return supabaseResponse

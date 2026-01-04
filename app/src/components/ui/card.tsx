@@ -7,7 +7,7 @@ type CardProps = HTMLAttributes<HTMLElement> & {
 }
 
 export const cardBaseClasses =
-  'rounded-[4px] border-2 border-[--border-subtle] bg-[--background] p-6 relative'
+  'rounded-[4px] border-2 border-(--border-subtle) bg-(--background) p-6 relative'
 
 export function Card({
   className,

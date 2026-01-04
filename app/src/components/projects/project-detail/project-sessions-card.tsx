@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
-import { Card, Badge, Spinner } from '@/components/ui'
+import { Badge, Spinner } from '@/components/ui'
 import type { SessionWithProject } from '@/types/session'
 
 interface ProjectSessionsCardProps {

@@ -17,4 +17,3 @@ export function WizardStep({ stepNumber, currentStep, children }: WizardStepProp
     </div>
   )
 }
-

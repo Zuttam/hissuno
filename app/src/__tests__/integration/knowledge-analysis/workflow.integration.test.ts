@@ -15,20 +15,16 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
 import { mastra } from '@/mastra'
-import { createAdminClient } from '@/lib/supabase/server'
 import {
   setupTestProject,
   createCodebaseSource,
   createRawTextSource,
   createWebsiteSource,
   getKnowledgePackages,
-  getKnowledgeSources,
-  getLatestAnalysis,
-  mockCodebaseInStorage,
+  mockCodebaseInLocal,
   sampleCodebaseFiles,
   cleanupTestData,
   cleanupOrphanedTestData,
-  waitForAnalysisComplete,
   type TestContext,
 } from './test-utils'
 
@@ -218,7 +214,7 @@ interface WorkflowSource {
 
 interface WorkflowInput {
   projectId: string
-  sourceCodePath: string | null
+  localCodePath: string | null
   analysisScope: string | null
   sources: WorkflowSource[]
 }
@@ -250,28 +246,23 @@ describe('Analysis with Codebase', () => {
       testContext = await setupTestProject({
         name: 'Codebase Test Project',
         withSourceCode: true,
+        repositoryBranch: 'main',
       })
 
-      // Upload mock codebase files
-      const storagePath = await mockCodebaseInStorage(
+      // Create mock codebase files in local temp directory
+      const localPath = await mockCodebaseInLocal(
         testContext.projectId,
+        'main',
         sampleCodebaseFiles
       )
 
-      // Update source_codes with storage URI
-      const supabase = createAdminClient()
-      await supabase
-        .from('source_codes')
-        .update({ storage_uri: storagePath })
-        .eq('id', testContext.sourceCodeId!)
-
       // Create codebase source
-      const codebaseSource = await createCodebaseSource(testContext.projectId)
+      await createCodebaseSource(testContext.projectId)
 
-      // Execute workflow - codebase is handled via sourceCodePath, not in sources array
+      // Execute workflow - codebase is handled via localCodePath, not in sources array
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: storagePath,
+        localCodePath: localPath,
         analysisScope: null,
         sources: [], // No additional sources beyond codebase
       })
@@ -307,7 +298,7 @@ describe('Analysis with Codebase', () => {
       // Execute workflow with no codebase path (simulating disabled)
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null, // No codebase
+        localCodePath: null, // No codebase
         analysisScope: null,
         sources: [
           {
@@ -333,22 +324,24 @@ describe('Analysis with Codebase', () => {
       testContext = await setupTestProject({
         name: 'Scoped Codebase Test',
         withSourceCode: true,
+        repositoryBranch: 'main',
       })
 
-      const storagePath = await mockCodebaseInStorage(
+      const localPath = await mockCodebaseInLocal(
         testContext.projectId,
+        'main',
         sampleCodebaseFiles
       )
 
       // Create codebase source with scope
-      const codebaseSource = await createCodebaseSource(testContext.projectId, {
+      await createCodebaseSource(testContext.projectId, {
         analysisScope: 'src',
       })
 
-      // Execute workflow with scope - codebase is handled via sourceCodePath/analysisScope
+      // Execute workflow with scope - codebase is handled via localCodePath/analysisScope
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: storagePath,
+        localCodePath: localPath,
         analysisScope: 'src',
         sources: [], // No additional sources beyond codebase
       })
@@ -393,7 +386,7 @@ A: We offer Basic ($10/mo), Pro ($25/mo), and Enterprise (custom) plans.
 
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null,
+        localCodePath: null,
         analysisScope: null,
         sources: [
           {
@@ -432,7 +425,7 @@ A: We offer Basic ($10/mo), Pro ($25/mo), and Enterprise (custom) plans.
 
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null,
+        localCodePath: null,
         analysisScope: null,
         sources: [
           {
@@ -468,14 +461,16 @@ describe('Analysis with Mixed Sources', () => {
       testContext = await setupTestProject({
         name: 'Mixed Sources Test',
         withSourceCode: true,
+        repositoryBranch: 'main',
       })
 
-      const storagePath = await mockCodebaseInStorage(
+      const localPath = await mockCodebaseInLocal(
         testContext.projectId,
+        'main',
         sampleCodebaseFiles
       )
 
-      const codebaseSource = await createCodebaseSource(testContext.projectId)
+      await createCodebaseSource(testContext.projectId)
       const rawTextSource = await createRawTextSource(
         testContext.projectId,
         'Additional context: This product is used by enterprise customers.'
@@ -483,10 +478,10 @@ describe('Analysis with Mixed Sources', () => {
 
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: storagePath,
+        localCodePath: localPath,
         analysisScope: null,
         sources: [
-          // Codebase is handled via sourceCodePath, only include raw_text
+          // Codebase is handled via localCodePath, only include raw_text
           {
             id: rawTextSource.id,
             type: 'raw_text',
@@ -525,7 +520,7 @@ describe('Analysis with Mixed Sources', () => {
 
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null,
+        localCodePath: null,
         analysisScope: null,
         sources: [
           {
@@ -572,7 +567,7 @@ describe('Knowledge Package Generation', () => {
 
       await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null,
+        localCodePath: null,
         analysisScope: null,
         sources: [
           {
@@ -624,7 +619,7 @@ describe('Knowledge Package Generation', () => {
       // First analysis
       await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null,
+        localCodePath: null,
         analysisScope: null,
         sources: [
           {
@@ -641,7 +636,7 @@ describe('Knowledge Package Generation', () => {
       // Second analysis
       await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null,
+        localCodePath: null,
         analysisScope: null,
         sources: [
           {
@@ -698,7 +693,7 @@ The service runs at 192.168.1.100:8080
 
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null,
+        localCodePath: null,
         analysisScope: null,
         sources: [
           {
@@ -748,7 +743,7 @@ Our product helps teams collaborate more effectively.
 
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: null,
+        localCodePath: null,
         analysisScope: null,
         sources: [
           {
@@ -773,6 +768,7 @@ Our product helps teams collaborate more effectively.
       testContext = await setupTestProject({
         name: 'Codebase Security Test',
         withSourceCode: true,
+        repositoryBranch: 'main',
       })
 
       // Create codebase files that might contain sensitive patterns
@@ -799,22 +795,17 @@ export const config = {
         },
       ]
 
-      const storagePath = await mockCodebaseInStorage(
+      const localPath = await mockCodebaseInLocal(
         testContext.projectId,
+        'main',
         sensitiveCodebaseFiles
       )
-
-      const supabase = createAdminClient()
-      await supabase
-        .from('source_codes')
-        .update({ storage_uri: storagePath })
-        .eq('id', testContext.sourceCodeId!)
 
       await createCodebaseSource(testContext.projectId)
 
       const result = await executeWorkflow({
         projectId: testContext.projectId,
-        sourceCodePath: storagePath,
+        localCodePath: localPath,
         analysisScope: null,
         sources: [],
       })
@@ -849,7 +840,7 @@ describe('Error Scenarios', () => {
       try {
         await executeWorkflow({
           projectId: testContext.projectId,
-          sourceCodePath: null,
+          localCodePath: null,
           analysisScope: null,
           sources: [],
         })

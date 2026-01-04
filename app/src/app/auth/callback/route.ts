@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sendWelcomeEmailIfNeeded } from '@/lib/email'
+import { getSafeRedirectPath } from '@/lib/auth/server'
 
 export const runtime = 'nodejs'
 
 /**
- * OAuth callback handler for GitHub (and future providers).
+ * OAuth callback handler for authentication providers.
  * This route handles the redirect from Supabase Auth after OAuth flow.
- * 
- * Key responsibility: Capture the provider_token from the session
- * and store it in user_github_tokens for later GitHub API access.
+ *
  */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/projects'
+  const next = searchParams.get('next')
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
 
@@ -43,46 +43,48 @@ export async function GET(request: Request) {
       return NextResponse.redirect(errorUrl)
     }
 
-    const { session, user } = data
+    // Send welcome email for OAuth users (Google, etc.)
+    const user = data?.user
+    if (user) {
+      const provider = user.app_metadata?.provider
+      const isOAuthUser = provider && provider !== 'email'
 
-    // Check if this was a GitHub OAuth flow by looking at provider_token
-    // and user identities
-    const githubIdentity = user?.identities?.find(
-      (identity) => identity.provider === 'github'
-    )
+      if (isOAuthUser && user.email) {
+        const fullName = user.user_metadata?.full_name ?? user.user_metadata?.name
 
-    if (session?.provider_token && githubIdentity) {
-      // Store the GitHub access token for API access
-      const githubUserMeta = githubIdentity.identity_data
-      const githubUsername = githubUserMeta?.user_name || githubUserMeta?.preferred_username || null
-      const githubUserId = githubIdentity.identity_id || githubUserMeta?.sub || null
-
-      const { error: upsertError } = await supabase
-        .from('user_github_tokens')
-        .upsert(
-          {
-            user_id: user.id,
-            access_token: session.provider_token,
-            github_username: githubUsername,
-            github_user_id: githubUserId,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'user_id',
-          }
-        )
-
-      if (upsertError) {
-        console.error('[auth.callback] Failed to store GitHub token:', upsertError)
-        // Don't fail the auth flow, just log the error
-        // The user can try reconnecting GitHub later
-      } else {
-        console.log('[auth.callback] GitHub token stored successfully for user:', user.id)
+        // Fire and forget - don't block redirect
+        setImmediate(() => {
+          sendWelcomeEmailIfNeeded(user.id, user.email!, fullName).catch((err) => {
+            console.error('[auth.callback] Failed to send welcome email:', err)
+          })
+        })
       }
     }
 
-    // Redirect to the intended destination
-    const redirectUrl = new URL(next, origin)
+    // Build redirect URL with validated path to prevent open redirect
+    const safePath = getSafeRedirectPath(next)
+    const redirectUrl = new URL(safePath, origin)
+
+    // Preserve UTM params for attribution tracking
+    const utmParams = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']
+    for (const key of utmParams) {
+      const value = searchParams.get(key)
+      if (value) {
+        redirectUrl.searchParams.set(key, value)
+      }
+    }
+
+    // Check if this is a new user (created within last 60 seconds)
+    if (user?.created_at) {
+      const createdAt = new Date(user.created_at).getTime()
+      const now = Date.now()
+      const isNewUser = now - createdAt < 60000 // Created within last minute
+
+      if (isNewUser) {
+        redirectUrl.searchParams.set('signup_completed', 'true')
+      }
+    }
+
     return NextResponse.redirect(redirectUrl)
   } catch (err) {
     console.error('[auth.callback] Unexpected error:', err)

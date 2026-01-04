@@ -4,11 +4,14 @@
  * Provides helper functions for:
  * - Creating test projects with source code configuration
  * - Managing knowledge sources of various types
- * - Uploading test codebases to storage
+ * - Creating mock codebases in local temp directories
  * - Cleanup operations
  */
 
+import { mkdir, writeFile, rm } from 'fs/promises'
+import { join } from 'path'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getLocalPath } from '@/lib/codebase/git-operations'
 import type { KnowledgeSourceType, KnowledgePackageRecord } from '@/lib/knowledge/types'
 
 // ============================================================================
@@ -39,7 +42,7 @@ let testProjectIds: string[] = []
 let testSourceIds: string[] = []
 let testPackageIds: string[] = []
 let testSourceCodeIds: string[] = []
-let testStoragePaths: string[] = []
+let testLocalPaths: string[] = []
 
 // ============================================================================
 // Project Setup
@@ -77,13 +80,18 @@ async function getExistingUserId(): Promise<string> {
 export async function setupTestProject(options: {
   name?: string
   withSourceCode?: boolean
-  sourceCodeKind?: 'path' | 'github'
-  storageUri?: string
+  repositoryUrl?: string
+  repositoryBranch?: string
 }): Promise<TestContext> {
   const supabase = createAdminClient()
   const userId = await getExistingUserId()
 
-  const { name, withSourceCode = false, sourceCodeKind = 'path', storageUri } = options
+  const {
+    name,
+    withSourceCode = false,
+    repositoryUrl = 'https://github.com/test/repo',
+    repositoryBranch = 'main',
+  } = options
 
   // Create test project
   const { data: project, error: projectError } = await supabase
@@ -104,17 +112,15 @@ export async function setupTestProject(options: {
 
   let sourceCodeId: string | null = null
 
-  // Create source code entry if requested
-  // Note: source_codes has user_id (not project_id), and projects.source_code_id references source_codes.id
+  // Create source code entry if requested (GitHub only)
   if (withSourceCode) {
     const { data: sourceCode, error: sourceCodeError } = await supabase
       .from('source_codes')
       .insert({
         user_id: userId,
-        kind: sourceCodeKind,
-        storage_uri: storageUri ?? `projects/${project.id}/codebase`,
-        repository_url: sourceCodeKind === 'github' ? 'https://github.com/test/repo' : null,
-        repository_branch: sourceCodeKind === 'github' ? 'main' : null,
+        kind: 'github',
+        repository_url: repositoryUrl,
+        repository_branch: repositoryBranch,
       })
       .select('id')
       .single()
@@ -125,16 +131,25 @@ export async function setupTestProject(options: {
 
     sourceCodeId = sourceCode.id
     testSourceCodeIds.push(sourceCode.id)
-    
-    // Link the source code to the project
-    const { error: linkError } = await supabase
-      .from('projects')
-      .update({ source_code_id: sourceCode.id })
-      .eq('id', project.id)
-      
-    if (linkError) {
-      throw new Error(`Failed to link source code to project: ${linkError.message}`)
+
+    // Create codebase knowledge_source with source_code_id
+    const { data: codebaseSource, error: ksError } = await supabase
+      .from('knowledge_sources')
+      .insert({
+        project_id: project.id,
+        type: 'codebase',
+        source_code_id: sourceCode.id,
+        status: 'pending',
+        enabled: true,
+      })
+      .select('id')
+      .single()
+
+    if (ksError || !codebaseSource) {
+      throw new Error(`Failed to create codebase knowledge source: ${ksError?.message}`)
     }
+
+    testSourceIds.push(codebaseSource.id)
   }
 
   return { projectId: project.id, userId, sourceCodeId }
@@ -295,35 +310,37 @@ export async function getLatestAnalysis(projectId: string) {
 }
 
 // ============================================================================
-// Storage Utilities
+// Local Filesystem Utilities
 // ============================================================================
 
 /**
- * Upload mock codebase files to Supabase Storage for testing
+ * Create mock codebase files in local temp directory for testing
+ * Uses the same path structure as the git-operations module
  */
-export async function mockCodebaseInStorage(
+export async function mockCodebaseInLocal(
   projectId: string,
+  branch: string,
   files: { path: string; content: string }[]
 ): Promise<string> {
-  const supabase = createAdminClient()
-  const basePath = `projects/${projectId}/codebase`
+  const localPath = getLocalPath(projectId, branch)
+
+  // Create the base directory
+  await mkdir(localPath, { recursive: true })
 
   for (const file of files) {
-    const fullPath = `${basePath}/${file.path}`
-    const blob = new Blob([file.content], { type: 'text/plain' })
+    const fullPath = join(localPath, file.path)
+    const dirPath = fullPath.substring(0, fullPath.lastIndexOf('/'))
 
-    const { error } = await supabase.storage
-      .from('codebases')
-      .upload(fullPath, blob, { upsert: true })
-
-    if (error) {
-      throw new Error(`Failed to upload file ${file.path}: ${error.message}`)
+    // Create subdirectories if needed
+    if (dirPath !== localPath) {
+      await mkdir(dirPath, { recursive: true })
     }
 
-    testStoragePaths.push(fullPath)
+    await writeFile(fullPath, file.content, 'utf-8')
   }
 
-  return basePath
+  testLocalPaths.push(localPath)
+  return localPath
 }
 
 /**
@@ -457,10 +474,12 @@ export async function cleanupTestData(): Promise<void> {
     await supabase.from('projects').delete().in('id', testProjectIds)
   }
 
-  // Clean up storage files
-  if (testStoragePaths.length > 0) {
-    for (const path of testStoragePaths) {
-      await supabase.storage.from('codebases').remove([path])
+  // Clean up local directories
+  for (const localPath of testLocalPaths) {
+    try {
+      await rm(localPath, { recursive: true, force: true })
+    } catch {
+      // Ignore cleanup errors
     }
   }
 
@@ -469,7 +488,7 @@ export async function cleanupTestData(): Promise<void> {
   testSourceIds = []
   testPackageIds = []
   testSourceCodeIds = []
-  testStoragePaths = []
+  testLocalPaths = []
 }
 
 /**
@@ -482,7 +501,7 @@ export async function cleanupOrphanedTestData(): Promise<void> {
   // Find test projects by name pattern (catches orphaned data from crashed tests)
   const { data: testProjects } = await supabase
     .from('projects')
-    .select('id, source_code_id')
+    .select('id')
     .or('name.ilike.%Test Project%,name.ilike.%E2E%,name.ilike.%Integration Test%')
 
   if (!testProjects || testProjects.length === 0) {
@@ -490,7 +509,18 @@ export async function cleanupOrphanedTestData(): Promise<void> {
   }
 
   const projectIds = testProjects.map((p) => p.id)
-  const sourceCodeIds = testProjects.map((p) => p.source_code_id).filter(Boolean) as string[]
+
+  // Get source_code_ids from codebase knowledge_sources before deletion
+  const { data: codebaseSources } = await supabase
+    .from('knowledge_sources')
+    .select('source_code_id')
+    .in('project_id', projectIds)
+    .eq('type', 'codebase')
+    .not('source_code_id', 'is', null)
+
+  const sourceCodeIds = (codebaseSources ?? [])
+    .map((s) => s.source_code_id)
+    .filter(Boolean) as string[]
 
   // Delete in order respecting foreign keys
   await supabase.from('knowledge_packages').delete().in('project_id', projectIds)
@@ -511,7 +541,7 @@ export function resetTestTracking(): void {
   testSourceIds = []
   testPackageIds = []
   testSourceCodeIds = []
-  testStoragePaths = []
+  testLocalPaths = []
 }
 
 // ============================================================================

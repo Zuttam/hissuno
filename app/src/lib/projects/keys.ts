@@ -1,24 +1,21 @@
 import { randomBytes } from 'crypto';
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server';
+import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from '@/lib/supabase/server';
 import type { Database } from '@/types/supabase';
 
 type ProjectRecord = Database['public']['Tables']['projects']['Row'];
+type ProjectSettingsRecord = Database['public']['Tables']['project_settings']['Row'];
 
-// Extended project type with the new key fields
+// Extended project type with the key fields (flattened from project_settings)
 export type ProjectWithKeys = ProjectRecord & {
-  public_key: string | null;
   secret_key: string | null;
   allowed_origins: string[] | null;
+  widget_token_required: boolean;
 };
 
-/**
- * Generates a secure public key for frontend widget use
- * Format: pk_live_XXXXXXXXXXXXXXXXXXXXXXXX (pk_live_ + 24 random chars)
- */
-export function generatePublicKey(): string {
-  const randomPart = randomBytes(18).toString('base64url').slice(0, 24);
-  return `pk_live_${randomPart}`;
-}
+// Raw type from database join
+type ProjectWithSettingsJoin = ProjectRecord & {
+  project_settings: ProjectSettingsRecord | null;
+};
 
 /**
  * Generates a secure secret key for backend/dashboard use
@@ -30,14 +27,6 @@ export function generateSecretKey(): string {
 }
 
 /**
- * Validates that a string looks like a valid public key
- */
-export function validatePublicKey(key: string): boolean {
-  if (!key || typeof key !== 'string') return false;
-  return /^pk_live_[A-Za-z0-9_-]{24}$/.test(key);
-}
-
-/**
  * Validates that a string looks like a valid secret key
  */
 export function validateSecretKey(key: string): boolean {
@@ -46,27 +35,40 @@ export function validateSecretKey(key: string): boolean {
 }
 
 /**
- * Looks up a project by its public key
- * Used by the CopilotKit endpoint to validate widget requests
+ * Flattens project with settings join into ProjectWithKeys
  */
-export async function getProjectByPublicKey(publicKey: string): Promise<ProjectWithKeys | null> {
-  if (!isSupabaseConfigured()) {
-    console.error('[keys] Supabase must be configured to look up projects');
+function flattenProjectWithSettings(data: ProjectWithSettingsJoin): ProjectWithKeys {
+  const { project_settings, ...project } = data;
+  return {
+    ...project,
+    allowed_origins: project_settings?.allowed_origins ?? [],
+    widget_token_required: project_settings?.widget_token_required ?? false,
+  };
+}
+
+/**
+ * Looks up a project by its ID
+ * Used for widget requests - bypasses RLS for public access
+ */
+export async function getProjectById(projectId: string): Promise<ProjectWithKeys | null> {
+  if (!isServiceRoleConfigured()) {
+    console.error('[keys] Service role must be configured to look up projects by ID');
     return null;
   }
 
-  if (!validatePublicKey(publicKey)) {
-    console.warn('[keys] Invalid public key format');
+  if (!projectId || typeof projectId !== 'string') {
+    console.warn('[keys] Invalid project ID');
     return null;
   }
 
   try {
-    const supabase = await createClient();
-    
+    // Use admin client to bypass RLS for public widget requests
+    const supabase = createAdminClient();
+
     const { data, error } = await supabase
       .from('projects')
-      .select('*')
-      .eq('public_key', publicKey)
+      .select('*, project_settings(*)')
+      .eq('id', projectId)
       .single();
 
     if (error) {
@@ -74,11 +76,11 @@ export async function getProjectByPublicKey(publicKey: string): Promise<ProjectW
         // Not found
         return null;
       }
-      console.error('[keys] Error looking up project by public key:', error);
+      console.error('[keys] Error looking up project by ID:', error);
       return null;
     }
 
-    return data as ProjectWithKeys;
+    return flattenProjectWithSettings(data as ProjectWithSettingsJoin);
   } catch (error) {
     console.error('[keys] Unexpected error looking up project:', error);
     return null;
@@ -90,8 +92,8 @@ export async function getProjectByPublicKey(publicKey: string): Promise<ProjectW
  * Used for admin operations that require full access
  */
 export async function getProjectBySecretKey(secretKey: string): Promise<ProjectWithKeys | null> {
-  if (!isSupabaseConfigured()) {
-    console.error('[keys] Supabase must be configured to look up projects');
+  if (!isServiceRoleConfigured()) {
+    console.error('[keys] Service role must be configured to look up projects by secret key');
     return null;
   }
 
@@ -101,11 +103,11 @@ export async function getProjectBySecretKey(secretKey: string): Promise<ProjectW
   }
 
   try {
-    const supabase = await createClient();
-    
+    const supabase = createAdminClient();
+
     const { data, error } = await supabase
       .from('projects')
-      .select('*')
+      .select('*, project_settings(*)')
       .eq('secret_key', secretKey)
       .single();
 
@@ -117,7 +119,7 @@ export async function getProjectBySecretKey(secretKey: string): Promise<ProjectW
       return null;
     }
 
-    return data as ProjectWithKeys;
+    return flattenProjectWithSettings(data as ProjectWithSettingsJoin);
   } catch (error) {
     console.error('[keys] Unexpected error looking up project:', error);
     return null;
@@ -125,54 +127,43 @@ export async function getProjectBySecretKey(secretKey: string): Promise<ProjectW
 }
 
 /**
- * Generates both public and secret keys for a project
- * Returns an object that can be used to update the project
+ * Regenerates a project's secret key
+ * This invalidates existing integrations using the old key
  */
-export function generateProjectKeys(): { public_key: string; secret_key: string } {
-  return {
-    public_key: generatePublicKey(),
-    secret_key: generateSecretKey(),
-  };
-}
-
-/**
- * Updates a project's keys (regeneration)
- * This invalidates all existing widget integrations using the old keys
- */
-export async function regenerateProjectKeys(
+export async function regenerateSecretKey(
   projectId: string,
   userId: string
-): Promise<{ public_key: string; secret_key: string } | null> {
+): Promise<string | null> {
   if (!isSupabaseConfigured()) {
     console.error('[keys] Supabase must be configured to regenerate keys');
     return null;
   }
 
-  const newKeys = generateProjectKeys();
+  const newSecretKey = generateSecretKey();
 
   try {
     const supabase = await createClient();
-    
+
     const { error } = await supabase
       .from('projects')
-      .update(newKeys)
+      .update({ secret_key: newSecretKey })
       .eq('id', projectId)
       .eq('user_id', userId);
 
     if (error) {
-      console.error('[keys] Error regenerating project keys:', error);
+      console.error('[keys] Error regenerating secret key:', error);
       return null;
     }
 
-    return newKeys;
+    return newSecretKey;
   } catch (error) {
-    console.error('[keys] Unexpected error regenerating keys:', error);
+    console.error('[keys] Unexpected error regenerating key:', error);
     return null;
   }
 }
 
 /**
- * Updates a project's allowed origins
+ * Updates a project's allowed origins in project_settings
  */
 export async function updateAllowedOrigins(
   projectId: string,
@@ -191,12 +182,27 @@ export async function updateAllowedOrigins(
 
   try {
     const supabase = await createClient();
-    
-    const { error } = await supabase
+
+    // First verify user owns the project
+    const { data: project, error: projectError } = await supabase
       .from('projects')
-      .update({ allowed_origins: normalizedOrigins })
+      .select('id')
       .eq('id', projectId)
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .single();
+
+    if (projectError || !project) {
+      console.error('[keys] Project not found or access denied:', projectError);
+      return false;
+    }
+
+    // Upsert to project_settings
+    const { error } = await supabase
+      .from('project_settings')
+      .upsert(
+        { project_id: projectId, allowed_origins: normalizedOrigins },
+        { onConflict: 'project_id' }
+      );
 
     if (error) {
       console.error('[keys] Error updating allowed origins:', error);
@@ -217,22 +223,21 @@ function normalizeOrigin(origin: string): string {
   try {
     const trimmed = origin.trim();
     if (!trimmed) return '';
-    
+
     // Handle wildcard domains
     if (trimmed.startsWith('*.')) {
       return trimmed.toLowerCase();
     }
-    
+
     // Add protocol if missing
     let urlString = trimmed;
     if (!urlString.includes('://')) {
       urlString = `https://${urlString}`;
     }
-    
+
     const url = new URL(urlString);
     return url.origin.toLowerCase();
   } catch {
     return origin.trim().toLowerCase();
   }
 }
-

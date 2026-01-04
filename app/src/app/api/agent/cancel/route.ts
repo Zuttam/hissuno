@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getProjectByPublicKey } from '@/lib/projects/keys'
+import { getProjectById } from '@/lib/projects/keys'
 import { createAdminClient } from '@/lib/supabase/server'
 import { cancelChatRun } from '@/lib/agent/chat-run-service'
+import { isOriginAllowed } from '@/lib/utils/widget-auth'
 
 export const runtime = 'nodejs'
 
 interface CancelRequestBody {
-  publicKey: string
+  projectId: string
   sessionId: string
+}
+
+/**
+ * Get the request origin from headers
+ * Uses Origin header if present, otherwise falls back to request URL origin
+ */
+function getRequestOrigin(request: NextRequest): string {
+  return request.headers.get('Origin') || request.nextUrl.origin
 }
 
 /**
@@ -25,15 +34,15 @@ function addCorsHeaders(response: NextResponse, origin: string): NextResponse {
  * Cancel a running chat
  */
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get('Origin') || '*'
+  const origin = getRequestOrigin(request)
 
   try {
     const body = (await request.json()) as CancelRequestBody
-    const { publicKey, sessionId } = body
+    const { projectId, sessionId } = body
 
-    if (!publicKey) {
+    if (!projectId) {
       return addCorsHeaders(
-        NextResponse.json({ error: 'publicKey is required' }, { status: 400 }),
+        NextResponse.json({ error: 'projectId is required' }, { status: 400 }),
         origin
       )
     }
@@ -45,11 +54,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate public key
-    const project = await getProjectByPublicKey(publicKey)
+    // Validate project
+    const project = await getProjectById(projectId)
     if (!project) {
       return addCorsHeaders(
-        NextResponse.json({ error: 'Invalid public key' }, { status: 401 }),
+        NextResponse.json({ error: 'Invalid project ID' }, { status: 401 }),
+        origin
+      )
+    }
+
+    // Check origin
+    if (!isOriginAllowed(origin, project.allowed_origins)) {
+      return addCorsHeaders(
+        NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
         origin
       )
     }
@@ -82,14 +99,14 @@ export async function POST(request: NextRequest) {
     console.error('[agent.cancel] unexpected error', error)
     return addCorsHeaders(
       NextResponse.json({ error: 'Failed to cancel chat.' }, { status: 500 }),
-      request.headers.get('Origin') || '*'
+      origin
     )
   }
 }
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  const origin = request.headers.get('Origin') || '*'
+  const origin = getRequestOrigin(request)
 
   return new NextResponse(null, {
     status: 204,

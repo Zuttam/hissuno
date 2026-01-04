@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState, useRef, type ChangeEvent } from 'react'
-import { Card, Button, Badge, Alert, Spinner, Collapsible, FormField, Input, Textarea } from '@/components/ui'
+import { useCallback, useEffect, useState, useRef } from 'react'
+import { Button, Badge, Alert, Spinner, Collapsible } from '@/components/ui'
 import { KnowledgeViewer } from './knowledge-viewer'
 import { AnalysisProgressBar, type AnalysisEvent } from './analysis-progress-bar'
 import {
@@ -42,8 +42,6 @@ interface KnowledgePackage {
   generated_at: string
 }
 
-type AddSourceType = 'website' | 'docs_portal' | 'raw_text'
-
 export function KnowledgeManagementCard({ projectId }: KnowledgeManagementCardProps) {
   const [sources, setSources] = useState<KnowledgeSourceRecord[]>([])
   const [packages, setPackages] = useState<KnowledgePackage[]>([])
@@ -58,12 +56,6 @@ export function KnowledgeManagementCard({ projectId }: KnowledgeManagementCardPr
   const [analysisEvents, setAnalysisEvents] = useState<AnalysisEvent[]>([])
   const eventSourceRef = useRef<EventSource | null>(null)
 
-  // Add source form state
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [addSourceType, setAddSourceType] = useState<AddSourceType>('website')
-  const [addSourceUrl, setAddSourceUrl] = useState('')
-  const [addSourceContent, setAddSourceContent] = useState('')
-  const [isAddingSource, setIsAddingSource] = useState(false)
 
   // Fetch knowledge sources
   const fetchSources = useCallback(async () => {
@@ -266,92 +258,6 @@ export function KnowledgeManagementCard({ projectId }: KnowledgeManagementCardPr
     }
   }
 
-  const handleAddSource = async () => {
-    if (isAddingSource) return
-
-    setIsAddingSource(true)
-    setError(null)
-
-    try {
-      const body: Record<string, string> = { type: addSourceType }
-      if (addSourceType === 'website' || addSourceType === 'docs_portal') {
-        if (!addSourceUrl.trim()) {
-          throw new Error('URL is required')
-        }
-        body.url = addSourceUrl.trim()
-      } else if (addSourceType === 'raw_text') {
-        if (!addSourceContent.trim()) {
-          throw new Error('Content is required')
-        }
-        body.content = addSourceContent.trim()
-      }
-
-      const response = await fetch(`/api/projects/${projectId}/knowledge-sources`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error ?? 'Failed to add source')
-      }
-
-      // Reset form and refresh
-      setAddSourceUrl('')
-      setAddSourceContent('')
-      setShowAddForm(false)
-      void fetchSources()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to add source'
-      setError(message)
-    } finally {
-      setIsAddingSource(false)
-    }
-  }
-
-  const handleDeleteSource = async (sourceId: string) => {
-    try {
-      const response = await fetch(
-        `/api/projects/${projectId}/knowledge-sources?sourceId=${sourceId}`,
-        { method: 'DELETE' }
-      )
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error ?? 'Failed to delete source')
-      }
-
-      void fetchSources()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete source'
-      setError(message)
-    }
-  }
-
-  const handleUpdateSource = async (sourceId: string, updates: { enabled?: boolean; analysis_scope?: string }) => {
-    try {
-      const response = await fetch(
-        `/api/projects/${projectId}/knowledge-sources?sourceId=${sourceId}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-        }
-      )
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error ?? 'Failed to update source')
-      }
-
-      void fetchSources()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update source'
-      setError(message)
-    }
-  }
-
   const isLoading = isLoadingSources || isLoadingPackages
 
   // Calculate total sources count (codebase is now included in sources)
@@ -424,34 +330,17 @@ export function KnowledgeManagementCard({ projectId }: KnowledgeManagementCardPr
           defaultOpen={false}
           trigger={<span>Sources ({totalSourcesCount})</span>}
           headerActions={
-            !showAddForm && (
-              <button
-                type="button"
-                onClick={() => setShowAddForm(true)}
-                className="text-sm text-[color:var(--accent-selected)] hover:underline transition"
-              >
-                + Add source
-              </button>
-            )
+            <a
+              href={`/projects/${projectId}/edit?step=knowledge`}
+              className="text-sm text-[color:var(--accent-selected)] hover:underline transition"
+            >
+              Configure sources
+            </a>
           }
         >
           <SourcesSection
             sources={sources}
             isLoading={isLoading}
-            showAddForm={showAddForm}
-            onShowAddForm={() => setShowAddForm(true)}
-            onHideAddForm={() => setShowAddForm(false)}
-            addSourceType={addSourceType}
-            onAddSourceTypeChange={setAddSourceType}
-            addSourceUrl={addSourceUrl}
-            onAddSourceUrlChange={setAddSourceUrl}
-            addSourceContent={addSourceContent}
-            onAddSourceContentChange={setAddSourceContent}
-            isAddingSource={isAddingSource}
-            onAddSource={handleAddSource}
-            onDeleteSource={handleDeleteSource}
-            onUpdateSource={handleUpdateSource}
-            projectId={projectId}
           />
         </Collapsible>
       </div>
@@ -477,6 +366,7 @@ function KnowledgeSection({ packages, isLoading, projectId, onPackageUpdated }: 
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
 
   const fetchContent = useCallback(
     async (category: KnowledgeCategory) => {
@@ -548,6 +438,38 @@ function KnowledgeSection({ packages, isLoading, projectId, onPackageUpdated }: 
     setSaveError(null)
   }
 
+  const handleExport = async () => {
+    setIsExporting(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/knowledge/export`)
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error ?? 'Failed to export knowledge')
+      }
+
+      // Get the blob and trigger download
+      const blob = await response.blob()
+      const contentDisposition = response.headers.get('Content-Disposition')
+      const filename = contentDisposition?.match(/filename="(.+)"/)?.[1] ?? 'knowledge-export.zip'
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to export'
+      console.error('[knowledge] Export failed:', message)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -601,15 +523,29 @@ function KnowledgeSection({ packages, isLoading, projectId, onPackageUpdated }: 
           })}
         </div>
 
-        {/* Edit button - only show when content exists and not already editing */}
-        {activePackage && content && !isEditing && (
-          <button
-            type="button"
-            onClick={handleEdit}
-            className="text-sm text-[color:var(--accent-selected)] hover:underline transition font-mono"
-          >
-            Edit
-          </button>
+        {/* Action buttons - only show when not editing */}
+        {!isEditing && (
+          <div className="flex items-center gap-4">
+            {packages.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={isExporting}
+                className="text-sm text-[color:var(--accent-selected)] hover:underline transition font-mono disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isExporting ? 'Exporting...' : 'Export'}
+              </button>
+            )}
+            {activePackage && content && (
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="text-sm text-[color:var(--accent-selected)] hover:underline transition font-mono"
+              >
+                Edit
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -647,39 +583,9 @@ function KnowledgeSection({ packages, isLoading, projectId, onPackageUpdated }: 
 interface SourcesSectionProps {
   sources: KnowledgeSourceRecord[]
   isLoading: boolean
-  showAddForm: boolean
-  onShowAddForm: () => void
-  onHideAddForm: () => void
-  addSourceType: AddSourceType
-  onAddSourceTypeChange: (type: AddSourceType) => void
-  addSourceUrl: string
-  onAddSourceUrlChange: (url: string) => void
-  addSourceContent: string
-  onAddSourceContentChange: (content: string) => void
-  isAddingSource: boolean
-  onAddSource: () => void
-  onDeleteSource: (id: string) => void
-  onUpdateSource: (id: string, updates: { enabled?: boolean; analysis_scope?: string }) => void
-  projectId: string
 }
 
-function SourcesSection({
-  sources,
-  isLoading,
-  showAddForm,
-  onHideAddForm,
-  addSourceType,
-  onAddSourceTypeChange,
-  addSourceUrl,
-  onAddSourceUrlChange,
-  addSourceContent,
-  onAddSourceContentChange,
-  isAddingSource,
-  onAddSource,
-  onDeleteSource,
-  onUpdateSource,
-}: SourcesSectionProps) {
-  // Separate codebase source from other sources
+function SourcesSection({ sources, isLoading }: SourcesSectionProps) {
   const codebaseSource = sources.find((s) => s.type === 'codebase')
   const otherSources = sources.filter((s) => s.type !== 'codebase')
 
@@ -692,100 +598,18 @@ function SourcesSection({
   }
 
   return (
-    <div className="space-y-3">
-      {/* Add Source Form */}
-      {showAddForm && (
-        <div className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-4">
-          <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--foreground)] mb-4">
-            Add Knowledge Source
-          </h3>
-
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              {(['website', 'docs_portal', 'raw_text'] as const).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => onAddSourceTypeChange(type)}
-                  className={`rounded-[4px] border-2 px-3 py-2 font-mono text-xs font-semibold uppercase transition
-                    ${
-                      addSourceType === type
-                        ? 'border-[color:var(--accent-selected)] bg-[color:var(--accent-selected)]/10 text-[color:var(--accent-selected)]'
-                        : 'border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:border-[color:var(--border)]'
-                    }`}
-                >
-                  {getSourceTypeLabel(type)}
-                </button>
-              ))}
-            </div>
-
-            {(addSourceType === 'website' || addSourceType === 'docs_portal') && (
-              <FormField
-                label={addSourceType === 'website' ? 'Website URL' : 'Documentation URL'}
-                htmlFor="add-url"
-              >
-                <Input
-                  id="add-url"
-                  type="url"
-                  value={addSourceUrl}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => onAddSourceUrlChange(e.target.value)}
-                  placeholder={
-                    addSourceType === 'website'
-                      ? 'https://yourcompany.com'
-                      : 'https://docs.yourcompany.com'
-                  }
-                />
-              </FormField>
-            )}
-
-            {addSourceType === 'raw_text' && (
-              <FormField label="Content" htmlFor="add-content">
-                <Textarea
-                  id="add-content"
-                  value={addSourceContent}
-                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => onAddSourceContentChange(e.target.value)}
-                  placeholder="Add Q&A pairs, notes, or any knowledge..."
-                  rows={4}
-                />
-              </FormField>
-            )}
-
-            <div className="flex gap-2">
-              <Button onClick={onAddSource} loading={isAddingSource}>
-                Add Source
-              </Button>
-              <Button variant="ghost" onClick={onHideAddForm}>
-                Cancel
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-2">
+      {codebaseSource && <CodebaseSourceItem source={codebaseSource} />}
+      {otherSources.map((source) => (
+        <SourceItem key={source.id} source={source} />
+      ))}
+      {!codebaseSource && otherSources.length === 0 && (
+        <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] p-6 text-center">
+          <p className="text-sm text-[color:var(--text-secondary)]">
+            No knowledge sources configured.
+          </p>
         </div>
       )}
-
-      {/* Sources List */}
-      <div className="space-y-2">
-        {/* Codebase source (if exists) */}
-        {codebaseSource && (
-          <CodebaseSourceItem
-            source={codebaseSource}
-            onUpdate={(updates) => onUpdateSource(codebaseSource.id, updates)}
-          />
-        )}
-
-        {/* Other sources */}
-        {otherSources.map((source) => (
-          <SourceItem key={source.id} source={source} onDelete={() => onDeleteSource(source.id)} />
-        ))}
-
-        {/* Empty state when no sources */}
-        {!codebaseSource && otherSources.length === 0 && (
-          <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] p-6 text-center">
-            <p className="text-sm text-[color:var(--text-secondary)]">
-              No knowledge sources configured. Add sources like your website, documentation, or custom notes.
-            </p>
-          </div>
-        )}
-      </div>
     </div>
   )
 }
@@ -796,27 +620,9 @@ function SourcesSection({
 
 interface CodebaseSourceItemProps {
   source: KnowledgeSourceRecord
-  onUpdate: (updates: { enabled?: boolean; analysis_scope?: string }) => void
 }
 
-function CodebaseSourceItem({ source, onUpdate }: CodebaseSourceItemProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [localScope, setLocalScope] = useState(source.analysis_scope ?? '')
-  const [isSaving, setIsSaving] = useState(false)
-
-  const handleToggle = async () => {
-    setIsSaving(true)
-    await onUpdate({ enabled: !source.enabled })
-    setIsSaving(false)
-  }
-
-  const handleSaveScope = async () => {
-    setIsSaving(true)
-    await onUpdate({ analysis_scope: localScope.trim() || undefined })
-    setIsSaving(false)
-    setIsExpanded(false)
-  }
-
+function CodebaseSourceItem({ source }: CodebaseSourceItemProps) {
   const statusColors: Record<string, 'default' | 'success' | 'warning' | 'info'> = {
     pending: 'default',
     processing: 'info',
@@ -825,84 +631,25 @@ function CodebaseSourceItem({ source, onUpdate }: CodebaseSourceItemProps) {
   }
 
   return (
-    <div className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)]">
-      <div className="flex items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <Badge variant="default">Codebase</Badge>
-          <span className="text-sm text-[color:var(--foreground)]">
-            {source.analysis_scope ? `Project source code (${source.analysis_scope})` : 'Project source code'}
-          </span>
-          <Badge variant={source.enabled ? statusColors[source.status] ?? 'default' : 'default'}>
-            {source.enabled ? source.status : 'disabled'}
-          </Badge>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Toggle switch */}
-          <label className="relative inline-flex cursor-pointer items-center">
-            <input
-              type="checkbox"
-              checked={source.enabled}
-              onChange={handleToggle}
-              disabled={isSaving}
-              className="peer sr-only"
-            />
-            <div className={`
-              h-6 w-11 rounded-full border-2 transition-colors
-              ${source.enabled 
-                ? 'border-[color:var(--accent-selected)] bg-[color:var(--accent-selected)]' 
-                : 'border-[color:var(--border)] bg-[color:var(--surface)]'
-              }
-              after:content-[''] after:absolute after:left-[4px] after:top-[4px] after:h-4 after:w-4 after:rounded-full after:transition-transform
-              ${source.enabled ? 'after:translate-x-5 after:bg-white' : 'after:bg-[color:var(--text-tertiary)]'}
-            `} />
-          </label>
-          <button
-            type="button"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="text-xs text-[color:var(--accent-selected)] hover:underline font-mono"
-          >
-            {isExpanded ? 'Hide' : 'Settings'}
-          </button>
-        </div>
+    <div className="flex items-center justify-between rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-4 py-3">
+      <div className="flex items-center gap-3 min-w-0">
+        <Badge variant="default">Codebase</Badge>
+        <span className="text-sm text-[color:var(--foreground)]">
+          {source.analysis_scope ? `Project source code (${source.analysis_scope})` : 'Project source code'}
+        </span>
+        <Badge variant={statusColors[source.status] ?? 'default'}>
+          {source.status}
+        </Badge>
       </div>
-
-      {/* Expandable settings */}
-      {isExpanded && (
-        <div className="border-t border-[color:var(--border-subtle)] px-4 py-3">
-          <FormField
-            label="Analysis Scope"
-            description="Limit analysis to a specific path (e.g., packages/my-app for monorepos)"
-          >
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={localScope}
-                onChange={(e) => setLocalScope(e.target.value)}
-                placeholder="Leave empty to analyze entire codebase"
-                className="flex-1 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] px-3 py-2 font-mono text-sm text-[color:var(--foreground)] outline-none transition focus:border-[color:var(--accent-primary)] focus:ring-0"
-              />
-              <Button
-                size="sm"
-                onClick={handleSaveScope}
-                loading={isSaving}
-                disabled={localScope === (source.analysis_scope ?? '')}
-              >
-                Save
-              </Button>
-            </div>
-          </FormField>
-        </div>
-      )}
     </div>
   )
 }
 
 interface SourceItemProps {
   source: KnowledgeSourceRecord
-  onDelete: () => void
 }
 
-function SourceItem({ source, onDelete }: SourceItemProps) {
+function SourceItem({ source }: SourceItemProps) {
   const statusColors: Record<string, 'default' | 'success' | 'warning' | 'info'> = {
     pending: 'default',
     processing: 'info',
@@ -922,16 +669,11 @@ function SourceItem({ source, onDelete }: SourceItemProps) {
         <span className="text-sm text-[color:var(--foreground)] truncate max-w-[300px]">{displayValue}</span>
         <Badge variant={statusColors[source.status] ?? 'default'}>{source.status}</Badge>
       </div>
-      <div className="flex items-center gap-2">
-        {source.error_message && (
-          <span className="text-xs text-[color:var(--accent-danger)]" title={source.error_message}>
-            Error
-          </span>
-        )}
-        <Button variant="ghost" size="sm" onClick={onDelete}>
-          Delete
-        </Button>
-      </div>
+      {source.error_message && (
+        <span className="text-xs text-[color:var(--accent-danger)]" title={source.error_message}>
+          Error
+        </span>
+      )}
     </div>
   )
 }

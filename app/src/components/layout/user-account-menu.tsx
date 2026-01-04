@@ -112,6 +112,13 @@ export function UserAccountMenu({ user }: UserAccountMenuProps) {
             >
               Account settings
             </Link>
+            <Link
+              href="/account/settings/billing"
+              onClick={() => setOpen(false)}
+              className="block rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-3 py-2 font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--foreground)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
+            >
+              Billing
+            </Link>
             <form action={signOutAction}>
               <SignOutButton />
             </form>

@@ -7,9 +7,11 @@ import { useSessions, useSessionDetail } from '@/hooks/use-sessions'
 import { SessionsFilters } from './sessions-filters'
 import { SessionsTable } from './sessions-table'
 import { SessionSidebar } from './session-sidebar'
+import { CreateSessionDialog } from './create-session-dialog'
 import { IconButton } from '@/components/ui/icon-button'
 import { RefreshIcon } from '@/components/ui/refresh-icon'
-import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { FloatingCard } from '@/components/ui/floating-card'
 
 type SessionView = 'messages' | 'details'
 
@@ -33,6 +35,7 @@ export function SessionsPage({
   })
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(initialSessionId ?? null)
   const [view, setView] = useState<SessionView>(initialView)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
 
   // Update URL when selectedSessionId or view changes
   useEffect(() => {
@@ -66,12 +69,17 @@ export function SessionsPage({
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  const { sessions, isLoading, error, refresh } = useSessions({
+  const { sessions, isLoading, error, refresh, createSession, archiveSession } = useSessions({
     initialSessions,
     filters,
   })
 
-  const { session: selectedSession, messages, isLoading: isLoadingDetail } = useSessionDetail({
+  const {
+    session: selectedSession,
+    messages,
+    isLoading: isLoadingDetail,
+    refresh: refreshSessionDetail,
+  } = useSessionDetail({
     sessionId: selectedSessionId,
   })
 
@@ -97,21 +105,39 @@ export function SessionsPage({
     setSelectedSessionId(null)
   }, [])
 
+  const handleSessionUpdated = useCallback(() => {
+    void refreshSessionDetail()
+    void refresh()
+  }, [refreshSessionDetail, refresh])
+
+  const handleArchiveSession = useCallback(async (session: SessionWithProject) => {
+    await archiveSession(session.id, !session.is_archived)
+  }, [archiveSession])
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-      <Card className="flex flex-col gap-8 border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)]">
-        <header className="flex items-center gap-3">
-          <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-            Sessions
-          </h1>
-          <IconButton
-            aria-label="Refresh sessions"
-            variant="ghost"
-            size="md"
-            onClick={() => void refresh()}
+      <FloatingCard floating="gentle" variant="default" className="flex flex-col gap-8">
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+              Sessions
+            </h1>
+            <IconButton
+              aria-label="Refresh sessions"
+              variant="ghost"
+              size="md"
+              onClick={() => void refresh()}
+            >
+              <RefreshIcon />
+            </IconButton>
+          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowCreateDialog(true)}
           >
-            <RefreshIcon />
-          </IconButton>
+            Create
+          </Button>
         </header>
 
         <SessionsFilters
@@ -136,9 +162,10 @@ export function SessionsPage({
             selectedSessionId={selectedSessionId}
             onSelectSession={handleSessionSelect}
             onOpenMessages={handleOpenMessages}
+            onArchive={handleArchiveSession}
           />
         )}
-      </Card>
+      </FloatingCard>
 
       {selectedSessionId && (
         <SessionSidebar
@@ -146,10 +173,18 @@ export function SessionsPage({
           messages={messages}
           isLoading={isLoadingDetail}
           onClose={handleCloseSidebar}
+          onSessionUpdated={handleSessionUpdated}
           view={view}
           onViewChange={handleViewChange}
         />
       )}
+
+      <CreateSessionDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        projects={projects}
+        onCreateSession={createSession}
+      />
     </div>
   )
 }
