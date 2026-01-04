@@ -155,6 +155,11 @@ export interface HissunoConfig {
 }
 
 /**
+ * Sender type for messages
+ */
+export type MessageSenderType = 'ai' | 'human_agent' | 'system';
+
+/**
  * Chat message structure
  */
 export interface ChatMessage {
@@ -162,6 +167,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt?: Date;
+  senderType?: MessageSenderType; // 'ai' for AI, 'human_agent' for human takeover
 }
 
 /**

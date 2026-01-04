@@ -21,6 +21,10 @@ const DEFAULT_SETTINGS: Omit<ProjectSettingsRecord, 'project_id' | 'created_at' 
   widget_position: 'bottom-right',
   widget_title: 'Support',
   widget_initial_message: 'Hi! How can I help you today?',
+  // Session lifecycle defaults
+  session_idle_timeout_minutes: 5,
+  session_goodbye_delay_seconds: 90,
+  session_idle_response_timeout_seconds: 60,
 }
 
 export function ProjectIssuesCard({ projectId, settingsVersion }: ProjectIssuesCardProps) {
@@ -78,7 +82,7 @@ export function ProjectIssuesCard({ projectId, settingsVersion }: ProjectIssuesC
   const displaySettings = settings ?? { ...DEFAULT_SETTINGS, project_id: projectId, created_at: '', updated_at: '' }
 
   return (
-    <Card className="lg:col-span-2">
+    <div className="lg:col-span-2">
       <div className="flex items-center justify-between mb-6">
         <h3 className="font-mono text-lg font-bold uppercase tracking-tight text-[color:var(--foreground)]">
           Issues Tracking
@@ -172,14 +176,14 @@ export function ProjectIssuesCard({ projectId, settingsVersion }: ProjectIssuesC
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="divide-y divide-[color:var(--border-subtle)] border border-[color:var(--border-subtle)] rounded-[4px] overflow-hidden">
             {issues.map((issue) => (
               <IssueRow key={issue.id} issue={issue} />
             ))}
           </div>
         )}
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -211,7 +215,7 @@ function IssueRow({ issue }: IssueRowProps) {
   return (
     <Link
       href={`/issues?project=${issue.project_id}&issue=${issue.id}`}
-      className="flex items-center justify-between rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3 transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
+      className="flex items-center justify-between bg-[color:var(--background)] px-3 py-2 transition hover:bg-[color:var(--surface-hover)]"
     >
       <div className="flex items-center gap-3">
         <Badge variant={getTypeVariant(issue.type)}>

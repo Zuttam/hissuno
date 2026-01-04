@@ -413,6 +413,10 @@ export async function getProjectSettingsWithAuth(projectId: string): Promise<Pro
     widget_position: 'bottom-right',
     widget_title: 'Support',
     widget_initial_message: 'Hi! How can I help you today?',
+    // Session lifecycle defaults
+    session_idle_timeout_minutes: 5,
+    session_goodbye_delay_seconds: 90,
+    session_idle_response_timeout_seconds: 60,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -476,6 +480,9 @@ export async function upsertProjectSettings(
     | 'widget_position'
     | 'widget_title'
     | 'widget_initial_message'
+    | 'session_idle_timeout_minutes'
+    | 'session_goodbye_delay_seconds'
+    | 'session_idle_response_timeout_seconds'
   >>
 ): Promise<ProjectSettingsRecord | null> {
   if (!isSupabaseConfigured()) {

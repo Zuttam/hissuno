@@ -17,23 +17,22 @@
 - [] Unit test GET `/api/agent/stream` emits correct SSE events
 - [] Unit test POST `/api/agent/cancel` stops active stream
 
-## 2. Test Session Close Logic and Automatic PM Review Trigger
+## 2. Test Session Close Logic and Automatic session analysis trigger
 **Test Suite:** `src/app/api/sessions/__tests__/session-close.test.ts`
 - [] Test POST `/api/sessions/{id}/close` marks session as closed
-- [] Verify `triggerPMReview=true` query param creates pm_reviews record
-- [] Test that PM review is fire-and-forget (doesn't block close response)
+- [] Test that session analysis and PM review is fire-and-forget (doesn't block close response)
 - [] Test race condition: concurrent close requests (unique constraint)
 - [] Verify runId is returned when PM review is triggered
 - [] Test session close on widget unmount triggers close API
 
-## 3. Test PM Review with Stream (Including Cancel)
-**Test Suite:** `src/app/api/sessions/__tests__/pm-review.test.ts`
-- [] Test POST `/api/sessions/{id}/pm-review` creates pm_reviews record with status='running'
+## 3. Test Session Analysis and PM Review with Stream (Including Cancel)
+**Test Suite:** `src/app/api/sessions/__tests__/session-analysis.test.ts`
+- [] Test POST `/api/sessions/{id}/pm-review` creates session_reviews record with status='running'
 - [] Verify SSE connection to `/api/sessions/{id}/pm-review/stream`
 - [] Test step progression: `get-context` → `analyze` → `completion`
 - [] Verify `review-finish` event contains correct PMReviewResult
 - [] Test actions: 'created' (new issue), 'upvoted' (existing), 'skipped'
-- [] Test cancel mid-review updates pm_reviews status to 'cancelled'
+- [] Test cancel mid-review updates session_reviews status to 'cancelled'
 - [] Test reconnection: close sidebar, reopen, and see review still running
 - [] Verify `session.pm_reviewed_at` updated on completion
 - [] Test concurrent PM review prevention (unique constraint on running)

@@ -3,9 +3,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { Badge, Spinner } from '@/components/ui'
-import type { SessionWithProject, ChatMessage } from '@/types/session'
-import { usePMReview } from '@/hooks/use-pm-review'
-import { MessagesPanel } from './messages-panel'
+import type { SessionWithProject, ChatMessage, SessionStatus, SessionTag, SessionSource } from '@/types/session'
+import { SESSION_SOURCE_INFO } from '@/types/session'
+import { useSessionReview } from '@/hooks/use-session-review'
+import { SessionChat } from './session-chat'
+import { SessionTagEditor } from './session-tag-editor'
+import { SessionTagList } from './session-tag-badge'
+
+type SessionView = 'messages' | 'details'
 
 interface SessionSidebarProps {
   session: SessionWithProject | null
@@ -13,6 +18,8 @@ interface SessionSidebarProps {
   isLoading: boolean
   onClose: () => void
   onSessionUpdated?: () => void
+  view: SessionView
+  onViewChange: (view: SessionView) => void
 }
 
 export function SessionSidebar({
@@ -21,28 +28,51 @@ export function SessionSidebar({
   isLoading,
   onClose,
   onSessionUpdated,
+  view,
+  onViewChange,
 }: SessionSidebarProps) {
   const {
     isReviewing,
-    result: pmResult,
-    currentStep,
+    result: reviewResult,
+    currentPhase,
+    progressMessage,
+    tags: reviewTags,
     triggerReview,
-  } = usePMReview({ sessionId: session?.id ?? null })
-  const [showPMResult, setShowPMResult] = useState(false)
-  const [showMessagesPanel, setShowMessagesPanel] = useState(false)
+  } = useSessionReview({ sessionId: session?.id ?? null })
+  const [showReviewResult, setShowReviewResult] = useState(false)
+  const [localTags, setLocalTags] = useState<SessionTag[]>(session?.tags ?? [])
+
+  // Sync local tags with session tags
+  useEffect(() => {
+    setLocalTags(session?.tags ?? [])
+  }, [session?.tags])
+
+  // Update local tags when review completes with new tags
+  useEffect(() => {
+    if (reviewTags.length > 0 && !isReviewing) {
+      setLocalTags(reviewTags)
+    }
+  }, [reviewTags, isReviewing])
 
   // Refresh session data when review completes
   useEffect(() => {
-    if (pmResult && !isReviewing) {
+    if (reviewResult && !isReviewing) {
       onSessionUpdated?.()
     }
-  }, [pmResult, isReviewing, onSessionUpdated])
+  }, [reviewResult, isReviewing, onSessionUpdated])
 
-  const handlePMReview = useCallback(async () => {
+  const handleReview = useCallback(async () => {
     if (!session) return
-    setShowPMResult(true)
+    setShowReviewResult(true)
     await triggerReview()
   }, [session, triggerReview])
+
+  const handleTagsUpdated = useCallback((tags: SessionTag[]) => {
+    setLocalTags(tags)
+    onSessionUpdated?.()
+  }, [onSessionUpdated])
+
+  const isSessionActive = session?.status !== 'closed'
 
   return (
     <>
@@ -54,33 +84,50 @@ export function SessionSidebar({
       />
 
       {/* Sidebar */}
-      <aside className="fixed right-0 top-0 z-50 flex h-full w-full max-w-lg flex-col border-l-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-xl">
+      <aside className="fixed right-0 top-0 z-50 flex h-full w-full max-w-2xl flex-col border-l-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between border-b-2 border-[color:var(--border-subtle)] p-4">
-          <h2 className="font-mono text-lg font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-            Session Details
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-[4px] p-2 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
-            aria-label="Close sidebar"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <div className="flex items-center gap-3">
+            <h2 className="font-mono text-lg font-bold uppercase tracking-tight text-[color:var(--foreground)]">
+              {view === 'messages' ? 'Conversation' : 'Session Details'}
+            </h2>
+            {view === 'messages' && isSessionActive && (
+              <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-600">
+                Live
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* View toggle link */}
+            <button
+              type="button"
+              onClick={() => onViewChange(view === 'messages' ? 'details' : 'messages')}
+              className="rounded-[4px] px-3 py-1.5 text-sm text-[color:var(--accent-primary)] transition hover:bg-[color:var(--surface-hover)]"
             >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+              {view === 'messages' ? 'View Details →' : '← Messages'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-[4px] p-2 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
+              aria-label="Close sidebar"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -88,46 +135,50 @@ export function SessionSidebar({
             <Spinner />
           </div>
         ) : session ? (
-          <>
-            {/* Session Details */}
-            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <SessionDetails session={session} />
-            </div>
+          view === 'messages' ? (
+            <MessagesView
+              session={session}
+              messages={messages}
+              onMessageSent={onSessionUpdated}
+            />
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              {/* Session Details */}
+              <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+                <SessionDetails session={session} />
+              </div>
 
-            {/* PM Review Button */}
-            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <PMReviewSection
-                session={session}
-                isReviewing={isReviewing}
-                result={pmResult}
-                showResult={showPMResult}
-                currentStep={currentStep}
-                onTriggerReview={handlePMReview}
-              />
-            </div>
+              {/* Tags Section */}
+              <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+                <SessionTagEditor
+                  sessionId={session.id}
+                  currentTags={localTags}
+                  onTagsUpdated={handleTagsUpdated}
+                  disabled={isReviewing}
+                />
+              </div>
 
-            {/* Messages Preview */}
-            <div className="p-4">
-              <MessagesPreview
-                messages={messages}
-                onExpand={() => setShowMessagesPanel(true)}
-              />
+              {/* Session Review */}
+              <div className="p-4">
+                <SessionReviewSection
+                  session={session}
+                  isReviewing={isReviewing}
+                  result={reviewResult}
+                  showResult={showReviewResult}
+                  currentPhase={currentPhase}
+                  progressMessage={progressMessage}
+                  reviewTags={reviewTags}
+                  onTriggerReview={handleReview}
+                />
+              </div>
             </div>
-          </>
+          )
         ) : (
           <div className="flex flex-1 items-center justify-center">
             <p className="text-[color:var(--text-secondary)]">Session not found</p>
           </div>
         )}
       </aside>
-
-      {/* Messages Panel */}
-      {showMessagesPanel && (
-        <MessagesPanel
-          messages={messages}
-          onClose={() => setShowMessagesPanel(false)}
-        />
-      )}
     </>
   )
 }
@@ -137,16 +188,26 @@ interface SessionDetailsProps {
 }
 
 function SessionDetails({ session }: SessionDetailsProps) {
+  const sourceInfo = SESSION_SOURCE_INFO[session.source as SessionSource] || SESSION_SOURCE_INFO.widget
+
   return (
     <div className="space-y-4">
-      {/* Status and Project */}
+      {/* Status, Source, and Project */}
       <div className="flex items-center justify-between">
-        <Badge variant={session.status === 'active' ? 'success' : 'default'}>
-          {session.status}
-        </Badge>
-        <span className="font-mono text-sm text-[color:var(--foreground)]">
+        <div className="flex items-center gap-2">
+          <Badge variant={session.status === 'active' ? 'success' : 'default'}>
+            {session.status}
+          </Badge>
+          <Badge variant={sourceInfo.variant}>
+            {sourceInfo.label}
+          </Badge>
+        </div>
+        <Link
+          href={`/projects/${session.project_id}`}
+          className="font-mono text-sm text-[color:var(--accent-primary)] hover:underline"
+        >
           {session.project?.name || 'Unknown Project'}
-        </span>
+        </Link>
       </div>
 
       {/* Session ID */}
@@ -243,64 +304,176 @@ function formatDateTime(dateString: string): string {
   })
 }
 
-interface MessagesPreviewProps {
+interface MessagesViewProps {
+  session: SessionWithProject
   messages: ChatMessage[]
-  onExpand: () => void
+  onMessageSent?: () => void
 }
 
-function MessagesPreview({ messages, onExpand }: MessagesPreviewProps) {
-  const latestMessage = messages[messages.length - 1]
-  const previewText = latestMessage?.content
-    ? latestMessage.content.slice(0, 100) + (latestMessage.content.length > 100 ? '...' : '')
-    : null
+function MessagesView({ session, messages, onMessageSent }: MessagesViewProps) {
+  const [input, setInput] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const isSessionActive = session.status !== 'closed'
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault()
+      const content = input.trim()
+      if (!content || isSending || !isSessionActive) return
+
+      setError(null)
+      setIsSending(true)
+
+      try {
+        const response = await fetch(`/api/sessions/${session.id}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ content }),
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Failed to send message')
+        }
+
+        setInput('')
+        onMessageSent?.()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to send message')
+      } finally {
+        setIsSending(false)
+      }
+    },
+    [input, isSending, isSessionActive, session.id, onMessageSent]
+  )
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        handleSubmit(e)
+      }
+    },
+    [handleSubmit]
+  )
 
   return (
-    <button
-      type="button"
-      onClick={onExpand}
-      className="w-full rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 text-left transition hover:border-[color:var(--accent-primary)] hover:bg-[color:var(--surface-hover)]"
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-          Messages ({messages.length})
-        </span>
-        <span className="text-xs text-[color:var(--accent-primary)]">View all →</span>
+    <>
+      {/* Chat Content */}
+      <div className="flex-1 overflow-hidden">
+        <SessionChat messages={messages} />
       </div>
-      {latestMessage ? (
-        <div className="space-y-1">
-          <p className="line-clamp-2 text-sm text-[color:var(--foreground)]">
-            {previewText}
-          </p>
-          <p className="text-xs text-[color:var(--text-tertiary)]">
-            {latestMessage.role === 'user' ? 'User' : 'Assistant'} · {formatDateTime(latestMessage.createdAt)}
-          </p>
+
+      {/* Reply Input */}
+      {isSessionActive && (
+        <div className="border-t-2 border-[color:var(--border-subtle)] p-4">
+          <form onSubmit={handleSubmit}>
+            {error && (
+              <div className="mb-2 rounded-[4px] bg-red-500/10 px-3 py-2 text-xs text-red-600">
+                {error}
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <div className="relative flex-1">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Reply as human agent..."
+                  disabled={isSending}
+                  rows={2}
+                  className="w-full resize-none rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-3 py-2 text-sm text-[color:var(--foreground)] placeholder:text-[color:var(--text-tertiary)] focus:border-[color:var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-primary)] disabled:opacity-50"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={!input.trim() || isSending}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] bg-[color:var(--accent-primary)] text-white transition hover:bg-[color:var(--accent-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Send message"
+              >
+                {isSending ? (
+                  <svg
+                    className="h-5 w-5 animate-spin"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="22" y1="2" x2="11" y2="13" />
+                    <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                  </svg>
+                )}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-[color:var(--text-tertiary)]">
+              Press Enter to send, Shift+Enter for new line
+            </p>
+          </form>
         </div>
-      ) : (
-        <p className="text-sm text-[color:var(--text-secondary)]">
-          No messages yet
-        </p>
       )}
-    </button>
+
+      {/* Closed session notice */}
+      {!isSessionActive && (
+        <div className="border-t-2 border-[color:var(--border-subtle)] p-4">
+          <div className="rounded-[4px] bg-[color:var(--surface)] p-3 text-center text-sm text-[color:var(--text-secondary)]">
+            This session is closed. You cannot send new messages.
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
-interface PMReviewSectionProps {
+interface SessionReviewSectionProps {
   session: SessionWithProject
   isReviewing: boolean
-  result: import('@/types/issue').PMReviewResult | null
+  result: import('@/hooks/use-session-review').SessionReviewResult | null
   showResult: boolean
-  currentStep: string | null
+  currentPhase: 'classify' | 'pm-review' | null
+  progressMessage: string | null
+  reviewTags: SessionTag[]
   onTriggerReview: () => void
 }
 
-function PMReviewSection({
+function SessionReviewSection({
   session,
   isReviewing,
   result,
   showResult,
-  currentStep,
+  currentPhase,
+  progressMessage,
+  reviewTags,
   onTriggerReview,
-}: PMReviewSectionProps) {
+}: SessionReviewSectionProps) {
   const wasReviewed = Boolean(session.pm_reviewed_at)
   const linkedIssues = session.linked_issues ?? []
   const hasLinkedIssues = linkedIssues.length > 0
@@ -309,12 +482,20 @@ function PMReviewSection({
   const showFreshResult = showResult && result && !isReviewing
   const showPersistedResult = !showFreshResult && !isReviewing && wasReviewed
 
+  // Get current step message - prefer real progress from stream, fallback to phase-based
+  const currentStepMessage = progressMessage
+    ?? (currentPhase === 'classify'
+      ? 'Classifying session...'
+      : currentPhase === 'pm-review'
+        ? 'Analyzing for actionable feedback...'
+        : 'Starting review...')
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            PM Review
+            Session Review
           </label>
           {wasReviewed && (
             <p className="text-xs text-[color:var(--text-secondary)]">
@@ -328,7 +509,7 @@ function PMReviewSection({
           disabled={isReviewing}
           className="rounded-[4px] border-2 border-[color:var(--accent-primary)] bg-transparent px-3 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--accent-primary)] transition hover:bg-[color:var(--accent-primary)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isReviewing ? 'Analyzing...' : wasReviewed ? 'Re-analyze' : 'Run PM Review'}
+          {isReviewing ? 'Analyzing...' : wasReviewed ? 'Re-analyze' : 'Run Review'}
         </button>
       </div>
 
@@ -336,14 +517,29 @@ function PMReviewSection({
         <div className="flex items-center gap-2 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
           <Spinner />
           <span className="text-sm text-[color:var(--text-secondary)]">
-            {currentStep || 'Analyzing session for actionable feedback...'}
+            {currentStepMessage}
           </span>
+        </div>
+      )}
+
+      {/* Show tags applied during review */}
+      {isReviewing && reviewTags.length > 0 && (
+        <div className="rounded-[4px] border border-[color:var(--accent-success)] bg-[color:var(--accent-success)]/10 p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-lg text-[color:var(--accent-success)]">✓</span>
+            <div>
+              <p className="text-sm font-medium text-[color:var(--foreground)]">Tags applied</p>
+              <div className="mt-1">
+                <SessionTagList tags={reviewTags} size="sm" />
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Show fresh result from current analysis */}
       {showFreshResult && (
-        <PMReviewResult result={result} />
+        <SessionReviewResult result={result} />
       )}
 
       {/* Show persisted result from database */}
@@ -355,7 +551,7 @@ function PMReviewSection({
             <div className="flex items-center gap-2">
               <span className="text-lg text-[color:var(--text-tertiary)]">—</span>
               <div>
-                <p className="font-medium text-[color:var(--foreground)]">Marked as irrelevant</p>
+                <p className="font-medium text-[color:var(--foreground)]">No issues found</p>
                 <p className="text-xs text-[color:var(--text-secondary)]">
                   Session does not contain actionable feedback
                 </p>
@@ -411,11 +607,11 @@ function LinkedIssuesDisplay({ issues }: LinkedIssuesDisplayProps) {
   )
 }
 
-interface PMReviewResultProps {
-  result: import('@/types/issue').PMReviewResult
+interface SessionReviewResultProps {
+  result: import('@/hooks/use-session-review').SessionReviewResult
 }
 
-function PMReviewResult({ result }: PMReviewResultProps) {
+function SessionReviewResult({ result }: SessionReviewResultProps) {
   if (result.action === 'skipped') {
     return (
       <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">

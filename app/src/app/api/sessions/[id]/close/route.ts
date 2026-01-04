@@ -32,15 +32,12 @@ export async function OPTIONS(request: NextRequest) {
 
 /**
  * POST /api/sessions/[id]/close
- * Closes a session and optionally triggers async PM agent analysis.
- *
- * Request body:
- * - triggerPMReview: boolean (default: true) - whether to run PM analysis
+ * Closes a session and triggers async session review (classification + PM analysis).
  *
  * Response:
  * - success: boolean
- * - pmReviewTriggered?: boolean - whether PM review was triggered
- * - runId?: string - PM review run ID if triggered
+ * - reviewTriggered: boolean - whether session review was triggered
+ * - runId?: string - review run ID if triggered
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const corsHeaders = getCorsHeaders(request)
@@ -55,8 +52,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   try {
     const { id: sessionId } = await params
-    const body = await request.json().catch(() => ({}))
-    const triggerPMReview = body.triggerPMReview ?? true
+    // Consume body (backwards compatible with old widgets that still send it)
+    await request.json().catch(() => ({}))
 
     const supabase = createAdminClient()
 
@@ -67,10 +64,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq('id', sessionId)
       .single()
 
+    // If session doesn't exist, return success (idempotent close)
+    // This handles the case where close is called before any message was sent
     if (sessionError || !session) {
       return NextResponse.json(
-        { error: 'Session not found.' },
-        { status: 404, headers: corsHeaders }
+        { success: true, reviewTriggered: false },
+        { headers: corsHeaders }
       )
     }
 
@@ -91,63 +90,62 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     }
 
-    let pmReviewTriggered = false
+    let reviewTriggered = false
     let runId: string | undefined
 
-    // Trigger async PM review if requested
-    if (triggerPMReview) {
-      try {
-        // Check if a review is already running
-        const { data: existingReview } = await supabase
-          .from('pm_reviews')
-          .select('id, run_id')
-          .eq('session_id', sessionId)
-          .eq('status', 'running')
-          .single()
+    // Trigger async session review
+    try {
+      // Check if a review is already running
+      const { data: existingReview } = await supabase
+        .from('session_reviews')
+        .select('id, run_id')
+        .eq('session_id', sessionId)
+        .eq('status', 'running')
+        .single()
 
-        if (existingReview) {
-          // Review already in progress
-          pmReviewTriggered = true
-          runId = existingReview.run_id
-        } else {
-          // Create new pm_reviews record for async execution
-          runId = `pm-review-${sessionId}-${Date.now()}`
+      if (existingReview) {
+        // Review already in progress
+        reviewTriggered = true
+        runId = existingReview.run_id
+      } else {
+        // Create new review record for async execution
+        runId = `session-review-${sessionId}-${Date.now()}`
 
-          const { error: insertError } = await supabase
-            .from('pm_reviews')
-            .insert({
-              session_id: sessionId,
-              project_id: session.project_id,
-              run_id: runId,
-              status: 'running',
-              metadata: {
-                triggeredBy: 'session-close',
-                sessionId,
-                projectId: session.project_id,
-              },
-            })
+        const { error: insertError } = await supabase
+          .from('session_reviews')
+          .insert({
+            session_id: sessionId,
+            project_id: session.project_id,
+            run_id: runId,
+            status: 'running',
+            metadata: {
+              triggeredBy: 'session-close',
+              sessionId,
+              projectId: session.project_id,
+              type: 'session-review',
+            },
+          })
 
-          if (insertError) {
-            // Check for unique constraint violation (race condition)
-            if (insertError.code === '23505') {
-              console.log('[sessions.close] PM review already in progress (race condition)')
-              pmReviewTriggered = true
-            } else {
-              console.error('[sessions.close] Failed to create PM review record:', insertError)
-              // Don't fail the close operation if PM review trigger fails
-            }
+        if (insertError) {
+          // Check for unique constraint violation (race condition)
+          if (insertError.code === '23505') {
+            console.log('[sessions.close] Session review already in progress (race condition)')
+            reviewTriggered = true
           } else {
-            pmReviewTriggered = true
+            console.error('[sessions.close] Failed to create review record:', insertError)
+            // Don't fail the close operation if review trigger fails
           }
+        } else {
+          reviewTriggered = true
         }
-      } catch (pmError) {
-        console.error('[sessions.close] Failed to trigger PM review:', pmError)
-        // Don't fail the close operation if PM review fails
       }
+    } catch (reviewError) {
+      console.error('[sessions.close] Failed to trigger session review:', reviewError)
+      // Don't fail the close operation if review fails
     }
 
     return NextResponse.json(
-      { success: true, pmReviewTriggered, runId },
+      { success: true, reviewTriggered, runId },
       { headers: corsHeaders }
     )
   } catch (error) {

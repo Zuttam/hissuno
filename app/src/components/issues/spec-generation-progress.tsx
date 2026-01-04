@@ -8,6 +8,8 @@ interface SpecGenerationProgressProps {
   events: SpecGenerationEvent[]
   isProcessing: boolean
   onCancel?: () => void
+  streamedText?: string
+  activeTools?: string[]
 }
 
 /**
@@ -51,17 +53,21 @@ export function SpecGenerationProgress({
   events,
   isProcessing,
   onCancel,
+  streamedText = '',
+  activeTools = [],
 }: SpecGenerationProgressProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [showLivePreview, setShowLivePreview] = useState(false)
 
   const currentStep = getCurrentStep(events)
   const progressMessages = getProgressMessages(events)
   const hasError = events.some((e) => e.type === 'error')
   const isComplete = events.some((e) => e.type === 'workflow-finish')
 
-  // Count completed steps (total: gather-context, generate-spec, save-spec)
+  // Get totalSteps from workflow-start event, default to 1
+  const workflowStartEvent = events.find((e) => e.type === 'workflow-start')
+  const totalSteps = (workflowStartEvent?.data?.totalSteps as number) || 1
   const completedSteps = events.filter((e) => e.type === 'step-finish').length
-  const totalSteps = 3
 
   const toggleExpanded = useCallback(() => {
     setIsExpanded((prev) => !prev)
@@ -112,13 +118,15 @@ export function SpecGenerationProgress({
                   ? 'Generation failed'
                   : 'Specification generated'}
             </p>
-            <p className="text-xs text-[color:var(--text-secondary)]">
-              {isProcessing
-                ? `${completedSteps} of ${totalSteps} steps completed`
-                : hasError
-                  ? 'Please try again'
-                  : 'View below'}
-            </p>
+            {(totalSteps > 1 || !isProcessing) && (
+              <p className="text-xs text-[color:var(--text-secondary)]">
+                {isProcessing
+                  ? `${completedSteps} of ${totalSteps} steps completed`
+                  : hasError
+                    ? 'Please try again'
+                    : 'View below'}
+              </p>
+            )}
           </div>
         </div>
 
@@ -151,18 +159,46 @@ export function SpecGenerationProgress({
         />
       </div>
 
-      {/* Expand/collapse for progress messages */}
-      {progressMessages.length > 0 && (
-        <>
-          <button
-            type="button"
-            onClick={toggleExpanded}
-            className="mt-2 text-xs text-[color:var(--accent-selected)] hover:underline font-mono"
-          >
-            {isExpanded ? 'Hide details' : 'Show details'}
-          </button>
+      {/* Active tools indicator */}
+      {activeTools.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {activeTools.map((tool) => (
+            <span
+              key={tool}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--accent-selected)]/10 px-2.5 py-0.5 text-xs font-mono text-[color:var(--accent-selected)]"
+            >
+              <Spinner size="sm" className="h-3 w-3" />
+              {tool}
+            </span>
+          ))}
+        </div>
+      )}
 
-          {isExpanded && (
+      {/* Expand/collapse for progress messages */}
+      {(progressMessages.length > 0 || streamedText) && (
+        <>
+          <div className="mt-2 flex gap-2">
+            {progressMessages.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleExpanded}
+                className="text-xs text-[color:var(--accent-selected)] hover:underline font-mono"
+              >
+                {isExpanded ? 'Hide details' : 'Show details'}
+              </button>
+            )}
+            {streamedText && (
+              <button
+                type="button"
+                onClick={() => setShowLivePreview((prev) => !prev)}
+                className="text-xs text-[color:var(--accent-selected)] hover:underline font-mono"
+              >
+                {showLivePreview ? 'Hide preview' : 'Show live preview'}
+              </button>
+            )}
+          </div>
+
+          {isExpanded && progressMessages.length > 0 && (
             <div className="mt-2 pt-2 border-t border-[color:var(--border-subtle)]">
               <ul className="space-y-1">
                 {progressMessages.map((msg, idx) => (
@@ -172,6 +208,16 @@ export function SpecGenerationProgress({
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {showLivePreview && streamedText && (
+            <div className="mt-2 pt-2 border-t border-[color:var(--border-subtle)]">
+              <p className="text-xs font-mono text-[color:var(--text-secondary)] mb-1">Live output:</p>
+              <div className="max-h-32 overflow-y-auto rounded bg-[color:var(--surface)] p-2 text-xs text-[color:var(--foreground)] font-mono whitespace-pre-wrap">
+                {streamedText}
+                <span className="animate-pulse">▊</span>
+              </div>
             </div>
           )}
         </>

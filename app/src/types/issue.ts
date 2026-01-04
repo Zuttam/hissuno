@@ -93,6 +93,10 @@ export interface ProjectSettingsRecord {
   widget_position: WidgetPosition
   widget_title: string
   widget_initial_message: string
+  // Session lifecycle settings
+  session_idle_timeout_minutes: number
+  session_goodbye_delay_seconds: number
+  session_idle_response_timeout_seconds: number
   created_at: string
   updated_at: string
 }

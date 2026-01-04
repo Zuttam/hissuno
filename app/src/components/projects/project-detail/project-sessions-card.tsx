@@ -38,7 +38,7 @@ export function ProjectSessionsCard({ projectId }: ProjectSessionsCardProps) {
   }, [fetchSessions])
 
   return (
-    <Card className="lg:col-span-2">
+    <div className="lg:col-span-2">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-mono text-lg font-bold uppercase tracking-tight text-[color:var(--foreground)]">
           Recent Sessions
@@ -66,13 +66,13 @@ export function ProjectSessionsCard({ projectId }: ProjectSessionsCardProps) {
           </p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2 overflow-hidden">
           {sessions.map((session) => (
             <SessionRow key={session.id} session={session} />
           ))}
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -93,15 +93,10 @@ function SessionRow({ session }: SessionRowProps) {
 
   return (
     <Link
-      href={`/sessions?project=${session.project_id}`}
-      className="flex items-center justify-between rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3 transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
+      href={`/sessions/${session.id}`}
+      className="flex items-center justify-between bg-[color:var(--background) transition hover:bg-[color:var(--surface-hover)]"
     >
       <div className="flex items-center gap-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[color:var(--surface)] border border-[color:var(--border-subtle)]">
-          <span className="text-xs font-medium text-[color:var(--text-secondary)]">
-            {truncatedUser ? truncatedUser.charAt(0).toUpperCase() : '?'}
-          </span>
-        </div>
         <div className="flex flex-col">
           <span className="text-sm font-medium text-[color:var(--foreground)]" title={userDisplayName || 'Anonymous'}>
             {truncatedUser || 'Anonymous'}

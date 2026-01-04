@@ -175,7 +175,7 @@ export type Database = {
           },
         ]
       }
-      pm_reviews: {
+      session_reviews: {
         Row: {
           completed_at: string | null
           created_at: string
@@ -217,14 +217,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "pm_reviews_project_id_fkey"
+            foreignKeyName: "session_reviews_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pm_reviews_session_id_fkey"
+            foreignKeyName: "session_reviews_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "sessions"

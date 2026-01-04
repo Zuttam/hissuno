@@ -2,6 +2,8 @@
 
 import React, { type FormEvent, type KeyboardEvent } from 'react';
 import { ChatMessages } from './ChatMessages';
+import { ConversationHistory, HistoryIcon } from './ConversationHistory';
+import type { SessionEntry } from './useHissunoChat';
 import type { ChatMessage } from './types';
 
 interface ChatSidepanelProps {
@@ -20,6 +22,14 @@ interface ChatSidepanelProps {
   theme?: 'light' | 'dark' | 'auto';
   onClearHistory?: () => void;
   onCancelChat?: () => void;
+  onOpenHistory?: () => void;
+  // History panel props
+  isHistoryOpen?: boolean;
+  sessionHistory?: SessionEntry[];
+  currentSessionId?: string | null;
+  onCloseHistory?: () => void;
+  onSelectSession?: (sessionId: string) => void;
+  onDeleteSession?: (sessionId: string) => void;
 }
 
 export function ChatSidepanel({
@@ -38,6 +48,13 @@ export function ChatSidepanel({
   theme = 'light',
   onClearHistory,
   onCancelChat,
+  onOpenHistory,
+  isHistoryOpen = false,
+  sessionHistory = [],
+  currentSessionId,
+  onCloseHistory,
+  onSelectSession,
+  onDeleteSession,
 }: ChatSidepanelProps) {
   if (!isOpen) return null;
 
@@ -94,6 +111,18 @@ export function ChatSidepanel({
           overflow: 'hidden',
         }}
       >
+        {/* History Panel */}
+        {onCloseHistory && onSelectSession && onDeleteSession && (
+          <ConversationHistory
+            isOpen={isHistoryOpen}
+            onClose={onCloseHistory}
+            sessions={sessionHistory}
+            onSelectSession={onSelectSession}
+            onDeleteSession={onDeleteSession}
+            currentSessionId={currentSessionId}
+            theme={theme}
+          />
+        )}
         {/* Header */}
         <div
           style={{
@@ -104,17 +133,40 @@ export function ChatSidepanel({
             borderBottom: `1px solid ${borderColor}`,
           }}
         >
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 16,
-              fontWeight: 600,
-              color: textColor,
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-            }}
-          >
-            {title}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {onOpenHistory && (
+              <button
+                type="button"
+                onClick={onOpenHistory}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: secondaryTextColor,
+                  borderRadius: 4,
+                }}
+                aria-label="Conversation history"
+                title="Conversation history"
+              >
+                <HistoryIcon />
+              </button>
+            )}
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 16,
+                fontWeight: 600,
+                color: textColor,
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            >
+              {title}
+            </h2>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {onClearHistory && (
               <button
@@ -131,10 +183,10 @@ export function ChatSidepanel({
                   color: secondaryTextColor,
                   borderRadius: 4,
                 }}
-                aria-label="Clear chat history"
-                title="Clear chat history"
+                aria-label="New conversation"
+                title="New conversation"
               >
-                <TrashIcon />
+                <NewThreadIcon />
               </button>
             )}
             <button
@@ -284,7 +336,7 @@ function CloseIcon() {
   );
 }
 
-function TrashIcon() {
+function NewThreadIcon() {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -297,8 +349,8 @@ function TrashIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <polyline points="3,6 5,6 21,6" />
-      <path d="M19,6v14a2,2 0,0 1,-2,2H7a2,2 0,0 1,-2,-2V6m3,0V4a2,2 0,0 1,2,-2h4a2,2 0,0 1,2,2v2" />
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
     </svg>
   );
 }

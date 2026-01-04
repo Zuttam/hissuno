@@ -13,7 +13,7 @@ import {
   assertPriority,
   generateTestId,
   MockDataStore,
-} from '../integration/pm-agent/test-utils'
+} from '../integration/session-analysis/test-utils'
 import type { PMEvalTestCase } from '@/evals/datasets/types'
 
 describe('PM Agent Response Parser', () => {

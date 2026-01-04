@@ -19,6 +19,7 @@ interface AgentRequestBody {
   pageUrl?: string
   pageTitle?: string
   sessionId?: string
+  source?: 'widget' | 'slack' | 'intercom' | 'gong' | 'api'
 }
 
 /**
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as AgentRequestBody
-    const { messages, publicKey, userId, userMetadata, pageUrl, pageTitle, sessionId: clientSessionId } = body
+    const { messages, publicKey, userId, userMetadata, pageUrl, pageTitle, sessionId: clientSessionId, source } = body
 
     // Validate required fields
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -147,6 +148,7 @@ export async function POST(request: NextRequest) {
       userMetadata: userMetadata || null,
       pageUrl: pageUrl || null,
       pageTitle: pageTitle || null,
+      source: source || 'widget',
     }).catch((error) => {
       console.error('[agent.post] failed to upsert session', error)
     })

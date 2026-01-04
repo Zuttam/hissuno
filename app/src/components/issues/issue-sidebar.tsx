@@ -10,14 +10,12 @@ import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
 
 interface IssueSidebarProps {
-  projectId: string
   issueId: string
   onClose: () => void
   onIssueUpdated?: () => void
 }
 
 export function IssueSidebar({
-  projectId,
   issueId,
   onClose,
   onIssueUpdated,
@@ -27,15 +25,16 @@ export function IssueSidebar({
     isLoading,
     updateIssue,
     refresh: refreshIssue,
-  } = useIssueDetail({ projectId, issueId })
+  } = useIssueDetail({ issueId })
 
   const {
     isGenerating: isGeneratingSpec,
     events: specEvents,
+    streamedText: specStreamedText,
+    activeTools: specActiveTools,
     startGeneration: handleGenerateSpec,
     cancelGeneration: handleCancelSpec,
   } = useSpecGeneration({
-    projectId,
     issueId,
     onComplete: () => {
       refreshIssue()
@@ -168,13 +167,13 @@ export function IssueSidebar({
                 <h3 className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
                   Product Specification
                 </h3>
-                {!issue.product_spec && !isGeneratingSpec && (
+                {!isGeneratingSpec && (
                   <button
                     type="button"
                     onClick={handleGenerateSpec}
                     className="rounded-[4px] border-2 border-[color:var(--accent-primary)] bg-transparent px-3 py-1 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--accent-primary)] transition hover:bg-[color:var(--accent-primary)] hover:text-white"
                   >
-                    Generate Spec
+                    {issue.product_spec ? 'Regenerate Spec' : 'Generate Spec'}
                   </button>
                 )}
               </div>
@@ -186,6 +185,8 @@ export function IssueSidebar({
                     events={specEvents}
                     isProcessing={isGeneratingSpec}
                     onCancel={handleCancelSpec}
+                    streamedText={specStreamedText}
+                    activeTools={specActiveTools}
                   />
                 </div>
               )}

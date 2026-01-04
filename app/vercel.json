@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/session-lifecycle",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/pm-reviews",
+      "schedule": "*/3 * * * *"
+    }
+  ]
+}

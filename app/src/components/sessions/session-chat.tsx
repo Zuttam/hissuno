@@ -48,6 +48,14 @@ interface ChatMessageBubbleProps {
 
 function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   const isUser = message.role === 'user'
+  const isHumanAgent = message.senderType === 'human_agent'
+
+  // Determine the label and styling based on message type
+  const getLabel = () => {
+    if (isUser) return 'User'
+    if (isHumanAgent) return 'Human Agent'
+    return 'Assistant'
+  }
 
   return (
     <div
@@ -57,16 +65,39 @@ function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         className={`max-w-[85%] rounded-[4px] px-4 py-3 ${
           isUser
             ? 'bg-[color:var(--accent-primary)] text-white'
+            : isHumanAgent
+            ? 'border-2 border-purple-500/50 bg-purple-500/10 text-[color:var(--foreground)]'
             : 'border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] text-[color:var(--foreground)]'
         }`}
       >
         {/* Role label */}
         <div
-          className={`mb-1 font-mono text-[10px] font-bold uppercase tracking-wider ${
-            isUser ? 'text-white/70' : 'text-[color:var(--text-secondary)]'
+          className={`mb-1 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-wider ${
+            isUser
+              ? 'text-white/70'
+              : isHumanAgent
+              ? 'text-purple-600'
+              : 'text-[color:var(--text-secondary)]'
           }`}
         >
-          {isUser ? 'User' : 'Assistant'}
+          {isHumanAgent && (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          )}
+          {getLabel()}
         </div>
 
         {/* Message content */}
@@ -81,7 +112,11 @@ function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
         {/* Timestamp */}
         <div
           className={`mt-2 text-[10px] ${
-            isUser ? 'text-white/60' : 'text-[color:var(--text-tertiary)]'
+            isUser
+              ? 'text-white/60'
+              : isHumanAgent
+              ? 'text-purple-500/60'
+              : 'text-[color:var(--text-tertiary)]'
           }`}
         >
           {formatMessageTime(message.createdAt)}

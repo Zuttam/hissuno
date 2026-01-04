@@ -186,7 +186,7 @@ export function EditProjectDialog({ project, onClose, onSaved }: EditProjectDial
       const { error: linkError } = await supabase.auth.linkIdentity({
         provider: 'github',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/projects/${project.id}`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/projects/${project.id}?editing=true`,
           scopes: 'user:email read:user repo',
         },
       })
