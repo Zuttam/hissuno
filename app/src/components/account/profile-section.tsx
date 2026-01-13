@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { FormField, Input, Select, Button } from '@/components/ui'
+import { FormField, Input, Select, Button, Heading } from '@/components/ui'
+import { FloatingCard } from '@/components/ui/floating-card'
 
 type CompanySize = '1-10' | '11-50' | '51-200' | '201-500' | '500+' | ''
 
@@ -106,21 +107,29 @@ export function ProfileSection({ email }: ProfileSectionProps) {
 
   if (isLoading) {
     return (
-      <section className="space-y-4 rounded-3xl border border-slate-200 bg-white/70 p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Profile</h2>
+      <FloatingCard
+        floating="gentle"
+        variant="elevated"
+        className="space-y-4 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
+      >
+        <Heading as="h2" size="section">Profile</Heading>
         <div className="animate-pulse space-y-4">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-16 rounded-lg bg-slate-200 dark:bg-slate-700" />
           ))}
         </div>
-      </section>
+      </FloatingCard>
     )
   }
 
   return (
-    <section className="space-y-6 rounded-3xl border border-slate-200 bg-white/70 p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+    <FloatingCard
+      floating="gentle"
+      variant="elevated"
+      className="space-y-6 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
+    >
       <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Profile</h2>
+        <Heading as="h2" size="section">Profile</Heading>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Manage how Hissuno recognizes you across projects.
         </p>
@@ -197,6 +206,6 @@ export function ProfileSection({ email }: ProfileSectionProps) {
       >
         {isSaving ? 'Saving...' : 'Save Profile'}
       </Button>
-    </section>
+    </FloatingCard>
   )
 }

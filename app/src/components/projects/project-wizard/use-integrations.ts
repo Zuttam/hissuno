@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import type { ProjectIntegrations, ProjectWizardMode, ProjectStepId } from '../shared/wizard/steps'
 
 interface UseIntegrationsProps {
@@ -21,21 +22,32 @@ export function useIntegrations({
   // GitHub state
   const [githubConnected, setGithubConnected] = useState(false)
   const [githubConnecting, setGithubConnecting] = useState(false)
+  const [githubInstallationId, setGithubInstallationId] = useState<number | null>(null)
 
   // Slack state
   const [slackConnected, setSlackConnected] = useState(false)
   const [slackConnecting, setSlackConnecting] = useState(false)
   const [slackWorkspaceName, setSlackWorkspaceName] = useState<string | undefined>()
 
-  // Check GitHub integration status for edit mode
+  const searchParams = useSearchParams()
+
+  // Check GitHub integration status
   useEffect(() => {
-    if (mode === 'edit' && projectId) {
+    // Fetch status if in edit mode OR if we just returned from GitHub OAuth
+    const justConnected = searchParams.get('github') === 'connected'
+    if ((mode === 'edit' || justConnected) && projectId) {
       fetch(`/api/integrations/github?projectId=${projectId}`)
         .then((res) => res.json())
-        .then((data) => setGithubConnected(data.connected))
-        .catch(() => {})
+        .then((data) => {
+          setGithubConnected(data.connected)
+          setGithubInstallationId(data.installationId ?? null)
+          setGithubConnecting(false)
+        })
+        .catch(() => {
+          setGithubConnecting(false)
+        })
     }
-  }, [mode, projectId])
+  }, [mode, projectId, searchParams])
 
   // Check Slack integration status for edit mode
   useEffect(() => {
@@ -118,6 +130,7 @@ export function useIntegrations({
     github: {
       isConnected: githubConnected,
       isConnecting: githubConnecting,
+      installationId: githubInstallationId,
       onConnect: handleGitHubConnect,
       onDisconnect: handleGitHubDisconnect,
     },

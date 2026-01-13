@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { sendWelcomeEmailIfNeeded } from '@/lib/email'
+import { sendWelcomeNotificationIfNeeded } from '@/lib/notifications/welcome-notifications'
 import { getSafeRedirectPath } from '@/lib/auth/server'
 
 export const runtime = 'nodejs'
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
 
         // Fire and forget - don't block redirect
         setImmediate(() => {
-          sendWelcomeEmailIfNeeded(user.id, user.email!, fullName).catch((err) => {
+          sendWelcomeNotificationIfNeeded(user.id, user.email!, fullName).catch((err) => {
             console.error('[auth.callback] Failed to send welcome email:', err)
           })
         })

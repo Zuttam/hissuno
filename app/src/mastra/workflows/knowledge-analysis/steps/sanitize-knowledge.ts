@@ -55,7 +55,7 @@ export const sanitizeKnowledge = createStep({
 
     await writer?.write({ type: 'progress', message: 'Scanning for sensitive information...' })
 
-    const { business, product, technical } = inputData
+    const { business, product, technical, faq, how_to } = inputData
     const agent = mastra?.getAgent('securityScannerAgent')
 
     // Track redaction stats
@@ -63,6 +63,8 @@ export const sanitizeKnowledge = createStep({
       business: 0,
       product: 0,
       technical: 0,
+      faq: 0,
+      how_to: 0,
     }
     const allTypes = new Set<string>()
 
@@ -74,9 +76,11 @@ export const sanitizeKnowledge = createStep({
         business,
         product,
         technical,
+        faq,
+        how_to,
         redactionSummary: {
           totalRedactions: 0,
-          byCategory: { business: 0, product: 0, technical: 0 },
+          byCategory: { business: 0, product: 0, technical: 0, faq: 0, how_to: 0 },
           types: [],
         },
       }
@@ -86,7 +90,7 @@ export const sanitizeKnowledge = createStep({
      * Scan and sanitize a single category of knowledge
      */
     async function sanitizeCategory(
-      category: 'business' | 'product' | 'technical',
+      category: 'business' | 'product' | 'technical' | 'faq' | 'how_to',
       content: string
     ): Promise<string> {
       if (!content || content.trim().length === 0) {
@@ -145,8 +149,15 @@ Return the sanitized content maintaining the exact same structure and formatting
     await writer?.write({ type: 'progress', message: 'Scanning technical knowledge...' })
     const sanitizedTechnical = await sanitizeCategory('technical', technical)
 
+    await writer?.write({ type: 'progress', message: 'Scanning FAQ...' })
+    const sanitizedFaq = await sanitizeCategory('faq', faq)
+
+    await writer?.write({ type: 'progress', message: 'Scanning how-to guides...' })
+    const sanitizedHowTo = await sanitizeCategory('how_to', how_to)
+
     const totalRedactions =
-      redactionStats.business + redactionStats.product + redactionStats.technical
+      redactionStats.business + redactionStats.product + redactionStats.technical +
+      redactionStats.faq + redactionStats.how_to
 
     if (totalRedactions > 0) {
       await writer?.write({
@@ -166,6 +177,8 @@ Return the sanitized content maintaining the exact same structure and formatting
       business: sanitizedBusiness,
       product: sanitizedProduct,
       technical: sanitizedTechnical,
+      faq: sanitizedFaq,
+      how_to: sanitizedHowTo,
       redactionSummary: {
         totalRedactions,
         byCategory: redactionStats,

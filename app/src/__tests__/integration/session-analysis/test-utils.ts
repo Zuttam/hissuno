@@ -20,7 +20,7 @@
  */
 
 import type { IssueType, IssuePriority, IssueRecord } from '@/types/issue'
-import type { SessionRecord, ChatMessage, SessionTag } from '@/types/session'
+import type { SessionRecord, ChatMessage, SessionTag, CustomTagRecord } from '@/types/session'
 import type { PMEvalTestCase, PMEvalSeedIssue } from '@/evals/datasets/types'
 
 // ============================================================================
@@ -148,11 +148,12 @@ export function createMockIssue(
  * Parsed result from session classification (tagging) step
  */
 export interface ParsedSessionTaggingResult {
-  tags: SessionTagType[]
+  tags: string[]  // Changed to string[] to support custom tags
   tagsApplied: boolean
   reasoning: string
   hasActionableTags: boolean
   hasSentimentTags: boolean
+  hasCustomTags: boolean  // NEW: indicates if any custom tags are present
 }
 
 /**
@@ -183,11 +184,28 @@ export interface ParsedSessionReviewResult {
 // ============================================================================
 
 /**
- * Parse session tagging (classification) response
+ * Get valid tags including custom tags
  */
-export function parseSessionTaggingResponse(responseText: string): ParsedSessionTaggingResult {
+export function getValidTags(customTags: CustomTagRecord[] = []): string[] {
+  return [...SESSION_TAGS, ...customTags.map(t => t.slug)]
+}
+
+/**
+ * Parse session tagging (classification) response
+ * @param responseText - The raw response text from the tagging agent
+ * @param customTags - Optional array of project-specific custom tags
+ */
+export function parseSessionTaggingResponse(
+  responseText: string,
+  customTags: CustomTagRecord[] = []
+): ParsedSessionTaggingResult {
   const textLower = responseText.toLowerCase()
-  const tags: SessionTagType[] = []
+  const tags: string[] = []
+
+  // Build valid tags set including custom tags
+  const validNativeTags = new Set(SESSION_TAGS as readonly string[])
+  const customSlugs = new Set(customTags.map(t => t.slug))
+  const allValidTags = new Set([...SESSION_TAGS, ...customSlugs])
 
   // Try to extract JSON
   const jsonMatch = responseText.match(/\{[\s\S]*\}/)
@@ -195,10 +213,9 @@ export function parseSessionTaggingResponse(responseText: string): ParsedSession
     try {
       const parsed = JSON.parse(jsonMatch[0])
       if (Array.isArray(parsed.tags)) {
-        const validTags = new Set(SESSION_TAGS)
         for (const t of parsed.tags) {
-          if (validTags.has(t)) {
-            tags.push(t as SessionTagType)
+          if (allValidTags.has(t)) {
+            tags.push(t)
           }
         }
       }
@@ -207,7 +224,7 @@ export function parseSessionTaggingResponse(responseText: string): ParsedSession
     }
   }
 
-  // Fallback: detect tags from text
+  // Fallback: detect native tags from text (custom tags require explicit mention)
   if (tags.length === 0) {
     if (textLower.includes('general_feedback') || textLower.includes('general feedback')) {
       tags.push('general_feedback')
@@ -226,6 +243,13 @@ export function parseSessionTaggingResponse(responseText: string): ParsedSession
     }
     if (textLower.includes('change_request') || textLower.includes('change request') || textLower.includes('ux improvement')) {
       tags.push('change_request')
+    }
+
+    // Also check for custom tag slugs in text
+    for (const customSlug of customSlugs) {
+      if (textLower.includes(customSlug.toLowerCase())) {
+        tags.push(customSlug)
+      }
     }
   }
 
@@ -247,8 +271,9 @@ export function parseSessionTaggingResponse(responseText: string): ParsedSession
     tags,
     tagsApplied: tags.length > 0,
     reasoning,
-    hasActionableTags: tags.some((t) => ACTIONABLE_SESSION_TAGS.includes(t)),
-    hasSentimentTags: tags.some((t) => SENTIMENT_SESSION_TAGS.includes(t)),
+    hasActionableTags: tags.some((t) => ACTIONABLE_SESSION_TAGS.includes(t as SessionTagType)),
+    hasSentimentTags: tags.some((t) => SENTIMENT_SESSION_TAGS.includes(t as SessionTagType)),
+    hasCustomTags: tags.some((t) => customSlugs.has(t)),
   }
 }
 
@@ -412,7 +437,7 @@ export function parsePMAgentResponse(responseText: string): ParsedPMResponse {
  */
 export function assertSessionTags(
   actual: ParsedSessionTaggingResult,
-  expectedTags: SessionTagType[]
+  expectedTags: string[]
 ): { passed: boolean; message: string } {
   const actualSet = new Set(actual.tags)
   const expectedSet = new Set(expectedTags)
@@ -441,7 +466,7 @@ export function assertSessionTags(
  */
 export function assertHasAnyTag(
   actual: ParsedSessionTaggingResult,
-  expectedTags: SessionTagType[]
+  expectedTags: string[]
 ): { passed: boolean; message: string } {
   const hasAny = expectedTags.some((t) => actual.tags.includes(t))
 

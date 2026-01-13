@@ -13,14 +13,12 @@
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/server'
-import { mastra } from '@/mastra'
+import { getSessionMessages } from '@/lib/supabase/session-messages'
 import type {
   IssueType,
   IssuePriority,
 } from '@/types/issue'
-import type { ChatMessage } from '@/types/session'
 import { downloadKnowledgePackage } from '@/lib/knowledge/storage'
-import { parseMastraMessages } from '@/lib/utils/mastra/parse-messages'
 
 /**
  * Helper to get projectId from runtimeContext with validation
@@ -172,18 +170,8 @@ Use this to retrieve the conversation history before analyzing a session.`,
         }
       }
 
-      // Get messages from Mastra storage
-      const storage = mastra.getStorage()
-      let messages: ChatMessage[] = []
-
-      if (storage) {
-        try {
-          const mastraMessages = await storage.getMessages({ threadId: sessionId })
-          messages = parseMastraMessages(mastraMessages)
-        } catch {
-          // Storage might not have messages for this session
-        }
-      }
+      // Get messages from session_messages table
+      const messages = await getSessionMessages(sessionId)
 
       const project = Array.isArray(session.project)
         ? session.project[0]
@@ -628,8 +616,7 @@ Use this data to generate a comprehensive product spec.`,
         ? issue.project[0]
         : issue.project
 
-      // Get messages for each session from Mastra storage
-      const storage = mastra.getStorage()
+      // Get messages for each session from session_messages table
       const sessionsWithMessages = []
 
       for (const isLink of issue.issue_sessions || []) {
@@ -639,20 +626,11 @@ Use this data to generate a comprehensive product spec.`,
 
         if (!sessionData) continue
 
-        let messages: { role: 'user' | 'assistant' | 'system'; content: string }[] =
-          []
-
-        if (storage) {
-          try {
-            const mastraMessages = await storage.getMessages({ threadId: sessionData.id })
-            messages = parseMastraMessages(mastraMessages).map((m) => ({
-              role: m.role,
-              content: m.content,
-            }))
-          } catch {
-            // Storage might not have messages for this session
-          }
-        }
+        const sessionMessages = await getSessionMessages(sessionData.id)
+        const messages = sessionMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }))
 
         sessionsWithMessages.push({
           id: sessionData.id,

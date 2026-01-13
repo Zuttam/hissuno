@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
-import { SESSION_TAG_INFO, type SessionTag } from '@/types/session'
+import { getTagInfo, type CustomTagRecord } from '@/types/session'
 
 function XIcon({ className }: { className?: string }) {
   return (
@@ -22,7 +22,10 @@ function XIcon({ className }: { className?: string }) {
 }
 
 interface SessionTagBadgeProps {
-  tag: SessionTag
+  /** Tag slug (native or custom) */
+  tag: string
+  /** Custom tags for the project (optional, needed for custom tag display) */
+  customTags?: CustomTagRecord[]
   onRemove?: () => void
   removable?: boolean
   size?: 'sm' | 'md'
@@ -30,14 +33,16 @@ interface SessionTagBadgeProps {
 
 /**
  * Badge component for displaying a session tag with appropriate styling.
+ * Supports both native tags and custom tags.
  */
 export function SessionTagBadge({
   tag,
+  customTags = [],
   onRemove,
   removable = false,
   size = 'sm',
 }: SessionTagBadgeProps) {
-  const tagInfo = SESSION_TAG_INFO[tag]
+  const tagInfo = getTagInfo(tag, customTags)
 
   return (
     <Badge
@@ -62,22 +67,29 @@ export function SessionTagBadge({
   )
 }
 
+interface SessionTagListProps {
+  /** Array of tag slugs (native or custom) */
+  tags: string[]
+  /** Custom tags for the project (optional, needed for custom tag display) */
+  customTags?: CustomTagRecord[]
+  onRemove?: (tag: string) => void
+  removable?: boolean
+  size?: 'sm' | 'md'
+  emptyText?: string
+}
+
 /**
  * Display multiple tags in a row.
+ * Supports both native tags and custom tags.
  */
 export function SessionTagList({
   tags,
+  customTags = [],
   onRemove,
   removable = false,
   size = 'sm',
   emptyText = 'No tags',
-}: {
-  tags: SessionTag[]
-  onRemove?: (tag: SessionTag) => void
-  removable?: boolean
-  size?: 'sm' | 'md'
-  emptyText?: string
-}) {
+}: SessionTagListProps) {
   if (tags.length === 0) {
     return (
       <span className="text-xs text-[color:var(--text-tertiary)]">{emptyText}</span>
@@ -90,6 +102,7 @@ export function SessionTagList({
         <SessionTagBadge
           key={tag}
           tag={tag}
+          customTags={customTags}
           removable={removable}
           onRemove={onRemove ? () => onRemove(tag) : undefined}
           size={size}

@@ -15,7 +15,7 @@ export function AppHeader({ children }: { children: ReactNode }) {
   return (
     <header
       className={cn(
-        'fixed left-0 right-0 top-0 mx-auto px-12 py-4 transition-all duration-300',
+        'fixed left-0 right-0 top-0 mx-auto px-4 py-0.5 transition-all duration-300',
         'z-10',
         // Liquid glass effect
         'bg-[var(--background)]/40 backdrop-blur-xl backdrop-saturate-150',

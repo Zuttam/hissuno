@@ -1,11 +1,11 @@
 # Tasks
 
 ## Phase 1
-[x] Test welcome email (including supabase webhook)  
+[] Test welcome email (including supabase webhook)  
 [x] Test limits enforcement  
 [x] Test downgrade and upgrade  
 [x] Setup & Test analytics   
-[] Test upload session messages from json
+[x] Test upload session messages from json
 [x] Add TOS  
 
 ## Phase 2
@@ -14,7 +14,7 @@
 [] Improve welcome email visualization
 
 ## Phase 3
-- g-suite 
+[x] g-suite 
 - Deploy to prod
   - resend
   - supabase

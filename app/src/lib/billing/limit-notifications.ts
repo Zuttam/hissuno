@@ -4,6 +4,7 @@
  * Functions to send notifications when users reach their subscription limits.
  */
 
+import { render } from '@react-email/components'
 import { getResendClient, getFromAddress, isResendConfigured } from '@/lib/email/resend'
 import { LimitReachedEmail } from '@/lib/email/templates/limit-reached'
 import {
@@ -70,17 +71,23 @@ export async function sendLimitNotificationIfNeeded(
 
       try {
         const resend = getResendClient()
-        await resend.emails.send({
-          from: getFromAddress(),
-          to: email,
-          subject: `You've reached your ${result.dimension} limit on Hissuno`,
-          react: LimitReachedEmail({
+
+        // Pre-render to HTML to avoid Resend's internal rendering issues with Next.js bundling
+        const emailHtml = await render(
+          LimitReachedEmail({
             fullName,
             dimension: result.dimension,
             current: result.current,
             limit: result.limit,
             upgradeUrl,
-          }),
+          })
+        )
+
+        await resend.emails.send({
+          from: getFromAddress(),
+          to: email,
+          subject: `You've reached your ${result.dimension} limit on Hissuno`,
+          html: emailHtml,
         })
 
         console.log(`${LOG_PREFIX} Sent limit reached email to ${email}`)

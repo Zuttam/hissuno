@@ -76,7 +76,7 @@ export function AnalysisProgressBar({ events, isProcessing }: AnalysisProgressBa
 
   // Count completed steps
   const completedSteps = events.filter((e) => e.type === 'step-finish').length
-  const totalSteps = 5 // analyze-codebase, analyze-sources, compile-knowledge, sanitize-knowledge, save-packages
+  const totalSteps = 6 // analyze-codebase, analyze-sources, compile-knowledge, sanitize-knowledge, save-packages, embed-knowledge
 
   // If we're processing but have no detailed events, show generic progress
   const hasDetailedEvents = events.some((e) => e.type === 'step-start' || e.type === 'step-finish')

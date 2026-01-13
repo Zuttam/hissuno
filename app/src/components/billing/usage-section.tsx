@@ -2,6 +2,7 @@
 
 import type { UsageMetrics } from '@/types/billing'
 import { FloatingCard } from '@/components/ui/floating-card'
+import { Heading } from '@/components/ui'
 
 interface UsageSectionProps {
   usage: UsageMetrics
@@ -39,9 +40,7 @@ export function UsageSection({ usage }: UsageSectionProps) {
       className="space-y-4 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
     >
       <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
-          Usage This Period
-        </h2>
+        <Heading as="h2" size="section">Usage This Period</Heading>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           {formatDate(periodStart)} - {periodEnd ? formatDate(periodEnd) : 'Now'}
         </p>

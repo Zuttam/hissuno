@@ -100,6 +100,10 @@ export function CreateSessionDialog({
 
         if (validMessages.length === 0) {
           setError('No valid messages found in the file.')
+          // Reset file input on error to allow retry
+          if (fileInputRef.current) {
+            fileInputRef.current.value = ''
+          }
           return
         }
 
@@ -107,11 +111,10 @@ export function CreateSessionDialog({
         setError(null)
       } catch {
         setError('Failed to parse file. Please ensure it is valid JSON.')
-      }
-
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+        // Reset file input on error to allow retry
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
       }
     },
     []

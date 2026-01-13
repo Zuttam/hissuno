@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { updateSessionTags } from '@/lib/supabase/sessions'
-import { SESSION_TAGS, type SessionTag } from '@/types/session'
+import { getProjectCustomTags } from '@/lib/supabase/custom-tags'
+import { SESSION_TAGS } from '@/types/session'
 
 export const runtime = 'nodejs'
 
@@ -13,6 +14,7 @@ interface RouteParams {
  * PATCH /api/sessions/[id]/tags
  * Update tags for a session manually.
  * Requires authenticated user who owns the project.
+ * Supports both native tags and project-specific custom tags.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (!isSupabaseConfigured()) {
@@ -24,15 +26,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { id: sessionId } = await params
     const body = await request.json()
 
-    // Validate tags
+    // Validate tags is an array
     if (!Array.isArray(body.tags)) {
       return NextResponse.json({ error: 'Tags must be an array.' }, { status: 400 })
     }
-
-    const validTagSet = new Set(SESSION_TAGS)
-    const tags: SessionTag[] = body.tags.filter((t: unknown) =>
-      typeof t === 'string' && validTagSet.has(t as SessionTag)
-    )
 
     // Verify user owns the project
     const supabase = await createClient()
@@ -60,6 +57,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!projectUserId || projectUserId !== user.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
+
+    // Build valid tag set: native tags + project's custom tags
+    const validTagSet = new Set<string>(SESSION_TAGS)
+    const customTags = await getProjectCustomTags(session.project_id)
+    for (const tag of customTags) {
+      validTagSet.add(tag.slug)
+    }
+
+    // Filter tags to only valid ones
+    const tags: string[] = body.tags.filter((t: unknown) =>
+      typeof t === 'string' && validTagSet.has(t)
+    )
 
     // Update tags
     const result = await updateSessionTags(sessionId, tags, false)

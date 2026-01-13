@@ -40,8 +40,7 @@ export const analyzeSources = createStep({
       })
       try {
         switch (source.type) {
-          case 'website':
-          case 'docs_portal': {
+          case 'website': {
             if (!source.url) {
               results.push({
                 sourceId: source.id,
@@ -52,7 +51,7 @@ export const analyzeSources = createStep({
               break
             }
 
-            // Fetch and analyze website content
+            // Fetch and analyze single website page
             const response = await fetch(source.url, {
               headers: {
                 'User-Agent': 'Mozilla/5.0 (compatible; HissunoBot/1.0)',
@@ -74,7 +73,7 @@ export const analyzeSources = createStep({
             const textContent = extractTextFromHtml(html)
 
             if (webAgent) {
-              const prompt = `Analyze this ${source.type === 'docs_portal' ? 'documentation portal' : 'website'} content and extract key information:
+              const prompt = `Analyze this website content and extract key information:
 
 URL: ${source.url}
 
@@ -99,6 +98,78 @@ Please extract:
                 sourceId: source.id,
                 type: source.type,
                 content: textContent,
+              })
+            }
+            break
+          }
+
+          case 'docs_portal': {
+            if (!source.url) {
+              results.push({
+                sourceId: source.id,
+                type: source.type,
+                content: '',
+                error: 'No URL provided',
+              })
+              break
+            }
+
+            await writer?.write({
+              type: 'progress',
+              message: `Crawling documentation portal: ${source.url}`,
+            })
+
+            // Use crawler for full portal indexing
+            const { crawlDocsPortal, combineCrawlResults } = await import('@/lib/knowledge/docs-crawler')
+            const crawlResults = await crawlDocsPortal(source.url, {
+              maxPages: 50,
+              rateLimit: 500,
+            })
+
+            const successfulPages = crawlResults.filter((r) => !r.error && r.content)
+
+            if (successfulPages.length === 0) {
+              results.push({
+                sourceId: source.id,
+                type: source.type,
+                content: '',
+                error: 'No pages could be crawled from documentation portal',
+              })
+              break
+            }
+
+            await writer?.write({
+              type: 'progress',
+              message: `Crawled ${successfulPages.length} pages from docs portal`,
+            })
+
+            // Combine all pages into structured content
+            const combinedContent = combineCrawlResults(crawlResults)
+
+            if (webAgent) {
+              const prompt = `Analyze this documentation portal content and extract key information:
+
+${combinedContent.slice(0, 30000)}
+
+Please extract and organize:
+1. Main product/service overview
+2. Key features and capabilities
+3. Getting started guides
+4. API documentation highlights
+5. Common FAQs or troubleshooting
+6. Best practices and tutorials`
+
+              const agentResponse = await webAgent.generate([{ role: 'user', content: prompt }])
+              results.push({
+                sourceId: source.id,
+                type: source.type,
+                content: agentResponse.text || combinedContent,
+              })
+            } else {
+              results.push({
+                sourceId: source.id,
+                type: source.type,
+                content: combinedContent,
               })
             }
             break

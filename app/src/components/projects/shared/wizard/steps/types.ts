@@ -42,6 +42,7 @@ export interface ValidationResult {
 export interface GitHubIntegrationState {
   isConnected: boolean
   isConnecting: boolean
+  installationId: number | null
   onConnect: () => void
   onDisconnect: () => void
 }

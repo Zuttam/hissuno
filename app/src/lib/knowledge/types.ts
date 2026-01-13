@@ -14,7 +14,7 @@ export type KnowledgeSourceType =
 export type KnowledgeSourceStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
 /** Categories for compiled knowledge packages */
-export type KnowledgeCategory = 'business' | 'product' | 'technical'
+export type KnowledgeCategory = 'business' | 'product' | 'technical' | 'faq' | 'how_to'
 
 /**
  * Database row type for knowledge_sources table
@@ -194,6 +194,8 @@ export interface KnowledgeAnalysisOutput {
   business: string
   product: string
   technical: string
+  faq: string
+  how_to: string
 }
 
 /**

@@ -1,6 +1,8 @@
 export { Alert } from './alert'
 export { Badge, getStatusBadgeVariant, getStatusLabel } from './badge'
 export { Button } from './button'
+export { Heading, type HeadingProps, type HeadingSize, type HeadingLevel } from './heading'
+export { Text, type TextProps, type TextSize, type TextVariant } from './text'
 export { Card } from './card'
 export { Checkbox } from './checkbox'
 export { Dialog } from './dialog'
@@ -28,4 +30,6 @@ export {
   type WizardStepProps,
 } from './wizard'
 export { WizardStepHeader } from './wizard-step-header'
+export { ThemeLogo } from './theme-logo'
+export { ThemeToggle } from './theme-toggle'
 

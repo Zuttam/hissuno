@@ -143,6 +143,6 @@ List of sessions that contributed to this issue:
 - Provide clear reasoning for your decisions
 - Be concise but thorough
 `,
-  model: 'openai/gpt-4o',
+  model: 'openai/gpt-5.2',
   tools: Object.fromEntries(issueTools.map((tool) => [tool.id, tool])),
 })

@@ -1,6 +1,7 @@
 ---
-name: design-log
-description: Use when implementing new features, significant architectural changes, or adding new functionality. Enforces design-before-implementation methodology with version-controlled design logs. Triggers on "add feature", "implement", "build", "create new", "refactor", or any substantial code changes.
+name: design-log  
+description: Use when implementing new features, planning any task, significant architectural changes, or adding new functionality. Enforces design-before-implementation methodology with version-controlled design logs. Triggers on "add feature", "implement", "build", "create new", "refactor", "plan", "design", or any task requiring upfront planning before code changes.
+
 ---
 
 # Design Log Methodology

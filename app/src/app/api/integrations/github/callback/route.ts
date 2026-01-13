@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { storeGitHubToken } from '@/lib/integrations/github'
-import { exchangeGitHubOAuthCode, getGitHubUser } from '@/lib/integrations/github/app-client'
+import { storeGitHubInstallation } from '@/lib/integrations/github'
+import { getInstallationInfo } from '@/lib/integrations/github/jwt'
 
 export const runtime = 'nodejs'
 
 /**
  * GET /api/integrations/github/callback
- * Handles GitHub OAuth callback
+ * Handles GitHub App installation callback
  */
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin
@@ -17,29 +17,28 @@ export async function GET(request: NextRequest) {
     return redirectWithError('Supabase must be configured.', origin)
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID
-  const clientSecret = process.env.GITHUB_SECRET
-  const redirectUri = process.env.GITHUB_REDIRECT_URI
-
-  if (!clientId || !clientSecret || !redirectUri) {
-    console.error('[integrations.github.callback] Missing GitHub OAuth configuration')
-    return redirectWithError('GitHub integration not configured.', origin)
-  }
-
   try {
-    const code = request.nextUrl.searchParams.get('code')
+    // GitHub App installation sends: installation_id, setup_action, state
+    const installationId = request.nextUrl.searchParams.get('installation_id')
+    const setupAction = request.nextUrl.searchParams.get('setup_action')
     const state = request.nextUrl.searchParams.get('state')
     const error = request.nextUrl.searchParams.get('error')
 
-    // Handle user declining authorization
+    // Handle user declining installation
     if (error) {
       console.log('[integrations.github.callback] User declined:', error)
-      return redirectWithError('GitHub authorization was declined.', origin)
+      return redirectWithError('GitHub App installation was declined.', origin)
     }
 
-    if (!code || !state) {
-      return redirectWithError('Missing authorization code or state.', origin)
+    if (!installationId || !state) {
+      console.error('[integrations.github.callback] Missing installation_id or state')
+      return redirectWithError('Missing installation_id or state.', origin)
     }
+
+    console.log('[integrations.github.callback] Received installation:', {
+      installationId,
+      setupAction,
+    })
 
     // Decode and validate state
     let stateData: { projectId: string; userId: string; nonce: string; redirectUrl: string }
@@ -56,8 +55,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Use admin client to verify the project belongs to the userId from state
-    // Note: We trust the userId from state because it was created by the connect route
-    // which verified the user's session. Session cookies don't work cross-domain (ngrok vs localhost).
     const adminSupabase = createAdminClient()
     const { data: project, error: projectError } = await adminSupabase
       .from('projects')
@@ -73,35 +70,21 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Project access denied.', origin)
     }
 
-    // Exchange code for access token
-    const tokenResponse = await exchangeGitHubOAuthCode({
-      code,
-      clientId,
-      clientSecret,
-      redirectUri,
-    })
+    // Fetch installation details from GitHub
+    const installationInfo = await getInstallationInfo(Number(installationId))
 
-    if (tokenResponse.error || !tokenResponse.access_token) {
-      console.error('[integrations.github.callback] Token exchange failed:', tokenResponse.error)
-      return redirectWithError('Failed to complete GitHub authorization.', origin)
-    }
-
-    // Get user info
-    const githubUser = await getGitHubUser(tokenResponse.access_token)
-
-    // Store the token (reuse admin client from above)
-    const storeResult = await storeGitHubToken(adminSupabase, {
+    // Store the installation (reuse admin client from above)
+    const storeResult = await storeGitHubInstallation(adminSupabase, {
       projectId,
-      accessToken: tokenResponse.access_token,
-      accountLogin: githubUser.login,
-      accountId: githubUser.id,
+      installationId: Number(installationId),
+      accountLogin: installationInfo.account.login,
+      accountId: installationInfo.account.id,
+      targetType: installationInfo.account.type,
       installedByUserId: userId,
-      installedByEmail: null, // Email not available without session
-      scope: tokenResponse.scope || null,
     })
 
     if (!storeResult.success) {
-      console.error('[integrations.github.callback] Failed to store token:', storeResult.error)
+      console.error('[integrations.github.callback] Failed to store installation:', storeResult.error)
       return redirectWithError('Failed to save GitHub connection.', origin)
     }
 

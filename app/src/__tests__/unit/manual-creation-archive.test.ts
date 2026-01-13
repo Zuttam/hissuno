@@ -65,7 +65,7 @@ describe('Manual Creation and Archive Feature', () => {
       }
 
       expect(input.project_id).toBe('project-123')
-      expect(input.session_ids).toEqual([])
+      expect(input.session_ids).toBeUndefined()
       expect(input.type).toBe('feature_request')
     })
 

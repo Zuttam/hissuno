@@ -214,7 +214,7 @@ export function WaterPlane() {
         uOpacity: { value: 0.6 },  // Default, overridden by CSS variable
         uCausticSharpness: { value: 0.4 },  // Default, overridden by CSS variable (lower = sharper)
         uRippleIntensity: { value: 3.0 },  // Default, overridden by CSS variable (higher = more visible ripples)
-        uBackgroundColor: { value: new THREE.Color('#faf0dc') },  // Sandy background for light mode
+        uBackgroundColor: { value: new THREE.Color('#fafafa') },  // White background for light mode
       },
       vertexShader,
       fragmentShader,
@@ -242,7 +242,7 @@ export function WaterPlane() {
       material.uniforms.uDeepColor.value.set(deepColor || '#5ec4db')
       material.uniforms.uRippleColor.value.set(rippleColor || '#ffffff')
       material.uniforms.uCausticColor.value.set(causticColor || '#ffffff')
-      material.uniforms.uBackgroundColor.value.set(backgroundColorCSS || '#faf0dc')
+      material.uniforms.uBackgroundColor.value.set(backgroundColorCSS || '#fafafa')
       if (causticIntensityCSS) {
         material.uniforms.uCausticIntensity.value = parseFloat(causticIntensityCSS)
       }

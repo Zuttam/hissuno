@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getSessionUser } from '@/lib/auth/server'
+import { sendWelcomeNotificationIfNeeded } from '@/lib/notifications/welcome-notifications'
 
 export type AuthActionState = {
   error?: string
@@ -40,10 +41,19 @@ export async function loginAction(
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
   if (error) {
     return { error: error.message }
+  }
+
+  // Send welcome email for email/password users (fire and forget)
+  const user = data?.user
+  if (user?.email) {
+    const fullName = user.user_metadata?.full_name ?? user.user_metadata?.name
+    sendWelcomeNotificationIfNeeded(user.id, user.email, fullName).catch((err) => {
+      console.error('[auth.login] Failed to send welcome email:', err)
+    })
   }
 
   await refreshAuthDependentPaths()

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import type { BillingInfo, Plan } from '@/types/billing'
 import { IconButton } from '@/components/ui/icon-button'
 import { RefreshIcon } from '@/components/ui/refresh-icon'
+import { Heading } from '@/components/ui'
 import { CurrentPlanSection } from './current-plan-section'
 import { UsageSection } from './usage-section'
 import { PlansSection } from './plans-section'
@@ -60,9 +61,7 @@ export function AccountBillingContent({ initialBillingInfo, plans }: AccountBill
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">
-            Billing & Usage
-          </h1>
+          <Heading as="h1" size="page">Billing & Usage</Heading>
           <IconButton
             aria-label="Refresh billing info"
             variant="ghost"

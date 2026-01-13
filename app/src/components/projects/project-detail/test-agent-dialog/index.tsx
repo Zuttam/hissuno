@@ -149,12 +149,12 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
   }
 
   const handleNewThread = useCallback(() => {
+    // Generate new session ID and use loadSession to properly reset
+    // Don't use clearHistory() as it generates its own ID causing state mismatch
     const newSessionId = generateUniqueSessionId()
     setCurrentSessionId(newSessionId)
-    clearHistory()
-    // Refresh sessions list after first message is sent
-    // The session will appear after the user sends a message
-  }, [clearHistory])
+    loadSession(newSessionId, [])
+  }, [loadSession])
 
   const handleSelectSession = useCallback(async (sessionId: string) => {
     if (sessionId === currentSessionId) return
@@ -197,11 +197,16 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
     messages[messages.length - 1].role === 'user'
 
   // Show streaming content as a live message bubble
-  const showStreamingBubble = isStreaming && streamingContent
+  // Guard: don't show streaming bubble if last message already has this content (prevents brief duplicate)
+  const lastMessage = messages[messages.length - 1]
+  const showStreamingBubble =
+    isStreaming &&
+    streamingContent &&
+    !(lastMessage?.role === 'assistant' && lastMessage?.content === streamingContent)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--background)]/80 backdrop-blur-sm">
-      <div className="flex h-[600px] w-full max-w-3xl overflow-hidden rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-lg">
+      <div className="flex h-[80vh] w-full max-w-5xl overflow-hidden rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-lg">
         {/* Session List Sidebar */}
         <SessionListSidebar
           projectId={project.id}

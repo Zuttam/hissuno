@@ -56,7 +56,9 @@ function getStepDisplayName(stepId: string): string {
     'analyze-codebase': 'Analyzing codebase',
     'analyze-sources': 'Analyzing knowledge sources',
     'compile-knowledge': 'Compiling knowledge packages',
+    'sanitize-knowledge': 'Sanitizing sensitive information',
     'save-packages': 'Saving knowledge packages',
+    'embed-knowledge': 'Generating semantic embeddings',
   }
   return stepNames[stepId] ?? stepId
 }

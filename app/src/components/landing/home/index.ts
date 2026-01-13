@@ -1,4 +1,5 @@
 export { HeroSection } from './hero-section'
-export { UseCasesSection } from './use-cases-section'
+export { FeaturesSection } from './features-section'
+export { ValuePropsSection } from './value-props-section'
 export { CommunitySection } from './community-section'
 export { CTASection } from './cta-section'

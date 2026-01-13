@@ -63,11 +63,11 @@ export async function cloneRepository(params: {
   // Clean up if exists (fresh clone)
   await cleanupRepository(projectId, branch)
 
-  // Build authenticated URL
-  // Supports both https://github.com/owner/repo and https://github.com/owner/repo.git
+  // Build authenticated URL for GitHub App installation token
+  // Format: https://x-access-token:{token}@github.com/owner/repo
   const authUrl = repositoryUrl.replace(
     /^https:\/\/github\.com\//,
-    `https://oauth2:${token}@github.com/`
+    `https://x-access-token:${token}@github.com/`
   )
 
   const git: SimpleGit = simpleGit()
@@ -96,8 +96,10 @@ export async function cloneRepository(params: {
 export async function pullRepository(params: {
   projectId: string
   branch: string
+  repositoryUrl: string
+  token: string
 }): Promise<PullResult> {
-  const { projectId, branch } = params
+  const { projectId, branch, repositoryUrl, token } = params
   const localPath = getLocalPath(projectId, branch)
 
   // Check if repo exists
@@ -107,6 +109,13 @@ export async function pullRepository(params: {
   }
 
   const git = simpleGit(localPath)
+
+  // Update remote URL with fresh token (installation tokens expire)
+  const authUrl = repositoryUrl.replace(
+    /^https:\/\/github\.com\//,
+    `https://x-access-token:${token}@github.com/`
+  )
+  await git.remote(['set-url', 'origin', authUrl])
 
   // Get current SHA before pull
   const beforeLog = await git.log({ maxCount: 1 })
