@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { mastra } from '@/mastra'
+import type { WorkflowOutput } from '@/mastra/workflows/session-review/schemas'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest) {
     // =========================================
     const { data: sessionsToClose, error: closeError } = await supabase
       .from('sessions')
-      .select('id, project_id, status')
+      .select('id, project_id, status, is_over_limit')
       .in('status', ['closing_soon', 'awaiting_idle_response'])
       .lte('scheduled_close_at', now.toISOString())
 
@@ -69,9 +71,15 @@ export async function GET(request: NextRequest) {
 
           results.sessionsClosed++
 
-          // Trigger PM review
+          // Skip PM review for over-limit sessions (soft enforcement)
+          if (session.is_over_limit) {
+            console.log(`${LOG_PREFIX} Skipping PM review for over-limit session ${session.id}`)
+            continue
+          }
+
+          // Trigger PM review - create record and execute workflow
           const runId = `pm-review-${session.id}-${Date.now()}`
-          const { error: pmError } = await supabase
+          const { data: reviewRecord, error: pmError } = await supabase
             .from('session_reviews')
             .insert({
               session_id: session.id,
@@ -84,12 +92,89 @@ export async function GET(request: NextRequest) {
                 projectId: session.project_id,
               },
             })
+            .select()
+            .single()
 
-          if (!pmError) {
-            results.pmReviewsTriggered++
-          } else if (pmError.code !== '23505') {
-            // Ignore unique constraint violations (review already in progress)
-            console.error(`${LOG_PREFIX} Failed to trigger PM review for session ${session.id}:`, pmError)
+          if (pmError) {
+            if (pmError.code !== '23505') {
+              // Ignore unique constraint violations (review already in progress)
+              console.error(`${LOG_PREFIX} Failed to trigger PM review for session ${session.id}:`, pmError)
+            }
+          } else if (reviewRecord) {
+            // Execute the workflow directly
+            const workflow = mastra.getWorkflow('sessionReviewWorkflow')
+            if (workflow) {
+              try {
+                console.log(`${LOG_PREFIX} Executing session review workflow for session ${session.id}`)
+                const run = await workflow.createRunAsync({ runId })
+                const workflowResult = await run.start({
+                  inputData: {
+                    sessionId: session.id,
+                    projectId: session.project_id,
+                  },
+                })
+
+                // Check if workflow succeeded
+                if (workflowResult.status === 'failed') {
+                  throw new Error(workflowResult.error?.message ?? 'Workflow failed')
+                }
+
+                // Extract result from the pm-review step output
+                // Mastra stores step outputs in workflowResult.steps['step-id']
+                // Using type assertion since Mastra's types are complex
+                const steps = workflowResult.steps as Record<string, { output?: unknown } | undefined> | undefined
+                const pmReviewOutput = steps?.['pm-review']?.output as Partial<WorkflowOutput> | undefined
+                const classifyOutput = steps?.['classify-session']?.output as { tags?: string[]; tagsApplied?: boolean } | undefined
+
+                // Build combined result from step outputs
+                const resultData: WorkflowOutput = {
+                  tags: (classifyOutput?.tags ?? []) as WorkflowOutput['tags'],
+                  tagsApplied: classifyOutput?.tagsApplied ?? false,
+                  action: pmReviewOutput?.action ?? 'skipped',
+                  issueId: pmReviewOutput?.issueId,
+                  issueTitle: pmReviewOutput?.issueTitle,
+                  skipReason: pmReviewOutput?.skipReason ?? (pmReviewOutput?.action ? undefined : 'No result from workflow'),
+                  thresholdMet: pmReviewOutput?.thresholdMet,
+                  specGenerated: pmReviewOutput?.specGenerated,
+                }
+
+                // Update the review record with the result
+                await supabase
+                  .from('session_reviews')
+                  .update({
+                    status: 'completed',
+                    completed_at: new Date().toISOString(),
+                    result: resultData,
+                  })
+                  .eq('id', reviewRecord.id)
+
+                results.pmReviewsTriggered++
+                console.log(`${LOG_PREFIX} Session review completed for session ${session.id}:`, resultData.action)
+              } catch (workflowError) {
+                console.error(`${LOG_PREFIX} Workflow execution failed for session ${session.id}:`, workflowError)
+                // Mark review as failed
+                await supabase
+                  .from('session_reviews')
+                  .update({
+                    status: 'failed',
+                    completed_at: new Date().toISOString(),
+                    error_message: workflowError instanceof Error ? workflowError.message : 'Unknown error',
+                  })
+                  .eq('id', reviewRecord.id)
+              }
+            } else {
+              console.warn(`${LOG_PREFIX} Session review workflow not configured, skipping review for session ${session.id}`)
+              // Mark as completed with skip reason
+              await supabase
+                .from('session_reviews')
+                .update({
+                  status: 'completed',
+                  completed_at: new Date().toISOString(),
+                  result: { action: 'skipped', skipReason: 'Workflow not configured' },
+                })
+                .eq('id', reviewRecord.id)
+              results.pmReviewsTriggered++
+            }
           }
         } catch (err) {
           console.error(`${LOG_PREFIX} Error closing session ${session.id}:`, err)

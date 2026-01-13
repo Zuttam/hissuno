@@ -2,16 +2,15 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import type { IntegrationStats } from '@/lib/supabase/sessions'
 import { useProjectDetail } from '@/hooks/use-projects'
-import { Card } from '@/components/ui'
+import { FloatingCard } from '@/components/ui/floating-card'
 import { ProjectHeader } from './project-header'
 import { ProjectSessionsCard } from './project-sessions-card'
 import { ProjectIssuesCard } from './project-issues-card'
 import { KnowledgeManagementCard } from './knowledge-management-card'
-import { EditProjectDialog } from './edit-project-dialog'
 import { TestAgentDialog } from './test-agent-dialog'
 
 interface ProjectDetailProps {
@@ -21,12 +20,10 @@ interface ProjectDetailProps {
 
 export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { project, isLoading, error, refresh } = useProjectDetail({
     projectId,
     initialProject,
   })
-  const [isEditing, setIsEditing] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [integrationStats, setIntegrationStats] = useState<IntegrationStats | null>(null)
@@ -48,14 +45,10 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
     fetchIntegrationStats()
   }, [fetchIntegrationStats])
 
-  // Auto-open edit dialog if redirected back from GitHub OAuth
-  useEffect(() => {
-    if (searchParams.get('editing') === 'true') {
-      setIsEditing(true)
-      // Clean up URL
-      router.replace(`/projects/${projectId}`, { scroll: false })
-    }
-  }, [searchParams, projectId, router])
+  // Handle edit navigation
+  const handleEditProject = useCallback(() => {
+    router.push(`/projects/${projectId}/edit`)
+  }, [router, projectId])
 
   return (
     <div>
@@ -72,39 +65,28 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
           </div>
         )}
 
-        <Card className="border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8">
+        <FloatingCard floating="gentle" className="p-8">
           <ProjectHeader
             project={project ?? initialProject}
             integrationStats={integrationStats}
             isLoading={isLoading}
             onRefresh={refresh}
             onTestAgent={() => setIsTesting(true)}
-            onEditProject={() => setIsEditing(true)}
+            onEditProject={handleEditProject}
           />
-        </Card>
-        <Card className="border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)]">
+        </FloatingCard>
+        <FloatingCard floating="gentle">
           <KnowledgeManagementCard
             projectId={projectId}
           />
-        </Card>
-        <Card className="border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)]">
-        <ProjectIssuesCard projectId={projectId} settingsVersion={settingsVersion} />
-        </Card>
-        <Card className="border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)]">
+        </FloatingCard>
+        <FloatingCard floating="gentle">
+          <ProjectIssuesCard projectId={projectId} settingsVersion={settingsVersion} />
+        </FloatingCard>
+        <FloatingCard floating="gentle">
           <ProjectSessionsCard projectId={projectId} />
-        </Card>
+        </FloatingCard>
       </div>
-
-      {project && isEditing && (
-        <EditProjectDialog
-          project={project}
-          onClose={() => setIsEditing(false)}
-          onSaved={async () => {
-            await refresh()
-            setSettingsVersion((v) => v + 1)
-          }}
-        />
-      )}
 
       {project && isTesting && (
         <TestAgentDialog

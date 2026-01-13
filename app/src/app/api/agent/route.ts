@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getProjectByPublicKey } from '@/lib/projects/keys'
+import { getProjectById } from '@/lib/projects/keys'
 import { upsertSession } from '@/lib/supabase/sessions'
 import { triggerChatRun, getChatRunStatus } from '@/lib/agent/chat-run-service'
+import { checkSessionLimitSoft } from '@/lib/billing/enforcement-service'
 import { createAdminClient } from '@/lib/supabase/server'
+import { saveSessionMessage } from '@/lib/supabase/session-messages'
+import { isOriginAllowed, verifyWidgetJWT } from '@/lib/utils/widget-auth'
 
 export const runtime = 'nodejs'
 
@@ -13,13 +16,13 @@ interface ChatMessage {
 
 interface AgentRequestBody {
   messages: ChatMessage[]
-  publicKey: string
+  projectId: string
   userId?: string
   userMetadata?: Record<string, string>
   pageUrl?: string
   pageTitle?: string
   sessionId?: string
-  source?: 'widget' | 'slack' | 'intercom' | 'gong' | 'api'
+  widgetToken?: string
 }
 
 /**
@@ -53,19 +56,27 @@ function addCorsHeaders(response: NextResponse, origin: string): NextResponse {
 }
 
 /**
- * GET /api/agent?publicKey=xxx&sessionId=xxx
+ * Get the request origin from headers
+ * Uses Origin header if present, otherwise falls back to request URL origin
+ */
+function getRequestOrigin(request: NextRequest): string {
+  return request.headers.get('Origin') || request.nextUrl.origin
+}
+
+/**
+ * GET /api/agent?projectId=xxx&sessionId=xxx
  * Get the current status of a chat run
  */
 export async function GET(request: NextRequest) {
-  const origin = request.headers.get('Origin') || '*'
+  const origin = getRequestOrigin(request)
 
   try {
-    const publicKey = request.nextUrl.searchParams.get('publicKey')
+    const projectId = request.nextUrl.searchParams.get('projectId')
     const sessionId = request.nextUrl.searchParams.get('sessionId')
 
-    if (!publicKey) {
+    if (!projectId) {
       return addCorsHeaders(
-        NextResponse.json({ error: 'publicKey is required' }, { status: 400 }),
+        NextResponse.json({ error: 'projectId is required' }, { status: 400 }),
         origin
       )
     }
@@ -77,11 +88,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Validate public key
-    const project = await getProjectByPublicKey(publicKey)
+    // Validate project
+    const project = await getProjectById(projectId)
     if (!project) {
       return addCorsHeaders(
-        NextResponse.json({ error: 'Invalid public key' }, { status: 401 }),
+        NextResponse.json({ error: 'Invalid project ID' }, { status: 401 }),
+        origin
+      )
+    }
+
+    // Check origin for widget requests
+    if (!isOriginAllowed(origin, project.allowed_origins)) {
+      return addCorsHeaders(
+        NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
         origin
       )
     }
@@ -105,11 +124,20 @@ export async function GET(request: NextRequest) {
  * Trigger a new chat run (creates chat_run record, returns runId for SSE streaming)
  */
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get('Origin') || '*'
+  const origin = getRequestOrigin(request)
 
   try {
     const body = (await request.json()) as AgentRequestBody
-    const { messages, publicKey, userId, userMetadata, pageUrl, pageTitle, sessionId: clientSessionId, source } = body
+    const {
+      messages,
+      projectId,
+      userId: bodyUserId,
+      userMetadata: bodyUserMetadata,
+      pageUrl,
+      pageTitle,
+      sessionId: clientSessionId,
+      widgetToken,
+    } = body
 
     // Validate required fields
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
@@ -119,26 +147,64 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!publicKey) {
+    if (!projectId) {
       return addCorsHeaders(
-        NextResponse.json({ error: 'publicKey is required' }, { status: 400 }),
+        NextResponse.json({ error: 'projectId is required' }, { status: 400 }),
         origin
       )
     }
 
-    // Derive project from publicKey
-    const project = await getProjectByPublicKey(publicKey)
+    // Look up project by ID
+    const project = await getProjectById(projectId)
     if (!project) {
       return addCorsHeaders(
-        NextResponse.json({ error: 'Invalid public key' }, { status: 401 }),
+        NextResponse.json({ error: 'Invalid project ID' }, { status: 401 }),
         origin
       )
     }
 
-    const projectId = project.id
+    // Always check origin
+    if (!isOriginAllowed(origin, project.allowed_origins)) {
+      return addCorsHeaders(
+        NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
+        origin
+      )
+    }
+
+    // JWT verification
+    let userId = bodyUserId
+    let userMetadata = bodyUserMetadata
+
+    if (project.secret_key) {
+      // If token is required, reject if not provided
+      if (project.widget_token_required && !widgetToken) {
+        return addCorsHeaders(
+          NextResponse.json({ error: 'Widget token is required' }, { status: 401 }),
+          origin
+        )
+      }
+
+      // If token is provided, verify it
+      if (widgetToken) {
+        const verifyResult = verifyWidgetJWT(widgetToken, project.secret_key)
+        if (!verifyResult.valid) {
+          return addCorsHeaders(
+            NextResponse.json({ error: verifyResult.error }, { status: 401 }),
+            origin
+          )
+        }
+
+        // Use verified data from token (overrides body data for security)
+        userId = verifyResult.payload.userId
+        userMetadata = verifyResult.payload.userMetadata ?? bodyUserMetadata
+      }
+    }
 
     // Use client-provided sessionId if available, otherwise generate a unique one
     const sessionId = clientSessionId || generateUniqueSessionId()
+
+    // Check session limit for project owner (soft enforcement - allow but mark as over-limit)
+    const { isOverLimit } = await checkSessionLimitSoft(project.user_id, projectId)
 
     // Upsert session for tracking (fire and forget - don't block the response)
     upsertSession({
@@ -148,7 +214,8 @@ export async function POST(request: NextRequest) {
       userMetadata: userMetadata || null,
       pageUrl: pageUrl || null,
       pageTitle: pageTitle || null,
-      source: source || 'widget',
+      source: 'widget',
+      isOverLimit,
     }).catch((error) => {
       console.error('[agent.post] failed to upsert session', error)
     })
@@ -176,6 +243,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Save user message to session_messages (fire and forget)
+    const lastUserMessage = messages[messages.length - 1]
+    if (lastUserMessage?.role === 'user') {
+      saveSessionMessage({
+        sessionId,
+        projectId,
+        senderType: 'user',
+        content: lastUserMessage.content,
+      }).catch((error) => {
+        console.error('[agent.post] failed to save user message', error)
+      })
+    }
+
     return addCorsHeaders(
       NextResponse.json({
         message: 'Chat started.',
@@ -190,14 +270,14 @@ export async function POST(request: NextRequest) {
     console.error('[agent.post] unexpected error', error)
     return addCorsHeaders(
       NextResponse.json({ error: 'Failed to process request' }, { status: 500 }),
-      request.headers.get('Origin') || '*'
+      origin
     )
   }
 }
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  const origin = request.headers.get('Origin') || '*'
+  const origin = getRequestOrigin(request)
 
   return new NextResponse(null, {
     status: 204,

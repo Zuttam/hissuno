@@ -10,7 +10,6 @@ import type { SessionEntry } from './useHissunoChat';
 import type { HissunoWidgetProps, WidgetSettings, WidgetVariant, BubblePosition } from './types';
 
 const DEFAULT_API_URL = '/api/agent';
-const WIDGET_SETTINGS_API = '/api/widget-settings';
 
 /**
  * HissunoWidget - Embeddable support agent widget
@@ -27,7 +26,8 @@ const WIDGET_SETTINGS_API = '/api/widget-settings';
  *     <div>
  *       <YourApp />
  *       <HissunoWidget
- *         publicKey="pk_live_xxx"
+ *         projectId="your-project-id"
+ *         widgetToken={generatedToken} // Optional: generated on your backend
  *         userId={currentUser.id}
  *         userMetadata={{ name: currentUser.name, email: currentUser.email }}
  *       />
@@ -37,7 +37,8 @@ const WIDGET_SETTINGS_API = '/api/widget-settings';
  * ```
  */
 export function HissunoWidget({
-  publicKey,
+  projectId,
+  widgetToken,
   variant: propVariant,
   fetchDefaults = true,
   userId,
@@ -61,27 +62,19 @@ export function HissunoWidget({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [sessionHistory, setSessionHistory] = useState<SessionEntry[]>([]);
 
-  // Validate required props
-  if (!publicKey) {
-    console.error('[HissunoWidget] publicKey is required');
-    return null;
-  }
+  // Fetch widget settings from server if enabled (must be called before any conditional returns)
+  const { settings: serverSettings, blocked, loading: settingsLoading, error: settingsError } = useWidgetSettings(projectId || '', fetchDefaults && !!projectId, apiUrl, widgetToken);
 
-  if (!publicKey.startsWith('pk_')) {
-    console.warn(
-      '[HissunoWidget] publicKey should start with "pk_". Make sure you\'re using the public key, not the secret key.'
-    );
-  }
-
-  // Fetch widget settings from server if enabled
-  const serverSettings = useWidgetSettings(publicKey, fetchDefaults, apiUrl);
+  // Debug: log settings
+  console.log('[HissunoWidget] serverSettings:', serverSettings, 'propVariant:', propVariant);
 
   // Merge props with server defaults (props always win)
-  const variant: WidgetVariant = propVariant ?? serverSettings?.variant ?? 'popup';
-  const theme = propTheme ?? serverSettings?.theme ?? 'light';
-  const bubblePosition: BubblePosition = propBubblePosition ?? serverSettings?.position ?? 'bottom-right';
-  const title = propTitle ?? serverSettings?.title ?? 'Support';
-  const initialMessage = propInitialMessage ?? serverSettings?.initialMessage ?? "Hi! 👋 How can I help you today?";
+  const resolvedVariant: WidgetVariant = propVariant ?? serverSettings?.variant ?? 'popup';
+  console.log('[HissunoWidget] resolvedVariant:', resolvedVariant);
+  const resolvedBaseTheme = propTheme ?? serverSettings?.theme ?? 'light';
+  const resolvedBubblePosition: BubblePosition = propBubblePosition ?? serverSettings?.position ?? 'bottom-right';
+  const resolvedTitle = propTitle ?? serverSettings?.title ?? 'Support';
+  const resolvedInitialMessage = propInitialMessage ?? serverSettings?.initialMessage ?? "Hi! 👋 How can I help you today?";
 
   const {
     messages,
@@ -100,9 +93,10 @@ export function HissunoWidget({
     getSessionHistory,
     deleteSession,
   } = useHissunoChat({
-    publicKey,
+    projectId: projectId || '',
+    widgetToken,
     apiUrl,
-    initialMessage,
+    initialMessage: resolvedInitialMessage,
     headers,
     userId,
     userMetadata,
@@ -189,7 +183,35 @@ export function HissunoWidget({
   }, []);
 
   // Resolve theme based on system preference if 'auto'
-  const resolvedTheme = useResolvedTheme(theme);
+  const resolvedTheme = useResolvedTheme(resolvedBaseTheme);
+
+  // Validate required props (after all hooks)
+  if (!projectId) {
+    console.error('[HissunoWidget] projectId is required');
+    return null;
+  }
+
+  // Don't render until settings are loaded (when fetchDefaults is enabled)
+  if (settingsLoading) {
+    return null;
+  }
+
+  // If origin is blocked, don't render the widget
+  if (blocked) {
+    console.warn('[HissunoWidget] Widget blocked: origin not allowed for this project');
+    return null;
+  }
+
+  // Don't render if settings fetch failed and we have no settings
+  if (settingsError && !serverSettings) {
+    console.warn('[HissunoWidget] Widget not rendered: failed to fetch settings');
+    return null;
+  }
+
+  // Warn if token is required but not provided
+  if (serverSettings?.tokenRequired && !widgetToken) {
+    console.warn('[HissunoWidget] This project requires a widgetToken for secure authentication. Requests may fail.');
+  }
 
   return (
     <div className={`hissuno-widget ${className ?? ''}`}>
@@ -200,14 +222,14 @@ export function HissunoWidget({
         <ChatBubble
           isOpen={isOpen}
           onClick={toggle}
-          position={bubblePosition}
+          position={resolvedBubblePosition}
           offset={bubbleOffset}
           theme={resolvedTheme}
         />
       ) : null}
 
       {/* Chat popup or sidepanel */}
-      {variant === 'sidepanel' ? (
+      {resolvedVariant === 'sidepanel' ? (
         <ChatSidepanel
           isOpen={isOpen}
           onClose={close}
@@ -219,7 +241,7 @@ export function HissunoWidget({
           isStreaming={isStreaming}
           streamingContent={streamingContent}
           error={error}
-          title={title}
+          title={resolvedTitle}
           placeholder={placeholder}
           theme={resolvedTheme}
           onClearHistory={clearHistory}
@@ -244,10 +266,10 @@ export function HissunoWidget({
           isStreaming={isStreaming}
           streamingContent={streamingContent}
           error={error}
-          title={title}
+          title={resolvedTitle}
           placeholder={placeholder}
           theme={resolvedTheme}
-          position={bubblePosition}
+          position={resolvedBubblePosition}
           offset={bubbleOffset}
           onClearHistory={clearHistory}
           onCancelChat={cancelChat}
@@ -297,26 +319,43 @@ function useResolvedTheme(theme: 'light' | 'dark' | 'auto'): 'light' | 'dark' {
 
 /**
  * Hook to fetch widget settings from the server
+ * Returns settings, blocked flag, and loading state
  */
 function useWidgetSettings(
-  publicKey: string,
+  projectId: string,
   enabled: boolean,
-  apiUrl: string
-): WidgetSettings | null {
+  apiUrl: string,
+  widgetToken?: string
+): { settings: WidgetSettings | null; blocked: boolean; loading: boolean; error: boolean } {
   const [settings, setSettings] = useState<WidgetSettings | null>(null);
+  const [blocked, setBlocked] = useState(false);
+  const [loading, setLoading] = useState(enabled);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!enabled || !publicKey) return;
+    if (!enabled || !projectId) {
+      setLoading(false);
+      return;
+    }
 
-    // Derive the base URL from apiUrl (which defaults to /api/agent)
-    // The widget-settings endpoint is at the same base path level
-    const baseUrl = apiUrl.replace(/\/agent$/, '');
-    const settingsUrl = `${baseUrl}/widget-settings?publicKey=${encodeURIComponent(publicKey)}`;
+    setLoading(true);
+    setError(false);
+
+    // Widget settings endpoint is under /api/agent/widget
+    const settingsUrl = `${apiUrl}/widget?projectId=${encodeURIComponent(projectId)}`;
 
     const controller = new AbortController();
 
-    fetch(settingsUrl, { signal: controller.signal })
+    fetch(settingsUrl, {
+      signal: controller.signal,
+    })
       .then((res) => {
+        if (res.status === 403) {
+          // Origin blocked
+          console.warn('[HissunoWidget] Origin not allowed for this project');
+          setBlocked(true);
+          return null;
+        }
         if (!res.ok) {
           console.warn('[HissunoWidget] Failed to fetch widget settings:', res.status);
           return null;
@@ -325,19 +364,27 @@ function useWidgetSettings(
       })
       .then((data) => {
         if (data) {
+          console.log('[HissunoWidget] Fetched settings:', data);
           setSettings(data as WidgetSettings);
+          if (data.blocked) {
+            setBlocked(true);
+          }
         }
       })
       .catch((err) => {
         if (err.name !== 'AbortError') {
           console.warn('[HissunoWidget] Failed to fetch widget settings:', err);
+          setError(true);
         }
+      })
+      .finally(() => {
+        setLoading(false);
       });
 
     return () => controller.abort();
-  }, [publicKey, enabled, apiUrl]);
+  }, [projectId, enabled, apiUrl]);
 
-  return settings;
+  return { settings, blocked, loading, error };
 }
 
 /**

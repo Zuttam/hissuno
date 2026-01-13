@@ -145,7 +145,7 @@ export function SessionSidebar({
             <div className="flex-1 overflow-y-auto">
               {/* Session Details */}
               <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-                <SessionDetails session={session} />
+                <SessionDetails session={session} onSessionUpdated={onSessionUpdated} />
               </div>
 
               {/* Tags Section */}
@@ -185,10 +185,31 @@ export function SessionSidebar({
 
 interface SessionDetailsProps {
   session: SessionWithProject
+  onSessionUpdated?: () => void
 }
 
-function SessionDetails({ session }: SessionDetailsProps) {
+function SessionDetails({ session, onSessionUpdated }: SessionDetailsProps) {
+  const [isArchiving, setIsArchiving] = useState(false)
   const sourceInfo = SESSION_SOURCE_INFO[session.source as SessionSource] || SESSION_SOURCE_INFO.widget
+
+  const handleArchiveToggle = useCallback(async () => {
+    setIsArchiving(true)
+    try {
+      const response = await fetch(`/api/sessions/${session.id}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_archived: !session.is_archived }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to update archive status')
+      }
+      onSessionUpdated?.()
+    } catch (err) {
+      console.error('[session-sidebar] archive toggle failed:', err)
+    } finally {
+      setIsArchiving(false)
+    }
+  }, [session.id, session.is_archived, onSessionUpdated])
 
   return (
     <div className="space-y-4">
@@ -201,6 +222,9 @@ function SessionDetails({ session }: SessionDetailsProps) {
           <Badge variant={sourceInfo.variant}>
             {sourceInfo.label}
           </Badge>
+          {session.is_archived && (
+            <Badge variant="default">Archived</Badge>
+          )}
         </div>
         <Link
           href={`/projects/${session.project_id}`}
@@ -292,6 +316,16 @@ function SessionDetails({ session }: SessionDetailsProps) {
           </p>
         </div>
       </div>
+
+      {/* Archive Button */}
+      <button
+        type="button"
+        onClick={handleArchiveToggle}
+        disabled={isArchiving}
+        className="w-full rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isArchiving ? 'Updating...' : session.is_archived ? 'Unarchive Session' : 'Archive Session'}
+      </button>
     </div>
   )
 }

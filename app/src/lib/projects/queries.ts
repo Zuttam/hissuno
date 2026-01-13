@@ -9,11 +9,11 @@ type SourceCodesTable = Database['public']['Tables']['source_codes']
 export type ProjectRecord = ProjectsTable['Row']
 export type CodebaseRecord = SourceCodesTable['Row']
 
-export type ProjectWithCodebase = ProjectRecord & {
-  source_code: CodebaseRecord | null
-}
-
-const selectProjectWithCodebase = '*, source_code:source_codes(*)'
+/**
+ * Project type - source_code is now accessed through knowledge_sources
+ * @deprecated Use getCodebaseForProject() to access codebase data
+ */
+export type ProjectWithCodebase = ProjectRecord
 
 export const listProjects = cache(async (): Promise<ProjectWithCodebase[]> => {
   if (!isSupabaseConfigured()) {
@@ -38,7 +38,7 @@ export const listProjects = cache(async (): Promise<ProjectWithCodebase[]> => {
 
     const { data, error } = await supabase
       .from('projects')
-      .select(selectProjectWithCodebase)
+      .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
@@ -77,7 +77,7 @@ export const getProjectById = cache(async (projectId: string): Promise<ProjectWi
 
     const { data, error } = await supabase
       .from('projects')
-      .select(selectProjectWithCodebase)
+      .select('*')
       .eq('id', projectId)
       .eq('user_id', user.id)
       .single()
@@ -99,7 +99,7 @@ export const getProjectById = cache(async (projectId: string): Promise<ProjectWi
 
 export async function updateProjectMetadata(
   projectId: string,
-  updates: Partial<Pick<ProjectRecord, 'name' | 'description' | 'source_code_id'>>
+  updates: Partial<Pick<ProjectRecord, 'name' | 'description'>>
 ): Promise<ProjectRecord> {
   if (!isSupabaseConfigured()) {
     throw new Error('Supabase must be configured.')

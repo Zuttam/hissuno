@@ -1,7 +1,8 @@
 import { cache } from 'react'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
-import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource } from '@/types/session'
+import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, CreateSessionInput, CreateMessageInput } from '@/types/session'
+import { mastra } from '@/mastra'
 
 const selectSessionWithProject = '*, project:projects(id, name)'
 const selectSessionWithLinkedIssues = `
@@ -24,6 +25,8 @@ export async function upsertSession(params: {
   pageUrl?: string | null
   pageTitle?: string | null
   source?: SessionSource | null
+  /** True if session is created when account is over session limit (soft enforcement) */
+  isOverLimit?: boolean
 }): Promise<void> {
   if (!isServiceRoleConfigured()) {
     console.warn('[supabase.sessions] Service role not configured, skipping session upsert')
@@ -45,6 +48,7 @@ export async function upsertSession(params: {
           page_title: params.pageTitle || null,
           source: params.source || 'widget',
           last_activity_at: new Date().toISOString(),
+          is_over_limit: params.isOverLimit ?? false,
         },
         {
           onConflict: 'id',
@@ -142,6 +146,11 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     }
 
     query = query.in('project_id', projectIds)
+
+    // Filter archived sessions (hidden by default)
+    if (!filters.showArchived) {
+      query = query.eq('is_archived', false)
+    }
 
     // Apply filters
     if (filters.projectId) {
@@ -415,3 +424,157 @@ export const getProjectIntegrationStats = cache(async (projectId: string): Promi
     return { lastActivityAt: null, isActive: false }
   }
 })
+
+/**
+ * Creates a manual session. Requires authenticated user context.
+ */
+export async function createManualSession(input: CreateSessionInput): Promise<SessionWithProject | null> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase must be configured.')
+  }
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      throw new UnauthorizedError('Unable to resolve user context.')
+    }
+
+    // Verify user owns the project
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id, name')
+      .eq('id', input.project_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!project) {
+      throw new UnauthorizedError('You do not have permission to create sessions for this project.')
+    }
+
+    // Generate a unique session ID
+    const sessionId = `manual-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
+    const messageCount = input.messages?.length ?? 0
+    const now = new Date()
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert({
+        id: sessionId,
+        project_id: input.project_id,
+        user_id: input.user_id || null,
+        page_url: input.page_url || null,
+        page_title: input.page_title || null,
+        source: 'manual',
+        status: 'active',
+        message_count: messageCount,
+        tags: input.tags ?? [],
+        is_archived: false,
+        first_message_at: messageCount > 0 ? now.toISOString() : null,
+        last_activity_at: now.toISOString(),
+      })
+      .select(selectSessionWithProject)
+      .single()
+
+    if (error) {
+      console.error('[supabase.sessions] failed to create manual session', error)
+      throw new Error('Unable to create session.')
+    }
+
+    // Store messages in Mastra storage if provided
+    if (input.messages && input.messages.length > 0) {
+      try {
+        const storage = mastra.getStorage()
+        if (storage) {
+          const mastraMessages = input.messages.map((msg, index) => ({
+            id: crypto.randomUUID(),
+            threadId: sessionId,
+            type: 'text' as const,
+            role: msg.role,
+            content: msg.content,
+            createdAt: new Date(now.getTime() + index * 1000), // Stagger by 1 second for ordering
+          }))
+          await storage.saveMessages({ messages: mastraMessages })
+        }
+      } catch (mastraError) {
+        console.error('[supabase.sessions] Failed to store messages in Mastra:', mastraError)
+        // Continue even if Mastra storage fails - the session is created
+      }
+    }
+
+    return data as SessionWithProject
+  } catch (error) {
+    console.error('[supabase.sessions] unexpected error creating manual session', error)
+    throw error
+  }
+}
+
+/**
+ * Updates the archive status of a session. Requires authenticated user context.
+ */
+export async function updateSessionArchiveStatus(
+  sessionId: string,
+  isArchived: boolean
+): Promise<SessionRecord | null> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase must be configured.')
+  }
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      throw new UnauthorizedError('Unable to resolve user context.')
+    }
+
+    // Get session and verify ownership
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('project_id')
+      .eq('id', sessionId)
+      .single()
+
+    if (!session) {
+      return null
+    }
+
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', session.project_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!project) {
+      throw new UnauthorizedError('You do not have permission to update this session.')
+    }
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .update({
+        is_archived: isArchived,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[supabase.sessions] failed to update session archive status', sessionId, error)
+      throw new Error('Unable to update session.')
+    }
+
+    return data as SessionRecord
+  } catch (error) {
+    console.error('[supabase.sessions] unexpected error updating session archive status', sessionId, error)
+    throw error
+  }
+}

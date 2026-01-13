@@ -1,13 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { SessionWithProject, SessionWithMessages, SessionFilters, ChatMessage } from '@/types/session'
+import type { SessionWithProject, SessionWithMessages, SessionFilters, ChatMessage, CreateSessionInput } from '@/types/session'
 
 interface UseSessionsState {
   sessions: SessionWithProject[]
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
+  createSession: (input: CreateSessionInput) => Promise<SessionWithProject | null>
+  archiveSession: (sessionId: string, isArchived: boolean) => Promise<boolean>
 }
 
 interface UseSessionsOptions {
@@ -34,6 +36,7 @@ export function useSessions({
       if (filters.status) params.set('status', filters.status)
       if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
       if (filters.dateTo) params.set('dateTo', filters.dateTo)
+      if (filters.showArchived) params.set('showArchived', 'true')
       if (filters.limit) params.set('limit', String(filters.limit))
       if (filters.offset) params.set('offset', String(filters.offset))
 
@@ -54,7 +57,51 @@ export function useSessions({
     } finally {
       setIsLoading(false)
     }
-  }, [filters.projectId, filters.userId, filters.sessionId, filters.status, filters.dateFrom, filters.dateTo, filters.limit, filters.offset])
+  }, [filters.projectId, filters.userId, filters.sessionId, filters.status, filters.dateFrom, filters.dateTo, filters.showArchived, filters.limit, filters.offset])
+
+  const createSession = useCallback(async (input: CreateSessionInput): Promise<SessionWithProject | null> => {
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const payload = await response.json()
+      if (payload.session) {
+        setSessions((prev) => [payload.session, ...prev])
+      }
+      return payload.session ?? null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const archiveSession = useCallback(async (sessionId: string, isArchived: boolean): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_archived: isArchived }),
+      })
+
+      if (!response.ok) {
+        return false
+      }
+
+      // Update local state
+      setSessions((prev) =>
+        prev.map((s) => (s.id === sessionId ? { ...s, is_archived: isArchived } : s))
+      )
+      return true
+    } catch {
+      return false
+    }
+  }, [])
 
   useEffect(() => {
     void fetchSessions()
@@ -66,8 +113,10 @@ export function useSessions({
       isLoading,
       error,
       refresh: fetchSessions,
+      createSession,
+      archiveSession,
     }),
-    [sessions, isLoading, error, fetchSessions]
+    [sessions, isLoading, error, fetchSessions, createSession, archiveSession]
   )
 }
 

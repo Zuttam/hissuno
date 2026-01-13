@@ -9,9 +9,7 @@ import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { SessionListSidebar } from './session-list-sidebar'
 
 interface TestAgentDialogProps {
-  project: ProjectWithCodebase & {
-    public_key?: string | null
-  }
+  project: ProjectWithCodebase
   onClose: () => void
 }
 
@@ -52,7 +50,6 @@ function LoadingIndicator() {
 }
 
 export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
-  const publicKey = project.public_key
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useUser()
 
@@ -83,7 +80,7 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
     loadSession,
     cancelChat,
   } = useHissunoChat({
-    publicKey: publicKey ?? '',
+    projectId: project.id,
     initialMessage: 'Hi! How can I help you today?',
     userId: user?.id,
     sessionId: currentSessionId || undefined,
@@ -202,34 +199,12 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
   // Show streaming content as a live message bubble
   const showStreamingBubble = isStreaming && streamingContent
 
-  if (!publicKey) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--background)]/80 backdrop-blur-sm">
-        <div className="w-full max-w-md space-y-6 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-8">
-          <div className="space-y-2">
-            <h2 className="font-mono text-lg font-semibold uppercase tracking-wide text-[color:var(--foreground)]">
-              Public Key Required
-            </h2>
-            <p className="text-sm text-[color:var(--text-secondary)]">
-              A public key must be generated before testing the agent. Please
-              ensure the project has a public key configured.
-            </p>
-          </div>
-          <Button onClick={onClose} className="w-full">
-            Close
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--background)]/80 backdrop-blur-sm">
       <div className="flex h-[600px] w-full max-w-3xl overflow-hidden rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-lg">
         {/* Session List Sidebar */}
         <SessionListSidebar
           projectId={project.id}
-          publicKey={publicKey}
           userId={user?.id}
           currentSessionId={currentSessionId}
           isOpen={isSidebarOpen}

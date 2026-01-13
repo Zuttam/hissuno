@@ -20,7 +20,7 @@ export type SourceInput = z.infer<typeof sourceInputSchema>
 
 export const workflowInputSchema = z.object({
   projectId: z.string(),
-  sourceCodePath: z.string().nullable().optional(),
+  localCodePath: z.string().nullable().optional(),
   analysisScope: z.string().nullable().optional(),
   sources: z.array(sourceInputSchema),
 })

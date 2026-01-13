@@ -26,7 +26,7 @@ export function FormField({
   children,
   ...props
 }: FormFieldProps) {
-  const containerClasses = 'space-y-2'
+  const containerClasses = 'flex flex-col gap-2'
   const mergedClasses = className
     ? `${containerClasses} ${className}`
     : containerClasses
@@ -37,7 +37,7 @@ export function FormField({
         <span
           className={
             labelClassName ??
-            'block text-sm font-mono font-semibold uppercase tracking-wide text-[--foreground]'
+            'block text-sm font-mono font-semibold uppercase tracking-wide text-(--foreground)'
           }
         >
           {label}
@@ -46,7 +46,7 @@ export function FormField({
           <span
             className={
               descriptionClassName ??
-              'text-xs font-normal text-[--text-secondary]'
+              'text-xs font-normal text-(--text-secondary)'
             }
           >
             {description}
@@ -57,7 +57,7 @@ export function FormField({
           <span
             className={
               supportingTextClassName ??
-              'text-xs font-normal text-[--text-secondary]'
+              'text-xs font-normal text-(--text-secondary)'
             }
           >
             {supportingText}
@@ -81,18 +81,18 @@ export function FormField({
         <span
           className={
             descriptionClassName ??
-            'text-xs font-normal text-[--text-secondary]'
+            'text-xs font-normal text-(--text-secondary)'
           }
         >
           {description}
         </span>
       ) : null}
-      <div className="mt-2 space-y-2">{children}</div>
+      <div className="mt-2 flex flex-col gap-2">{children}</div>
       {supportingText ? (
         <span
           className={
             supportingTextClassName ??
-            'text-xs font-normal text-[--text-secondary]'
+            'text-xs font-normal text-(--text-secondary)'
           }
         >
           {supportingText}

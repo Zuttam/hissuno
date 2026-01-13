@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { deleteCodebaseVersion, updateGitHubCodebase } from '@/lib/codebase'
+import { updateGitHubCodebase, cleanupRepository } from '@/lib/codebase'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
@@ -38,7 +38,7 @@ export async function GET(_request: Request, context: RouteContext) {
     const { supabase, user } = await resolveUser()
     const { data, error } = await supabase
       .from('projects')
-      .select('*, source_code:source_codes(*)')
+      .select('*')
       .eq('id', id)
       .eq('user_id', user.id)
       .single()
@@ -94,16 +94,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     projectUpdates.description = trimmed.length > 0 ? trimmed : null
   }
 
-  // Handle allowed_origins array
-  if (Array.isArray(payload.allowed_origins)) {
-    // Validate that all entries are valid origin strings
-    const origins = payload.allowed_origins.filter(
-      (origin: unknown) => typeof origin === 'string' && origin.trim().length > 0
-    ).map((origin: string) => origin.trim())
-    projectUpdates.allowed_origins = origins.length > 0 ? origins : null
-  } else if (payload.allowed_origins === null) {
-    projectUpdates.allowed_origins = null
-  }
+  // Note: allowed_origins and widget_token_required are now in project_settings
+  // Use PATCH /api/projects/[id]/settings to update them
 
   // Handle source code updates (for GitHub repos)
   if (typeof payload.repositoryUrl === 'string') {
@@ -131,10 +123,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     await assertUserOwnsProject(supabase, user.id, id)
 
-    // Get the current project with source code to update
+    // Get the current project
     const { data: currentProject, error: fetchError } = await supabase
       .from('projects')
-      .select('*, source_code:source_codes(*)')
+      .select('*')
       .eq('id', id)
       .eq('user_id', user.id)
       .single()
@@ -144,18 +136,28 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
     }
 
-    // Update source code if needed
-    if (hasSourceCodeUpdates && currentProject.source_code) {
-      const { repositoryUrl, repositoryBranch } = sourceCodeUpdates
+    // Update source code if needed - get source_code through codebase knowledge_source
+    if (hasSourceCodeUpdates) {
+      const { data: codebaseSource } = await supabase
+        .from('knowledge_sources')
+        .select('*, source_code:source_codes(*)')
+        .eq('project_id', id)
+        .eq('type', 'codebase')
+        .single()
 
-      // GitHub-specific updates (url and branch)
-      if ((repositoryUrl || repositoryBranch) && currentProject.source_code.kind === 'github') {
-        await updateGitHubCodebase(
-          supabase,
-          currentProject.source_code.id,
-          user.id,
-          { repositoryUrl, repositoryBranch }
-        )
+      const sourceCode = codebaseSource?.source_code
+      if (sourceCode) {
+        const { repositoryUrl, repositoryBranch } = sourceCodeUpdates
+
+        // GitHub-specific updates (url and branch)
+        if ((repositoryUrl || repositoryBranch) && sourceCode.kind === 'github') {
+          await updateGitHubCodebase(
+            supabase,
+            sourceCode.id,
+            user.id,
+            { repositoryUrl, repositoryBranch }
+          )
+        }
       }
     }
 
@@ -176,7 +178,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     // Fetch the updated project
     const { data, error } = await supabase
       .from('projects')
-      .select('*, source_code:source_codes(*)')
+      .select('*')
       .eq('id', id)
       .eq('user_id', user.id)
       .single()
@@ -210,20 +212,17 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
     await assertUserOwnsProject(supabase, user.id, id)
 
-    // Get the project with its source code to clean up storage
-    const { data: project, error: fetchError } = await supabase
-      .from('projects')
+    // Get the codebase knowledge_source with source_code to clean up storage
+    const { data: codebaseSource } = await supabase
+      .from('knowledge_sources')
       .select('*, source_code:source_codes(*)')
-      .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('project_id', id)
+      .eq('type', 'codebase')
       .single()
 
-    if (fetchError || !project) {
-      console.error('[projects.id.delete] failed to fetch project for deletion', id, fetchError)
-      return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
-    }
+    const sourceCode = codebaseSource?.source_code
 
-    // Delete the project (cascades to source_code due to FK constraint)
+    // Delete the project (cascades to knowledge_sources, source_codes due to FK constraints)
     const { error: deleteError } = await supabase
       .from('projects')
       .delete()
@@ -235,9 +234,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Failed to delete project.' }, { status: 500 })
     }
 
-    // Clean up storage (best-effort)
-    if (project.source_code?.storage_uri) {
-      await deleteCodebaseVersion(project.source_code.storage_uri)
+    // Clean up local clone if exists (best-effort)
+    if (sourceCode?.repository_branch) {
+      await cleanupRepository(id, sourceCode.repository_branch).catch(() => {})
     }
 
     return NextResponse.json({ success: true })

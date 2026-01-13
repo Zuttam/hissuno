@@ -34,6 +34,10 @@ const fragmentShader = /* glsl */ `
   uniform vec3 uRippleColor;
   uniform vec2 uResolution;
   uniform float uCausticIntensity;
+  uniform float uOpacity;
+  uniform float uCausticSharpness;
+  uniform float uRippleIntensity;
+  uniform vec3 uBackgroundColor;
 
   // Ripple data: vec4(x, y, startTime, strength) for up to 10 ripples
   uniform vec4 uRipples[10];
@@ -98,7 +102,8 @@ const fragmentShader = /* glsl */ `
     vec2 v3 = voronoi(uv, time, 8.0, 0.18);
     caustic += (v3.y - v3.x) * 0.15;
 
-    return smoothstep(0.0, 0.7, caustic);
+    // uCausticSharpness controls the smoothstep range (lower = sharper)
+    return smoothstep(0.0, uCausticSharpness, caustic);
   }
 
   void main() {
@@ -169,11 +174,14 @@ const fragmentShader = /* glsl */ `
       totalShadow += shadow * 0.025 * fade;
     }
 
-    // Apply 3D lighting effect - very subtle
-    color = color + vec3(totalHighlight) - vec3(totalShadow * 0.4);
+    // Apply 3D lighting effect - scaled by ripple intensity
+    color = color + vec3(totalHighlight * uRippleIntensity) - vec3(totalShadow * 0.4 * uRippleIntensity);
 
     // Clamp to valid range
     color = clamp(color, 0.0, 1.0);
+
+    // Mix water color with background based on opacity (for transparent water effect)
+    color = mix(uBackgroundColor, color, uOpacity);
 
     gl_FragColor = vec4(color, 1.0);
   }
@@ -195,19 +203,23 @@ export function WaterPlane() {
     return new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uBaseColor: { value: new THREE.Color('#ecf8ff') },  // Light blue (daytime pond)
-        uDeepColor: { value: new THREE.Color('#c7e8ff') },  // Deeper blue
+        uBaseColor: { value: new THREE.Color('#7dd3e8') },  // Light turquoise (ocean)
+        uDeepColor: { value: new THREE.Color('#5ec4db') },  // Slightly deeper turquoise
         uRippleColor: { value: new THREE.Color('#ffffff') },
         uResolution: { value: new THREE.Vector2(1920, 1080) },
         uRipples: { value: rippleUniforms },
         uRippleCount: { value: 0 },
-        uCausticIntensity: { value: 0.7 },  // Default, overridden by CSS variable
+        uCausticIntensity: { value: 0.5 },  // Default, overridden by CSS variable
         uCausticColor: { value: new THREE.Color('#ffffff') },
+        uOpacity: { value: 0.6 },  // Default, overridden by CSS variable
+        uCausticSharpness: { value: 0.4 },  // Default, overridden by CSS variable (lower = sharper)
+        uRippleIntensity: { value: 3.0 },  // Default, overridden by CSS variable (higher = more visible ripples)
+        uBackgroundColor: { value: new THREE.Color('#faf0dc') },  // Sandy background for light mode
       },
       vertexShader,
       fragmentShader,
-      transparent: false,
-      depthWrite: true,
+      transparent: true,
+      depthWrite: false,  // For proper transparency blending
       side: THREE.DoubleSide,
     })
   }, [rippleUniforms])
@@ -221,13 +233,27 @@ export function WaterPlane() {
       const rippleColor = styles.getPropertyValue('--water-ripple').trim()
       const causticColor = styles.getPropertyValue('--water-caustic').trim()
       const causticIntensityCSS = styles.getPropertyValue('--water-caustic-intensity').trim()
+      const opacityCSS = styles.getPropertyValue('--water-opacity').trim()
+      const causticSharpnessCSS = styles.getPropertyValue('--water-caustic-sharpness').trim()
+      const rippleIntensityCSS = styles.getPropertyValue('--water-ripple-intensity').trim()
+      const backgroundColorCSS = styles.getPropertyValue('--water-background').trim()
 
-      material.uniforms.uBaseColor.value.set(baseColor || '#ecf8ff')
-      material.uniforms.uDeepColor.value.set(deepColor || '#c7e8ff')
+      material.uniforms.uBaseColor.value.set(baseColor || '#7dd3e8')
+      material.uniforms.uDeepColor.value.set(deepColor || '#5ec4db')
       material.uniforms.uRippleColor.value.set(rippleColor || '#ffffff')
       material.uniforms.uCausticColor.value.set(causticColor || '#ffffff')
+      material.uniforms.uBackgroundColor.value.set(backgroundColorCSS || '#faf0dc')
       if (causticIntensityCSS) {
         material.uniforms.uCausticIntensity.value = parseFloat(causticIntensityCSS)
+      }
+      if (opacityCSS) {
+        material.uniforms.uOpacity.value = parseFloat(opacityCSS)
+      }
+      if (causticSharpnessCSS) {
+        material.uniforms.uCausticSharpness.value = parseFloat(causticSharpnessCSS)
+      }
+      if (rippleIntensityCSS) {
+        material.uniforms.uRippleIntensity.value = parseFloat(rippleIntensityCSS)
       }
     }
 

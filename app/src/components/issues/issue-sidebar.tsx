@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Spinner, Select } from '@/components/ui'
 import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType } from '@/types/issue'
@@ -112,6 +112,7 @@ export function IssueSidebar({
                 onStatusChange={handleStatusChange}
                 onPriorityChange={handlePriorityChange}
                 onTypeChange={handleTypeChange}
+                onIssueUpdated={onIssueUpdated}
               />
             </div>
 
@@ -195,6 +196,7 @@ export function IssueSidebar({
                 <ProductSpecView
                   spec={issue.product_spec}
                   generatedAt={issue.product_spec_generated_at}
+                  issueTitle={issue.title}
                 />
               ) : !isGeneratingSpec ? (
                 <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-6 text-center">
@@ -220,16 +222,45 @@ interface IssueHeaderProps {
   onStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
   onPriorityChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
   onTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
+  onIssueUpdated?: () => void
 }
 
-function IssueHeader({ issue, onStatusChange, onPriorityChange, onTypeChange }: IssueHeaderProps) {
+function IssueHeader({ issue, onStatusChange, onPriorityChange, onTypeChange, onIssueUpdated }: IssueHeaderProps) {
+  const [isArchiving, setIsArchiving] = useState(false)
+
+  const handleArchiveToggle = useCallback(async () => {
+    setIsArchiving(true)
+    try {
+      const response = await fetch(`/api/issues/${issue.id}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_archived: !issue.is_archived }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to update archive status')
+      }
+      onIssueUpdated?.()
+    } catch (err) {
+      console.error('[issue-sidebar] archive toggle failed:', err)
+    } finally {
+      setIsArchiving(false)
+    }
+  }, [issue.id, issue.is_archived, onIssueUpdated])
+
   return (
     <div className="space-y-4">
       {/* Title and Project */}
       <div className="space-y-2">
-        <span className="font-mono text-sm text-[color:var(--text-secondary)]">
-          {issue.project?.name || 'Unknown Project'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-sm text-[color:var(--text-secondary)]">
+            {issue.project?.name || 'Unknown Project'}
+          </span>
+          {issue.is_archived && (
+            <span className="rounded-full bg-[color:var(--surface)] px-2 py-0.5 text-xs font-medium text-[color:var(--text-secondary)]">
+              Archived
+            </span>
+          )}
+        </div>
         <h3 className="text-lg font-semibold text-[color:var(--foreground)]">
           {issue.title}
         </h3>
@@ -310,6 +341,16 @@ function IssueHeader({ issue, onStatusChange, onPriorityChange, onTypeChange }: 
           </p>
         </div>
       </div>
+
+      {/* Archive Button */}
+      <button
+        type="button"
+        onClick={handleArchiveToggle}
+        disabled={isArchiving}
+        className="w-full rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isArchiving ? 'Updating...' : issue.is_archived ? 'Unarchive Issue' : 'Archive Issue'}
+      </button>
     </div>
   )
 }

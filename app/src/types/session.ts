@@ -6,7 +6,7 @@ export type SessionStatus = 'active' | 'closing_soon' | 'awaiting_idle_response'
 /**
  * Session source channels
  */
-export type SessionSource = 'widget' | 'slack' | 'intercom' | 'gong' | 'api'
+export type SessionSource = 'widget' | 'slack' | 'intercom' | 'gong' | 'api' | 'manual'
 
 /**
  * Source display information for UI
@@ -20,6 +20,7 @@ export const SESSION_SOURCE_INFO: Record<
   intercom: { label: 'Intercom', variant: 'success' },
   gong: { label: 'Gong', variant: 'default' },
   api: { label: 'API', variant: 'default' },
+  manual: { label: 'Manual', variant: 'default' },
 }
 
 /**
@@ -54,7 +55,7 @@ export const SESSION_TAG_INFO: Record<
 /**
  * Sender type for messages
  */
-export type MessageSenderType = 'ai' | 'human_agent' | 'system'
+export type MessageSenderType = 'user' | 'ai' | 'human_agent' | 'system'
 
 /**
  * Session record from the database
@@ -77,6 +78,9 @@ export interface SessionRecord {
   goodbye_detected_at: string | null
   idle_prompt_sent_at: string | null
   scheduled_close_at: string | null
+  is_archived: boolean
+  /** True if session was created when account was over session limit. PM review is skipped. */
+  is_over_limit: boolean
   created_at: string
   updated_at: string
 }
@@ -117,13 +121,13 @@ export interface ChatMessage {
 }
 
 /**
- * Session message record from database (for human/system messages)
+ * Session message record from database (all message types)
  */
 export interface SessionMessageRecord {
   id: string
   session_id: string
   project_id: string
-  sender_type: 'human_agent' | 'system'
+  sender_type: MessageSenderType
   sender_user_id: string | null
   content: string
   created_at: string
@@ -148,6 +152,27 @@ export interface SessionFilters {
   tags?: SessionTag[]
   dateFrom?: string
   dateTo?: string
+  showArchived?: boolean
   limit?: number
   offset?: number
+}
+
+/**
+ * Input for a message when creating a manual session
+ */
+export interface CreateMessageInput {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+/**
+ * Input for creating a manual session
+ */
+export interface CreateSessionInput {
+  project_id: string
+  user_id?: string
+  page_url?: string
+  page_title?: string
+  tags?: SessionTag[]
+  messages?: CreateMessageInput[]
 }

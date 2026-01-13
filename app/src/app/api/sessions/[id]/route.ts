@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getSessionById } from '@/lib/supabase/sessions'
+import { getSessionMessages } from '@/lib/supabase/session-messages'
 import { isSupabaseConfigured } from '@/lib/supabase/server'
-import { mastra } from '@/mastra'
-import { parseMastraMessages } from '@/lib/utils/mastra/parse-messages'
 import type { ChatMessage } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -33,18 +32,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
     }
 
-    // Fetch messages from Mastra storage
-    let messages: ChatMessage[] = []
-    try {
-      const storage = mastra.getStorage()
-      if (storage) {
-        const mastraMessages = await storage.getMessages({ threadId: sessionId })
-        messages = parseMastraMessages(mastraMessages)
-      }
-    } catch (mastraError) {
-      console.error('[sessions.getById] Failed to fetch messages from Mastra:', mastraError)
-      // Continue without messages rather than failing the entire request
-    }
+    // Fetch messages from session_messages table
+    const messages: ChatMessage[] = await getSessionMessages(sessionId)
 
     return NextResponse.json({ session, messages })
   } catch (error) {

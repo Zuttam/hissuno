@@ -7,18 +7,20 @@ interface IssuesTableProps {
   issues: IssueWithProject[]
   selectedIssueId: string | null
   onSelectIssue: (issue: IssueWithProject) => void
+  onArchive: (issue: IssueWithProject) => void
 }
 
 export function IssuesTable({
   issues,
   selectedIssueId,
   onSelectIssue,
+  onArchive,
 }: IssuesTableProps) {
   return (
     <div className="overflow-hidden rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)]">
       <table className="w-full font-mono text-sm">
         <thead>
-          <tr className="border-b border-[color:var(--border-subtle)] bg-[color:var(--surface)]">
+          <tr className="border-b border-[color:var(--border-subtle)]">
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Title
             </th>
@@ -43,6 +45,9 @@ export function IssuesTable({
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Updated
             </th>
+            <th className="w-12 px-3 py-2">
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -52,6 +57,7 @@ export function IssuesTable({
               issue={issue}
               isSelected={selectedIssueId === issue.id}
               onSelect={() => onSelectIssue(issue)}
+              onArchive={() => onArchive(issue)}
             />
           ))}
         </tbody>
@@ -64,11 +70,12 @@ interface IssueRowProps {
   issue: IssueWithProject
   isSelected: boolean
   onSelect: () => void
+  onArchive: () => void
 }
 
-function IssueRow({ issue, isSelected, onSelect }: IssueRowProps) {
-  const truncatedTitle = issue.title.length > 50 
-    ? `${issue.title.slice(0, 50)}...` 
+function IssueRow({ issue, isSelected, onSelect, onArchive }: IssueRowProps) {
+  const truncatedTitle = issue.title.length > 50
+    ? `${issue.title.slice(0, 50)}...`
     : issue.title
 
   return (
@@ -78,11 +85,16 @@ function IssueRow({ issue, isSelected, onSelect }: IssueRowProps) {
         isSelected
           ? 'bg-[color:var(--accent-primary)]/10'
           : 'hover:bg-[color:var(--surface-hover)]'
-      }`}
+      } ${issue.is_archived ? 'opacity-60' : ''}`}
     >
       <td className="px-3 py-2">
-        <span className="text-[color:var(--foreground)]" title={issue.title}>
-          {truncatedTitle}
+        <span className="inline-flex items-center gap-2">
+          <span className="text-[color:var(--foreground)]" title={issue.title}>
+            {truncatedTitle}
+          </span>
+          {issue.is_archived && (
+            <Badge variant="default">Archived</Badge>
+          )}
         </span>
       </td>
       <td className="px-3 py-2">
@@ -115,6 +127,53 @@ function IssueRow({ issue, isSelected, onSelect }: IssueRowProps) {
         <span className="text-[color:var(--text-secondary)]">
           {formatRelativeTime(issue.updated_at)}
         </span>
+      </td>
+      <td className="px-3 py-2">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onArchive()
+          }}
+          className="rounded-[4px] p-1.5 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--accent-primary)]"
+          aria-label={issue.is_archived ? 'Unarchive issue' : 'Archive issue'}
+          title={issue.is_archived ? 'Unarchive' : 'Archive'}
+        >
+          {issue.is_archived ? (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="4" width="20" height="5" rx="2" />
+              <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+              <path d="M12 13v4" />
+              <path d="m9 16 3 3 3-3" />
+            </svg>
+          ) : (
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="4" width="20" height="5" rx="2" />
+              <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+              <path d="M10 13h4" />
+            </svg>
+          )}
+        </button>
       </td>
     </tr>
   )

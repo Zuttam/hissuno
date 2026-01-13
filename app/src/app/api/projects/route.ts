@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
-import { createCodebase, createGitHubCodebase, syncGitHubCodebase } from '@/lib/codebase'
+import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/codebase'
 import { triggerKnowledgeAnalysis } from '@/lib/knowledge/analysis-service'
-import { selectGitignore } from '@/lib/projects/source-code-utils'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { enforceLimit, LimitExceededError } from '@/lib/billing/enforcement-service'
 import type { Database } from '@/types/supabase'
 import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
 import {
@@ -38,7 +38,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from('projects')
-      .select('*, source_code:source_codes(id, kind, storage_uri, repository_url, repository_branch, created_at, updated_at)')
+      .select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
@@ -69,16 +69,13 @@ export async function POST(request: Request) {
   const description = formData.get('description')?.toString().trim() || null
   const codebaseSource = formData.get('codebaseSource')?.toString().trim() || 'none'
   const skipAnalysis = formData.get('skipAnalysis')?.toString() === 'true'
-  const includeCodebaseInAnalysis = formData.get('includeCodebaseInAnalysis')?.toString() !== 'false'
 
   // GitHub source params
   const repositoryUrl = formData.get('repositoryUrl')?.toString().trim() || null
   const repositoryBranch = formData.get('repositoryBranch')?.toString().trim() || null
 
   // Analysis scope (for monorepos) - stored in knowledge_sources, not source_codes
-  const analysisScope = includeCodebaseInAnalysis 
-    ? (formData.get('analysisScope')?.toString().trim() || null)
-    : null
+  const analysisScope = formData.get('analysisScope')?.toString().trim() || null
 
   // Additional knowledge sources (JSON array)
   const knowledgeSourcesJson = formData.get('knowledgeSources')?.toString()
@@ -91,17 +88,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // Upload folder source params
-  const codebaseFiles = formData
-    .getAll('codebase')
-    .filter((entry): entry is File => entry instanceof File && entry.size > 0)
-  const gitignoreUpload = formData.get('gitignore')
-  const explicitGitignore =
-    gitignoreUpload instanceof File && gitignoreUpload.size > 0 ? gitignoreUpload : null
-  const gitignoreSelection = selectGitignore(codebaseFiles, explicitGitignore)
-  const gitignoreFile = gitignoreSelection?.file ?? null
-
-  const hasFilesToUpload = codebaseFiles.length > 0
   const hasGitHubSource = codebaseSource === 'github' && repositoryUrl && repositoryBranch
   const id = randomUUID()
 
@@ -112,6 +98,12 @@ export async function POST(request: Request) {
 
   try {
     const { supabase, user } = await resolveUser()
+
+    // Enforce project limit before creation
+    await enforceLimit({
+      userId: user.id,
+      dimension: 'projects',
+    })
 
     let codebaseId: string | null = null
 
@@ -124,7 +116,7 @@ export async function POST(request: Request) {
       })
       codebaseId = codebase.id
 
-      // Sync GitHub codebase immediately to download files
+      // Sync (clone) GitHub codebase immediately
       const syncResult = await syncGitHubCodebase({
         codebaseId: codebase.id,
         userId: user.id,
@@ -132,35 +124,23 @@ export async function POST(request: Request) {
       })
 
       if (syncResult.status === 'error') {
-        console.warn('[projects.post] GitHub sync failed, but project will still be created:', syncResult.error)
+        console.warn('[projects.post] GitHub clone failed, but project will still be created:', syncResult.error)
       } else {
-        console.log('[projects.post] GitHub sync completed:', syncResult.status, syncResult.commitSha)
+        console.log('[projects.post] GitHub clone completed:', syncResult.status, syncResult.commitSha)
       }
-    }
-    // Create codebase from uploaded files if provided
-    else if (hasFilesToUpload) {
-      const { codebase } = await createCodebase({
-        files: codebaseFiles,
-        gitignore: gitignoreFile,
-        projectId: id,
-        userId: user.id,
-      })
-
-      codebaseId = codebase.id
     }
 
     const projectInsert: Database['public']['Tables']['projects']['Insert'] = {
       id,
       name,
       description,
-      source_code_id: codebaseId,
       user_id: user.id,
     }
 
     const { data: createdProject, error: projectInsertError } = await supabase
       .from('projects')
       .insert(projectInsert)
-      .select('*, source_code:source_codes(id, kind, storage_uri, repository_url, repository_branch, created_at, updated_at)')
+      .select('*')
       .single()
 
     if (projectInsertError || !createdProject) {
@@ -176,9 +156,10 @@ export async function POST(request: Request) {
       knowledgeSourcesToInsert.push({
         project_id: id,
         type: 'codebase',
+        source_code_id: codebaseId,
         status: 'pending',
         analysis_scope: analysisScope,
-        enabled: includeCodebaseInAnalysis,
+        enabled: true,
       })
     }
 
@@ -248,6 +229,10 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+
+    if (error instanceof LimitExceededError) {
+      return NextResponse.json(error.toResponse(), { status: 429 })
     }
 
     console.error('[projects.post] unexpected error', error)

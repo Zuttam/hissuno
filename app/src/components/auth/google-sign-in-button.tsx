@@ -2,25 +2,38 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getStoredUTM } from '@/lib/analytics'
 
 interface GoogleSignInButtonProps {
   redirectTo?: string
+  onClick?: () => void
 }
 
-export function GoogleSignInButton({ redirectTo = '/projects' }: GoogleSignInButtonProps) {
+export function GoogleSignInButton({ redirectTo = '/projects', onClick }: GoogleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleGoogleSignIn = async () => {
+    // Call onClick handler for tracking before redirect
+    onClick?.()
+
     setIsLoading(true)
     setError(null)
 
     try {
       const supabase = createClient()
-      
+
       // Build the callback URL with the intended redirect
       const callbackUrl = new URL('/auth/callback', window.location.origin)
       callbackUrl.searchParams.set('next', redirectTo)
+
+      // Include stored UTM params in callback URL for attribution
+      const storedUTM = getStoredUTM()
+      if (storedUTM) {
+        Object.entries(storedUTM).forEach(([key, value]) => {
+          if (value) callbackUrl.searchParams.set(key, value)
+        })
+      }
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

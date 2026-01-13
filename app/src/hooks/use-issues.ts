@@ -1,13 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { IssueWithProject, IssueWithSessions, IssueFilters, PMReviewResult } from '@/types/issue'
+import type { IssueWithProject, IssueWithSessions, IssueFilters, CreateIssueInput, PMReviewResult } from '@/types/issue'
 
 interface UseIssuesState {
   issues: IssueWithProject[]
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
+  createIssue: (input: CreateIssueInput) => Promise<IssueWithProject | null>
+  archiveIssue: (issueId: string, isArchived: boolean) => Promise<boolean>
 }
 
 interface UseIssuesOptions {
@@ -33,6 +35,7 @@ export function useIssues({
       if (filters.priority) params.set('priority', filters.priority)
       if (filters.status) params.set('status', filters.status)
       if (filters.search) params.set('search', filters.search)
+      if (filters.showArchived) params.set('showArchived', 'true')
       if (filters.limit) params.set('limit', String(filters.limit))
       if (filters.offset) params.set('offset', String(filters.offset))
 
@@ -53,7 +56,51 @@ export function useIssues({
     } finally {
       setIsLoading(false)
     }
-  }, [filters.projectId, filters.type, filters.priority, filters.status, filters.search, filters.limit, filters.offset])
+  }, [filters.projectId, filters.type, filters.priority, filters.status, filters.search, filters.showArchived, filters.limit, filters.offset])
+
+  const createIssue = useCallback(async (input: CreateIssueInput): Promise<IssueWithProject | null> => {
+    try {
+      const response = await fetch('/api/issues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const payload = await response.json()
+      if (payload.issue) {
+        setIssues((prev) => [payload.issue, ...prev])
+      }
+      return payload.issue ?? null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const archiveIssue = useCallback(async (issueId: string, isArchived: boolean): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/issues/${issueId}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_archived: isArchived }),
+      })
+
+      if (!response.ok) {
+        return false
+      }
+
+      // Update local state
+      setIssues((prev) =>
+        prev.map((i) => (i.id === issueId ? { ...i, is_archived: isArchived } : i))
+      )
+      return true
+    } catch {
+      return false
+    }
+  }, [])
 
   useEffect(() => {
     void fetchIssues()
@@ -65,8 +112,10 @@ export function useIssues({
       isLoading,
       error,
       refresh: fetchIssues,
+      createIssue,
+      archiveIssue,
     }),
-    [issues, isLoading, error, fetchIssues]
+    [issues, isLoading, error, fetchIssues, createIssue, archiveIssue]
   )
 }
 

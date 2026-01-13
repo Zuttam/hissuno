@@ -35,6 +35,8 @@ export interface KnowledgeSourceRecord {
   analysis_scope: string | null
   /** Whether this source is enabled for analysis */
   enabled: boolean
+  /** FK to source_codes - required for type='codebase', null for other types */
+  source_code_id: string | null
 }
 
 /**
@@ -54,6 +56,8 @@ export interface KnowledgeSourceInsert {
   updated_at?: string
   analysis_scope?: string | null
   enabled?: boolean
+  /** FK to source_codes - required for type='codebase', null for other types */
+  source_code_id?: string | null
 }
 
 /**
@@ -73,6 +77,24 @@ export interface KnowledgeSourceUpdate {
   updated_at?: string
   analysis_scope?: string | null
   enabled?: boolean
+  /** FK to source_codes - required for type='codebase', null for other types */
+  source_code_id?: string | null
+}
+
+/**
+ * Knowledge source with joined source_code data (for codebase type)
+ */
+export interface KnowledgeSourceWithCodebase extends KnowledgeSourceRecord {
+  source_code: {
+    id: string
+    kind: string
+    repository_url: string | null
+    repository_branch: string | null
+    commit_sha: string | null
+    synced_at: string | null
+    created_at: string
+    updated_at: string
+  } | null
 }
 
 /**

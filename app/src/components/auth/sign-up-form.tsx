@@ -1,10 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect } from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { signUpAction, type AuthActionState } from '@/lib/auth/actions'
 import { GoogleSignInButton } from './google-sign-in-button'
+import { trackSignupStarted, getStoredUTM, storePreselectedUseCase } from '@/lib/analytics'
+import { Divider } from '@/components/ui/divider'
 
 const initialState: AuthActionState = {}
 
@@ -22,29 +25,39 @@ function SubmitButton() {
   )
 }
 
-export function SignUpForm() {
+interface SignUpFormProps {
+  preSelectedUseCase?: string
+}
+
+export function SignUpForm({ preSelectedUseCase }: SignUpFormProps) {
   const [state, formAction] = useActionState(signUpAction, initialState)
 
+  // Store pre-selected use case for onboarding when component mounts
+  useEffect(() => {
+    if (preSelectedUseCase) {
+      storePreselectedUseCase(preSelectedUseCase)
+    }
+  }, [preSelectedUseCase])
+
+  const handleGoogleClick = () => {
+    trackSignupStarted({ method: 'google', utm: getStoredUTM() ?? undefined })
+  }
+
+  const handleFormSubmit = () => {
+    trackSignupStarted({ method: 'email', utm: getStoredUTM() ?? undefined })
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       {/* Google Sign-In */}
-      <GoogleSignInButton redirectTo="/projects" />
+      <GoogleSignInButton redirectTo="/onboarding" onClick={handleGoogleClick} />
 
       {/* Divider */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-[--border-subtle]" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="bg-[--background] px-4 font-mono uppercase tracking-wide text-[--text-secondary]">
-            or
-          </span>
-        </div>
-      </div>
+      <Divider />
 
       {/* Email/Password Form */}
-      <form className="space-y-4" action={formAction}>
-        <div className="space-y-1">
+      <form className="flex flex-col gap-4" action={formAction} onSubmit={handleFormSubmit}>
+        <div className="flex flex-col gap-2">
           <label className="block font-mono text-sm font-semibold uppercase tracking-wide text-[--foreground]" htmlFor="email">
             Email
           </label>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
-import { Input, Select } from '@/components/ui'
+import { Input, Select, Checkbox } from '@/components/ui'
 import type { IssueFilters, IssueType, IssuePriority, IssueStatus } from '@/types/issue'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 
@@ -51,6 +51,13 @@ export function IssuesFilters({
     [filters, onFilterChange]
   )
 
+  const handleShowArchivedChange = useCallback(
+    (checked: boolean) => {
+      onFilterChange({ ...filters, showArchived: checked || undefined })
+    },
+    [filters, onFilterChange]
+  )
+
   const handleClearFilters = useCallback(() => {
     onFilterChange({})
   }, [onFilterChange])
@@ -60,7 +67,8 @@ export function IssuesFilters({
     filters.type ||
     filters.priority ||
     filters.status ||
-    filters.search
+    filters.search ||
+    filters.showArchived
 
   return (
     <div className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-4">
@@ -142,6 +150,14 @@ export function IssuesFilters({
             value={filters.search || ''}
             onChange={handleSearchChange}
             className="w-48"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 self-end pb-2">
+          <Checkbox
+            checked={filters.showArchived || false}
+            onChange={handleShowArchivedChange}
+            label="Show archived"
           />
         </div>
 

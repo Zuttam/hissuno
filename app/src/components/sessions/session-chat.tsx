@@ -64,7 +64,7 @@ function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
       <div
         className={`max-w-[85%] rounded-[4px] px-4 py-3 ${
           isUser
-            ? 'bg-[color:var(--accent-primary)] text-white'
+            ? 'bg-[color:var(--user-message-bg)] text-white'
             : isHumanAgent
             ? 'border-2 border-purple-500/50 bg-purple-500/10 text-[color:var(--foreground)]'
             : 'border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] text-[color:var(--foreground)]'

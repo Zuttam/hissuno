@@ -114,9 +114,7 @@ enabled = true
 # enabled = true
 
 # Configure local storage buckets
-[storage.buckets.codebases]
-public = false
-file_size_limit = "100MiB"
+# Note: codebases bucket removed - we now use local git clones instead
 
 [storage.buckets.knowledge]
 public = false
@@ -301,13 +299,6 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
-[auth.external.github]
-enabled = true
-client_id = "env(SUPABASE_AUTH_EXTERNAL_GITHUB_CLIENT_ID)"
-# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
-secret = "env(SUPABASE_AUTH_EXTERNAL_GITHUB_SECRET)"
-# Overrides the default auth redirectUrl.
-redirect_uri = ""
 
 [auth.external.google]
 enabled = true

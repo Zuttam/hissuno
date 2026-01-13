@@ -1,15 +1,28 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import type { IntegrationStats } from '@/lib/supabase/sessions'
-import { Badge, Collapsible } from '@/components/ui'
+import { Collapsible } from '@/components/ui'
 
 type IntegrationStatus = 'inactive' | 'idle' | 'active'
 
+type SlackIntegrationState = {
+  connected: boolean
+  workspaceName: string | null
+  isLoading: boolean
+  error: string | null
+}
+
+type GitHubIntegrationState = {
+  connected: boolean
+  accountLogin: string | null
+  isLoading: boolean
+  error: string | null
+}
+
 interface IntegrationsSectionProps {
   project: ProjectWithCodebase & {
-    public_key?: string | null
     secret_key?: string | null
     allowed_origins?: string[] | null
   }
@@ -17,11 +30,8 @@ interface IntegrationsSectionProps {
   isLoading?: boolean
 }
 
-function getIntegrationStatus(
-  hasPublicKey: boolean,
-  hasRecentActivity: boolean
-): IntegrationStatus {
-  if (!hasPublicKey) return 'inactive'
+function getIntegrationStatus(hasRecentActivity: boolean): IntegrationStatus {
+  // Widget is always configured since we use projectId
   if (!hasRecentActivity) return 'idle'
   return 'active'
 }
@@ -44,6 +54,184 @@ function formatRelativeTime(dateString: string): string {
 
 export function IntegrationsSection({ project, integrationStats, isLoading }: IntegrationsSectionProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [slackState, setSlackState] = useState<SlackIntegrationState>({
+    connected: false,
+    workspaceName: null,
+    isLoading: true,
+    error: null,
+  })
+  const [githubState, setGithubState] = useState<GitHubIntegrationState>({
+    connected: false,
+    accountLogin: null,
+    isLoading: true,
+    error: null,
+  })
+
+  // Fetch Slack integration status
+  const fetchSlackStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/integrations/slack?projectId=${project.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setSlackState({
+          connected: data.connected,
+          workspaceName: data.workspaceName,
+          isLoading: false,
+          error: null,
+        })
+      } else {
+        setSlackState((prev) => ({ ...prev, isLoading: false }))
+      }
+    } catch {
+      setSlackState((prev) => ({ ...prev, isLoading: false }))
+    }
+  }, [project.id])
+
+  // Fetch GitHub integration status
+  const fetchGitHubStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/integrations/github?projectId=${project.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setGithubState({
+          connected: data.connected,
+          accountLogin: data.accountLogin,
+          isLoading: false,
+          error: null,
+        })
+      } else {
+        setGithubState((prev) => ({ ...prev, isLoading: false }))
+      }
+    } catch {
+      setGithubState((prev) => ({ ...prev, isLoading: false }))
+    }
+  }, [project.id])
+
+  useEffect(() => {
+    fetchSlackStatus()
+    fetchGitHubStatus()
+  }, [fetchSlackStatus, fetchGitHubStatus])
+
+  // Check for success/error from OAuth callbacks
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+
+    // Slack callback
+    const slackSuccess = urlParams.get('slack')
+    const slackError = urlParams.get('slack_error')
+
+    if (slackSuccess === 'connected') {
+      fetchSlackStatus()
+      const url = new URL(window.location.href)
+      url.searchParams.delete('slack')
+      window.history.replaceState({}, '', url.toString())
+    }
+
+    if (slackError) {
+      setSlackState((prev) => ({ ...prev, error: slackError }))
+      const url = new URL(window.location.href)
+      url.searchParams.delete('slack_error')
+      window.history.replaceState({}, '', url.toString())
+    }
+
+    // GitHub callback
+    const githubSuccess = urlParams.get('github')
+    const githubError = urlParams.get('github_error')
+
+    if (githubSuccess === 'connected') {
+      fetchGitHubStatus()
+      const url = new URL(window.location.href)
+      url.searchParams.delete('github')
+      window.history.replaceState({}, '', url.toString())
+    }
+
+    if (githubError) {
+      setGithubState((prev) => ({ ...prev, error: githubError }))
+      const url = new URL(window.location.href)
+      url.searchParams.delete('github_error')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [fetchSlackStatus, fetchGitHubStatus])
+
+  const handleConnectSlack = () => {
+    window.location.href = `/api/integrations/slack/connect?projectId=${project.id}`
+  }
+
+  const handleDisconnectSlack = async () => {
+    if (!confirm('Are you sure you want to disconnect Slack?')) {
+      return
+    }
+
+    setSlackState((prev) => ({ ...prev, isLoading: true }))
+
+    try {
+      const response = await fetch(`/api/integrations/slack?projectId=${project.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setSlackState({
+          connected: false,
+          workspaceName: null,
+          isLoading: false,
+          error: null,
+        })
+      } else {
+        const data = await response.json()
+        setSlackState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: data.error || 'Failed to disconnect',
+        }))
+      }
+    } catch {
+      setSlackState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: 'Failed to disconnect',
+      }))
+    }
+  }
+
+  const handleConnectGitHub = () => {
+    window.location.href = `/api/integrations/github/connect?projectId=${project.id}`
+  }
+
+  const handleDisconnectGitHub = async () => {
+    if (!confirm('Are you sure you want to disconnect GitHub?')) {
+      return
+    }
+
+    setGithubState((prev) => ({ ...prev, isLoading: true }))
+
+    try {
+      const response = await fetch(`/api/integrations/github?projectId=${project.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setGithubState({
+          connected: false,
+          accountLogin: null,
+          isLoading: false,
+          error: null,
+        })
+      } else {
+        const data = await response.json()
+        setGithubState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: data.error || 'Failed to disconnect',
+        }))
+      }
+    } catch {
+      setGithubState((prev) => ({
+        ...prev,
+        isLoading: false,
+        error: 'Failed to disconnect',
+      }))
+    }
+  }
 
   const copyToClipboard = async (value: string, fieldName: string) => {
     try {
@@ -66,16 +254,11 @@ export function IntegrationsSection({ project, integrationStats, isLoading }: In
     )
   }
 
-  const publicKey = project.public_key ?? 'Not generated'
-  const isWidgetConfigured = Boolean(project.public_key)
   const hasRecentActivity = integrationStats?.isActive ?? false
-  const widgetStatus = getIntegrationStatus(isWidgetConfigured, hasRecentActivity)
-
-  // Dynamic trigger text based on status
-  const triggerText = isWidgetConfigured ? 'View code' : 'How to integrate'
+  const widgetStatus = getIntegrationStatus(hasRecentActivity)
 
   return (
-    <div className="flex flex-col gap-4 pt-4 border-t border-[color:var(--border-subtle)]">
+    <div className="flex flex-col gap-4">
       {/* Widget Integration */}
       <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
         <div className="flex items-center gap-2">
@@ -83,8 +266,8 @@ export function IntegrationsSection({ project, integrationStats, isLoading }: In
           <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
             Widget Integration
           </span>
-          {/* Last activity - only show if configured and has activity */}
-          {isWidgetConfigured && integrationStats?.lastActivityAt && (
+          {/* Last activity */}
+          {integrationStats?.lastActivityAt && (
             <span className="text-xs text-[color:var(--text-tertiary)]">
               · Last: {formatRelativeTime(integrationStats.lastActivityAt)}
             </span>
@@ -92,12 +275,11 @@ export function IntegrationsSection({ project, integrationStats, isLoading }: In
         </div>
 
         <Collapsible
-          trigger={triggerText}
-          defaultOpen={!isWidgetConfigured}
+          trigger="View code"
           headerActions={
             <button
               type="button"
-              onClick={() => copyToClipboard(generateSnippet(publicKey), 'snippet')}
+              onClick={() => copyToClipboard(generateSnippet(project.id), 'snippet')}
               className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
             >
               {copiedField === 'snippet' ? 'Copied!' : 'Copy'}
@@ -106,20 +288,87 @@ export function IntegrationsSection({ project, integrationStats, isLoading }: In
           className="flex-1"
         >
           <pre className="overflow-x-auto rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 text-xs font-mono text-[color:var(--foreground)]">
-            <code>{generateSnippet(publicKey)}</code>
+            <code>{generateSnippet(project.id)}</code>
           </pre>
         </Collapsible>
       </div>
 
-      {/* Slack Integration */}
-      <div className="flex items-center gap-x-6">
+      {/* GitHub Integration */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div className="flex items-center gap-2">
-          <StatusIndicator status="inactive" />
+          <StatusIndicator status={githubState.connected ? 'active' : 'inactive'} />
+          <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+            GitHub Integration
+          </span>
+          {githubState.connected && githubState.accountLogin && (
+            <span className="text-xs text-[color:var(--text-tertiary)]">
+              · {githubState.accountLogin}
+            </span>
+          )}
+        </div>
+
+        {githubState.isLoading ? (
+          <span className="text-xs text-[color:var(--text-tertiary)]">Loading...</span>
+        ) : githubState.connected ? (
+          <button
+            type="button"
+            onClick={handleDisconnectGitHub}
+            className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-red-500 hover:text-red-500"
+          >
+            Disconnect
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleConnectGitHub}
+            className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
+          >
+            Connect
+          </button>
+        )}
+
+        {githubState.error && (
+          <span className="text-xs text-red-500">{githubState.error}</span>
+        )}
+      </div>
+
+      {/* Slack Integration */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="flex items-center gap-2">
+          <StatusIndicator status={slackState.connected ? 'active' : 'inactive'} />
           <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
             Slack Integration
           </span>
+          {slackState.connected && slackState.workspaceName && (
+            <span className="text-xs text-[color:var(--text-tertiary)]">
+              · {slackState.workspaceName}
+            </span>
+          )}
         </div>
-        <Badge variant="default">Coming Soon</Badge>
+
+        {slackState.isLoading ? (
+          <span className="text-xs text-[color:var(--text-tertiary)]">Loading...</span>
+        ) : slackState.connected ? (
+          <button
+            type="button"
+            onClick={handleDisconnectSlack}
+            className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-red-500 hover:text-red-500"
+          >
+            Disconnect
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleConnectSlack}
+            className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
+          >
+            Connect
+          </button>
+        )}
+
+        {slackState.error && (
+          <span className="text-xs text-red-500">{slackState.error}</span>
+        )}
       </div>
     </div>
   )
@@ -135,10 +384,10 @@ function StatusIndicator({ status }: { status: IntegrationStatus }) {
   return <span className={`h-2 w-2 rounded-full ${colorClass}`} />
 }
 
-function generateSnippet(publicKey: string): string {
+function generateSnippet(projectId: string): string {
   return `import { HissunoWidget } from '@hissuno/widget';
 
 <HissunoWidget
-  publicKey="${publicKey}"
+  projectId="${projectId}"
 />`
 }

@@ -2,8 +2,7 @@
 
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import type { IntegrationStats } from '@/lib/supabase/sessions'
-import { Button, KeyField } from '@/components/ui'
-import { CodebaseSection } from './codebase-section'
+import { Button, Divider, KeyField } from '@/components/ui'
 import { IntegrationsSection } from './integrations-section'
 import { formatTimestamp } from './utils'
 
@@ -68,18 +67,13 @@ export function ProjectHeader({
           </Button>
         </div>
       </div>
+      <Divider />
 
       {/* Keys Section */}
-      <div className="flex flex-wrap gap-x-6 gap-y-2 pt-4 border-t border-[color:var(--border-subtle)]">
+      <div className="flex flex-wrap gap-x-6 gap-y-2">
         <KeyField
           label="Project ID"
           value={project.id}
-          compact
-        />
-        <KeyField
-          label="Public Key"
-          value={project.public_key ?? 'Not generated'}
-          disabled={!project.public_key}
           compact
         />
         <KeyField
@@ -91,12 +85,7 @@ export function ProjectHeader({
         />
       </div>
 
-      {/* Codebase Section */}
-      <CodebaseSection
-        project={project}
-        isLoading={isLoading}
-        onRefresh={onRefresh}
-      />
+      <Divider />
 
       {/* Integrations Section */}
       <IntegrationsSection

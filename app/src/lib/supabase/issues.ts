@@ -6,6 +6,7 @@ import type {
   IssueWithProject,
   IssueWithSessions,
   IssueFilters,
+  CreateIssueInput,
   UpdateIssueInput,
   ProjectSettingsRecord,
 } from '@/types/issue'
@@ -62,6 +63,11 @@ export const listIssues = cache(async (filters: IssueFilters = {}): Promise<Issu
       .select(selectIssueWithProject)
       .in('project_id', projectIds)
       .order('updated_at', { ascending: false })
+
+    // Filter archived issues (hidden by default)
+    if (!filters.showArchived) {
+      query = query.eq('is_archived', false)
+    }
 
     // Apply filters
     if (filters.projectId) {
@@ -413,6 +419,9 @@ export async function getProjectSettingsWithAuth(projectId: string): Promise<Pro
     widget_position: 'bottom-right',
     widget_title: 'Support',
     widget_initial_message: 'Hi! How can I help you today?',
+    // Widget security defaults
+    allowed_origins: [],
+    widget_token_required: false,
     // Session lifecycle defaults
     session_idle_timeout_minutes: 5,
     session_goodbye_delay_seconds: 90,
@@ -585,3 +594,137 @@ export const getProjectIssueStats = cache(async (projectId: string): Promise<{
     throw error
   }
 })
+
+/**
+ * Creates a manual issue. Requires authenticated user context.
+ */
+export async function createManualIssue(input: CreateIssueInput): Promise<IssueWithProject | null> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase must be configured.')
+  }
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      throw new UnauthorizedError('Unable to resolve user context.')
+    }
+
+    // Verify user owns the project
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id, name')
+      .eq('id', input.project_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!project) {
+      throw new UnauthorizedError('You do not have permission to create issues for this project.')
+    }
+
+    const { data, error } = await supabase
+      .from('issues')
+      .insert({
+        project_id: input.project_id,
+        type: input.type,
+        title: input.title,
+        description: input.description,
+        priority: input.priority || 'low',
+        priority_manual_override: true,
+        upvote_count: 1,
+        status: 'open',
+        is_archived: false,
+      })
+      .select(selectIssueWithProject)
+      .single()
+
+    if (error) {
+      console.error('[supabase.issues] failed to create manual issue', error)
+      throw new Error('Unable to create issue.')
+    }
+
+    // Link to sessions if provided
+    if (input.session_ids && input.session_ids.length > 0) {
+      const sessionLinks = input.session_ids.map((sessionId) => ({
+        issue_id: data.id,
+        session_id: sessionId,
+      }))
+      await supabase.from('issue_sessions').insert(sessionLinks)
+    }
+
+    return data as IssueWithProject
+  } catch (error) {
+    console.error('[supabase.issues] unexpected error creating manual issue', error)
+    throw error
+  }
+}
+
+/**
+ * Updates the archive status of an issue. Requires authenticated user context.
+ */
+export async function updateIssueArchiveStatus(
+  issueId: string,
+  isArchived: boolean
+): Promise<IssueRecord | null> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase must be configured.')
+  }
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      throw new UnauthorizedError('Unable to resolve user context.')
+    }
+
+    // Get issue and verify ownership
+    const { data: issue } = await supabase
+      .from('issues')
+      .select('project_id')
+      .eq('id', issueId)
+      .single()
+
+    if (!issue) {
+      return null
+    }
+
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', issue.project_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!project) {
+      throw new UnauthorizedError('You do not have permission to update this issue.')
+    }
+
+    const { data, error } = await supabase
+      .from('issues')
+      .update({
+        is_archived: isArchived,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', issueId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[supabase.issues] failed to update issue archive status', issueId, error)
+      throw new Error('Unable to update issue.')
+    }
+
+    return data as IssueRecord
+  } catch (error) {
+    console.error('[supabase.issues] unexpected error updating issue archive status', issueId, error)
+    throw error
+  }
+}

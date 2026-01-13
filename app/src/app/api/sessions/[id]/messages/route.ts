@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { mastra } from '@/mastra'
-import type { ChatMessage, SessionMessageRecord } from '@/types/session'
+import type { ChatMessage } from '@/types/session'
 
 export const runtime = 'nodejs'
 
@@ -104,28 +103,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to send message.' }, { status: 500 })
     }
 
-    // Store in Mastra memory for chat continuity
-    try {
-      const storage = mastra.getStorage()
-      if (storage) {
-        await storage.saveMessages({
-          messages: [
-            {
-              id: messageId,
-              threadId: sessionId,
-              role: 'assistant', // Shows as assistant to end-user, but we track senderType separately
-              content: content.trim(),
-              createdAt: new Date(now),
-              resourceId: user.id,
-            },
-          ],
-        })
-      }
-    } catch (mastraError) {
-      console.error('[sessions.messages] Failed to store in Mastra:', mastraError)
-      // Continue even if Mastra storage fails - the message is in our DB
-    }
-
     // Update session last_activity_at
     await adminClient
       .from('sessions')
@@ -150,85 +127,5 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     console.error('[sessions.messages] unexpected error', error)
     return NextResponse.json({ error: 'Unable to send message.' }, { status: 500 })
-  }
-}
-
-/**
- * GET /api/sessions/[id]/messages
- * Gets all human agent messages for a session.
- * Requires authenticated user who owns the project.
- */
-export async function GET(request: NextRequest, { params }: RouteParams) {
-  if (!isSupabaseConfigured()) {
-    return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
-  }
-
-  try {
-    const { id: sessionId } = await params
-
-    // Get authenticated user
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError()
-    }
-
-    // Get session and verify user owns the project
-    const adminClient = createAdminClient()
-    const { data: session } = await adminClient
-      .from('sessions')
-      .select('id, project_id')
-      .eq('id', sessionId)
-      .single()
-
-    if (!session) {
-      return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
-    }
-
-    // Verify user owns the project
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', session.project_id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!project) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 })
-    }
-
-    // Get all human agent messages for this session
-    const { data: messages, error: messagesError } = await adminClient
-      .from('session_messages')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('created_at', { ascending: true })
-
-    if (messagesError) {
-      console.error('[sessions.messages] Failed to get messages:', messagesError)
-      return NextResponse.json({ error: 'Failed to get messages.' }, { status: 500 })
-    }
-
-    // Transform to ChatMessage format
-    const chatMessages: ChatMessage[] = (messages ?? []).map((msg: SessionMessageRecord) => ({
-      id: msg.id,
-      role: 'assistant' as const,
-      content: msg.content,
-      createdAt: msg.created_at,
-      senderType: msg.sender_type === 'human_agent' ? 'human_agent' : 'system',
-    }))
-
-    return NextResponse.json({ messages: chatMessages })
-  } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
-
-    console.error('[sessions.messages] unexpected error', error)
-    return NextResponse.json({ error: 'Unable to get messages.' }, { status: 500 })
   }
 }

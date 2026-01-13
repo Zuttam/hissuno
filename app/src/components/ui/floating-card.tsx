@@ -60,6 +60,8 @@ const SHADOW_CONFIGS = {
 interface FloatingCardProps {
   children?: ReactNode
   className?: string
+  /** Optional inline styles */
+  style?: React.CSSProperties
   /** Controls the ambient floating animation intensity */
   floating?: FloatingPreset
   /** Controls the shadow depth appearance */
@@ -71,6 +73,7 @@ interface FloatingCardProps {
 export function FloatingCard({
   children,
   className,
+  style,
   floating = 'gentle',
   variant = 'elevated',
   respondToRipple = false,
@@ -138,42 +141,40 @@ export function FloatingCard({
     return () => cancelAnimationFrame(frame)
   }, [resolvedFloating, driftX, driftY])
 
-  if (respondToRipple) {
-    // Subscribe to ripple events
-    useEffect(() => {
-      if (!water || !ref.current) return
+  // Subscribe to ripple events
+  useEffect(() => {
+    if (!respondToRipple || !water || !ref.current) return
 
-      const getRect = () => ref.current!.getBoundingClientRect()
+    const getRect = () => ref.current!.getBoundingClientRect()
 
-      const handleRipple = (
-        _event: RippleEvent,
-        distance: number,
-        angle: number
-      ) => {
-        // Calculate nudge based on distance (closer = stronger)
-        const maxDistance = 600
-        const strength = Math.pow(1 - distance / maxDistance, 2)
+    const handleRipple = (
+      _event: RippleEvent,
+      distance: number,
+      angle: number
+    ) => {
+      // Calculate nudge based on distance (closer = stronger)
+      const maxDistance = 600
+      const strength = Math.pow(1 - distance / maxDistance, 2)
 
-        // Push away from ripple origin
-        const pushX = Math.cos(angle) * strength * 30
-        const pushY = Math.sin(angle) * strength * 30
-        const tiltAmount = strength * 5 * (angle > 0 ? 1 : -1)
+      // Push away from ripple origin
+      const pushX = Math.cos(angle) * strength * 30
+      const pushY = Math.sin(angle) * strength * 30
+      const tiltAmount = strength * 5 * (angle > 0 ? 1 : -1)
 
-        nudgeX.set(pushX)
-        nudgeY.set(pushY)
-        tilt.set(tiltAmount)
+      nudgeX.set(pushX)
+      nudgeY.set(pushY)
+      tilt.set(tiltAmount)
 
-        // Return to neutral after delay
-        setTimeout(() => {
-          nudgeX.set(0)
-          nudgeY.set(0)
-          tilt.set(0)
-        }, 800)
-      }
+      // Return to neutral after delay
+      setTimeout(() => {
+        nudgeX.set(0)
+        nudgeY.set(0)
+        tilt.set(0)
+      }, 800)
+    }
 
-      return water.subscribeToRipples(componentId, getRect, handleRipple)
-    }, [water, componentId, nudgeX, nudgeY, tilt])
-  }
+    return water.subscribeToRipples(componentId, getRect, handleRipple)
+  }, [respondToRipple, water, componentId, nudgeX, nudgeY, tilt])
 
   // Get shadow config based on variant
   const shadowConfig = SHADOW_CONFIGS[variant]
@@ -184,6 +185,7 @@ export function FloatingCard({
       className={cn(cardBaseClasses, className)}
       data-no-ripple
       style={{
+        ...style,
         x: combinedX,
         y: combinedY,
         rotate: tilt,

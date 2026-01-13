@@ -79,6 +79,7 @@ export function KnowledgeViewer({
     <div
       className={cn(
         'prose prose-sm max-w-none dark:prose-invert',
+        'max-h-[400px] overflow-y-auto',
         // Custom styling for knowledge documents
         'prose-headings:font-mono prose-headings:uppercase prose-headings:tracking-tight',
         'prose-h1:text-2xl prose-h1:border-b prose-h1:border-[color:var(--border-subtle)] prose-h1:pb-4',

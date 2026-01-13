@@ -28,6 +28,7 @@ export interface IssueRecord {
   status: IssueStatus
   product_spec: string | null
   product_spec_generated_at: string | null
+  is_archived: boolean
   created_at: string
   updated_at: string
 }
@@ -93,6 +94,9 @@ export interface ProjectSettingsRecord {
   widget_position: WidgetPosition
   widget_title: string
   widget_initial_message: string
+  // Widget security settings (moved from projects table)
+  allowed_origins: string[] | null
+  widget_token_required: boolean | null
   // Session lifecycle settings
   session_idle_timeout_minutes: number
   session_goodbye_delay_seconds: number
@@ -106,7 +110,7 @@ export interface ProjectSettingsRecord {
  */
 export interface CreateIssueInput {
   project_id: string
-  session_id: string
+  session_ids?: string[]
   type: IssueType
   title: string
   description: string
@@ -134,6 +138,7 @@ export interface IssueFilters {
   priority?: IssuePriority
   status?: IssueStatus
   search?: string
+  showArchived?: boolean
   limit?: number
   offset?: number
 }

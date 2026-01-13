@@ -39,7 +39,8 @@ interface UpdateSSEEvent {
 }
 
 interface UseHissunoChatOptions {
-  publicKey: string;
+  projectId: string;
+  widgetToken?: string;
   apiUrl?: string;
   initialMessage?: string;
   headers?: Record<string, string>;
@@ -79,11 +80,11 @@ function generateSessionId(): string {
   return `session_${timestamp}_${random}`;
 }
 
-function getStorageKey(publicKey: string, sessionId?: string): string {
+function getStorageKey(projectId: string, sessionId?: string): string {
   if (sessionId) {
-    return `${STORAGE_KEY_PREFIX}${publicKey}_${sessionId}`;
+    return `${STORAGE_KEY_PREFIX}${projectId}_${sessionId}`;
   }
-  return `${STORAGE_KEY_PREFIX}${publicKey}`;
+  return `${STORAGE_KEY_PREFIX}${projectId}`;
 }
 
 interface StoredMessage {
@@ -94,11 +95,11 @@ interface StoredMessage {
   senderType?: 'ai' | 'human_agent' | 'system';
 }
 
-function loadMessagesFromStorage(publicKey: string, sessionId?: string): (Message & { senderType?: string })[] {
+function loadMessagesFromStorage(projectId: string, sessionId?: string): (Message & { senderType?: string })[] {
   if (typeof window === 'undefined') return [];
 
   try {
-    const stored = localStorage.getItem(getStorageKey(publicKey, sessionId));
+    const stored = localStorage.getItem(getStorageKey(projectId, sessionId));
     if (!stored) return [];
 
     const parsed = JSON.parse(stored) as StoredMessage[];
@@ -115,7 +116,7 @@ function loadMessagesFromStorage(publicKey: string, sessionId?: string): (Messag
   }
 }
 
-function saveMessagesToStorage(publicKey: string, messages: (Message & { senderType?: string })[], sessionId?: string): void {
+function saveMessagesToStorage(projectId: string, messages: (Message & { senderType?: string })[], sessionId?: string): void {
   if (typeof window === 'undefined') return;
 
   try {
@@ -126,32 +127,32 @@ function saveMessagesToStorage(publicKey: string, messages: (Message & { senderT
       createdAt: msg.createdAt?.toISOString(),
       senderType: msg.senderType as 'ai' | 'human_agent' | 'system' | undefined,
     }));
-    localStorage.setItem(getStorageKey(publicKey, sessionId), JSON.stringify(toStore));
+    localStorage.setItem(getStorageKey(projectId, sessionId), JSON.stringify(toStore));
   } catch {
     // Storage might be full or disabled
   }
 }
 
-function clearMessagesFromStorage(publicKey: string, sessionId?: string): void {
+function clearMessagesFromStorage(projectId: string, sessionId?: string): void {
   if (typeof window === 'undefined') return;
 
   try {
-    localStorage.removeItem(getStorageKey(publicKey, sessionId));
+    localStorage.removeItem(getStorageKey(projectId, sessionId));
   } catch {
     // Ignore errors
   }
 }
 
 // Session registry functions - for conversation history (requires userId)
-function getSessionsRegistryKey(publicKey: string, userId: string): string {
-  return `${SESSIONS_REGISTRY_PREFIX}${publicKey}_${userId}`;
+function getSessionsRegistryKey(projectId: string, userId: string): string {
+  return `${SESSIONS_REGISTRY_PREFIX}${projectId}_${userId}`;
 }
 
-function loadSessionsRegistry(publicKey: string, userId: string): SessionEntry[] {
+function loadSessionsRegistry(projectId: string, userId: string): SessionEntry[] {
   if (typeof window === 'undefined' || !userId) return [];
 
   try {
-    const stored = localStorage.getItem(getSessionsRegistryKey(publicKey, userId));
+    const stored = localStorage.getItem(getSessionsRegistryKey(projectId, userId));
     if (!stored) return [];
     return JSON.parse(stored) as SessionEntry[];
   } catch {
@@ -160,7 +161,7 @@ function loadSessionsRegistry(publicKey: string, userId: string): SessionEntry[]
 }
 
 function saveSessionToRegistry(
-  publicKey: string,
+  projectId: string,
   userId: string,
   sessionId: string,
   messages: (Message & { senderType?: string })[]
@@ -168,7 +169,7 @@ function saveSessionToRegistry(
   if (typeof window === 'undefined' || !userId) return;
 
   try {
-    const registry = loadSessionsRegistry(publicKey, userId);
+    const registry = loadSessionsRegistry(projectId, userId);
 
     // Find first user message for title, or use default
     const firstUserMessage = messages.find(m => m.role === 'user');
@@ -197,29 +198,30 @@ function saveSessionToRegistry(
     // Keep only last 50 sessions
     const trimmed = registry.slice(0, 50);
 
-    localStorage.setItem(getSessionsRegistryKey(publicKey, userId), JSON.stringify(trimmed));
+    localStorage.setItem(getSessionsRegistryKey(projectId, userId), JSON.stringify(trimmed));
   } catch {
     // Storage might be full or disabled
   }
 }
 
-function deleteSessionFromRegistry(publicKey: string, userId: string, sessionId: string): void {
+function deleteSessionFromRegistry(projectId: string, userId: string, sessionId: string): void {
   if (typeof window === 'undefined' || !userId) return;
 
   try {
-    const registry = loadSessionsRegistry(publicKey, userId);
+    const registry = loadSessionsRegistry(projectId, userId);
     const filtered = registry.filter(s => s.sessionId !== sessionId);
-    localStorage.setItem(getSessionsRegistryKey(publicKey, userId), JSON.stringify(filtered));
+    localStorage.setItem(getSessionsRegistryKey(projectId, userId), JSON.stringify(filtered));
 
     // Also delete the session's messages
-    clearMessagesFromStorage(publicKey, sessionId);
+    clearMessagesFromStorage(projectId, sessionId);
   } catch {
     // Ignore errors
   }
 }
 
 export function useHissunoChat({
-  publicKey,
+  projectId,
+  widgetToken,
   apiUrl = '/api/agent',
   initialMessage,
   headers = {},
@@ -249,7 +251,7 @@ export function useHissunoChat({
 
   // State for messages, input, and streaming
   const [messages, setMessages] = useState<ExtendedMessage[]>(() => {
-    const stored = loadMessagesFromStorage(publicKey, sessionId);
+    const stored = loadMessagesFromStorage(projectId, sessionId);
     if (stored.length > 0) {
       return stored;
     }
@@ -283,10 +285,10 @@ export function useHissunoChat({
   // Save messages to storage whenever they change
   useEffect(() => {
     if (hasInitialized.current && messages.length > 0) {
-      saveMessagesToStorage(publicKey, messages, sessionId);
+      saveMessagesToStorage(projectId, messages, sessionId);
     }
     hasInitialized.current = true;
-  }, [messages, publicKey, sessionId]);
+  }, [messages, projectId, sessionId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -318,7 +320,7 @@ export function useHissunoChat({
     setStreamingContent('');
     setIsStreaming(true);
 
-    const streamUrl = `${apiUrl}/stream?publicKey=${encodeURIComponent(publicKey)}&sessionId=${encodeURIComponent(sessionId)}`;
+    const streamUrl = `${apiUrl}/stream?projectId=${encodeURIComponent(projectId)}&sessionId=${encodeURIComponent(sessionId)}`;
     const eventSource = new EventSource(streamUrl);
     eventSourceRef.current = eventSource;
 
@@ -385,13 +387,13 @@ export function useHissunoChat({
         }
       }
     };
-  }, [apiUrl, publicKey, sessionId]);
+  }, [apiUrl, projectId, sessionId]);
 
   // Check for running chat on mount
   useEffect(() => {
     const checkRunningChat = async () => {
       try {
-        const statusUrl = `${apiUrl}?publicKey=${encodeURIComponent(publicKey)}&sessionId=${encodeURIComponent(sessionId)}`;
+        const statusUrl = `${apiUrl}?projectId=${encodeURIComponent(projectId)}&sessionId=${encodeURIComponent(sessionId)}`;
         const response = await fetch(statusUrl);
         if (!response.ok) return;
 
@@ -406,15 +408,13 @@ export function useHissunoChat({
     };
 
     checkRunningChat();
-  }, [apiUrl, publicKey, sessionId, connectToStream]);
+  }, [apiUrl, projectId, sessionId, connectToStream]);
 
   // Connect to updates SSE for human agent messages
   useEffect(() => {
     if (sessionClosedRef.current || !sessionId) return;
 
-    // Derive the base URL from apiUrl (e.g., /api/agent -> /api)
-    const baseUrl = apiUrl.replace(/\/agent$/, '');
-    const updatesUrl = `${baseUrl}/sessions/${sessionId}/updates?publicKey=${encodeURIComponent(publicKey)}`;
+    const updatesUrl = `${apiUrl}/session/updates?sessionId=${encodeURIComponent(sessionId)}&projectId=${encodeURIComponent(projectId)}`;
 
     const connectUpdates = () => {
       if (updatesEventSourceRef.current) return;
@@ -477,7 +477,7 @@ export function useHissunoChat({
         updatesEventSourceRef.current = null;
       }
     };
-  }, [apiUrl, publicKey, sessionId, messages.length, onSessionClose]);
+  }, [apiUrl, projectId, sessionId, messages.length, onSessionClose]);
 
   // Convert messages to ChatMessage format
   const chatMessages: ChatMessage[] = useMemo(() => {
@@ -496,7 +496,7 @@ export function useHissunoChat({
       // Check if there's at least one user message (not just initial message)
       const hasUserMessages = messages.some(m => m.role === 'user');
       if (hasUserMessages) {
-        saveSessionToRegistry(publicKey, userId, sessionId, messages);
+        saveSessionToRegistry(projectId, userId, sessionId, messages);
       }
     }
 
@@ -534,7 +534,7 @@ export function useHissunoChat({
     }
     setError(undefined);
     setStreamingContent('');
-  }, [publicKey, userId, initialMessage, sessionId, messages]);
+  }, [projectId, userId, initialMessage, sessionId, messages]);
 
   const loadSession = useCallback((newSessionId: string, sessionMessages?: Message[]) => {
     // Reset session state
@@ -558,10 +558,10 @@ export function useHissunoChat({
     if (sessionMessages && sessionMessages.length > 0) {
       setMessages(sessionMessages);
       // Save to storage for persistence
-      saveMessagesToStorage(publicKey, sessionMessages, newSessionId);
+      saveMessagesToStorage(projectId, sessionMessages, newSessionId);
     } else {
       // Load from localStorage
-      const storedMessages = loadMessagesFromStorage(publicKey, newSessionId);
+      const storedMessages = loadMessagesFromStorage(projectId, newSessionId);
       if (storedMessages.length > 0) {
         setMessages(storedMessages);
       } else if (initialMessage) {
@@ -581,19 +581,19 @@ export function useHissunoChat({
 
     setError(undefined);
     setStreamingContent('');
-  }, [publicKey, initialMessage]);
+  }, [projectId, initialMessage]);
 
   // Get session history for current user (only if userId is provided)
   const getSessionHistory = useCallback((): SessionEntry[] => {
     if (!userId) return [];
-    return loadSessionsRegistry(publicKey, userId);
-  }, [publicKey, userId]);
+    return loadSessionsRegistry(projectId, userId);
+  }, [projectId, userId]);
 
   // Delete a session from history
   const deleteSession = useCallback((sessionIdToDelete: string) => {
     if (!userId) return;
-    deleteSessionFromRegistry(publicKey, userId, sessionIdToDelete);
-  }, [publicKey, userId]);
+    deleteSessionFromRegistry(projectId, userId, sessionIdToDelete);
+  }, [projectId, userId]);
 
   // Close session function - calls the backend to close the session and trigger PM review
   const closeSession = useCallback(async () => {
@@ -607,22 +607,19 @@ export function useHissunoChat({
     }
 
     try {
-      // Derive the base URL from apiUrl (e.g., /api/agent -> /api)
-      const baseUrl = apiUrl.replace(/\/agent$/, '');
-      await fetch(`${baseUrl}/sessions/${sessionId}/close`, {
+      await fetch(`${apiUrl}/session/close`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Public-Key': publicKey,
           ...headers,
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ sessionId, projectId }),
       });
       onSessionClose?.();
     } catch (error) {
       console.error('[HissunoWidget] Failed to close session:', error);
     }
-  }, [sessionId, apiUrl, publicKey, headers, onSessionClose]);
+  }, [sessionId, apiUrl, projectId, headers, onSessionClose]);
 
   // Cancel ongoing chat
   const cancelChat = useCallback(async () => {
@@ -635,7 +632,7 @@ export function useHissunoChat({
           ...headers,
         },
         body: JSON.stringify({
-          publicKey,
+          projectId,
           sessionId,
         }),
       });
@@ -658,7 +655,7 @@ export function useHissunoChat({
       const message = err instanceof Error ? err.message : 'Failed to cancel';
       setError(new Error(message));
     }
-  }, [apiUrl, publicKey, sessionId, headers]);
+  }, [apiUrl, projectId, sessionId, headers]);
 
   // Inactivity timeout - reset on new messages
   useEffect(() => {
@@ -687,15 +684,14 @@ export function useHissunoChat({
       if (!sessionId || sessionClosedRef.current) return;
 
       // Use sendBeacon for reliable delivery on page unload
-      const baseUrl = apiUrl.replace(/\/agent$/, '');
-      const url = `${baseUrl}/sessions/${sessionId}/close`;
-      const data = JSON.stringify({});
+      const url = `${apiUrl}/session/close`;
+      const data = JSON.stringify({ sessionId, projectId });
       navigator.sendBeacon(url, data);
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [sessionId, apiUrl]);
+  }, [sessionId, apiUrl, projectId]);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
@@ -733,13 +729,13 @@ export function useHissunoChat({
           },
           body: JSON.stringify({
             messages: allMessages,
-            publicKey,
+            projectId,
             userId,
             userMetadata,
             pageUrl,
             pageTitle,
             sessionId,
-            source: 'widget',
+            widgetToken,
           }),
         });
 
@@ -761,7 +757,7 @@ export function useHissunoChat({
         setIsLoading(false);
       }
     },
-    [input, messages, apiUrl, headers, publicKey, userId, userMetadata, pageUrl, pageTitle, sessionId, connectToStream]
+    [input, messages, apiUrl, headers, projectId, widgetToken, userId, userMetadata, pageUrl, pageTitle, sessionId, connectToStream]
   );
 
   return useMemo(

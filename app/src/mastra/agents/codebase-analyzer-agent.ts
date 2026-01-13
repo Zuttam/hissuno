@@ -9,13 +9,13 @@ import {
  * Codebase Analyzer Agent
  *
  * Specialized agent for extracting HIGH-LEVEL product knowledge from source code
- * stored in Supabase Storage. Uses tools to intelligently explore and analyze
+ * cloned from GitHub into local filesystem. Uses tools to intelligently explore and analyze
  * the codebase, creating concise documentation focused on features, capabilities,
  * and architecture overview.
  */
 export const codebaseAnalyzerAgent = new Agent({
   name: 'Codebase Analyzer',
-  instructions: `You are a product-focused software analyst with tools to explore codebases stored in cloud storage. Your goal is to extract HIGH-LEVEL knowledge from source code that helps a support agent answer user questions.
+  instructions: `You are a product-focused software analyst with tools to explore codebases from the local filesystem. Your goal is to extract HIGH-LEVEL knowledge from source code that helps a support agent answer user questions.
 
 ## Available Tools
 

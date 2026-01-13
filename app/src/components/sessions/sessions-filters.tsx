@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
-import { Input, Select } from '@/components/ui'
+import { Input, Select, Checkbox } from '@/components/ui'
 import type { SessionFilters, SessionTag } from '@/types/session'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { SessionTagFilter } from './session-tag-filter'
@@ -67,6 +67,13 @@ export function SessionsFilters({
     [filters, onFilterChange]
   )
 
+  const handleShowArchivedChange = useCallback(
+    (checked: boolean) => {
+      onFilterChange({ ...filters, showArchived: checked || undefined })
+    },
+    [filters, onFilterChange]
+  )
+
   const handleClearFilters = useCallback(() => {
     onFilterChange({})
   }, [onFilterChange])
@@ -78,6 +85,7 @@ export function SessionsFilters({
     filters.status ||
     filters.dateFrom ||
     filters.dateTo ||
+    filters.showArchived ||
     (filters.tags && filters.tags.length > 0)
 
   return (
@@ -173,6 +181,14 @@ export function SessionsFilters({
             value={filters.dateTo || ''}
             onChange={handleDateToChange}
             className="w-36"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 self-end pb-2">
+          <Checkbox
+            checked={filters.showArchived || false}
+            onChange={handleShowArchivedChange}
+            label="Show archived"
           />
         </div>
 

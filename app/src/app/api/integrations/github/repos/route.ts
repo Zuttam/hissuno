@@ -1,37 +1,49 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { getGitHubToken, fetchUserRepos } from '@/lib/integrations/github'
+import { getGitHubInstallationToken } from '@/lib/integrations/github'
+import { listUserRepos } from '@/lib/integrations/github/app-client'
 
 export const runtime = 'nodejs'
 
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
-
 /**
- * GET /api/integrations/github/repos
- * List user's GitHub repositories
+ * GET /api/integrations/github/repos?projectId=xxx
+ * List repositories accessible by project's GitHub token
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
     console.error('[integrations.github.repos.get] Supabase must be configured')
     return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    const token = await getGitHubToken(supabase, user.id)
+    const projectId = request.nextUrl.searchParams.get('projectId')
+    if (!projectId) {
+      return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+    }
+
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      throw new UnauthorizedError('User not authenticated')
+    }
+
+    // Verify user owns this project
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('id, user_id')
+      .eq('id', projectId)
+      .single()
+
+    if (projectError || !project || project.user_id !== user.id) {
+      throw new UnauthorizedError('Not authorized to access this project')
+    }
+
+    const token = await getGitHubInstallationToken(supabase, projectId)
 
     if (!token) {
       return NextResponse.json(
@@ -40,7 +52,7 @@ export async function GET() {
       )
     }
 
-    const repos = await fetchUserRepos(token)
+    const repos = await listUserRepos(token)
 
     // Transform to a simpler format for the frontend
     const simplifiedRepos = repos.map((repo) => ({

@@ -1,7 +1,5 @@
 # Roadmap
 
-
-
 1. Option to activate coding agent of Github copilot (api of GH)
 2. ⁠open issues in jira | linear | notion (tickets)
 [3. ⁠one-time connection to code / make it optional]
