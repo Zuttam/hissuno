@@ -58,11 +58,11 @@ export async function GET(request: NextRequest) {
 
     // Generate state with projectId and full redirectUrl for CSRF protection
     const nonce = crypto.randomUUID()
-    const origin = request.nextUrl.origin
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const redirectUrl =
       mode === 'edit'
-        ? `${origin}/projects/${projectId}/edit?restored=true&step=${returnStep}&github=connected`
-        : `${origin}/projects/new?restored=true&step=${returnStep}&github=connected`
+        ? `${appUrl}/projects/${projectId}/edit?restored=true&step=${returnStep}&github=connected`
+        : `${appUrl}/projects/new?restored=true&step=${returnStep}&github=connected`
 
     const state = Buffer.from(
       JSON.stringify({
@@ -76,6 +76,8 @@ export async function GET(request: NextRequest) {
     // Build GitHub App installation URL
     const installUrl = new URL(`https://github.com/apps/${appSlug}/installations/new`)
     installUrl.searchParams.set('state', state)
+    // Specify which callback URL to use (must match one configured in GitHub App settings)
+    installUrl.searchParams.set('redirect_uri', `${appUrl}/api/integrations/github/callback`)
 
     // Redirect to GitHub App installation
     return NextResponse.redirect(installUrl.toString())

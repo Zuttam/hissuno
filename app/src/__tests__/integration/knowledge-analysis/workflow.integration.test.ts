@@ -25,8 +25,10 @@ import {
   sampleCodebaseFiles,
   cleanupTestData,
   cleanupOrphanedTestData,
+  waitForWorkflowCompletion,
   type TestContext,
 } from './test-utils'
+import { mockOpenAIEmbeddings } from '@/__tests__/mocks/openai-embeddings'
 
 // Test timeout for workflow tests
 const TEST_TIMEOUT = 60000
@@ -149,6 +151,9 @@ let testContext: TestContext
 // ============================================================================
 
 beforeAll(async () => {
+  // Mock OpenAI embeddings API for deterministic tests
+  mockOpenAIEmbeddings()
+
   // Clean up any orphaned test data from previous crashed runs
   await cleanupOrphanedTestData()
 
@@ -270,8 +275,8 @@ describe('Analysis with Codebase', () => {
       // Verify workflow completed
       expect(result).toBeDefined()
 
-      // Check packages were created
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete and check packages
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
 
       const categories = packages.map((p) => p.category).sort()
@@ -311,8 +316,8 @@ describe('Analysis with Codebase', () => {
 
       expect(result).toBeDefined()
 
-      // Packages should still be created from raw_text
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete and check packages
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
     },
     TEST_TIMEOUT
@@ -348,7 +353,8 @@ describe('Analysis with Codebase', () => {
 
       expect(result).toBeDefined()
 
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
     },
     TEST_TIMEOUT
@@ -399,7 +405,8 @@ A: We offer Basic ($10/mo), Pro ($25/mo), and Enterprise (custom) plans.
 
       expect(result).toBeDefined()
 
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
     },
     TEST_TIMEOUT
@@ -443,7 +450,8 @@ A: We offer Basic ($10/mo), Pro ($25/mo), and Enterprise (custom) plans.
 
       expect(result).toBeDefined()
 
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
     },
     TEST_TIMEOUT
@@ -492,7 +500,8 @@ describe('Analysis with Mixed Sources', () => {
 
       expect(result).toBeDefined()
 
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
     },
     TEST_TIMEOUT
@@ -539,8 +548,8 @@ describe('Analysis with Mixed Sources', () => {
       // Workflow should complete even if one source fails
       expect(result).toBeDefined()
 
-      // Packages should still be created
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete and check packages
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
     },
     TEST_TIMEOUT
@@ -578,7 +587,8 @@ describe('Knowledge Package Generation', () => {
         ],
       })
 
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
 
       expect(packages.length).toBe(3)
 
@@ -630,7 +640,8 @@ describe('Knowledge Package Generation', () => {
         ],
       })
 
-      let packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for first workflow to complete
+      let { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages[0]?.version).toBe(1)
 
       // Second analysis
@@ -647,7 +658,8 @@ describe('Knowledge Package Generation', () => {
         ],
       })
 
-      packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for second workflow to complete
+      ;({ packages } = await waitForWorkflowCompletion(testContext.projectId))
       expect(packages[0]?.version).toBe(2)
     },
     TEST_TIMEOUT
@@ -706,8 +718,8 @@ The service runs at 192.168.1.100:8080
 
       expect(result).toBeDefined()
 
-      // Packages should still be created
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete and check packages
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
     },
     TEST_TIMEOUT
@@ -756,7 +768,8 @@ Our product helps teams collaborate more effectively.
 
       expect(result).toBeDefined()
 
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
     },
     TEST_TIMEOUT
@@ -812,7 +825,8 @@ export const config = {
 
       expect(result).toBeDefined()
 
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId)
       expect(packages.length).toBe(3)
 
       // Technical package should exist

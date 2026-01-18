@@ -447,48 +447,61 @@ authRouter.post('/logout', (req, res) => {
 export async function cleanupTestData(): Promise<void> {
   const supabase = createAdminClient()
 
+  // Capture current arrays BEFORE resetting (in case of crash during cleanup)
+  const projectIds = [...testProjectIds]
+  const sourceIds = [...testSourceIds]
+  const packageIds = [...testPackageIds]
+  const sourceCodeIds = [...testSourceCodeIds]
+  const localPaths = [...testLocalPaths]
+
+  // Reset tracking arrays IMMEDIATELY (before async operations)
+  // This ensures subsequent tests start fresh even if cleanup fails
+  testProjectIds = []
+  testSourceIds = []
+  testPackageIds = []
+  testSourceCodeIds = []
+  testLocalPaths = []
+
+  // Delete knowledge embeddings first (foreign key on packages)
+  for (const projectId of projectIds) {
+    await supabase.from('knowledge_embeddings').delete().eq('project_id', projectId)
+  }
+
   // Delete knowledge packages (foreign key on project)
-  if (testPackageIds.length > 0) {
-    await supabase.from('knowledge_packages').delete().in('id', testPackageIds)
+  if (packageIds.length > 0) {
+    await supabase.from('knowledge_packages').delete().in('id', packageIds)
   }
 
   // Delete knowledge sources
-  if (testSourceIds.length > 0) {
-    await supabase.from('knowledge_sources').delete().in('id', testSourceIds)
+  if (sourceIds.length > 0) {
+    await supabase.from('knowledge_sources').delete().in('id', sourceIds)
   }
 
-  // Delete project analyses
-  for (const projectId of testProjectIds) {
+  // Delete project analyses and remaining packages/sources by project
+  for (const projectId of projectIds) {
     await supabase.from('project_analyses').delete().eq('project_id', projectId)
     await supabase.from('knowledge_packages').delete().eq('project_id', projectId)
     await supabase.from('knowledge_sources').delete().eq('project_id', projectId)
   }
 
   // Delete source codes
-  if (testSourceCodeIds.length > 0) {
-    await supabase.from('source_codes').delete().in('id', testSourceCodeIds)
+  if (sourceCodeIds.length > 0) {
+    await supabase.from('source_codes').delete().in('id', sourceCodeIds)
   }
 
   // Delete test projects
-  if (testProjectIds.length > 0) {
-    await supabase.from('projects').delete().in('id', testProjectIds)
+  if (projectIds.length > 0) {
+    await supabase.from('projects').delete().in('id', projectIds)
   }
 
   // Clean up local directories
-  for (const localPath of testLocalPaths) {
+  for (const localPath of localPaths) {
     try {
       await rm(localPath, { recursive: true, force: true })
     } catch {
       // Ignore cleanup errors
     }
   }
-
-  // Reset tracking arrays
-  testProjectIds = []
-  testSourceIds = []
-  testPackageIds = []
-  testSourceCodeIds = []
-  testLocalPaths = []
 }
 
 /**
@@ -607,4 +620,55 @@ export async function waitForAnalysisComplete(
     },
     { timeout, interval: 2000 }
   )
+}
+
+/**
+ * Wait for workflow to complete by checking if packages are created
+ * Use this after executeWorkflow() to ensure all async steps have finished
+ */
+export async function waitForWorkflowCompletion(
+  projectId: string,
+  options: {
+    timeout?: number
+    expectedPackages?: number
+    checkEmbeddings?: boolean
+  } = {}
+): Promise<{ packages: KnowledgePackageRecord[]; hasEmbeddings: boolean }> {
+  const { timeout = 30000, expectedPackages = 3, checkEmbeddings = false } = options
+  const supabase = createAdminClient()
+
+  // Wait for packages to be created
+  const packagesCreated = await waitForCondition(
+    async () => {
+      const packages = await getKnowledgePackages(projectId)
+      return packages.length >= expectedPackages
+    },
+    { timeout, interval: 500 }
+  )
+
+  if (!packagesCreated) {
+    throw new Error(
+      `Workflow did not complete within ${timeout}ms - expected ${expectedPackages} packages`
+    )
+  }
+
+  const packages = await getKnowledgePackages(projectId)
+
+  // Optionally wait for embeddings
+  let hasEmbeddings = false
+  if (checkEmbeddings) {
+    const embeddingsCreated = await waitForCondition(
+      async () => {
+        const { count } = await supabase
+          .from('knowledge_embeddings')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+        return (count ?? 0) > 0
+      },
+      { timeout: timeout / 2, interval: 500 }
+    )
+    hasEmbeddings = embeddingsCreated
+  }
+
+  return { packages, hasEmbeddings }
 }

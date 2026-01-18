@@ -16,9 +16,10 @@ export async function GET(request: NextRequest) {
   }
 
   const clientId = process.env.SLACK_CLIENT_ID
-  const redirectUri = process.env.SLACK_REDIRECT_URI
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const redirectUri = `${appUrl}/api/integrations/slack/callback`
 
-  if (!clientId || !redirectUri) {
+  if (!clientId) {
     console.error('[integrations.slack.connect] Missing Slack OAuth configuration')
     return NextResponse.json({ error: 'Slack integration not configured.' }, { status: 500 })
   }

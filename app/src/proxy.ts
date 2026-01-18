@@ -16,7 +16,6 @@ const PUBLIC_PATH_PREFIXES = [
 
   '/api/webhooks/lemon-squeezy',
   '/api/webhooks/slack',
-  '/api/webhooks/supabase-auth',
 ]
 
 // Paths that are public but should redirect authenticated users elsewhere

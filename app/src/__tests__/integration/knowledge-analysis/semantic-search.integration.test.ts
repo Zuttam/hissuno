@@ -23,9 +23,11 @@ import {
   getKnowledgePackages,
   cleanupTestData,
   cleanupOrphanedTestData,
+  waitForWorkflowCompletion,
   type TestContext,
 } from './test-utils'
 import { createAdminClient } from '@/lib/supabase/server'
+import { mockOpenAIEmbeddings } from '@/__tests__/mocks/openai-embeddings'
 
 // Test timeout for integration tests
 const TEST_TIMEOUT = 120000
@@ -146,6 +148,9 @@ let testContext: TestContext
 // ============================================================================
 
 beforeAll(async () => {
+  // Mock OpenAI embeddings API for deterministic tests
+  mockOpenAIEmbeddings()
+
   await cleanupOrphanedTestData()
 
   // Mock agents for deterministic testing
@@ -272,8 +277,10 @@ describeWithDb('Embedding Generation', () => {
 
       expect(result).toBeDefined()
 
-      // Verify packages were created
-      const packages = await getKnowledgePackages(testContext.projectId)
+      // Wait for workflow to complete (packages + embeddings)
+      const { packages } = await waitForWorkflowCompletion(testContext.projectId, {
+        checkEmbeddings: true,
+      })
       expect(packages.length).toBe(3)
 
       // Verify embeddings were created
@@ -330,6 +337,9 @@ Another section with content.
         ],
       })
 
+      // Wait for workflow to complete
+      await waitForWorkflowCompletion(testContext.projectId, { checkEmbeddings: true })
+
       const embeddings = await getEmbeddings(testContext.projectId)
 
       // Check that embeddings have heading metadata
@@ -368,6 +378,9 @@ Another section with content.
         sources: [{ id: source.id, type: 'raw_text', content: 'Initial content for testing.' }],
       })
 
+      // Wait for first workflow to complete
+      await waitForWorkflowCompletion(testContext.projectId, { checkEmbeddings: true })
+
       let embeddings = await getEmbeddings(testContext.projectId)
       const initialIds = new Set(embeddings.map((e) => e.id))
 
@@ -384,6 +397,9 @@ Another section with content.
           },
         ],
       })
+
+      // Wait for second workflow to complete
+      await waitForWorkflowCompletion(testContext.projectId, { checkEmbeddings: true })
 
       embeddings = await getEmbeddings(testContext.projectId)
 
@@ -455,6 +471,9 @@ Our platform provides real-time customer analytics including:
         sources: [{ id: source.id, type: 'raw_text', content }],
       })
 
+      // Wait for workflow to complete
+      await waitForWorkflowCompletion(testContext.projectId, { checkEmbeddings: true })
+
       // Import search function
       const { searchKnowledgeEmbeddings } = await import('@/lib/knowledge/embedding-service')
 
@@ -505,6 +524,9 @@ API documentation and integration guides.
         sources: [{ id: source.id, type: 'raw_text', content: source.content }],
       })
 
+      // Wait for workflow to complete
+      await waitForWorkflowCompletion(testContext.projectId, { checkEmbeddings: true })
+
       const { searchKnowledgeEmbeddings } = await import('@/lib/knowledge/embedding-service')
 
       // Search only in business category
@@ -551,6 +573,9 @@ Follow these steps to get started with our product:
         sources: [{ id: source.id, type: 'raw_text', content: source.content }],
       })
 
+      // Wait for workflow to complete
+      await waitForWorkflowCompletion(testContext.projectId, { checkEmbeddings: true })
+
       const { searchKnowledgeEmbeddings } = await import('@/lib/knowledge/embedding-service')
 
       const results = await searchKnowledgeEmbeddings(testContext.projectId, 'how to get started', {
@@ -591,6 +616,9 @@ Follow these steps to get started with our product:
         analysisScope: null,
         sources: [{ id: source.id, type: 'raw_text', content: source.content }],
       })
+
+      // Wait for workflow to complete
+      await waitForWorkflowCompletion(testContext.projectId, { checkEmbeddings: true })
 
       const { searchKnowledgeEmbeddings } = await import('@/lib/knowledge/embedding-service')
 
@@ -685,6 +713,9 @@ Our main features include:
         analysisScope: null,
         sources: [{ id: source.id, type: 'raw_text', content: source.content }],
       })
+
+      // Wait for workflow to complete
+      await waitForWorkflowCompletion(testContext.projectId, { checkEmbeddings: true })
 
       const { semanticSearchKnowledgeTool } = await import('@/mastra/tools/knowledge-tools')
 

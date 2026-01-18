@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import posthog from 'posthog-js'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
@@ -42,6 +43,18 @@ export function AuthProvider({ children, initialUser = null }: AuthProviderProps
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       setIsLoading(false)
+
+      // PostHog user identification (only with consent)
+      const consent = localStorage.getItem('hissuno_cookie_consent')
+      if (session?.user && consent === 'accepted') {
+        posthog.identify(session.user.id, {
+          email: session.user.email,
+          signup_method: session.user.app_metadata?.provider || 'email',
+          created_at: session.user.created_at,
+        })
+      } else if (!session?.user) {
+        posthog.reset()
+      }
     })
 
     return () => {

@@ -7,7 +7,7 @@
 
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getGitHubInstallationToken, getLatestCommitSha, parseGitHubRepoUrl } from '@/lib/integrations/github'
-import { cloneRepository, pullRepository, cleanupRepository, repositoryExists, getLocalPath, getCurrentCommitSha } from './git-operations'
+import { cloneRepository, pullRepository, cleanupRepository, repositoryExists, getLocalPath, getCurrentCommitSha, GitOperationError } from './git-operations'
 import type { CodebaseRecord } from './types'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/supabase'
@@ -303,9 +303,13 @@ export async function syncGitHubCodebase(params: {
       localPath: cloneResult.localPath,
     }
   } catch (error) {
+    if (error instanceof GitOperationError) {
+      console.error('[codebase.sync] Git operation error:', error.code, error.message)
+      return { status: 'error', error: error.userMessage }
+    }
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('[codebase.sync] Error syncing codebase:', message)
-    return { status: 'error', error: message }
+    return { status: 'error', error: 'An unexpected error occurred while syncing the codebase.' }
   }
 }
 

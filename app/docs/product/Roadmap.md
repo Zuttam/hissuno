@@ -1,61 +1,63 @@
-# Roadmap
+# Tasks
 
-1. Option to activate coding agent of Github copilot (api of GH)
-2. ⁠open issues in jira | linear | notion (tickets)
-[3. ⁠one-time connection to code / make it optional]
+## Phase 1
 
+[x] Test welcome email
+[x] Test limits enforcement  
+[x] Test downgrade and upgrade  
+[x] Setup & Test analytics  
+[x] Test upload session messages from json
+[x] Add TOS  
+[x] Add join list
 
+## Phase 2
 
-# Knowledge
-Check large context knowledge and use of embedding db 
+[x] g-suite 
 
-## Sessions
-- Slack Integration (app)
-    - listen only/on demand mode - Join slack channels and listen to conversations  
-
-- Import sessions transcripts (manual upload)
-- Import sessions from Intercom (intercom integration?)
-- import sessions from Gong (Intercom integration)
-
-- Human takeover (human in the loop) -> human takeover the conversation 
-
-- Email Integration
-
-## Issues 
-- Issues can also be todo actions list assigned to non engineers. 
-
-- Sync Issues with Github issues (specific types)
-- Add SW agent flow (configurable):
-    - Create PR on issue with spec 
-    - Alert developer on new PR 
-- Extend rule based to also mark priority by customer size
-
-- Track Issue progression / alerts
-
-
-## Platform
-- Multiple users
-- Billing and Metering
-- Redesign 
-- API using secret key 
-- Analytics
-- Notifications
-- Base44 custom integration (growth)
-
-
-### Deployment
-- Dashboard
-- Widget in NPM
-- Website (coming soon)
-- Docs
-
-
-## Marketing
-- Website (coming soon)
-- Docs
+[x] Deploy to prod
+    - resend
+    - supabase
+    - vercel (enable cron)
+    - slack
+    - lemon squeezy 
+    - github
+    - openai 
+    - posthog
 
 
 
+## Phase 3
 
+[] Add widget variants
+  - right side drawer (sticky badge)
+  - headless
+  - dialog with shortcut (cmd+k)  
+[] npm deploy widget
+[] Find alternative to cron (session lifecycle)
+[] Analytics
 
+## Phase 4
+
+[] Improve landing page
+[] work on ads 
+    - YouTube
+    - Google 
+    - ChatGPT
+    - LinkedIn
+[] setup google, openai and linkedin tracking
+[] Improve welcome email visualization
+[] Improve project layout and edit
+[] Issues Integration (linear, jira)
+
+## Phase 5
+
+- Sessions Improvements
+  - slack read threads (only read)
+  - Gong integration
+  - Intercom integration
+  - Email agent
+- Support Actions items (not issues)
+- Alerts (email, slack)
+- Coding agent
+- Docs portal
 

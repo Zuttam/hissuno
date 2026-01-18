@@ -127,8 +127,8 @@ export async function GET(_request: Request, context: RouteContext) {
         console.log(`${LOG_PREFIX} Creating run with runId:`, runId)
         const run = await workflow.createRunAsync({ runId })
 
-        console.log(`${LOG_PREFIX} Calling streamVNext to execute workflow...`)
-        const workflowStream = run.streamVNext({
+        console.log(`${LOG_PREFIX} Calling stream to execute workflow...`)
+        const workflowStream = run.stream({
           inputData: {
             sessionId,
             projectId: session.project_id,
@@ -140,7 +140,7 @@ export async function GET(_request: Request, context: RouteContext) {
         let currentTags: SessionTag[] = []
 
         // Process stream events from the workflow execution
-        for await (const event of workflowStream) {
+        for await (const event of workflowStream.fullStream) {
           eventCount++
 
           // Stop processing if controller is closed (client disconnected)

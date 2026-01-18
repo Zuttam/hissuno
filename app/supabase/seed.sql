@@ -1,4 +1,4 @@
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- pgcrypto is already enabled in extensions schema on Supabase
 
 DO $$
 DECLARE
@@ -28,7 +28,7 @@ BEGIN
 
     UPDATE auth.users
     SET
-      encrypted_password = crypt(admin_password, gen_salt('bf', 10)),
+      encrypted_password = extensions.crypt(admin_password, extensions.gen_salt('bf', 10)),
       email_confirmed_at = now_ts,
       confirmation_token = '',
       confirmation_sent_at = now_ts,
@@ -80,7 +80,7 @@ BEGIN
       'authenticated',
       'authenticated',
       admin_email,
-      crypt(admin_password, gen_salt('bf', 10)),
+      extensions.crypt(admin_password, extensions.gen_salt('bf', 10)),
       now_ts,
       '',
       now_ts,

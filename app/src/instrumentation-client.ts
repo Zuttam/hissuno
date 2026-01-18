@@ -13,22 +13,25 @@ const CONSENT_KEY = 'hissuno_cookie_consent'
 const consent =
   typeof window !== 'undefined' ? localStorage.getItem(CONSENT_KEY) : null
 
+// Always initialize PostHog for anonymous pageview tracking
+// Consent controls persistence and session recording
+const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
+const posthogHost =
+  process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
+
+if (posthogKey) {
+  posthog.init(posthogKey, {
+    api_host: posthogHost,
+    person_profiles: 'identified_only', // No person profiles until identify()
+    capture_pageview: true,
+    capture_pageleave: true,
+    persistence: consent === 'accepted' ? 'localStorage+cookie' : 'memory',
+    disable_session_recording: consent !== 'accepted',
+  })
+}
+
+// Initialize Google Ads only with consent
 if (consent === 'accepted') {
-  // Initialize PostHog
-  const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
-  const posthogHost =
-    process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
-
-  if (posthogKey) {
-    posthog.init(posthogKey, {
-      api_host: posthogHost,
-      person_profiles: 'identified_only',
-      capture_pageview: true,
-      capture_pageleave: true,
-    })
-  }
-
-  // Initialize Google Ads (YouTube)
   const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
   if (googleAdsId) {
     // Load gtag script
@@ -49,14 +52,13 @@ if (consent === 'accepted') {
 }
 
 // Track route changes (Next.js 15.3+ instrumentation hook)
-export function onRouterTransitionStart({
-  targetUrl,
-}: {
-  targetUrl: string
-}): void {
+export function onRouterTransitionStart(
+  url: string,
+  navigationType: 'push' | 'replace' | 'traverse'
+): void {
   // PostHog auto-captures with capture_pageview: true
-  // Google Ads page_view
+  // Google Ads page_view (only with consent)
   if (consent === 'accepted' && window.gtag) {
-    window.gtag('event', 'page_view', { page_path: targetUrl })
+    window.gtag('event', 'page_view', { page_path: url, navigation_type: navigationType })
   }
 }

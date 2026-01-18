@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build:widget": "cd packages/widget && npm run build",
+    "build": "npm run build:widget && next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -36,6 +37,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "ai": "^5.0.87",
     "ignore": "^7.0.5",
+    "isomorphic-git": "^1.36.1",
     "jsonwebtoken": "^9.0.3",
     "jszip": "^3.10.1",
     "mastra": "^0.17.7",
@@ -50,7 +52,6 @@
     "react-markdown": "^9.0.1",
     "rehype-highlight": "^7.0.0",
     "resend": "^6.7.0",
-    "simple-git": "^3.30.0",
     "svix": "^1.84.1",
     "three": "^0.182.0",
     "zod": "^3.23.8"

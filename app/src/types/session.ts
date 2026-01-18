@@ -149,7 +149,7 @@ export interface SessionFilters {
   userId?: string
   sessionId?: string
   status?: SessionStatus
-  tags?: SessionTag[]
+  tags?: string[]
   dateFrom?: string
   dateTo?: string
   showArchived?: boolean

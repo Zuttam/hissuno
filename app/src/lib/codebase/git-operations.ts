@@ -2,10 +2,13 @@
  * Git Operations Module
  *
  * Provides functions for cloning, pulling, and managing ephemeral git repositories.
+ * Uses isomorphic-git (pure JS) for Vercel serverless compatibility.
  * Repositories are cloned into /tmp/hissuno/{projectId}-{branch}/ and cleaned up after analysis.
  */
 
-import simpleGit, { SimpleGit } from 'simple-git'
+import * as git from 'isomorphic-git'
+import http from 'isomorphic-git/http/node'
+import * as fs from 'fs'
 import { rm, mkdir, access } from 'fs/promises'
 import { join } from 'path'
 
@@ -19,6 +22,59 @@ export interface CloneResult {
 export interface PullResult {
   commitSha: string
   updated: boolean
+}
+
+/**
+ * Custom error class for git operations with user-friendly messages.
+ */
+export class GitOperationError extends Error {
+  constructor(
+    public code: 'AUTH_FAILED' | 'REPO_NOT_FOUND' | 'CLONE_FAILED' | 'PULL_FAILED' | 'NETWORK_ERROR',
+    public userMessage: string,
+    originalError?: Error
+  ) {
+    super(userMessage)
+    this.name = 'GitOperationError'
+    this.cause = originalError
+  }
+}
+
+/**
+ * Classifies an error and throws a GitOperationError with a user-friendly message.
+ */
+function classifyAndThrow(error: unknown, operation: 'clone' | 'pull'): never {
+  const msg = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase()
+
+  if (msg.includes('401') || msg.includes('authentication') || msg.includes('unauthorized')) {
+    throw new GitOperationError(
+      'AUTH_FAILED',
+      'GitHub authentication failed. Please reconnect your GitHub account.',
+      error instanceof Error ? error : undefined
+    )
+  }
+
+  if (msg.includes('404') || msg.includes('not found') || msg.includes('repository not found')) {
+    throw new GitOperationError(
+      'REPO_NOT_FOUND',
+      "Repository not found or you don't have access. Please check the repository URL and permissions.",
+      error instanceof Error ? error : undefined
+    )
+  }
+
+  if (msg.includes('network') || msg.includes('enotfound') || msg.includes('timeout') || msg.includes('econnrefused')) {
+    throw new GitOperationError(
+      'NETWORK_ERROR',
+      'Network error while accessing GitHub. Please try again.',
+      error instanceof Error ? error : undefined
+    )
+  }
+
+  const defaultCode = operation === 'clone' ? 'CLONE_FAILED' : 'PULL_FAILED'
+  throw new GitOperationError(
+    defaultCode,
+    `Failed to ${operation} repository. Please try again.`,
+    error instanceof Error ? error : undefined
+  )
 }
 
 /**
@@ -38,6 +94,8 @@ export async function repositoryExists(projectId: string, branch: string): Promi
   const localPath = getLocalPath(projectId, branch)
   try {
     await access(localPath)
+    // Also verify it's a git repository
+    await git.resolveRef({ fs, dir: localPath, ref: 'HEAD' })
     return true
   } catch {
     return false
@@ -63,30 +121,32 @@ export async function cloneRepository(params: {
   // Clean up if exists (fresh clone)
   await cleanupRepository(projectId, branch)
 
-  // Build authenticated URL for GitHub App installation token
-  // Format: https://x-access-token:{token}@github.com/owner/repo
-  const authUrl = repositoryUrl.replace(
-    /^https:\/\/github\.com\//,
-    `https://x-access-token:${token}@github.com/`
-  )
+  // Create the target directory
+  await mkdir(localPath, { recursive: true })
 
-  const git: SimpleGit = simpleGit()
+  try {
+    // Clone with depth 1 for efficiency (shallow clone)
+    await git.clone({
+      fs,
+      http,
+      dir: localPath,
+      url: repositoryUrl,
+      ref: branch,
+      singleBranch: true,
+      depth: 1,
+      onAuth: () => ({ username: 'x-access-token', password: token }),
+    })
 
-  // Clone with depth 1 for efficiency (shallow clone)
-  await git.clone(authUrl, localPath, [
-    '--branch',
-    branch,
-    '--depth',
-    '1',
-    '--single-branch',
-  ])
+    // Get current commit SHA
+    const commits = await git.log({ fs, dir: localPath, depth: 1 })
+    const commitSha = commits[0]?.oid || ''
 
-  // Get current commit SHA
-  const localGit = simpleGit(localPath)
-  const log = await localGit.log({ maxCount: 1 })
-  const commitSha = log.latest?.hash || ''
-
-  return { localPath, commitSha }
+    return { localPath, commitSha }
+  } catch (error) {
+    // Clean up on failure
+    await cleanupRepository(projectId, branch)
+    classifyAndThrow(error, 'clone')
+  }
 }
 
 /**
@@ -99,38 +159,59 @@ export async function pullRepository(params: {
   repositoryUrl: string
   token: string
 }): Promise<PullResult> {
-  const { projectId, branch, repositoryUrl, token } = params
+  const { projectId, branch, token } = params
   const localPath = getLocalPath(projectId, branch)
 
   // Check if repo exists
   const exists = await repositoryExists(projectId, branch)
   if (!exists) {
-    throw new Error('Repository not cloned. Call cloneRepository first.')
+    throw new GitOperationError('PULL_FAILED', 'Repository not cloned. Please sync the codebase first.')
   }
 
-  const git = simpleGit(localPath)
+  try {
+    // Get current SHA before pull
+    const beforeCommits = await git.log({ fs, dir: localPath, depth: 1 })
+    const beforeSha = beforeCommits[0]?.oid
 
-  // Update remote URL with fresh token (installation tokens expire)
-  const authUrl = repositoryUrl.replace(
-    /^https:\/\/github\.com\//,
-    `https://x-access-token:${token}@github.com/`
-  )
-  await git.remote(['set-url', 'origin', authUrl])
+    // Fetch latest changes
+    await git.fetch({
+      fs,
+      http,
+      dir: localPath,
+      ref: branch,
+      singleBranch: true,
+      onAuth: () => ({ username: 'x-access-token', password: token }),
+    })
 
-  // Get current SHA before pull
-  const beforeLog = await git.log({ maxCount: 1 })
-  const beforeSha = beforeLog.latest?.hash
+    // Fast-forward merge to origin/branch
+    await git.merge({
+      fs,
+      dir: localPath,
+      ours: branch,
+      theirs: `origin/${branch}`,
+      fastForward: true,
+      abortOnConflict: true,
+      author: { name: 'Hissuno', email: 'noreply@hissuno.com' },
+    })
 
-  // Pull latest
-  await git.pull()
+    // Checkout to update working directory
+    await git.checkout({
+      fs,
+      dir: localPath,
+      ref: branch,
+      force: true,
+    })
 
-  // Get SHA after pull
-  const afterLog = await git.log({ maxCount: 1 })
-  const afterSha = afterLog.latest?.hash || ''
+    // Get SHA after pull
+    const afterCommits = await git.log({ fs, dir: localPath, depth: 1 })
+    const afterSha = afterCommits[0]?.oid || ''
 
-  return {
-    commitSha: afterSha,
-    updated: beforeSha !== afterSha,
+    return {
+      commitSha: afterSha,
+      updated: beforeSha !== afterSha,
+    }
+  } catch (error) {
+    classifyAndThrow(error, 'pull')
   }
 }
 
@@ -160,9 +241,8 @@ export async function getCurrentCommitSha(projectId: string, branch: string): Pr
   }
 
   try {
-    const git = simpleGit(localPath)
-    const log = await git.log({ maxCount: 1 })
-    return log.latest?.hash || null
+    const commits = await git.log({ fs, dir: localPath, depth: 1 })
+    return commits[0]?.oid || null
   } catch {
     return null
   }
