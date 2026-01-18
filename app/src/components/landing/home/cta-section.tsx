@@ -54,7 +54,7 @@ export function CTASection() {
           <Button
             size="lg"
             onClick={handleButtonClick}
-            className="bg-[var(--accent-teal)] hover:bg-[var(--accent-teal-hover)]"
+            className="bg-[var(--accent-selected)] hover:opacity-90"
           >
             Join the Waitlist
           </Button>

@@ -20,7 +20,7 @@ export function HeroSection() {
   }
 
   return (
-    <section className="relative overflow-hidden px-6 py-24 md:px-12 md:py-32">
+    <section className="relative overflow-hidden px-6 py-16 md:px-12 md:py-24">
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         {/* Interactive logo that triggers ripples */}
         <motion.div
@@ -46,15 +46,10 @@ export function HeroSection() {
           <Button
             size="lg"
             onClick={handleWaitlistClick}
-            className="w-full bg-[var(--accent-teal)] hover:bg-[var(--accent-teal-hover)] sm:w-auto"
+            className="w-full bg-[var(--accent-selected)] hover:opacity-90 sm:w-auto"
           >
             Join the Waitlist
           </Button>
-          <Link href="/login">
-            <Button variant="secondary" size="lg" className="w-full sm:w-auto">
-              Sign In
-            </Button>
-          </Link>
         </div>
       </div>
     </section>

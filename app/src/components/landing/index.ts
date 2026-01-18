@@ -5,7 +5,6 @@ export { UTMCapture } from './utm-capture'
 export { WaitlistProvider, useWaitlist } from './waitlist-context'
 export { WaitlistDialog } from './waitlist-dialog'
 export { MarketingNav } from './marketing-nav'
-export { MarketingLayoutClient } from './marketing-layout-client'
 
 // Home page sections
 export { HeroSection, FeaturesSection, ValuePropsSection, CommunitySection, CTASection } from './home'
