@@ -8,6 +8,8 @@ import { WidgetChannel } from './widget-channel'
 import { SlackChannel } from './slack-channel'
 import { GongChannel } from './gong-channel'
 import { IntercomChannel } from './intercom-channel'
+import { CustomTagsSection } from './custom-tags-section'
+import { useCustomTags } from '@/hooks/use-custom-tags'
 
 interface WidgetData {
   variant: WidgetVariant
@@ -23,7 +25,18 @@ interface WidgetData {
 }
 
 export function SessionsStep({ context, onValidationChange, title, description }: StepProps) {
-  const { formData, setFormData, integrations, mode } = context
+  const { formData, setFormData, integrations, mode, projectId } = context
+
+  // Custom tags hook (only active in edit mode when we have a projectId)
+  const {
+    tags: customTags,
+    isLoading: isLoadingTags,
+    error: tagsError,
+    canAddMore,
+    createTag,
+    updateTag,
+    deleteTag,
+  } = useCustomTags({ projectId })
 
   // Sessions step is always valid (optional)
   useEffect(() => {
@@ -68,6 +81,24 @@ export function SessionsStep({ context, onValidationChange, title, description }
           />
         </div>
       </div>
+
+      {/* Custom Tags - Only show in edit mode */}
+      {mode === 'edit' && projectId && (
+        <div className="mb-6">
+          <h3 className="text-xs font-medium text-[color:var(--text-secondary)] uppercase tracking-wide mb-2">
+            Custom Classification Tags
+          </h3>
+          <CustomTagsSection
+            tags={customTags}
+            isLoading={isLoadingTags}
+            error={tagsError}
+            canAddMore={canAddMore}
+            onCreateTag={createTag}
+            onUpdateTag={updateTag}
+            onDeleteTag={deleteTag}
+          />
+        </div>
+      )}
 
       {/* Integrations */}
       <div>

@@ -287,9 +287,6 @@ export default function PrivacyPolicyPage() {
           <p>
             <strong>Email:</strong> privacy@hissuno.com
           </p>
-          <p>
-            <strong>Data Protection Officer:</strong> dpo@hissuno.com
-          </p>
         </section>
       </div>
     </article>

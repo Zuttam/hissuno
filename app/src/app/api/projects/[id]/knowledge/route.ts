@@ -124,7 +124,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const body = await request.json()
     const { category, content } = body as { category: KnowledgeCategory; content: string }
 
-    if (!category || !['business', 'product', 'technical'].includes(category)) {
+    if (!category || !['business', 'product', 'technical', 'faq', 'how_to'].includes(category)) {
       return NextResponse.json({ error: 'Invalid category.' }, { status: 400 })
     }
 

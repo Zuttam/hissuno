@@ -2,6 +2,7 @@
 
 import type { Subscription, Plan } from '@/types/billing'
 import { FloatingCard } from '@/components/ui/floating-card'
+import { Heading } from '@/components/ui'
 
 interface CurrentPlanSectionProps {
   subscription: Subscription | null
@@ -51,7 +52,7 @@ export function CurrentPlanSection({
       className="space-y-4 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
     >
       <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Current Plan</h2>
+        <Heading as="h2" size="section">Current Plan</Heading>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Your active subscription details.
         </p>
@@ -107,6 +108,35 @@ export function CurrentPlanSection({
                 />
               </svg>
             </a>
+          )}
+        </div>
+      ) : subscription ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-slate-50">
+                {subscription.plan_name.charAt(0).toUpperCase() + subscription.plan_name.slice(1)}
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Custom plan</p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusBadge(subscription.status)}`}
+            >
+              {formatStatus(subscription.status)}
+            </span>
+          </div>
+
+          {subscription.current_period_end && (
+            <div className="rounded-2xl bg-slate-100/70 p-4 text-sm dark:bg-slate-800/60">
+              <div className="flex justify-between">
+                <span className="text-slate-600 dark:text-slate-400">
+                  {subscription.status === 'on_trial' ? 'Trial ends' : 'Next billing date'}
+                </span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">
+                  {formatDate(subscription.current_period_end)}
+                </span>
+              </div>
+            </div>
           )}
         </div>
       ) : (

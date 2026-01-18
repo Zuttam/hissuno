@@ -5,6 +5,9 @@ import { USER_EMAIL_HEADER, USER_ID_HEADER } from '@/lib/auth/server'
 const PUBLIC_PATH_PREFIXES = [
   '/login',
   '/sign-up',
+  '/legal',
+  '/landing',
+
   '/auth/callback',
   '/api/auth',
   '/api/agent',

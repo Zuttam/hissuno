@@ -246,7 +246,12 @@ export async function syncGitHubCodebase(params: {
 
       // Pull latest changes
       console.log('[codebase.sync] Pulling latest changes for', owner, repo, branch)
-      const pullResult = await pullRepository({ projectId, branch })
+      const pullResult = await pullRepository({
+        projectId,
+        branch,
+        repositoryUrl: codebase.repository_url,
+        token,
+      })
 
       // Update database record
       const { error: updateError } = await supabase

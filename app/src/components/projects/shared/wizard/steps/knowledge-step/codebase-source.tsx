@@ -19,6 +19,8 @@ interface CodebaseSourceProps {
   defaultExpanded?: boolean
 }
 
+const MANAGE_REPOS_VALUE = '__manage_repos__'
+
 export function CodebaseSource({
   codebase,
   github,
@@ -52,7 +54,17 @@ export function CodebaseSource({
           <FormField label="Repository">
             <Select
               value={codebase.fullName || ''}
-              onChange={onRepoChange}
+              onChange={(e) => {
+                if (e.target.value === MANAGE_REPOS_VALUE && github.installationId) {
+                  window.open(
+                    `https://github.com/settings/installations/${github.installationId}`,
+                    '_blank'
+                  )
+                  e.target.value = codebase.fullName || ''
+                  return
+                }
+                onRepoChange(e)
+              }}
               disabled={isLoadingRepos}
             >
               <option value="">
@@ -63,6 +75,12 @@ export function CodebaseSource({
                   {repo.fullName}
                 </option>
               ))}
+              {github.installationId && (
+                <>
+                  <option disabled>───────────</option>
+                  <option value={MANAGE_REPOS_VALUE}>+ Add more repositories...</option>
+                </>
+              )}
             </Select>
           </FormField>
 

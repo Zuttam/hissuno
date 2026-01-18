@@ -61,6 +61,8 @@ export const compiledKnowledgeSchema = z.object({
   business: z.string(),
   product: z.string(),
   technical: z.string(),
+  faq: z.string(),
+  how_to: z.string(),
 })
 
 export type CompiledKnowledge = z.infer<typeof compiledKnowledgeSchema>
@@ -71,6 +73,8 @@ export const redactionSummarySchema = z.object({
     business: z.number(),
     product: z.number(),
     technical: z.number(),
+    faq: z.number(),
+    how_to: z.number(),
   }),
   types: z.array(z.string()),
 })
@@ -81,6 +85,8 @@ export const sanitizedKnowledgeSchema = z.object({
   business: z.string(),
   product: z.string(),
   technical: z.string(),
+  faq: z.string(),
+  how_to: z.string(),
   redactionSummary: redactionSummarySchema,
 })
 
@@ -101,3 +107,24 @@ export const workflowOutputSchema = z.object({
 })
 
 export type WorkflowOutput = z.infer<typeof workflowOutputSchema>
+
+// ============================================================================
+// EMBEDDING STEP SCHEMAS
+// ============================================================================
+
+export const embeddingResultSchema = z.object({
+  success: z.boolean(),
+  chunksEmbedded: z.number(),
+  embeddingErrors: z.array(z.string()),
+})
+
+export type EmbeddingResult = z.infer<typeof embeddingResultSchema>
+
+export const workflowWithEmbeddingOutputSchema = z.object({
+  saved: z.boolean(),
+  packages: z.array(knowledgePackageSchema),
+  errors: z.array(z.string()),
+  embedding: embeddingResultSchema,
+})
+
+export type WorkflowWithEmbeddingOutput = z.infer<typeof workflowWithEmbeddingOutputSchema>

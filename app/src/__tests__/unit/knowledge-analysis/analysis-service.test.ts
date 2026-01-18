@@ -22,6 +22,8 @@ vi.mock('@/mastra', () => ({
 // Mock the codebase sync
 vi.mock('@/lib/codebase', () => ({
   syncGitHubCodebase: vi.fn(() => Promise.resolve({ status: 'success', commitSha: 'abc123' })),
+  getProjectCodebasePath: vi.fn((projectId: string, branch: string) => `/tmp/codebase/${projectId}/${branch}`),
+  cleanupProjectCodebase: vi.fn(() => Promise.resolve()),
 }))
 
 // ============================================================================
@@ -269,17 +271,23 @@ describe('triggerKnowledgeAnalysis', () => {
         projects: {
           data: {
             id: 'project-123',
-            source_code: {
-              id: 'sc-1',
-              storage_uri: 'projects/123/codebase',
-              kind: 'upload',
-            },
+            source_code: null, // Not used - source_code is joined via knowledge_sources
           },
           error: null,
         },
         knowledge_sources: {
           data: [
-            { id: 'source-1', type: 'codebase', enabled: true },
+            {
+              id: 'source-1',
+              type: 'codebase',
+              enabled: true,
+              source_code: {
+                id: 'sc-1',
+                kind: 'github',
+                repository_url: 'https://github.com/test/repo',
+                repository_branch: 'main',
+              },
+            },
           ],
           error: null,
         },
@@ -306,17 +314,23 @@ describe('triggerKnowledgeAnalysis', () => {
         projects: {
           data: {
             id: 'project-123',
-            source_code: {
-              id: 'sc-1',
-              storage_uri: 'projects/123/codebase',
-              kind: 'upload',
-            },
+            source_code: null, // Not used - source_code is joined via knowledge_sources
           },
           error: null,
         },
         knowledge_sources: {
           data: [
-            { id: 'source-1', type: 'codebase', enabled: false },
+            {
+              id: 'source-1',
+              type: 'codebase',
+              enabled: false,
+              source_code: {
+                id: 'sc-1',
+                kind: 'github',
+                repository_url: 'https://github.com/test/repo',
+                repository_branch: 'main',
+              },
+            },
             { id: 'source-2', type: 'raw_text', enabled: true, content: 'test' },
           ],
           error: null,
@@ -347,7 +361,7 @@ describe('triggerKnowledgeAnalysis', () => {
         },
         knowledge_sources: {
           data: [
-            { id: 'source-1', type: 'codebase', enabled: true },
+            { id: 'source-1', type: 'codebase', enabled: true, source_code: null },
             { id: 'source-2', type: 'raw_text', enabled: true, content: 'test' },
           ],
           error: null,
@@ -458,18 +472,24 @@ describe('triggerKnowledgeAnalysis', () => {
         projects: {
           data: {
             id: 'project-123',
-            source_code: {
-              id: 'sc-1',
-              storage_uri: null,
-              kind: 'github',
-              repository_url: 'https://github.com/test/repo',
-              repository_branch: 'main',
-            },
+            source_code: null, // Not used - source_code is joined via knowledge_sources
           },
           error: null,
         },
         knowledge_sources: {
-          data: [{ id: 'source-1', type: 'codebase', enabled: true }],
+          data: [
+            {
+              id: 'source-1',
+              type: 'codebase',
+              enabled: true,
+              source_code: {
+                id: 'sc-1',
+                kind: 'github',
+                repository_url: 'https://github.com/test/repo',
+                repository_branch: 'main',
+              },
+            },
+          ],
           error: null,
         },
         project_analyses_insert: {

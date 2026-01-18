@@ -1,8 +1,8 @@
 import { cache } from 'react'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
-import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, CreateSessionInput, CreateMessageInput } from '@/types/session'
-import { mastra } from '@/mastra'
+import { saveSessionMessage } from './session-messages'
+import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, CreateSessionInput } from '@/types/session'
 
 const selectSessionWithProject = '*, project:projects(id, name)'
 const selectSessionWithLinkedIssues = `
@@ -321,10 +321,11 @@ export const getProjectSessions = cache(async (projectId: string, limit = 5): Pr
 
 /**
  * Updates tags for a session. Uses admin client for workflow/API use.
+ * Accepts both native SessionTag values and custom label slugs as strings.
  */
 export async function updateSessionTags(
   sessionId: string,
-  tags: SessionTag[],
+  tags: string[],
   autoApplied = false
 ): Promise<{ success: boolean; error?: string }> {
   if (!isServiceRoleConfigured()) {
@@ -485,24 +486,20 @@ export async function createManualSession(input: CreateSessionInput): Promise<Se
       throw new Error('Unable to create session.')
     }
 
-    // Store messages in Mastra storage if provided
+    // Store messages in session_messages table if provided
     if (input.messages && input.messages.length > 0) {
       try {
-        const storage = mastra.getStorage()
-        if (storage) {
-          const mastraMessages = input.messages.map((msg, index) => ({
-            id: crypto.randomUUID(),
-            threadId: sessionId,
-            type: 'text' as const,
-            role: msg.role,
+        for (const msg of input.messages) {
+          await saveSessionMessage({
+            sessionId,
+            projectId: input.project_id,
+            senderType: msg.role === 'user' ? 'user' : 'ai',
             content: msg.content,
-            createdAt: new Date(now.getTime() + index * 1000), // Stagger by 1 second for ordering
-          }))
-          await storage.saveMessages({ messages: mastraMessages })
+          })
         }
-      } catch (mastraError) {
-        console.error('[supabase.sessions] Failed to store messages in Mastra:', mastraError)
-        // Continue even if Mastra storage fails - the session is created
+      } catch (msgError) {
+        console.error('[supabase.sessions] Failed to store messages:', msgError)
+        // Continue even if message storage fails - the session is created
       }
     }
 

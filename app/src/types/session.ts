@@ -176,3 +176,73 @@ export interface CreateSessionInput {
   tags?: SessionTag[]
   messages?: CreateMessageInput[]
 }
+
+/**
+ * Custom tag record from database
+ */
+export interface CustomTagRecord {
+  id: string
+  project_id: string
+  name: string
+  slug: string
+  description: string
+  color: string
+  position: number
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Input for creating/updating a custom tag
+ */
+export interface CustomTagInput {
+  name: string
+  slug: string
+  description: string
+  color?: string
+  position?: number
+}
+
+/**
+ * Badge color variants for tags
+ */
+export type TagColorVariant = 'info' | 'success' | 'danger' | 'warning' | 'default'
+
+/**
+ * Check if a tag is a native (built-in) tag
+ */
+export function isNativeTag(tag: string): tag is SessionTag {
+  return SESSION_TAGS.includes(tag as SessionTag)
+}
+
+/**
+ * Get display info for a tag (native or custom)
+ */
+export function getTagInfo(
+  tag: string,
+  customTags: CustomTagRecord[] = []
+): { label: string; variant: TagColorVariant; isCustom: boolean } {
+  if (isNativeTag(tag)) {
+    return {
+      label: SESSION_TAG_INFO[tag].label,
+      variant: SESSION_TAG_INFO[tag].variant,
+      isCustom: false,
+    }
+  }
+
+  const customTag = customTags.find((t) => t.slug === tag)
+  if (customTag) {
+    return {
+      label: customTag.name,
+      variant: (customTag.color as TagColorVariant) || 'default',
+      isCustom: true,
+    }
+  }
+
+  // Unknown tag - render as default
+  return {
+    label: tag,
+    variant: 'default',
+    isCustom: false,
+  }
+}

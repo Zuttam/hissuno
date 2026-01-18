@@ -78,6 +78,7 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
         <FloatingCard floating="gentle">
           <KnowledgeManagementCard
             projectId={projectId}
+            onTestAgent={() => setIsTesting(true)}
           />
         </FloatingCard>
         <FloatingCard floating="gentle">

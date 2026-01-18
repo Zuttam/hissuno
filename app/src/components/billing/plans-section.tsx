@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { Plan } from '@/types/billing'
 import { FloatingCard } from '@/components/ui/floating-card'
-import { Button } from '@/components/ui/button'
+import { Button, Heading } from '@/components/ui'
 import { cn } from '@/lib/utils/class'
 
 interface PlansSectionProps {
@@ -62,7 +62,7 @@ export function PlansSection({ plans, currentPlanId, onPlanChange }: PlansSectio
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">Available Plans</h2>
+        <Heading as="h2" size="section">Available Plans</Heading>
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Compare plans and upgrade to unlock more features.
         </p>

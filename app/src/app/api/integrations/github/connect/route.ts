@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { getGitHubOAuthUrl } from '@/lib/integrations/github/app-client'
 
 export const runtime = 'nodejs'
 
 /**
  * GET /api/integrations/github/connect?projectId=xxx
- * Initiates GitHub OAuth flow
+ * Initiates GitHub App installation flow
  */
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
@@ -15,11 +14,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID
-  const redirectUri = process.env.GITHUB_REDIRECT_URI
+  const appSlug = process.env.GITHUB_APP_SLUG
 
-  if (!clientId || !redirectUri) {
-    console.error('[integrations.github.connect] Missing GitHub OAuth configuration')
+  if (!appSlug) {
+    console.error('[integrations.github.connect] Missing GITHUB_APP_SLUG configuration')
     return NextResponse.json({ error: 'GitHub integration not configured.' }, { status: 500 })
   }
 
@@ -75,14 +73,12 @@ export async function GET(request: NextRequest) {
       })
     ).toString('base64url')
 
-    const oauthUrl = getGitHubOAuthUrl({
-      clientId,
-      redirectUri,
-      state,
-    })
+    // Build GitHub App installation URL
+    const installUrl = new URL(`https://github.com/apps/${appSlug}/installations/new`)
+    installUrl.searchParams.set('state', state)
 
-    // Redirect to GitHub OAuth
-    return NextResponse.redirect(oauthUrl)
+    // Redirect to GitHub App installation
+    return NextResponse.redirect(installUrl.toString())
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })

@@ -151,11 +151,12 @@ export async function GET(request: NextRequest) {
         if (isClosed) return
 
         try {
-          // Check for new human messages
+          // Check for new human agent messages only (ai/user messages are handled by the stream)
           let query = supabase
             .from('session_messages')
             .select('id, content, sender_type, created_at')
             .eq('session_id', sessionId)
+            .eq('sender_type', 'human_agent')
             .order('created_at', { ascending: true })
 
           if (lastMessageId) {

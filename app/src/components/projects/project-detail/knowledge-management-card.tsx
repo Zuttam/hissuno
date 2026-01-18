@@ -13,6 +13,7 @@ import {
 
 interface KnowledgeManagementCardProps {
   projectId: string
+  onTestAgent?: () => void
 }
 
 interface AnalysisStatus {
@@ -42,7 +43,7 @@ interface KnowledgePackage {
   generated_at: string
 }
 
-export function KnowledgeManagementCard({ projectId }: KnowledgeManagementCardProps) {
+export function KnowledgeManagementCard({ projectId, onTestAgent }: KnowledgeManagementCardProps) {
   const [sources, setSources] = useState<KnowledgeSourceRecord[]>([])
   const [packages, setPackages] = useState<KnowledgePackage[]>([])
   const [hasKnowledge, setHasKnowledge] = useState(false)
@@ -276,6 +277,11 @@ export function KnowledgeManagementCard({ projectId }: KnowledgeManagementCardPr
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {hasKnowledge && !isAnalyzing && onTestAgent && (
+            <Button onClick={onTestAgent} variant="secondary">
+              Test Agent
+            </Button>
+          )}
           {isAnalyzing && (
             <Button
               onClick={handleCancelAnalysis}
@@ -488,7 +494,7 @@ function KnowledgeSection({ packages, isLoading, projectId, onPackageUpdated }: 
     )
   }
 
-  const categories: KnowledgeCategory[] = ['business', 'product', 'technical']
+  const categories: KnowledgeCategory[] = ['business', 'product', 'technical', 'faq', 'how_to']
   const activePackage = packages.find((p) => p.category === activeCategory)
 
   return (

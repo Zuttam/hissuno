@@ -136,7 +136,10 @@ export async function GET(request: NextRequest) {
         if (!isClosed) {
           try {
             controller.enqueue(data)
-            console.log(`${LOG_PREFIX} Enqueued event:`, eventType ?? 'unknown')
+            // Only log non-chunk events to avoid terminal spam
+            if (eventType && eventType !== 'message-chunk') {
+              console.log(`${LOG_PREFIX} Enqueued event:`, eventType)
+            }
           } catch (enqueueError) {
             console.error(`${LOG_PREFIX} Failed to enqueue:`, enqueueError)
             isClosed = true

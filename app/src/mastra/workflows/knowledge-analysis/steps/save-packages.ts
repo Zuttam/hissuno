@@ -20,7 +20,7 @@ export const saveKnowledgePackages = createStep({
 
     await writer?.write({ type: 'progress', message: 'Saving knowledge packages...' })
 
-    const { business, product, technical, redactionSummary } = inputData
+    const { business, product, technical, faq, how_to, redactionSummary } = inputData
     const initData = getInitData?.() as { 
       projectId: string
       analysisId?: string
@@ -50,6 +50,8 @@ export const saveKnowledgePackages = createStep({
         { key: 'business' as const, content: business },
         { key: 'product' as const, content: product },
         { key: 'technical' as const, content: technical },
+        { key: 'faq' as const, content: faq },
+        { key: 'how_to' as const, content: how_to },
       ]
 
       for (const { key, content } of categories) {

@@ -2,10 +2,12 @@
  * Knowledge Tools for Support Agent
  *
  * These tools allow the support agent to dynamically access project knowledge packages
- * based on the type of question being asked. Knowledge is organized into three categories:
+ * based on the type of question being asked. Knowledge is organized into five categories:
  * - business: Company info, mission, values, policies, pricing
- * - product: Features, capabilities, user guides, FAQs
+ * - product: Features, capabilities, limitations
  * - technical: Architecture, APIs, integrations, technical specs
+ * - faq: Frequently asked questions and answers
+ * - how_to: Step-by-step guides and tutorials
  *
  * NOTE: These tools expect `projectId` to be available in the RuntimeContext.
  * The API route sets this automatically when handling widget requests.
@@ -15,9 +17,9 @@ import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/server'
 import { downloadKnowledgePackage } from '@/lib/knowledge/storage'
-import type { KnowledgeCategory, KnowledgePackageRecord } from '@/lib/knowledge/types'
+import type { KnowledgeCategory } from '@/lib/knowledge/types'
 
-const KNOWLEDGE_CATEGORIES: KnowledgeCategory[] = ['business', 'product', 'technical']
+const KNOWLEDGE_CATEGORIES: KnowledgeCategory[] = ['business', 'product', 'technical', 'faq', 'how_to']
 
 /**
  * Helper to get projectId from runtimeContext with validation
@@ -41,13 +43,13 @@ export const listProjectKnowledgeTool = createTool({
   id: 'list-project-knowledge',
   description: `List all available knowledge packages for the current project.
 Use this tool first to understand what knowledge is available before retrieving specific packages.
-Returns the categories (business, product, technical) that have been compiled, along with version info.
+Returns the categories (business, product, technical, faq, how_to) that have been compiled, along with version info.
 Note: The project is automatically determined from the conversation context.`,
   inputSchema: z.object({}),
   outputSchema: z.object({
     packages: z.array(
       z.object({
-        category: z.enum(['business', 'product', 'technical']),
+        category: z.enum(['business', 'product', 'technical', 'faq', 'how_to']),
         version: z.number(),
         generatedAt: z.string(),
         storagePath: z.string(),
@@ -119,16 +121,18 @@ export const getKnowledgePackageTool = createTool({
   description: `Retrieve the full content of a specific knowledge package by category.
 Use this when you know which category of knowledge is most relevant to the user's question:
 - business: Company info, mission, values, policies, pricing, business model
-- product: Features, capabilities, how-to guides, FAQs, user documentation
+- product: Features, capabilities, limitations, user documentation
 - technical: Architecture, APIs, integrations, technical specifications, developer docs
+- faq: Frequently asked questions and answers organized by topic
+- how_to: Step-by-step guides, tutorials, and best practices
 Note: The project is automatically determined from the conversation context.`,
   inputSchema: z.object({
     category: z
-      .enum(['business', 'product', 'technical'])
+      .enum(['business', 'product', 'technical', 'faq', 'how_to'])
       .describe('The knowledge category to retrieve'),
   }),
   outputSchema: z.object({
-    category: z.enum(['business', 'product', 'technical']),
+    category: z.enum(['business', 'product', 'technical', 'faq', 'how_to']),
     content: z.string(),
     version: z.number(),
     generatedAt: z.string(),
@@ -223,14 +227,14 @@ Note: The project is automatically determined from the conversation context.`,
   inputSchema: z.object({
     query: z.string().describe('The search query or keywords to find'),
     categories: z
-      .array(z.enum(['business', 'product', 'technical']))
+      .array(z.enum(['business', 'product', 'technical', 'faq', 'how_to']))
       .optional()
       .describe('Optional: limit search to specific categories'),
   }),
   outputSchema: z.object({
     results: z.array(
       z.object({
-        category: z.enum(['business', 'product', 'technical']),
+        category: z.enum(['business', 'product', 'technical', 'faq', 'how_to']),
         snippet: z.string(),
         relevanceContext: z.string(),
       })
@@ -347,9 +351,102 @@ Note: The project is automatically determined from the conversation context.`,
   },
 })
 
+/**
+ * Semantic search across knowledge packages using vector similarity
+ */
+export const semanticSearchKnowledgeTool = createTool({
+  id: 'semantic-search-knowledge',
+  description: `Search knowledge using semantic similarity (AI-powered search).
+Use this for natural language questions that may not contain exact keywords.
+Returns the most semantically relevant chunks from the knowledge base.
+
+This is the PREFERRED search method for most questions. It understands meaning,
+not just keywords. For example:
+- "How do I get started?" finds onboarding content even without those exact words
+- "What are the pricing options?" finds pricing info using semantic understanding
+- "Can I integrate with third-party services?" finds integration docs
+
+The tool automatically finds content that is conceptually similar to your query.
+Note: The project is automatically determined from the conversation context.`,
+  inputSchema: z.object({
+    query: z.string().describe('Natural language question or search query'),
+    categories: z
+      .array(z.enum(['business', 'product', 'technical', 'faq', 'how_to']))
+      .optional()
+      .describe('Optional: limit search to specific categories'),
+    limit: z
+      .number()
+      .min(1)
+      .max(10)
+      .default(5)
+      .optional()
+      .describe('Maximum results to return (default: 5)'),
+  }),
+  outputSchema: z.object({
+    results: z.array(
+      z.object({
+        category: z.enum(['business', 'product', 'technical', 'faq', 'how_to']),
+        chunk: z.string(),
+        sectionHeading: z.string().nullable(),
+        parentContext: z.array(z.string()),
+        similarity: z.number(),
+      })
+    ),
+    searchedCategories: z.array(z.string()),
+    totalResults: z.number(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, runtimeContext }) => {
+    const { query, categories, limit = 5 } = context
+    const projectId = getProjectIdFromContext(runtimeContext)
+
+    if (!projectId) {
+      return {
+        results: [],
+        searchedCategories: [],
+        totalResults: 0,
+        error: 'Project context not available. Unable to search knowledge.',
+      }
+    }
+
+    try {
+      const { searchKnowledgeEmbeddings } = await import('@/lib/knowledge/embedding-service')
+
+      const searchResults = await searchKnowledgeEmbeddings(projectId, query, {
+        categories: categories as KnowledgeCategory[] | undefined,
+        limit,
+        similarityThreshold: 0.65,
+      })
+
+      const results = searchResults.map((result) => ({
+        category: result.category,
+        chunk: result.chunkText,
+        sectionHeading: result.sectionHeading,
+        parentContext: result.parentHeadings,
+        similarity: Math.round(result.similarity * 100) / 100,
+      }))
+
+      return {
+        results,
+        searchedCategories: categories ?? KNOWLEDGE_CATEGORIES,
+        totalResults: results.length,
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      return {
+        results: [],
+        searchedCategories: [],
+        totalResults: 0,
+        error: message,
+      }
+    }
+  },
+})
+
 // Export all tools as an array for easy registration
 export const knowledgeTools = [
   listProjectKnowledgeTool,
   getKnowledgePackageTool,
   searchKnowledgeTool,
+  semanticSearchKnowledgeTool,
 ]

@@ -272,8 +272,8 @@ export function ProjectWizard({
           description: formData.description.trim() || null,
         })
 
-        // Update settings
-        await fetch(`/api/projects/${projectId}/settings`, {
+        // Update widget settings
+        await fetch(`/api/projects/${projectId}/settings/widget`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -282,22 +282,30 @@ export function ProjectWizard({
             widget_position: formData.widget.position,
             widget_title: formData.widget.title,
             widget_initial_message: formData.widget.initialMessage,
-            session_idle_timeout_minutes: formData.widget.idleTimeoutMinutes,
-            session_goodbye_delay_seconds: formData.widget.goodbyeDelaySeconds,
-            session_idle_response_timeout_seconds: formData.widget.idleResponseTimeoutSeconds,
-            issue_tracking_enabled: formData.issues.trackingEnabled,
-            issue_spec_threshold: formData.issues.specThreshold,
-            spec_guidelines: formData.issues.specGuidelines,
+            allowed_origins: formData.widget.allowedOrigins,
+            widget_token_required: formData.widget.tokenRequired,
           }),
         })
 
-        // Update allowed origins and token requirement (now in project_settings)
-        await fetch(`/api/projects/${projectId}/settings`, {
+        // Update session lifecycle settings
+        await fetch(`/api/projects/${projectId}/settings/sessions`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            allowed_origins: formData.widget.allowedOrigins,
-            widget_token_required: formData.widget.tokenRequired,
+            session_idle_timeout_minutes: formData.widget.idleTimeoutMinutes,
+            session_goodbye_delay_seconds: formData.widget.goodbyeDelaySeconds,
+            session_idle_response_timeout_seconds: formData.widget.idleResponseTimeoutSeconds,
+          }),
+        })
+
+        // Update issue tracking settings
+        await fetch(`/api/projects/${projectId}/settings/issues`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            issue_tracking_enabled: formData.issues.trackingEnabled,
+            issue_spec_threshold: formData.issues.specThreshold,
+            spec_guidelines: formData.issues.specGuidelines,
           }),
         })
 

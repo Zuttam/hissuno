@@ -1,15 +1,17 @@
 'use client'
 
-import Link from 'next/link'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui'
 import { useWaterWebGLOptional } from '@/components/water-webgl/WaterWebGLContext'
+import { useWaitlist } from '@/components/landing/waitlist-context'
 
 export function CTASection() {
   const water = useWaterWebGLOptional()
+  const { openWaitlistDialog } = useWaitlist()
 
   const handleButtonClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
+    openWaitlistDialog()
   }
 
   return (
@@ -40,7 +42,7 @@ export function CTASection() {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          Start your free trial today. No credit card required.
+          Join the waitlist to be first in line when we launch.
         </motion.p>
         <motion.div
           className="mt-8"
@@ -49,14 +51,13 @@ export function CTASection() {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <Link href="/sign-up" onClick={handleButtonClick}>
-            <Button
-              size="lg"
-              className="bg-[var(--accent-teal)] hover:bg-[var(--accent-teal-hover)]"
-            >
-              Get Started Free
-            </Button>
-          </Link>
+          <Button
+            size="lg"
+            onClick={handleButtonClick}
+            className="bg-[var(--accent-teal)] hover:bg-[var(--accent-teal-hover)]"
+          >
+            Join the Waitlist
+          </Button>
         </motion.div>
       </div>
     </section>

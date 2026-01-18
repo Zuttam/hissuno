@@ -1,6 +1,6 @@
-import Image from 'next/image'
 import { LoginForm } from '@/components/auth/login-form'
 import { getSafeRedirectPath } from '@/lib/auth/server'
+import { ThemeLogo } from '@/components/ui'
 
 interface LoginPageProps {
   searchParams?: Promise<Record<string, string | string[] | undefined>>
@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <div className="w-full max-w-md space-y-6 rounded-3xl border border-slate-200 bg-white/80 p-10 shadow-xl shadow-slate-900/5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/60 dark:shadow-none">
         <header className="space-y-4 text-center">
           <div className="flex justify-center">
-            <Image src="/logo.png" alt="Hissuno logo" width={300} height={100} priority />
+            <ThemeLogo width={300} height={100} priority />
           </div>
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">

@@ -52,7 +52,7 @@ export function FormField({
             {description}
           </span>
         ) : null}
-        <div className="mt-2 space-y-2">{children}</div>
+        <div>{children}</div>
         {supportingText ? (
           <span
             className={

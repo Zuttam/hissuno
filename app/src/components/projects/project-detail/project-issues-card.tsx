@@ -4,35 +4,18 @@ import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
 import { Badge, Spinner } from '@/components/ui'
 import { cn } from '@/lib/utils/class'
-import type { IssueWithProject, ProjectSettingsRecord } from '@/types/issue'
+import type { IssueWithProject } from '@/types/issue'
+import type { IssueSettings } from '@/lib/supabase/project-settings/types'
+import { DEFAULT_ISSUE_SETTINGS } from '@/lib/supabase/project-settings/types'
 
 interface ProjectIssuesCardProps {
   projectId: string
   settingsVersion?: number
 }
 
-const DEFAULT_SETTINGS: Omit<ProjectSettingsRecord, 'project_id' | 'created_at' | 'updated_at'> = {
-  issue_spec_threshold: 3,
-  issue_tracking_enabled: true,
-  spec_guidelines: null,
-  // Widget defaults (not displayed in this component)
-  widget_variant: 'popup',
-  widget_theme: 'light',
-  widget_position: 'bottom-right',
-  widget_title: 'Support',
-  widget_initial_message: 'Hi! How can I help you today?',
-  // Widget security defaults
-  allowed_origins: [],
-  widget_token_required: false,
-  // Session lifecycle defaults
-  session_idle_timeout_minutes: 5,
-  session_goodbye_delay_seconds: 90,
-  session_idle_response_timeout_seconds: 60,
-}
-
 export function ProjectIssuesCard({ projectId, settingsVersion }: ProjectIssuesCardProps) {
   const [issues, setIssues] = useState<IssueWithProject[]>([])
-  const [settings, setSettings] = useState<ProjectSettingsRecord | null>(null)
+  const [settings, setSettings] = useState<IssueSettings | null>(null)
   const [isLoadingIssues, setIsLoadingIssues] = useState(true)
   const [isLoadingSettings, setIsLoadingSettings] = useState(true)
   const [issuesError, setIssuesError] = useState<string | null>(null)
@@ -61,7 +44,7 @@ export function ProjectIssuesCard({ projectId, settingsVersion }: ProjectIssuesC
     setIsLoadingSettings(true)
     setSettingsError(null)
     try {
-      const response = await fetch(`/api/projects/${projectId}/settings`, {
+      const response = await fetch(`/api/projects/${projectId}/settings/issues`, {
         cache: 'no-store',
       })
       if (!response.ok) {
@@ -81,8 +64,7 @@ export function ProjectIssuesCard({ projectId, settingsVersion }: ProjectIssuesC
     void fetchSettings()
   }, [fetchIssues, fetchSettings, settingsVersion])
 
-  const isLoading = isLoadingIssues || isLoadingSettings
-  const displaySettings = settings ?? { ...DEFAULT_SETTINGS, project_id: projectId, created_at: '', updated_at: '' }
+  const displaySettings = settings ?? DEFAULT_ISSUE_SETTINGS
 
   return (
     <div className="lg:col-span-2">

@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { Badge, Spinner } from '@/components/ui'
-import type { SessionWithProject, ChatMessage, SessionStatus, SessionTag, SessionSource } from '@/types/session'
+import type { SessionWithProject, ChatMessage, SessionStatus, SessionSource } from '@/types/session'
 import { SESSION_SOURCE_INFO } from '@/types/session'
 import { useSessionReview } from '@/hooks/use-session-review'
 import { SessionChat } from './session-chat'
@@ -40,7 +40,7 @@ export function SessionSidebar({
     triggerReview,
   } = useSessionReview({ sessionId: session?.id ?? null })
   const [showReviewResult, setShowReviewResult] = useState(false)
-  const [localTags, setLocalTags] = useState<SessionTag[]>(session?.tags ?? [])
+  const [localTags, setLocalTags] = useState<string[]>(session?.tags ?? [])
 
   // Sync local tags with session tags
   useEffect(() => {
@@ -67,7 +67,7 @@ export function SessionSidebar({
     await triggerReview()
   }, [session, triggerReview])
 
-  const handleTagsUpdated = useCallback((tags: SessionTag[]) => {
+  const handleTagsUpdated = useCallback((tags: string[]) => {
     setLocalTags(tags)
     onSessionUpdated?.()
   }, [onSessionUpdated])
@@ -494,7 +494,7 @@ interface SessionReviewSectionProps {
   showResult: boolean
   currentPhase: 'classify' | 'pm-review' | null
   progressMessage: string | null
-  reviewTags: SessionTag[]
+  reviewTags: string[]
   onTriggerReview: () => void
 }
 

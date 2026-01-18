@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react'
 import { Input, Select, Checkbox } from '@/components/ui'
-import type { SessionFilters, SessionTag } from '@/types/session'
+import type { SessionFilters } from '@/types/session'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import { SessionTagFilter } from './session-tag-filter'
 
@@ -61,7 +61,7 @@ export function SessionsFilters({
   )
 
   const handleTagsChange = useCallback(
-    (tags: SessionTag[]) => {
+    (tags: string[]) => {
       onFilterChange({ ...filters, tags: tags.length > 0 ? tags : undefined })
     },
     [filters, onFilterChange]

@@ -81,41 +81,91 @@ export type Database = {
           },
         ]
       }
+      custom_tags: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string
+          id: string
+          name: string
+          position: number
+          project_id: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          name: string
+          position?: number
+          project_id: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          name?: string
+          position?: number
+          project_id?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_tags_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       github_app_installations: {
         Row: {
-          access_token: string
+          access_token: string | null
           account_id: number
           account_login: string
           created_at: string | null
           id: string
+          installation_id: number | null
           installed_by_email: string | null
           installed_by_user_id: string | null
           project_id: string
           scope: string | null
+          target_type: string | null
           updated_at: string | null
         }
         Insert: {
-          access_token: string
+          access_token?: string | null
           account_id: number
           account_login: string
           created_at?: string | null
           id?: string
+          installation_id?: number | null
           installed_by_email?: string | null
           installed_by_user_id?: string | null
           project_id: string
           scope?: string | null
+          target_type?: string | null
           updated_at?: string | null
         }
         Update: {
-          access_token?: string
+          access_token?: string | null
           account_id?: number
           account_login?: string
           created_at?: string | null
           id?: string
+          installation_id?: number | null
           installed_by_email?: string | null
           installed_by_user_id?: string | null
           project_id?: string
           scope?: string | null
+          target_type?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -267,6 +317,72 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "issues_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_embeddings: {
+        Row: {
+          category: string
+          chunk_end_line: number | null
+          chunk_index: number
+          chunk_start_line: number | null
+          chunk_text: string
+          created_at: string
+          embedding: string
+          id: string
+          package_id: string
+          parent_headings: string[] | null
+          project_id: string
+          section_heading: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          category: string
+          chunk_end_line?: number | null
+          chunk_index: number
+          chunk_start_line?: number | null
+          chunk_text: string
+          created_at?: string
+          embedding: string
+          id?: string
+          package_id: string
+          parent_headings?: string[] | null
+          project_id: string
+          section_heading?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          category?: string
+          chunk_end_line?: number | null
+          chunk_index?: number
+          chunk_start_line?: number | null
+          chunk_text?: string
+          created_at?: string
+          embedding?: string
+          id?: string
+          package_id?: string
+          parent_headings?: string[] | null
+          project_id?: string
+          section_heading?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_embeddings_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "knowledge_embeddings_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -971,7 +1087,6 @@ export type Database = {
           selected_use_cases: string[] | null
           updated_at: string
           user_id: string
-          welcome_email_sent_at: string | null
         }
         Insert: {
           company_name?: string | null
@@ -985,7 +1100,6 @@ export type Database = {
           selected_use_cases?: string[] | null
           updated_at?: string
           user_id: string
-          welcome_email_sent_at?: string | null
         }
         Update: {
           company_name?: string | null
@@ -999,7 +1113,6 @@ export type Database = {
           selected_use_cases?: string[] | null
           updated_at?: string
           user_id?: string
-          welcome_email_sent_at?: string | null
         }
         Relationships: []
       }
@@ -1011,6 +1124,23 @@ export type Database = {
       generate_project_key: {
         Args: { prefix: string; random_length: number }
         Returns: string
+      }
+      search_knowledge_embeddings: {
+        Args: {
+          p_categories?: string[]
+          p_limit?: number
+          p_project_id: string
+          p_query_embedding: string
+          p_similarity_threshold?: number
+        }
+        Returns: {
+          category: string
+          chunk_text: string
+          id: string
+          parent_headings: string[]
+          section_heading: string
+          similarity: number
+        }[]
       }
     }
     Enums: {

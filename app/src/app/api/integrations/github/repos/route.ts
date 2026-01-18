@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getGitHubInstallationToken } from '@/lib/integrations/github'
-import { listUserRepos } from '@/lib/integrations/github/app-client'
+import { listInstallationRepos } from '@/lib/integrations/github/app-client'
 
 export const runtime = 'nodejs'
 
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const repos = await listUserRepos(token)
+    const repos = await listInstallationRepos(token)
 
     // Transform to a simpler format for the frontend
     const simplifiedRepos = repos.map((repo) => ({
