@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { ProjectWithCodebase } from '@/lib/projects/queries'
 import type { IntegrationStats } from '@/lib/supabase/sessions'
 import { useProjectDetail } from '@/hooks/use-projects'
@@ -20,11 +20,12 @@ interface ProjectDetailProps {
 
 export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { project, isLoading, error, refresh } = useProjectDetail({
     projectId,
     initialProject,
   })
-  const [isTesting, setIsTesting] = useState(false)
+  const [isTesting, setIsTesting] = useState(() => searchParams.get('test') === 'true')
   const [settingsVersion, setSettingsVersion] = useState(0)
   const [integrationStats, setIntegrationStats] = useState<IntegrationStats | null>(null)
 
@@ -50,6 +51,17 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
     router.push(`/projects/${projectId}/edit`)
   }, [router, projectId])
 
+  // Handle test agent modal - update URL to keep state in sync
+  const handleOpenTestAgent = useCallback(() => {
+    setIsTesting(true)
+    router.replace(`/projects/${projectId}?test=true`, { scroll: false })
+  }, [router, projectId])
+
+  const handleCloseTestAgent = useCallback(() => {
+    setIsTesting(false)
+    router.replace(`/projects/${projectId}`, { scroll: false })
+  }, [router, projectId])
+
   return (
     <div>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
@@ -71,14 +83,14 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
             integrationStats={integrationStats}
             isLoading={isLoading}
             onRefresh={refresh}
-            onTestAgent={() => setIsTesting(true)}
+            onTestAgent={handleOpenTestAgent}
             onEditProject={handleEditProject}
           />
         </FloatingCard>
         <FloatingCard floating="gentle">
           <KnowledgeManagementCard
             projectId={projectId}
-            onTestAgent={() => setIsTesting(true)}
+            onTestAgent={handleOpenTestAgent}
           />
         </FloatingCard>
         <FloatingCard floating="gentle">
@@ -92,7 +104,7 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
       {project && isTesting && (
         <TestAgentDialog
           project={project}
-          onClose={() => setIsTesting(false)}
+          onClose={handleCloseTestAgent}
         />
       )}
     </div>

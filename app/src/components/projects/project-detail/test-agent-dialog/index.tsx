@@ -189,16 +189,16 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
     }
   }, [currentSessionId, loadSession])
 
-  // Show loading dots only when waiting for stream to start (not during streaming)
+  // Show loading dots when waiting for response (isLoading but no streaming content yet)
+  const lastMessage = messages[messages.length - 1]
   const showLoading =
     isLoading &&
-    !isStreaming &&
+    !streamingContent &&
     messages.length > 0 &&
-    messages[messages.length - 1].role === 'user'
+    lastMessage?.role === 'user'
 
   // Show streaming content as a live message bubble
   // Guard: don't show streaming bubble if last message already has this content (prevents brief duplicate)
-  const lastMessage = messages[messages.length - 1]
   const showStreamingBubble =
     isStreaming &&
     streamingContent &&
