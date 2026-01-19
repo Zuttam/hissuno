@@ -1,0 +1,201 @@
+'use client'
+
+import { useProjectAnalytics } from '@/hooks/use-analytics'
+import { PeriodSelector } from './period-selector'
+import { StatCard, StatCardGrid } from './stat-card'
+import { LineChart, BarChart } from './charts'
+import { Spinner } from '@/components/ui/spinner'
+
+const TAG_LABEL_MAP: Record<string, string> = {
+  bug: 'Bug',
+  feature_request: 'Feature Request',
+  change_request: 'Change Request',
+  general_feedback: 'General Feedback',
+  wins: 'Wins',
+  losses: 'Losses',
+}
+
+const TYPE_LABEL_MAP: Record<string, string> = {
+  bug: 'Bug',
+  feature_request: 'Feature Request',
+  change_request: 'Change Request',
+}
+
+const PRIORITY_LABEL_MAP: Record<string, string> = {
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+}
+
+const SOURCE_LABEL_MAP: Record<string, string> = {
+  widget: 'Widget',
+  slack: 'Slack',
+  intercom: 'Intercom',
+  gong: 'Gong',
+  api: 'API',
+  manual: 'Manual',
+}
+
+interface ProjectAnalyticsProps {
+  projectId: string
+}
+
+export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
+  const { data, isLoading, error, period, setPeriod } = useProjectAnalytics({
+    projectId,
+  })
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center">
+        <Spinner size="md" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-4 font-mono text-sm text-[color:var(--foreground)]">
+        {error}
+      </div>
+    )
+  }
+
+  if (!data) {
+    return null
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="font-mono text-lg font-semibold uppercase text-[color:var(--foreground)]">
+          Analytics
+        </h3>
+        <PeriodSelector value={period} onChange={setPeriod} />
+      </div>
+
+      {/* Summary Cards */}
+      <StatCardGrid columns={4}>
+        <StatCard
+          label="Sessions"
+          value={data.sessions.total}
+          change={data.sessions.change}
+          size="sm"
+        />
+        <StatCard
+          label="Active Issues"
+          value={data.activeIssues.total}
+          change={data.activeIssues.change}
+          size="sm"
+        />
+        <StatCard
+          label="Avg Messages"
+          value={data.avgMessages.value}
+          change={data.avgMessages.change}
+          size="sm"
+        />
+        <StatCard
+          label="Top Tag"
+          value={data.topTag ? TAG_LABEL_MAP[data.topTag] ?? data.topTag : 'None'}
+          trend="neutral"
+          size="sm"
+        />
+      </StatCardGrid>
+
+      {/* Charts */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard title="Sessions Over Time">
+          {data.timeSeries.sessions.length > 0 ? (
+            <LineChart
+              data={data.timeSeries.sessions}
+              label="Sessions"
+              color="var(--accent-info)"
+              height={180}
+            />
+          ) : (
+            <EmptyChartState />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Sessions by Tag">
+          {data.distributions.sessionsByTag.length > 0 ? (
+            <BarChart
+              data={data.distributions.sessionsByTag}
+              labelFormatter={(label) => TAG_LABEL_MAP[label] ?? label}
+              height={180}
+            />
+          ) : (
+            <EmptyChartState />
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ChartCard title="Sessions by Source">
+          {data.distributions.sessionsBySource.length > 0 ? (
+            <BarChart
+              data={data.distributions.sessionsBySource}
+              labelFormatter={(label) => SOURCE_LABEL_MAP[label] ?? label}
+              height={180}
+            />
+          ) : (
+            <EmptyChartState />
+          )}
+        </ChartCard>
+
+        <ChartCard title="Issues by Type">
+          {data.distributions.issuesByType.length > 0 ? (
+            <BarChart
+              data={data.distributions.issuesByType}
+              labelFormatter={(label) => TYPE_LABEL_MAP[label] ?? label}
+              height={180}
+            />
+          ) : (
+            <EmptyChartState />
+          )}
+        </ChartCard>
+      </div>
+
+      <ChartCard title="Issues by Priority">
+        {data.distributions.issuesByPriority.length > 0 ? (
+          <BarChart
+            data={data.distributions.issuesByPriority}
+            labelFormatter={(label) => PRIORITY_LABEL_MAP[label] ?? label}
+            height={180}
+            colorMap={{
+              low: 'var(--accent-success)',
+              medium: 'var(--accent-warning)',
+              high: 'var(--accent-danger)',
+            }}
+          />
+        ) : (
+          <EmptyChartState />
+        )}
+      </ChartCard>
+    </div>
+  )
+}
+
+interface ChartCardProps {
+  title: string
+  children: React.ReactNode
+}
+
+function ChartCard({ title, children }: ChartCardProps) {
+  return (
+    <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3">
+      <h4 className="mb-3 font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)]">
+        {title}
+      </h4>
+      {children}
+    </div>
+  )
+}
+
+function EmptyChartState() {
+  return (
+    <div className="flex h-[150px] items-center justify-center text-xs text-[color:var(--text-secondary)]">
+      No data available
+    </div>
+  )
+}

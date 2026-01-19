@@ -3,14 +3,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Dialog, Button, Select, Input, Textarea } from '@/components/ui'
 import { SessionTagList } from '@/components/sessions/session-tag-badge'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 import type { CreateIssueInput, IssueType, IssuePriority } from '@/types/issue'
 import type { SessionWithProject } from '@/types/session'
 
 interface CreateIssueDialogProps {
   open: boolean
   onClose: () => void
-  projects: ProjectWithCodebase[]
+  projects: ProjectRecord[]
   onCreateIssue: (input: CreateIssueInput) => Promise<unknown>
 }
 

@@ -222,6 +222,7 @@ function PriorityBadge({ priority, isManual }: { priority: IssuePriority; isManu
 function StatusBadge({ status }: { status: IssueStatus }) {
   const labels: Record<IssueStatus, string> = {
     open: 'Open',
+    ready: 'Ready',
     in_progress: 'In Progress',
     resolved: 'Resolved',
     closed: 'Closed',
@@ -229,6 +230,7 @@ function StatusBadge({ status }: { status: IssueStatus }) {
 
   const variants: Record<IssueStatus, 'default' | 'info' | 'success' | 'warning'> = {
     open: 'default',
+    ready: 'success',
     in_progress: 'info',
     resolved: 'success',
     closed: 'warning',

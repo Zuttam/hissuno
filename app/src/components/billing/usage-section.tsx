@@ -9,7 +9,7 @@ interface UsageSectionProps {
 }
 
 export function UsageSection({ usage }: UsageSectionProps) {
-  const { sessionsUsed, sessionsLimit, projectsUsed, projectsLimit, periodStart, periodEnd } =
+  const { analyzedSessionsUsed, analyzedSessionsLimit, projectsUsed, projectsLimit, periodStart, periodEnd } =
     usage
 
   const formatDate = (dateStr: string) => {
@@ -30,7 +30,7 @@ export function UsageSection({ usage }: UsageSectionProps) {
     return 'bg-green-500'
   }
 
-  const sessionsPercentage = getUsagePercentage(sessionsUsed, sessionsLimit)
+  const analyzedSessionsPercentage = getUsagePercentage(analyzedSessionsUsed, analyzedSessionsLimit)
   const projectsPercentage = getUsagePercentage(projectsUsed, projectsLimit)
 
   return (
@@ -47,16 +47,16 @@ export function UsageSection({ usage }: UsageSectionProps) {
       </div>
 
       <div className="space-y-6">
-        {/* Sessions Usage */}
+        {/* Analyzed Sessions Usage */}
         <div>
           <div className="mb-2 flex items-end justify-between">
-            <span className="text-sm text-slate-600 dark:text-slate-400">Sessions</span>
+            <span className="text-sm text-slate-600 dark:text-slate-400">Analyzed Sessions</span>
             <span className="text-2xl font-bold text-slate-900 dark:text-slate-50">
-              {sessionsUsed.toLocaleString()}
-              {sessionsLimit !== null ? (
+              {analyzedSessionsUsed.toLocaleString()}
+              {analyzedSessionsLimit !== null ? (
                 <span className="text-base font-normal text-slate-500">
                   {' '}
-                  / {sessionsLimit.toLocaleString()}
+                  / {analyzedSessionsLimit.toLocaleString()}
                 </span>
               ) : (
                 <span className="text-base font-normal text-slate-500"> / Unlimited</span>
@@ -64,20 +64,20 @@ export function UsageSection({ usage }: UsageSectionProps) {
             </span>
           </div>
 
-          {sessionsLimit !== null && (
+          {analyzedSessionsLimit !== null && (
             <>
               <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                 <div
-                  className={`h-full transition-all duration-300 ${getProgressColor(sessionsPercentage)}`}
-                  style={{ width: `${sessionsPercentage}%` }}
+                  className={`h-full transition-all duration-300 ${getProgressColor(analyzedSessionsPercentage)}`}
+                  style={{ width: `${analyzedSessionsPercentage}%` }}
                 />
               </div>
 
-              {sessionsPercentage >= 75 && (
+              {analyzedSessionsPercentage >= 75 && (
                 <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
-                  {sessionsPercentage >= 90
-                    ? 'You are approaching your session limit. Consider upgrading.'
-                    : 'You have used over 75% of your sessions.'}
+                  {analyzedSessionsPercentage >= 90
+                    ? 'You are approaching your analyzed sessions limit. Consider upgrading.'
+                    : 'You have used over 75% of your analyzed sessions.'}
                 </p>
               )}
             </>

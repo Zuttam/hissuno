@@ -11,7 +11,9 @@ type RouteContext = {
   params: Promise<RouteParams>
 }
 
-const VALID_WIDGET_VARIANTS = ['popup', 'sidepanel'] as const
+const VALID_WIDGET_TRIGGERS = ['bubble', 'drawer-badge', 'headless'] as const
+const VALID_WIDGET_DISPLAYS = ['popup', 'sidepanel', 'dialog'] as const
+const VALID_WIDGET_VARIANTS = ['popup', 'sidepanel'] as const // Legacy
 const VALID_WIDGET_THEMES = ['light', 'dark', 'auto'] as const
 const VALID_WIDGET_POSITIONS = ['bottom-right', 'bottom-left', 'top-right', 'top-left'] as const
 
@@ -66,6 +68,35 @@ export async function PATCH(request: Request, context: RouteContext) {
   // Validate and extract settings
   const updates: Record<string, unknown> = {}
 
+  // New trigger/display model
+  if (typeof payload.widget_trigger_type === 'string') {
+    if (!VALID_WIDGET_TRIGGERS.includes(payload.widget_trigger_type)) {
+      return NextResponse.json({ error: 'Invalid widget trigger type.' }, { status: 400 })
+    }
+    updates.widget_trigger_type = payload.widget_trigger_type
+  }
+
+  if (typeof payload.widget_display_type === 'string') {
+    if (!VALID_WIDGET_DISPLAYS.includes(payload.widget_display_type)) {
+      return NextResponse.json({ error: 'Invalid widget display type.' }, { status: 400 })
+    }
+    updates.widget_display_type = payload.widget_display_type
+  }
+
+  if (payload.widget_shortcut !== undefined) {
+    if (typeof payload.widget_shortcut === 'string') {
+      updates.widget_shortcut = payload.widget_shortcut.trim() || null
+    } else if (payload.widget_shortcut === null || payload.widget_shortcut === false) {
+      updates.widget_shortcut = null
+    }
+  }
+
+  if (typeof payload.widget_drawer_badge_label === 'string') {
+    const trimmed = payload.widget_drawer_badge_label.trim()
+    updates.widget_drawer_badge_label = trimmed || 'Support'
+  }
+
+  // Legacy variant support
   if (typeof payload.widget_variant === 'string') {
     if (!VALID_WIDGET_VARIANTS.includes(payload.widget_variant)) {
       return NextResponse.json({ error: 'Invalid widget variant.' }, { status: 400 })

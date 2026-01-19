@@ -1,59 +1,65 @@
 'use client'
 
 import { useCallback, useState, type ChangeEvent } from 'react'
-import { Button, Input, Textarea, Select, Badge, IconButton } from '@/components/ui'
-import type { CustomTagRecord, CustomTagInput, TagColorVariant } from '@/types/session'
+import { Button, Input, Textarea, Badge, IconButton, FormField } from '@/components/ui'
+import type { TagColorVariant } from '@/types/session'
 import { generateSlugFromName } from '@/lib/security/sanitize'
 
 const MAX_TAGS = 10
 const MAX_NAME_LENGTH = 50
 const MAX_DESCRIPTION_LENGTH = 500
 
-const COLOR_OPTIONS: { value: TagColorVariant; label: string }[] = [
-  { value: 'info', label: 'Blue' },
-  { value: 'success', label: 'Green' },
-  { value: 'warning', label: 'Yellow' },
-  { value: 'danger', label: 'Red' },
-  { value: 'default', label: 'Gray' },
+const COLOR_OPTIONS: { value: TagColorVariant; label: string; colorClass: string }[] = [
+  { value: 'info', label: 'Blue', colorClass: 'bg-blue-500' },
+  { value: 'success', label: 'Green', colorClass: 'bg-green-500' },
+  { value: 'warning', label: 'Yellow', colorClass: 'bg-yellow-500' },
+  { value: 'danger', label: 'Red', colorClass: 'bg-red-500' },
+  { value: 'default', label: 'Gray', colorClass: 'bg-gray-500' },
 ]
 
+/**
+ * Local tag type for client-side management.
+ * Tags with temp_ prefix IDs are new and haven't been saved yet.
+ */
+export interface LocalCustomTag {
+  id: string // Real ID for existing tags, temp_${timestamp} for new tags
+  name: string
+  slug: string
+  description: string
+  color: TagColorVariant
+  position: number
+}
+
 interface CustomTagsSectionProps {
-  tags: CustomTagRecord[]
+  tags: LocalCustomTag[]
+  onTagsChange: (tags: LocalCustomTag[]) => void
+  canAddMore: boolean
   isLoading?: boolean
   error?: string | null
-  canAddMore: boolean
-  onCreateTag: (input: CustomTagInput) => Promise<CustomTagRecord | null>
-  onUpdateTag: (tagId: string, input: Partial<CustomTagInput>) => Promise<CustomTagRecord | null>
-  onDeleteTag: (tagId: string) => Promise<boolean>
 }
 
 interface TagFormState {
   name: string
-  slug: string
   description: string
   color: TagColorVariant
 }
 
 const EMPTY_FORM: TagFormState = {
   name: '',
-  slug: '',
   description: '',
   color: 'info',
 }
 
 export function CustomTagsSection({
   tags,
+  onTagsChange,
+  canAddMore,
   isLoading,
   error,
-  canAddMore,
-  onCreateTag,
-  onUpdateTag,
-  onDeleteTag,
 }: CustomTagsSectionProps) {
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formState, setFormState] = useState<TagFormState>(EMPTY_FORM)
-  const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
   // Handle starting to add a new tag
@@ -65,14 +71,13 @@ export function CustomTagsSection({
   }, [])
 
   // Handle starting to edit a tag
-  const handleStartEdit = useCallback((tag: CustomTagRecord) => {
+  const handleStartEdit = useCallback((tag: LocalCustomTag) => {
     setIsAdding(false)
     setEditingId(tag.id)
     setFormState({
       name: tag.name,
-      slug: tag.slug,
       description: tag.description,
-      color: tag.color as TagColorVariant,
+      color: tag.color,
     })
     setFormError(null)
   }, [])
@@ -85,17 +90,10 @@ export function CustomTagsSection({
     setFormError(null)
   }, [])
 
-  // Handle name change (auto-generate slug)
+  // Handle name change
   const handleNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const name = e.target.value.substring(0, MAX_NAME_LENGTH)
-    const slug = generateSlugFromName(name)
-    setFormState((prev) => ({ ...prev, name, slug }))
-  }, [])
-
-  // Handle slug change (manual override)
-  const handleSlugChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const slug = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '').substring(0, 30)
-    setFormState((prev) => ({ ...prev, slug }))
+    setFormState((prev) => ({ ...prev, name }))
   }, [])
 
   // Handle description change
@@ -104,10 +102,13 @@ export function CustomTagsSection({
     setFormState((prev) => ({ ...prev, description }))
   }, [])
 
-  // Handle color change
-  const handleColorChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
-    setFormState((prev) => ({ ...prev, color: e.target.value as TagColorVariant }))
+  // Handle color change via swatch click
+  const handleColorChange = useCallback((color: TagColorVariant) => {
+    setFormState((prev) => ({ ...prev, color }))
   }, [])
+
+  // Generate slug from name
+  const generatedSlug = generateSlugFromName(formState.name)
 
   // Validate form
   const validateForm = useCallback((): string | null => {
@@ -117,11 +118,11 @@ export function CustomTagsSection({
     if (formState.name.length > MAX_NAME_LENGTH) {
       return `Name must be ${MAX_NAME_LENGTH} characters or less.`
     }
-    if (!formState.slug.trim()) {
-      return 'Slug is required.'
+    if (!generatedSlug.trim()) {
+      return 'Name must contain at least one letter.'
     }
-    if (!/^[a-z][a-z0-9_]*$/.test(formState.slug)) {
-      return 'Slug must start with a letter and contain only lowercase letters, numbers, and underscores.'
+    if (!/^[a-z][a-z0-9_]*$/.test(generatedSlug)) {
+      return 'Name must start with a letter.'
     }
     if (!formState.description.trim()) {
       return 'Description is required for AI classification.'
@@ -129,64 +130,71 @@ export function CustomTagsSection({
     if (formState.description.length > MAX_DESCRIPTION_LENGTH) {
       return `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less.`
     }
-    // Check for duplicate slugs (when adding or changing slug)
-    const existingTag = tags.find((t) => t.slug === formState.slug && t.id !== editingId)
+    // Check for duplicate slugs (when adding or changing name)
+    const existingTag = tags.find((t) => t.slug === generatedSlug && t.id !== editingId)
     if (existingTag) {
-      return 'A tag with this slug already exists.'
+      return 'A tag with this name already exists.'
     }
     return null
-  }, [formState, tags, editingId])
+  }, [formState, tags, editingId, generatedSlug])
 
   // Handle save (create or update)
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(() => {
     const validationError = validateForm()
     if (validationError) {
       setFormError(validationError)
       return
     }
 
-    setIsSaving(true)
-    setFormError(null)
-
-    try {
-      if (isAdding) {
-        const result = await onCreateTag({
-          name: formState.name.trim(),
-          slug: formState.slug.trim(),
-          description: formState.description.trim(),
-          color: formState.color,
-        })
-        if (result) {
-          handleCancel()
-        }
-      } else if (editingId) {
-        const result = await onUpdateTag(editingId, {
-          name: formState.name.trim(),
-          slug: formState.slug.trim(),
-          description: formState.description.trim(),
-          color: formState.color,
-        })
-        if (result) {
-          handleCancel()
-        }
+    if (isAdding) {
+      // Create new tag with temporary ID
+      const newTag: LocalCustomTag = {
+        id: `temp_${Date.now()}`,
+        name: formState.name.trim(),
+        slug: generatedSlug,
+        description: formState.description.trim(),
+        color: formState.color,
+        position: tags.length,
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save tag.'
-      setFormError(message)
-    } finally {
-      setIsSaving(false)
+      onTagsChange([...tags, newTag])
+      handleCancel()
+    } else if (editingId) {
+      // Update existing tag
+      const updatedTags = tags.map((tag) =>
+        tag.id === editingId
+          ? {
+              ...tag,
+              name: formState.name.trim(),
+              slug: generatedSlug,
+              description: formState.description.trim(),
+              color: formState.color,
+            }
+          : tag
+      )
+      onTagsChange(updatedTags)
+      handleCancel()
     }
-  }, [validateForm, isAdding, editingId, formState, onCreateTag, onUpdateTag, handleCancel])
+  }, [validateForm, isAdding, editingId, formState, generatedSlug, tags, onTagsChange, handleCancel])
 
   // Handle delete
   const handleDelete = useCallback(
-    async (tagId: string) => {
-      if (!confirm('Are you sure you want to delete this tag? Sessions with this tag will keep it, but it won\'t be available for new classifications.')) {
+    (tagId: string) => {
+      if (
+        !confirm(
+          "Are you sure you want to delete this tag? Sessions with this tag will keep it, but it won't be available for new classifications."
+        )
+      ) {
         return
       }
-      await onDeleteTag(tagId)
+      const filteredTags = tags.filter((tag) => tag.id !== tagId)
+      // Reposition remaining tags
+      const repositionedTags = filteredTags.map((tag, index) => ({
+        ...tag,
+        position: index,
+      }))
+      onTagsChange(repositionedTags)
     },
-    [onDeleteTag]
+    [tags, onTagsChange]
   )
 
   const isEditing = isAdding || editingId !== null
@@ -207,43 +215,37 @@ export function CustomTagsSection({
       )}
 
       {/* Tags list */}
-      <div className="space-y-2">
+      <div className="space-y-1">
         {tags.map((tag) => (
           <div
             key={tag.id}
-            className="flex items-start gap-3 p-3 rounded-lg border border-[color:var(--border-subtle)] bg-[color:var(--background-secondary)]"
+            className="flex items-center gap-3 p-2 rounded-lg bg-[color:var(--background-secondary)]"
           >
             {editingId === tag.id ? (
               /* Inline edit form */
-              <div className="flex-1 space-y-3">
+              <div className="flex-1 space-y-4 py-1">
                 <TagForm
                   formState={formState}
                   onNameChange={handleNameChange}
-                  onSlugChange={handleSlugChange}
                   onDescriptionChange={handleDescriptionChange}
                   onColorChange={handleColorChange}
                   formError={formError}
                 />
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? 'Saving...' : 'Save'}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={handleCancel}>
                     Cancel
+                  </Button>
+                  <Button size="sm" onClick={handleSave}>
+                    Save
                   </Button>
                 </div>
               </div>
             ) : (
               /* Display mode */
               <>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant={tag.color as TagColorVariant}>{tag.name}</Badge>
-                    <span className="text-xs text-[color:var(--text-tertiary)] font-mono">
-                      {tag.slug}
-                    </span>
-                  </div>
-                  <p className="text-sm text-[color:var(--text-secondary)] line-clamp-2">
+                <div className="flex-1 min-w-0 flex items-center gap-3">
+                  <Badge variant={tag.color}>{tag.name}</Badge>
+                  <p className="text-sm text-[color:var(--text-secondary)] truncate">
                     {tag.description}
                   </p>
                 </div>
@@ -254,7 +256,15 @@ export function CustomTagsSection({
                     onClick={() => handleStartEdit(tag)}
                     disabled={isEditing}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                     </svg>
@@ -262,10 +272,18 @@ export function CustomTagsSection({
                   <IconButton
                     size="sm"
                     aria-label="Delete tag"
-                    onClick={() => void handleDelete(tag.id)}
+                    onClick={() => handleDelete(tag.id)}
                     disabled={isEditing}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <polyline points="3 6 5 6 21 6" />
                       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
@@ -279,25 +297,21 @@ export function CustomTagsSection({
 
       {/* Add new tag form */}
       {isAdding && (
-        <div className="p-4 rounded-lg border border-[color:var(--border-accent)] bg-[color:var(--background-secondary)]">
-          <h4 className="text-sm font-medium mb-3">New Custom Tag</h4>
-          <div className="space-y-3">
-            <TagForm
-              formState={formState}
-              onNameChange={handleNameChange}
-              onSlugChange={handleSlugChange}
-              onDescriptionChange={handleDescriptionChange}
-              onColorChange={handleColorChange}
-              formError={formError}
-            />
-            <div className="flex gap-2">
-              <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Creating...' : 'Create Tag'}
-              </Button>
-              <Button size="sm" variant="ghost" onClick={handleCancel} disabled={isSaving}>
-                Cancel
-              </Button>
-            </div>
+        <div className="space-y-4">
+          <TagForm
+            formState={formState}
+            onNameChange={handleNameChange}
+            onDescriptionChange={handleDescriptionChange}
+            onColorChange={handleColorChange}
+            formError={formError}
+          />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave}>
+              Add Tag
+            </Button>
           </div>
         </div>
       )}
@@ -332,88 +346,76 @@ export function CustomTagsSection({
 interface TagFormProps {
   formState: TagFormState
   onNameChange: (e: ChangeEvent<HTMLInputElement>) => void
-  onSlugChange: (e: ChangeEvent<HTMLInputElement>) => void
   onDescriptionChange: (e: ChangeEvent<HTMLTextAreaElement>) => void
-  onColorChange: (e: ChangeEvent<HTMLSelectElement>) => void
+  onColorChange: (color: TagColorVariant) => void
   formError: string | null
 }
 
 function TagForm({
   formState,
   onNameChange,
-  onSlugChange,
   onDescriptionChange,
   onColorChange,
   formError,
 }: TagFormProps) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {formError && (
         <div className="p-2 rounded-md bg-[color:var(--background-danger)] text-[color:var(--text-danger)] text-xs">
           {formError}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-            Display Name
-          </label>
-          <Input
-            value={formState.name}
-            onChange={onNameChange}
-            placeholder="e.g., Onboarding Issue"
-            maxLength={MAX_NAME_LENGTH}
-          />
-          <p className="text-xs text-[color:var(--text-tertiary)] mt-1">
-            {formState.name.length}/{MAX_NAME_LENGTH}
-          </p>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-            Slug (Internal ID)
-          </label>
-          <Input
-            value={formState.slug}
-            onChange={onSlugChange}
-            placeholder="e.g., onboarding_issue"
-            className="font-mono text-sm"
-          />
-          <p className="text-xs text-[color:var(--text-tertiary)] mt-1">
-            Auto-generated from name
-          </p>
-        </div>
-      </div>
+      <FormField label="Tag Name" description="What users will see">
+        <Input
+          value={formState.name}
+          onChange={onNameChange}
+          placeholder="e.g., Onboarding Issue"
+          maxLength={MAX_NAME_LENGTH}
+        />
+      </FormField>
 
-      <div>
-        <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-          Classification Description
-        </label>
+      <FormField
+        label="Description"
+        description="When the AI should apply this tag"
+        supportingText={`${formState.description.length}/${MAX_DESCRIPTION_LENGTH} - This helps the AI decide when to apply this tag.`}
+      >
         <Textarea
           value={formState.description}
           onChange={onDescriptionChange}
-          placeholder="Describe when this tag should be applied. e.g., 'Apply when the user has issues during their first time using the product'"
-          rows={3}
+          placeholder="Apply when the user has issues during their first time using the product"
+          rows={2}
           maxLength={MAX_DESCRIPTION_LENGTH}
         />
-        <p className="text-xs text-[color:var(--text-tertiary)] mt-1">
-          {formState.description.length}/{MAX_DESCRIPTION_LENGTH} - This description helps the AI
-          decide when to apply this tag.
-        </p>
-      </div>
+      </FormField>
 
-      <div className="w-40">
-        <label className="block text-xs font-medium text-[color:var(--text-secondary)] mb-1">
-          Badge Color
-        </label>
-        <Select value={formState.color} onChange={onColorChange}>
-          {COLOR_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <FormField as="div" label="Color">
+        <div className="flex items-center gap-4">
+          {/* Color swatches */}
+          <div className="flex gap-2">
+            {COLOR_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onColorChange(option.value)}
+                className={`w-6 h-6 rounded-full ${option.colorClass} transition-all ${
+                  formState.color === option.value
+                    ? 'ring-2 ring-offset-2 ring-[color:var(--accent-primary)] ring-offset-[color:var(--background)]'
+                    : 'hover:scale-110'
+                }`}
+                title={option.label}
+                aria-label={`Select ${option.label} color`}
+                aria-pressed={formState.color === option.value}
+              />
+            ))}
+          </div>
+
+          {/* Live preview badge */}
+          {formState.name && (
+            <Badge variant={formState.color}>{formState.name}</Badge>
+          )}
+        </div>
+      </FormField>
     </div>
   )
 }

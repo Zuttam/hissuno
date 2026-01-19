@@ -1,7 +1,10 @@
 'use client'
 
+import { useMemo } from 'react'
 import { Badge } from '@/components/ui'
+import { ResizableTable, useColumnStyle, type ColumnConfig } from '@/components/ui/resizable-table'
 import type { SessionWithProject } from '@/types/session'
+import { SESSION_SOURCE_INFO, type SessionSource } from '@/types/session'
 import { SessionTagList } from './session-tag-badge'
 
 interface SessionsTableProps {
@@ -12,6 +15,8 @@ interface SessionsTableProps {
   onArchive: (session: SessionWithProject) => void
 }
 
+const STORAGE_KEY = 'sessions-table-column-widths'
+
 export function SessionsTable({
   sessions,
   selectedSessionId,
@@ -19,54 +24,39 @@ export function SessionsTable({
   onOpenMessages,
   onArchive,
 }: SessionsTableProps) {
+  const columns: ColumnConfig[] = useMemo(
+    () => [
+      { id: 'session', header: 'Session', defaultWidth: 140, minWidth: 80 },
+      { id: 'user', header: 'User', defaultWidth: 120, minWidth: 60 },
+      { id: 'project', header: 'Project', defaultWidth: 130, minWidth: 80 },
+      { id: 'source', header: 'Source', defaultWidth: 90, minWidth: 70 },
+      { id: 'page', header: 'Page', defaultWidth: 180, minWidth: 80 },
+      { id: 'messages', header: 'Messages', defaultWidth: 90, minWidth: 70, align: 'center' },
+      { id: 'tags', header: 'Tags', defaultWidth: 150, minWidth: 80 },
+      { id: 'status', header: 'Status', defaultWidth: 120, minWidth: 80 },
+      { id: 'lastActivity', header: 'Last Activity', defaultWidth: 120, minWidth: 80 },
+      { id: 'actions', header: <span className="sr-only">Actions</span>, defaultWidth: 80, minWidth: 60 },
+    ],
+    []
+  )
+
   return (
-    <div className="overflow-hidden rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)]">
-      <table className="w-full font-mono text-sm">
-        <thead>
-          <tr className="border-b border-[color:var(--border-subtle)]">
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Session
-            </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              User
-            </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Project
-            </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Page
-            </th>
-            <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Messages
-            </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Tags
-            </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Status
-            </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Last Activity
-            </th>
-            <th className="w-12 px-3 py-2">
-              <span className="sr-only">Actions</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.map((session) => (
-            <SessionRow
-              key={session.id}
-              session={session}
-              isSelected={selectedSessionId === session.id}
-              onSelect={() => onSelectSession(session)}
-              onOpenMessages={() => onOpenMessages(session)}
-              onArchive={() => onArchive(session)}
-            />
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <ResizableTable columns={columns} storageKey={STORAGE_KEY}>
+      {(columnWidths) =>
+        sessions.map((session) => (
+          <SessionRow
+            key={session.id}
+            session={session}
+            isSelected={selectedSessionId === session.id}
+            onSelect={() => onSelectSession(session)}
+            onOpenMessages={() => onOpenMessages(session)}
+            onArchive={() => onArchive(session)}
+            columnWidths={columnWidths}
+            columns={columns}
+          />
+        ))
+      }
+    </ResizableTable>
   )
 }
 
@@ -76,15 +66,30 @@ interface SessionRowProps {
   onSelect: () => void
   onOpenMessages: () => void
   onArchive: () => void
+  columnWidths: Record<string, number>
+  columns: ColumnConfig[]
 }
 
-function SessionRow({ session, isSelected, onSelect, onOpenMessages, onArchive }: SessionRowProps) {
+function SessionRow({
+  session,
+  isSelected,
+  onSelect,
+  onOpenMessages,
+  onArchive,
+  columnWidths,
+  columns,
+}: SessionRowProps) {
   const truncatedId = session.id.length > 12 ? `${session.id.slice(0, 12)}...` : session.id
   const truncatedPage = session.page_title
     ? session.page_title.length > 30
       ? `${session.page_title.slice(0, 30)}...`
       : session.page_title
     : getPathFromUrl(session.page_url)
+
+  const sourceInfo = SESSION_SOURCE_INFO[session.source as SessionSource] || {
+    label: session.source,
+    variant: 'default' as const,
+  }
 
   return (
     <tr
@@ -95,22 +100,21 @@ function SessionRow({ session, isSelected, onSelect, onOpenMessages, onArchive }
           : 'hover:bg-[color:var(--surface-hover)]'
       } ${session.is_archived ? 'opacity-60' : ''}`}
     >
-      <td className="px-3 py-2">
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'session', columns)}>
         <span className="text-[color:var(--foreground)]" title={session.id}>
           {truncatedId}
         </span>
       </td>
-      <td className="px-3 py-2">
-        <span className="text-[color:var(--text-secondary)]">
-          {session.user_id || '-'}
-        </span>
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'user', columns)}>
+        <span className="text-[color:var(--text-secondary)]">{session.user_id || '-'}</span>
       </td>
-      <td className="px-3 py-2">
-        <span className="text-[color:var(--foreground)]">
-          {session.project?.name || '-'}
-        </span>
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'project', columns)}>
+        <span className="text-[color:var(--foreground)]">{session.project?.name || '-'}</span>
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'source', columns)}>
+        <Badge variant={sourceInfo.variant}>{sourceInfo.label}</Badge>
+      </td>
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'page', columns)}>
         <span
           className="text-[color:var(--text-secondary)]"
           title={session.page_url || undefined}
@@ -118,34 +122,33 @@ function SessionRow({ session, isSelected, onSelect, onOpenMessages, onArchive }
           {truncatedPage || '-'}
         </span>
       </td>
-      <td className="px-3 py-2 text-center">
-        <span className="text-[color:var(--foreground)]">
-          {session.message_count}
-        </span>
+      <td
+        className="px-3 py-2 text-center"
+        style={useColumnStyle(columnWidths, 'messages', columns)}
+      >
+        <span className="text-[color:var(--foreground)]">{session.message_count}</span>
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'tags', columns)}>
         {session.tags && session.tags.length > 0 ? (
           <SessionTagList tags={session.tags} size="sm" emptyText="" />
         ) : (
           <span className="text-[color:var(--text-tertiary)]">-</span>
         )}
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'status', columns)}>
         <span className="inline-flex items-center gap-1">
           <Badge variant={session.status === 'active' ? 'success' : 'default'}>
             {session.status}
           </Badge>
-          {session.is_archived && (
-            <Badge variant="default">Archived</Badge>
-          )}
+          {session.is_archived && <Badge variant="default">Archived</Badge>}
         </span>
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'lastActivity', columns)}>
         <span className="text-[color:var(--text-secondary)]">
           {formatRelativeTime(session.last_activity_at)}
         </span>
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'actions', columns)}>
         <div className="flex items-center gap-1">
           <button
             type="button"

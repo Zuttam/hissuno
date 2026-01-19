@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { enforceLimit, LimitExceededError } from '@/lib/billing/enforcement-service'
 import { listSessions, getProjectIntegrationStats, createManualSession } from '@/lib/supabase/sessions'
 import { isSupabaseConfigured, createClient } from '@/lib/supabase/server'
 import type { SessionFilters, CreateSessionInput, CreateMessageInput, SessionTag } from '@/types/session'
@@ -105,29 +104,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'project_id is required.' }, { status: 400 })
     }
 
-    // Get authenticated user for limit enforcement
-    const supabase = await createClient()
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
-    if (userError || !user) {
-      throw new UnauthorizedError('User not authenticated')
-    }
-
-    // Enforce session limit before creation
-    await enforceLimit({
-      userId: user.id,
-      dimension: 'sessions',
-    })
-
+    // Note: Limits are enforced at analysis time (PM review), not at session creation
     const session = await createManualSession(input)
 
     return NextResponse.json({ session }, { status: 201 })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
-
-    if (error instanceof LimitExceededError) {
-      return NextResponse.json(error.toResponse(), { status: 429 })
     }
 
     console.error('[sessions.post] unexpected error', error)

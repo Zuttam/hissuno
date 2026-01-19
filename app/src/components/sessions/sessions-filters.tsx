@@ -1,13 +1,15 @@
 'use client'
 
-import { useCallback } from 'react'
-import { Input, Select, Checkbox } from '@/components/ui'
-import type { SessionFilters } from '@/types/session'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import { useCallback, useMemo } from 'react'
+import { Input, Select, Checkbox, CollapsibleSection } from '@/components/ui'
+import type { SessionFilters, SessionSource } from '@/types/session'
+import { SESSION_SOURCE_INFO } from '@/types/session'
+import type { ProjectRecord } from '@/lib/supabase/projects'
+import { useCustomTags } from '@/hooks/use-custom-tags'
 import { SessionTagFilter } from './session-tag-filter'
 
 interface SessionsFiltersProps {
-  projects: ProjectWithCodebase[]
+  projects: ProjectRecord[]
   filters: SessionFilters
   onFilterChange: (filters: SessionFilters) => void
 }
@@ -17,6 +19,9 @@ export function SessionsFilters({
   filters,
   onFilterChange,
 }: SessionsFiltersProps) {
+  // Fetch custom tags for the selected project
+  const { tags: customTags } = useCustomTags({ projectId: filters.projectId })
+
   const handleProjectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       onFilterChange({ ...filters, projectId: e.target.value || undefined })
@@ -42,6 +47,14 @@ export function SessionsFilters({
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       const value = e.target.value as 'active' | 'closed' | ''
       onFilterChange({ ...filters, status: value || undefined })
+    },
+    [filters, onFilterChange]
+  )
+
+  const handleSourceChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value as SessionSource | ''
+      onFilterChange({ ...filters, source: value || undefined })
     },
     [filters, onFilterChange]
   )
@@ -78,18 +91,28 @@ export function SessionsFilters({
     onFilterChange({})
   }, [onFilterChange])
 
-  const hasActiveFilters =
-    filters.projectId ||
-    filters.userId ||
-    filters.sessionId ||
-    filters.status ||
-    filters.dateFrom ||
-    filters.dateTo ||
-    filters.showArchived ||
-    (filters.tags && filters.tags.length > 0)
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filters.projectId) count++
+    if (filters.userId) count++
+    if (filters.sessionId) count++
+    if (filters.status) count++
+    if (filters.source) count++
+    if (filters.dateFrom) count++
+    if (filters.dateTo) count++
+    if (filters.showArchived) count++
+    if (filters.tags && filters.tags.length > 0) count++
+    return count
+  }, [filters])
+
+  const hasActiveFilters = activeFilterCount > 0
+
+  const collapsedSummary = hasActiveFilters
+    ? `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'} active`
+    : undefined
 
   return (
-    <div className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-4">
+    <CollapsibleSection title="Filters" collapsedSummary={collapsedSummary} defaultExpanded={false} variant="flat">
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">
           <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
@@ -152,11 +175,30 @@ export function SessionsFilters({
 
         <div className="flex flex-col gap-1">
           <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+            Source
+          </label>
+          <Select
+            value={filters.source || ''}
+            onChange={handleSourceChange}
+            className="w-32"
+          >
+            <option value="">All</option>
+            {(Object.keys(SESSION_SOURCE_INFO) as SessionSource[]).map((source) => (
+              <option key={source} value={source}>
+                {SESSION_SOURCE_INFO[source].label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
             Tags
           </label>
           <SessionTagFilter
             selectedTags={filters.tags ?? []}
             onChange={handleTagsChange}
+            customTags={customTags}
           />
         </div>
 
@@ -202,6 +244,6 @@ export function SessionsFilters({
           </button>
         )}
       </div>
-    </div>
+    </CollapsibleSection>
   )
 }

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react'
 
 export interface SpecGenerationEvent {
-  type: 'connected' | 'workflow-start' | 'step-start' | 'step-progress' | 'step-finish' | 'text-chunk' | 'tool-start' | 'tool-finish' | 'workflow-finish' | 'error'
+  type: 'connected' | 'workflow-start' | 'step-start' | 'step-progress' | 'step-finish' | 'text-chunk' | 'tool-start' | 'tool-finish' | 'workflow-finish' | 'heartbeat' | 'error'
   stepId?: string
   stepName?: string
   message?: string
@@ -37,6 +37,9 @@ interface UseSpecGenerationReturn {
   cancelGeneration: () => Promise<void>
 }
 
+// Connection timeout in milliseconds (60 seconds)
+const CONNECTION_TIMEOUT_MS = 60_000
+
 export function useSpecGeneration({
   issueId,
   onComplete,
@@ -49,13 +52,44 @@ export function useSpecGeneration({
   const [totalSteps, setTotalSteps] = useState(0)
   const [completedSteps, setCompletedSteps] = useState(0)
   const eventSourceRef = useRef<EventSource | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Clear the connection timeout
+  const clearConnectionTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [])
+
+  // Reset the connection timeout (called on each received event)
+  const resetConnectionTimeout = useCallback(() => {
+    clearConnectionTimeout()
+    timeoutRef.current = setTimeout(() => {
+      console.error('[useSpecGeneration] Connection timeout - no events received in 60 seconds')
+      // Close the connection
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+        eventSourceRef.current = null
+      }
+      setIsGenerating(false)
+      setError('Connection timeout. The server may be unresponsive. Please try again.')
+    }, CONNECTION_TIMEOUT_MS)
+  }, [clearConnectionTimeout])
+
+  // Clean up connection and timeout
+  const cleanup = useCallback(() => {
+    clearConnectionTimeout()
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+  }, [clearConnectionTimeout])
 
   // Connect to SSE stream with specific runId
   const connectToStream = useCallback((runId: string) => {
     // Close existing connection if any
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-    }
+    cleanup()
 
     // Clear previous state - no synthetic events, server sends all events
     setEvents([])
@@ -71,9 +105,21 @@ export function useSpecGeneration({
       )
       eventSourceRef.current = eventSource
 
+      // Start the connection timeout
+      resetConnectionTimeout()
+
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data) as SpecGenerationEvent
+
+          // Reset timeout on every message received (including heartbeats)
+          resetConnectionTimeout()
+
+          // Don't add heartbeat events to the events list (they're just keep-alives)
+          if (data.type === 'heartbeat') {
+            return
+          }
+
           setEvents((prev) => [...prev, data])
 
           // Handle workflow-start - get total steps
@@ -101,8 +147,7 @@ export function useSpecGeneration({
 
           // Check for completion
           if (data.type === 'workflow-finish' || data.type === 'error') {
-            eventSource.close()
-            eventSourceRef.current = null
+            cleanup()
 
             // Give a small delay then update state
             setTimeout(() => {
@@ -120,15 +165,23 @@ export function useSpecGeneration({
       }
 
       eventSource.onerror = () => {
-        // Only clean up if the connection is actually closed
+        // Handle connection errors
         if (eventSource.readyState === EventSource.CLOSED) {
-          eventSourceRef.current = null
+          cleanup()
+          // Only set error if we were still generating (not a normal close)
+          if (isGenerating) {
+            setIsGenerating(false)
+            setError('Connection lost. Please try again.')
+          }
         }
       }
     } catch (err) {
       console.error('[useSpecGeneration] Failed to create EventSource:', err)
+      cleanup()
+      setIsGenerating(false)
+      setError('Failed to connect to server. Please try again.')
     }
-  }, [issueId, onComplete])
+  }, [issueId, onComplete, cleanup, resetConnectionTimeout, isGenerating])
 
   // Start spec generation
   const startGeneration = useCallback(async () => {
@@ -183,11 +236,8 @@ export function useSpecGeneration({
         throw new Error(data.error ?? 'Failed to cancel')
       }
 
-      // Close the EventSource
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-        eventSourceRef.current = null
-      }
+      // Clean up connection and timeout
+      cleanup()
 
       setIsGenerating(false)
       setEvents([])
@@ -195,7 +245,7 @@ export function useSpecGeneration({
       const message = err instanceof Error ? err.message : 'Failed to cancel'
       setError(message)
     }
-  }, [issueId])
+  }, [issueId, cleanup])
 
   return {
     isGenerating,

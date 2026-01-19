@@ -10,8 +10,13 @@ export type IssuePriority = 'low' | 'medium' | 'high'
 
 /**
  * Issue status
+ * - open: Not yet reviewed by PM agent
+ * - ready: Ready for engineering (spec generated)
+ * - in_progress: Engineering work began
+ * - closed: Marked irrelevant by user
+ * - resolved: Issue merged to codebase
  */
-export type IssueStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+export type IssueStatus = 'open' | 'ready' | 'in_progress' | 'resolved' | 'closed'
 
 /**
  * Issue record from the database
@@ -66,7 +71,18 @@ export interface IssueSessionRecord {
 }
 
 /**
- * Widget display variants
+ * Widget trigger types - what activates the widget
+ */
+export type WidgetTrigger = 'bubble' | 'drawer-badge' | 'headless'
+
+/**
+ * Widget display types - how the chat UI appears
+ */
+export type WidgetDisplay = 'popup' | 'sidepanel' | 'dialog'
+
+/**
+ * Widget display variants (legacy, use WidgetDisplay)
+ * @deprecated Use WidgetDisplay instead
  */
 export type WidgetVariant = 'popup' | 'sidepanel'
 
@@ -88,7 +104,12 @@ export interface ProjectSettingsRecord {
   issue_spec_threshold: number
   issue_tracking_enabled: boolean
   spec_guidelines: string | null
-  // Widget settings
+  // Widget settings (new trigger/display model)
+  widget_trigger_type: WidgetTrigger
+  widget_display_type: WidgetDisplay
+  widget_shortcut: string | null
+  widget_drawer_badge_label: string
+  // Legacy widget settings
   widget_variant: WidgetVariant
   widget_theme: WidgetTheme
   widget_position: WidgetPosition

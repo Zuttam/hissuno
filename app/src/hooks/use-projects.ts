@@ -1,17 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 
 interface UseProjectsState {
-  projects: ProjectWithCodebase[]
+  projects: ProjectRecord[]
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
 }
 
-export function useProjects(initialProjects: ProjectWithCodebase[] = []): UseProjectsState {
-  const [projects, setProjects] = useState<ProjectWithCodebase[]>(initialProjects)
+export function useProjects(initialProjects: ProjectRecord[] = []): UseProjectsState {
+  const [projects, setProjects] = useState<ProjectRecord[]>(initialProjects)
   const [isLoading, setIsLoading] = useState<boolean>(initialProjects.length === 0)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,11 +52,11 @@ export function useProjects(initialProjects: ProjectWithCodebase[] = []): UsePro
 
 interface UseProjectDetailOptions {
   projectId?: string
-  initialProject?: ProjectWithCodebase | null
+  initialProject?: ProjectRecord | null
 }
 
 interface UseProjectDetailState {
-  project: ProjectWithCodebase | null
+  project: ProjectRecord | null
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -66,7 +66,7 @@ export function useProjectDetail({
   projectId,
   initialProject = null,
 }: UseProjectDetailOptions): UseProjectDetailState {
-  const [project, setProject] = useState<ProjectWithCodebase | null>(initialProject)
+  const [project, setProject] = useState<ProjectRecord | null>(initialProject)
   const [isLoading, setIsLoading] = useState<boolean>(initialProject ? false : Boolean(projectId))
   const [error, setError] = useState<string | null>(null)
 

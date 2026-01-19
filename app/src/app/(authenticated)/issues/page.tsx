@@ -1,6 +1,6 @@
 import { IssuesPageContent } from '@/components/issues/issues-page'
 import { listIssues } from '@/lib/supabase/issues'
-import { listProjects } from '@/lib/projects/queries'
+import { listProjects } from '@/lib/supabase/projects'
 
 interface IssuesPageParams {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>

@@ -37,7 +37,7 @@ export async function getWidgetSettings(projectId: string): Promise<WidgetSettin
 
     const { data, error } = await supabase
       .from('project_settings')
-      .select('widget_variant, widget_theme, widget_position, widget_title, widget_initial_message, allowed_origins, widget_token_required')
+      .select('widget_trigger_type, widget_display_type, widget_shortcut, widget_drawer_badge_label, widget_variant, widget_theme, widget_position, widget_title, widget_initial_message, allowed_origins, widget_token_required')
       .eq('project_id', projectId)
       .single()
 
@@ -104,7 +104,7 @@ export async function updateWidgetSettings(
         },
         { onConflict: 'project_id' }
       )
-      .select('widget_variant, widget_theme, widget_position, widget_title, widget_initial_message, allowed_origins, widget_token_required')
+      .select('widget_trigger_type, widget_display_type, widget_shortcut, widget_drawer_badge_label, widget_variant, widget_theme, widget_position, widget_title, widget_initial_message, allowed_origins, widget_token_required')
       .single()
 
     if (error) {

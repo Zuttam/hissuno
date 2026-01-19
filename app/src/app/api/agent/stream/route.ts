@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import type { CoreMessage } from 'ai'
+import type { ModelMessage } from 'ai'
 import { RuntimeContext } from '@mastra/core/runtime-context'
 import { getProjectById } from '@/lib/projects/keys'
 import { createAdminClient } from '@/lib/supabase/server'
 import { updateSessionActivity } from '@/lib/supabase/sessions'
 import { saveSessionMessage } from '@/lib/supabase/session-messages'
 import { getRunningChatRun, updateChatRunStatus } from '@/lib/agent/chat-run-service'
-import { type BaseSSEEvent, SSE_HEADERS } from '@/lib/sse'
+import {
+  type BaseSSEEvent,
+  createSSEStreamWithExecutor,
+  createSSEEvent,
+  createCorsHeaders,
+} from '@/lib/sse'
 import { mastra } from '@/mastra'
 import { isOriginAllowed } from '@/lib/utils/widget-auth'
 import type { SupportAgentContext } from '../route'
@@ -37,18 +42,6 @@ interface ChatSSEEvent extends BaseSSEEvent {
  */
 function getRequestOrigin(request: NextRequest): string {
   return request.headers.get('Origin') || request.nextUrl.origin
-}
-
-/**
- * Add CORS headers to SSE response
- */
-function addCorsToSSEHeaders(origin: string): Record<string, string> {
-  return {
-    ...SSE_HEADERS,
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  }
 }
 
 /**
@@ -105,7 +98,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Get messages from metadata
-  const messages = chatRun.metadata?.messages as { role: string; content: string }[] || []
+  const messages = (chatRun.metadata?.messages as { role: string; content: string }[]) || []
 
   if (!messages.length) {
     return NextResponse.json(
@@ -124,57 +117,19 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Create SSE stream with CORS headers
-  const corsHeaders = addCorsToSSEHeaders(origin)
+  // Create SSE stream with CORS headers using shared utilities
+  const corsHeaders = createCorsHeaders(origin)
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder()
-      let isClosed = false
-
-      const safeEnqueue = (data: Uint8Array, eventType?: string) => {
-        if (!isClosed) {
-          try {
-            controller.enqueue(data)
-            // Only log non-chunk events to avoid terminal spam
-            if (eventType && eventType !== 'message-chunk') {
-              console.log(`${LOG_PREFIX} Enqueued event:`, eventType)
-            }
-          } catch (enqueueError) {
-            console.error(`${LOG_PREFIX} Failed to enqueue:`, enqueueError)
-            isClosed = true
-          }
-        }
-      }
-
-      const safeClose = () => {
-        if (!isClosed) {
-          isClosed = true
-          try {
-            controller.close()
-          } catch {
-            // Already closed
-          }
-        }
-      }
-
-      const formatSSE = (event: ChatSSEEvent): string => {
-        return `event: message\ndata: ${JSON.stringify(event)}\n\n`
-      }
-
-      const emit = (event: ChatSSEEvent) => {
-        safeEnqueue(encoder.encode(formatSSE(event)), event.type)
-      }
-
+  return createSSEStreamWithExecutor<ChatSSEEvent>({
+    logPrefix: LOG_PREFIX,
+    headers: corsHeaders,
+    executor: async ({ emit, close, isClosed }) => {
+      // Helper to create typed events
       const emitEvent = (
         type: ChatSSEEventType,
         options: Partial<Omit<ChatSSEEvent, 'type' | 'timestamp'>> = {}
       ) => {
-        emit({
-          type,
-          ...options,
-          timestamp: new Date().toISOString(),
-        })
+        emit(createSSEEvent(type, options) as ChatSSEEvent)
       }
 
       try {
@@ -189,8 +144,8 @@ export async function GET(request: NextRequest) {
         runtimeContext.set('userMetadata', chatRun.metadata?.userMetadata || null)
         runtimeContext.set('sessionId', sessionId)
 
-        // Convert messages to CoreMessage format
-        const mastraMessages: CoreMessage[] = messages.map((msg) => ({
+        // Convert messages to ModelMessage format
+        const mastraMessages: ModelMessage[] = messages.map((msg) => ({
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
         }))
@@ -229,9 +184,9 @@ export async function GET(request: NextRequest) {
           // Check cancellation every 10 chunks
           if (chunkCount % 10 === 0) {
             const cancelled = await checkCancellation()
-            if (cancelled || isClosed) {
+            if (cancelled || isClosed()) {
               console.log(`${LOG_PREFIX} Chat cancelled or stream closed`)
-              safeClose()
+              close()
               return
             }
           }
@@ -241,8 +196,8 @@ export async function GET(request: NextRequest) {
           chunkCount++
         }
 
-        if (isClosed) {
-          safeClose()
+        if (isClosed()) {
+          close()
           return
         }
 
@@ -252,7 +207,7 @@ export async function GET(request: NextRequest) {
           data: { contentLength: fullContent.length },
         })
 
-        safeClose()
+        close()
 
         // Do post-completion DB updates in background (don't block the client)
         const postCompletionTasks = async () => {
@@ -329,12 +284,10 @@ export async function GET(request: NextRequest) {
           message: 'Chat encountered an issue. Please try again.',
         })
 
-        safeClose()
+        close()
       }
     },
   })
-
-  return new Response(stream, { headers: corsHeaders })
 }
 
 // Handle OPTIONS for CORS preflight

@@ -237,7 +237,6 @@ export function ProjectWizard({
         // Widget settings
         payload.append('widgetVariant', formData.widget.variant)
         payload.append('widgetTheme', formData.widget.theme)
-        payload.append('widgetPosition', formData.widget.position)
         payload.append('widgetTitle', formData.widget.title)
         payload.append('widgetInitialMessage', formData.widget.initialMessage)
         payload.append('widgetTokenRequired', formData.widget.tokenRequired ? 'true' : 'false')
@@ -273,33 +272,52 @@ export function ProjectWizard({
         })
 
         // Update widget settings
-        await fetch(`/api/projects/${projectId}/settings/widget`, {
+        const widgetResponse = await fetch(`/api/projects/${projectId}/settings/widget`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            widget_trigger_type: formData.widget.triggerType,
+            widget_display_type: formData.widget.displayType,
+            widget_shortcut: formData.widget.shortcut || null,
+            widget_drawer_badge_label: formData.widget.drawerBadgeLabel,
             widget_variant: formData.widget.variant,
             widget_theme: formData.widget.theme,
-            widget_position: formData.widget.position,
             widget_title: formData.widget.title,
             widget_initial_message: formData.widget.initialMessage,
             allowed_origins: formData.widget.allowedOrigins,
             widget_token_required: formData.widget.tokenRequired,
           }),
         })
+        if (!widgetResponse.ok) {
+          const errorData = await widgetResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Failed to save widget settings')
+        }
 
-        // Update session lifecycle settings
-        await fetch(`/api/projects/${projectId}/settings/sessions`, {
+        // Update session lifecycle settings and custom tags
+        const sessionResponse = await fetch(`/api/projects/${projectId}/settings/sessions`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             session_idle_timeout_minutes: formData.widget.idleTimeoutMinutes,
             session_goodbye_delay_seconds: formData.widget.goodbyeDelaySeconds,
             session_idle_response_timeout_seconds: formData.widget.idleResponseTimeoutSeconds,
+            custom_tags: formData.customTags.map((tag) => ({
+              id: tag.id,
+              name: tag.name,
+              slug: tag.slug,
+              description: tag.description,
+              color: tag.color,
+              position: tag.position,
+            })),
           }),
         })
+        if (!sessionResponse.ok) {
+          const errorData = await sessionResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Failed to save session settings')
+        }
 
         // Update issue tracking settings
-        await fetch(`/api/projects/${projectId}/settings/issues`, {
+        const issueResponse = await fetch(`/api/projects/${projectId}/settings/issues`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -308,6 +326,10 @@ export function ProjectWizard({
             spec_guidelines: formData.issues.specGuidelines,
           }),
         })
+        if (!issueResponse.ok) {
+          const errorData = await issueResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Failed to save issue settings')
+        }
 
         // Handle codebase changes (only if GitHub is actually connected)
         if (integrations.github.isConnected && formData.codebase.source === 'github' && formData.codebase.repositoryUrl) {

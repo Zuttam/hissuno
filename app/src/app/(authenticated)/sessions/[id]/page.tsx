@@ -1,6 +1,6 @@
 import { SessionsPage } from '@/components/sessions/sessions-page'
 import { listSessions, getSessionById } from '@/lib/supabase/sessions'
-import { listProjects } from '@/lib/projects/queries'
+import { listProjects } from '@/lib/supabase/projects'
 
 interface SessionDetailPageParams {
   params: Promise<{ id: string }>

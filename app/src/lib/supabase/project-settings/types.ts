@@ -1,9 +1,15 @@
-import type { WidgetVariant, WidgetTheme, WidgetPosition } from '@/types/issue'
+import type { WidgetTrigger, WidgetDisplay, WidgetVariant, WidgetTheme, WidgetPosition } from '@/types/issue'
 
 /**
  * Widget settings subset of ProjectSettingsRecord
  */
 export interface WidgetSettings {
+  // New trigger/display model
+  widget_trigger_type: WidgetTrigger
+  widget_display_type: WidgetDisplay
+  widget_shortcut: string | null
+  widget_drawer_badge_label: string
+  // Legacy and shared settings
   widget_variant: WidgetVariant
   widget_theme: WidgetTheme
   widget_position: WidgetPosition
@@ -50,7 +56,13 @@ export type IssueSettingsInput = Partial<IssueSettings>
  * Default widget settings
  */
 export const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
-  widget_variant: 'popup',
+  // New trigger/display model
+  widget_trigger_type: 'bubble',
+  widget_display_type: 'sidepanel',
+  widget_shortcut: 'mod+k',
+  widget_drawer_badge_label: 'Support',
+  // Legacy and shared settings
+  widget_variant: 'sidepanel',
   widget_theme: 'light',
   widget_position: 'bottom-right',
   widget_title: 'Support',

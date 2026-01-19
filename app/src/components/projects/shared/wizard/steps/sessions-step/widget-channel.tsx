@@ -10,15 +10,26 @@ import {
   ChipInput,
   Select,
   Checkbox,
+  ShortcutInput,
 } from '@/components/ui'
-import type { WidgetVariant, WidgetTheme, WidgetPosition } from '@/types/issue'
+import type {
+  WidgetTrigger,
+  WidgetDisplay,
+  WidgetVariant,
+  WidgetTheme,
+} from '@/types/issue'
 import { ChannelRow } from './channel-row'
 
-const POSITION_OPTIONS: { value: WidgetPosition; label: string }[] = [
-  { value: 'bottom-right', label: 'Bottom Right' },
-  { value: 'bottom-left', label: 'Bottom Left' },
-  { value: 'top-right', label: 'Top Right' },
-  { value: 'top-left', label: 'Top Left' },
+const TRIGGER_OPTIONS: { value: WidgetTrigger; label: string; description?: string }[] = [
+  { value: 'bubble', label: 'Bubble', description: 'Floating button' },
+  { value: 'drawer-badge', label: 'Drawer Badge', description: 'Side tab' },
+  { value: 'headless', label: 'Headless', description: 'Keyboard only' },
+]
+
+const DISPLAY_OPTIONS: { value: WidgetDisplay; label: string; description?: string }[] = [
+  { value: 'popup', label: 'Popup', description: 'Corner modal' },
+  { value: 'sidepanel', label: 'Side Panel', description: 'Full-height drawer' },
+  { value: 'dialog', label: 'Dialog', description: 'Centered modal' },
 ]
 
 const THEME_OPTIONS: { value: WidgetTheme; label: string }[] = [
@@ -27,10 +38,15 @@ const THEME_OPTIONS: { value: WidgetTheme; label: string }[] = [
   { value: 'auto', label: 'Auto' },
 ]
 
-interface WidgetData {
+export interface WidgetData {
+  // New trigger/display model
+  triggerType: WidgetTrigger
+  displayType: WidgetDisplay
+  shortcut: string
+  drawerBadgeLabel: string
+  // Legacy and shared settings
   variant: WidgetVariant
   theme: WidgetTheme
-  position: WidgetPosition
   title: string
   initialMessage: string
   allowedOrigins: string[]
@@ -53,9 +69,32 @@ export function WidgetChannel({
 }: WidgetChannelProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
 
-  const handleVariantChange = useCallback(
-    (variant: WidgetVariant) => {
-      onWidgetChange({ variant })
+  const handleTriggerChange = useCallback(
+    (triggerType: WidgetTrigger) => {
+      onWidgetChange({ triggerType })
+    },
+    [onWidgetChange]
+  )
+
+  const handleDisplayChange = useCallback(
+    (displayType: WidgetDisplay) => {
+      // Also update legacy variant for backwards compatibility
+      const variant = displayType === 'dialog' ? 'sidepanel' : displayType
+      onWidgetChange({ displayType, variant })
+    },
+    [onWidgetChange]
+  )
+
+  const handleShortcutChange = useCallback(
+    (shortcut: string | null) => {
+      onWidgetChange({ shortcut: shortcut ?? '' })
+    },
+    [onWidgetChange]
+  )
+
+  const handleDrawerBadgeLabelChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      onWidgetChange({ drawerBadgeLabel: e.target.value })
     },
     [onWidgetChange]
   )
@@ -63,13 +102,6 @@ export function WidgetChannel({
   const handleThemeChange = useCallback(
     (e: ChangeEvent<HTMLSelectElement>) => {
       onWidgetChange({ theme: e.target.value as WidgetTheme })
-    },
-    [onWidgetChange]
-  )
-
-  const handlePositionChange = useCallback(
-    (e: ChangeEvent<HTMLSelectElement>) => {
-      onWidgetChange({ position: e.target.value as WidgetPosition })
     },
     [onWidgetChange]
   )
@@ -126,6 +158,9 @@ export function WidgetChannel({
     [onWidgetChange]
   )
 
+  // Show drawer label input only when trigger is drawer-badge
+  const showDrawerLabel = widget.triggerType === 'drawer-badge'
+
   return (
     <div>
       <ChannelRow
@@ -138,27 +173,19 @@ export function WidgetChannel({
 
       {isExpanded && (
         <div className="mt-4 pl-8 space-y-6">
-          {/* Appearance */}
+          {/* Trigger & Display */}
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-              Appearance
+              Trigger & Display
             </h4>
 
-            <FormField label="Display Variant">
-              <ToggleGroup
-                value={widget.variant}
-                options={[
-                  { value: 'popup', label: 'Popup' },
-                  { value: 'sidepanel', label: 'Side Panel' },
-                ]}
-                onChange={handleVariantChange}
-              />
-            </FormField>
-
             <div className="grid grid-cols-2 gap-4">
-              <FormField label="Theme">
-                <Select value={widget.theme} onChange={handleThemeChange}>
-                  {THEME_OPTIONS.map((opt) => (
+              <FormField label="Trigger" description="How the widget is activated">
+                <Select
+                  value={widget.triggerType}
+                  onChange={(e) => handleTriggerChange(e.target.value as WidgetTrigger)}
+                >
+                  {TRIGGER_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -166,9 +193,12 @@ export function WidgetChannel({
                 </Select>
               </FormField>
 
-              <FormField label="Position">
-                <Select value={widget.position} onChange={handlePositionChange}>
-                  {POSITION_OPTIONS.map((opt) => (
+              <FormField label="Display" description="How the chat appears">
+                <Select
+                  value={widget.displayType}
+                  onChange={(e) => handleDisplayChange(e.target.value as WidgetDisplay)}
+                >
+                  {DISPLAY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -176,6 +206,44 @@ export function WidgetChannel({
                 </Select>
               </FormField>
             </div>
+
+            {showDrawerLabel && (
+              <FormField label="Drawer Badge Label" description="Text shown on the side tab">
+                <Input
+                  value={widget.drawerBadgeLabel}
+                  onChange={handleDrawerBadgeLabelChange}
+                  placeholder="Support"
+                />
+              </FormField>
+            )}
+
+            <FormField
+              label="Keyboard Shortcut"
+              description="Press a key combination to set. Leave empty to disable."
+            >
+              <ShortcutInput
+                value={widget.shortcut}
+                onChange={handleShortcutChange}
+                placeholder="None"
+              />
+            </FormField>
+          </div>
+
+          {/* Appearance */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+              Appearance
+            </h4>
+
+            <FormField label="Theme">
+              <Select value={widget.theme} onChange={handleThemeChange}>
+                {THEME_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
 
             <FormField label="Widget Title">
               <Input

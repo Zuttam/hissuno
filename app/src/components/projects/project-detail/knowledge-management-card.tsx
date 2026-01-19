@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState, useRef } from 'react'
-import { Button, Badge, Alert, Spinner, Collapsible } from '@/components/ui'
+import { Button, Badge, Alert, Spinner, Collapsible, CollapsibleSection, Heading } from '@/components/ui'
 import { KnowledgeViewer } from './knowledge-viewer'
 import { AnalysisProgressBar, type AnalysisEvent } from './analysis-progress-bar'
 import {
@@ -267,21 +267,11 @@ export function KnowledgeManagementCard({ projectId, onTestAgent }: KnowledgeMan
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="font-mono text-xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-            Knowledge Base
-          </h2>
-          <p className="text-sm text-[color:var(--text-secondary)] mt-1">
-            Manage knowledge sources and compiled documentation for the support agent.
-          </p>
-        </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <Heading as="h2" size="section">
+          Knowledge Base
+        </Heading>
         <div className="flex items-center gap-2">
-          {hasKnowledge && !isAnalyzing && onTestAgent && (
-            <Button onClick={onTestAgent} variant="secondary">
-              Test Agent
-            </Button>
-          )}
           {isAnalyzing && (
             <Button
               onClick={handleCancelAnalysis}
@@ -497,37 +487,81 @@ function KnowledgeSection({ packages, isLoading, projectId, onPackageUpdated }: 
   const categories: KnowledgeCategory[] = ['business', 'product', 'technical', 'faq', 'how_to']
   const activePackage = packages.find((p) => p.category === activeCategory)
 
+  const categoryLabel = categories.find((c) => c === activeCategory) ?? activeCategory
+  const activePkgVersion = activePackage?.version
+
+  // Category buttons component (reused in both mobile and desktop)
+  const CategoryButtons = () => (
+    <div className="flex flex-wrap gap-2">
+      {categories.map((category) => {
+        const pkg = packages.find((p) => p.category === category)
+        return (
+          <button
+            key={category}
+            type="button"
+            onClick={() => {
+              if (!isEditing) {
+                setActiveCategory(category)
+              }
+            }}
+            disabled={!pkg || isEditing}
+            className={`rounded-[4px] border-2 px-3 py-1.5 sm:px-4 sm:py-2 font-mono text-xs sm:text-sm font-semibold uppercase transition
+              ${
+                activeCategory === category
+                  ? 'border-[color:var(--accent-selected)] bg-[color:var(--accent-selected)]/10 text-[color:var(--accent-selected)]'
+                  : pkg && !isEditing
+                    ? 'border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:border-[color:var(--border)]'
+                    : 'border-[color:var(--border-subtle)] text-[color:var(--text-tertiary)] opacity-50 cursor-not-allowed'
+              }`}
+          >
+            {category}
+            {pkg && <span className="ml-1 text-xs opacity-60">v{pkg.version}</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          {categories.map((category) => {
-            const pkg = packages.find((p) => p.category === category)
-            return (
+    <div className="flex flex-col gap-4">
+      {/* Mobile: Collapsible categories */}
+      <div className="sm:hidden">
+        <CollapsibleSection
+          title={`Category: ${categoryLabel}${activePkgVersion ? ` v${activePkgVersion}` : ''}`}
+          defaultExpanded={false}
+          variant="flat"
+        >
+          <CategoryButtons />
+        </CollapsibleSection>
+        {/* Action buttons for mobile */}
+        {!isEditing && (
+          <div className="flex items-center gap-4 mt-3">
+            {packages.length > 0 && (
               <button
-                key={category}
                 type="button"
-                onClick={() => {
-                  if (!isEditing) {
-                    setActiveCategory(category)
-                  }
-                }}
-                disabled={!pkg || isEditing}
-                className={`rounded-[4px] border-2 px-4 py-2 font-mono text-sm font-semibold uppercase transition
-                  ${
-                    activeCategory === category
-                      ? 'border-[color:var(--accent-selected)] bg-[color:var(--accent-selected)]/10 text-[color:var(--accent-selected)]'
-                      : pkg && !isEditing
-                        ? 'border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:border-[color:var(--border)]'
-                        : 'border-[color:var(--border-subtle)] text-[color:var(--text-tertiary)] opacity-50 cursor-not-allowed'
-                  }`}
+                onClick={handleExport}
+                disabled={isExporting}
+                className="text-sm text-[color:var(--accent-selected)] hover:underline transition font-mono disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {category}
-                {pkg && <span className="ml-1 text-xs opacity-60">v{pkg.version}</span>}
+                {isExporting ? 'Exporting...' : 'Export'}
               </button>
-            )
-          })}
-        </div>
+            )}
+            {activePackage && content && (
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="text-sm text-[color:var(--accent-selected)] hover:underline transition font-mono"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: Inline categories */}
+      <div className="hidden sm:flex sm:items-center sm:justify-between">
+        <CategoryButtons />
 
         {/* Action buttons - only show when not editing */}
         {!isEditing && (

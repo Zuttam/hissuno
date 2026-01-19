@@ -1,7 +1,7 @@
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 
 export interface ProjectDetailsCardProps {
-  project: ProjectWithCodebase
+  project: ProjectRecord
   isLoading?: boolean
   onRefresh?: () => Promise<void>
 }

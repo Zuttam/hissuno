@@ -16,6 +16,8 @@ const selectSessionWithLinkedIssues = `
 /**
  * Upserts a session record. Uses admin client since this is called
  * from the copilotkit route which doesn't have user auth context.
+ *
+ * Note: Limits are enforced at analysis time (PM review), not at session creation.
  */
 export async function upsertSession(params: {
   id: string
@@ -25,8 +27,6 @@ export async function upsertSession(params: {
   pageUrl?: string | null
   pageTitle?: string | null
   source?: SessionSource | null
-  /** True if session is created when account is over session limit (soft enforcement) */
-  isOverLimit?: boolean
 }): Promise<void> {
   if (!isServiceRoleConfigured()) {
     console.warn('[supabase.sessions] Service role not configured, skipping session upsert')
@@ -48,7 +48,6 @@ export async function upsertSession(params: {
           page_title: params.pageTitle || null,
           source: params.source || 'widget',
           last_activity_at: new Date().toISOString(),
-          is_over_limit: params.isOverLimit ?? false,
         },
         {
           onConflict: 'id',

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import type { ReactNode } from 'react'
 
 export interface NavItem {
   href: string
@@ -17,11 +18,12 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
 
-export function AppNavigation({ items }: { items: NavItem[] }) {
+export function AppNavigation({ items, leadingElement }: { items: NavItem[]; leadingElement?: ReactNode }) {
   const pathname = usePathname()
 
   return (
-    <nav className="flex items-center gap-1 text-sm font-mono font-semibold">
+    <nav className="hidden md:flex items-center gap-1 text-sm font-mono font-semibold">
+      {leadingElement}
       {items.map((item) => {
         const active = isActivePath(pathname, item.href)
         const disabled = item.disabled ?? false

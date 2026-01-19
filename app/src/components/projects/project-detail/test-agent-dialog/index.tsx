@@ -5,11 +5,11 @@ import { Button, Input } from '@/components/ui'
 import { useHissunoChat, type ChatMessage, type Message } from '@hissuno/widget'
 import { useUser } from '@/components/providers/auth-provider'
 import { useSessions } from '@/hooks/use-sessions'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 import { SessionListSidebar } from './session-list-sidebar'
 
 interface TestAgentDialogProps {
-  project: ProjectWithCodebase
+  project: ProjectRecord
   onClose: () => void
 }
 

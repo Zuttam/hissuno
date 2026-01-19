@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getProjectById } from '@/lib/projects/keys'
 import { upsertSession } from '@/lib/supabase/sessions'
 import { triggerChatRun, getChatRunStatus } from '@/lib/agent/chat-run-service'
-import { checkSessionLimitSoft } from '@/lib/billing/enforcement-service'
 import { createAdminClient } from '@/lib/supabase/server'
 import { saveSessionMessage } from '@/lib/supabase/session-messages'
 import { isOriginAllowed, verifyWidgetJWT } from '@/lib/utils/widget-auth'
@@ -175,17 +174,24 @@ export async function POST(request: NextRequest) {
     let userId = bodyUserId
     let userMetadata = bodyUserMetadata
 
-    if (project.secret_key) {
+    // If widget token is required
+    if (project.widget_token_required) {
+      if (!project.secret_key) {
+        return addCorsHeaders(
+          NextResponse.json({ error: 'Project secret key is required' }, { status: 401 }),
+          origin
+        )
+      }
+      
       // If token is required, reject if not provided
-      if (project.widget_token_required && !widgetToken) {
+      if (!widgetToken) {
         return addCorsHeaders(
           NextResponse.json({ error: 'Widget token is required' }, { status: 401 }),
           origin
         )
       }
-
-      // If token is provided, verify it
-      if (widgetToken) {
+      else {
+      
         const verifyResult = verifyWidgetJWT(widgetToken, project.secret_key)
         if (!verifyResult.valid) {
           return addCorsHeaders(
@@ -203,10 +209,8 @@ export async function POST(request: NextRequest) {
     // Use client-provided sessionId if available, otherwise generate a unique one
     const sessionId = clientSessionId || generateUniqueSessionId()
 
-    // Check session limit for project owner (soft enforcement - allow but mark as over-limit)
-    const { isOverLimit } = await checkSessionLimitSoft(project.user_id, projectId)
-
     // Upsert session for tracking (fire and forget - don't block the response)
+    // Note: Limits are enforced at analysis time (PM review), not at session creation
     upsertSession({
       id: sessionId,
       projectId,
@@ -215,7 +219,6 @@ export async function POST(request: NextRequest) {
       pageUrl: pageUrl || null,
       pageTitle: pageTitle || null,
       source: 'widget',
-      isOverLimit,
     }).catch((error) => {
       console.error('[agent.post] failed to upsert session', error)
     })

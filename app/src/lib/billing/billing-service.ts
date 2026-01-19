@@ -98,19 +98,20 @@ export async function getUsageMetrics(
 
   const projectIds = userProjects?.map((p) => p.id) ?? []
 
-  // Count sessions created in the current period for user's projects
-  let sessionsCount = 0
+  // Count analyzed sessions (pm_reviewed_at IS NOT NULL) in the current period for user's projects
+  let analyzedSessionsCount = 0
   if (projectIds.length > 0) {
     const { count, error: sessionsError } = await supabase
       .from('sessions')
       .select('*', { count: 'exact', head: true })
       .in('project_id', projectIds)
-      .gte('created_at', periodStart.toISOString())
+      .not('pm_reviewed_at', 'is', null)
+      .gte('pm_reviewed_at', periodStart.toISOString())
 
     if (sessionsError) {
-      console.error('[billing-service] failed to count sessions', sessionsError)
+      console.error('[billing-service] failed to count analyzed sessions', sessionsError)
     }
-    sessionsCount = count ?? 0
+    analyzedSessionsCount = count ?? 0
   }
 
   // Count projects
@@ -124,12 +125,12 @@ export async function getUsageMetrics(
   }
 
   // Get limits from subscription (null = unlimited if no subscription)
-  const sessionsLimit = subscription?.sessions_limit ?? null
+  const analyzedSessionsLimit = subscription?.sessions_limit ?? null
   const projectsLimit = subscription?.projects_limit ?? null
 
   return {
-    sessionsUsed: sessionsCount,
-    sessionsLimit,
+    analyzedSessionsUsed: analyzedSessionsCount,
+    analyzedSessionsLimit,
     projectsUsed: projectsCount ?? 0,
     projectsLimit,
     periodStart: periodStart.toISOString(),

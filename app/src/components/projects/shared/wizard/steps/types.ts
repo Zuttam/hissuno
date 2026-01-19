@@ -1,9 +1,11 @@
 import type { KnowledgeSourceType } from '@/lib/knowledge/types'
 import type {
+  WidgetTrigger,
+  WidgetDisplay,
   WidgetVariant,
   WidgetTheme,
-  WidgetPosition,
 } from '@/types/issue'
+import type { TagColorVariant } from '@/types/session'
 
 // ============================================
 // Step IDs and Modes
@@ -96,9 +98,14 @@ export interface CodebaseConfig {
  * Widget configuration
  */
 export interface WidgetConfig {
+  // New trigger/display model
+  triggerType: WidgetTrigger
+  displayType: WidgetDisplay
+  shortcut: string
+  drawerBadgeLabel: string
+  // Legacy and shared settings
   variant: WidgetVariant
   theme: WidgetTheme
-  position: WidgetPosition
   title: string
   initialMessage: string
   allowedOrigins: string[]
@@ -117,6 +124,19 @@ export interface SlackConfig {
   workspaceId?: string
   workspaceName?: string
   enabledChannels?: string[]
+}
+
+/**
+ * Custom tag for local state management.
+ * Tags with temp_ prefix IDs are new and haven't been saved yet.
+ */
+export interface CustomTagConfig {
+  id: string // Real ID for existing tags, temp_${timestamp} for new tags
+  name: string
+  slug: string
+  description: string
+  color: TagColorVariant
+  position: number
 }
 
 /**
@@ -149,6 +169,7 @@ export interface ProjectWizardFormData {
   // Step 3: Sessions
   widget: WidgetConfig
   slack: SlackConfig
+  customTags: CustomTagConfig[]
 
   // Step 4: Issues
   issues: IssuesConfig
@@ -223,9 +244,14 @@ export const DEFAULT_FORM_DATA: ProjectWizardFormData = {
 
   // Step 3
   widget: {
-    variant: 'popup',
+    // New trigger/display model
+    triggerType: 'bubble',
+    displayType: 'sidepanel',
+    shortcut: 'mod+k',
+    drawerBadgeLabel: 'Support',
+    // Legacy and shared settings
+    variant: 'sidepanel',
     theme: 'light',
-    position: 'bottom-right',
     title: 'Support',
     initialMessage: 'Hi! How can I help you today?',
     allowedOrigins: [],
@@ -237,6 +263,7 @@ export const DEFAULT_FORM_DATA: ProjectWizardFormData = {
   slack: {
     connected: false,
   },
+  customTags: [],
 
   // Step 4
   issues: {

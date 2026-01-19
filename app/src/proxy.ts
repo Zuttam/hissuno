@@ -6,13 +6,14 @@ const PUBLIC_PATH_PREFIXES = [
   '/login',
   '/sign-up',
   '/legal',
-  '/landing',
 
   '/auth/callback',
   '/api/auth',
   '/api/agent',
   '/api/integrations/github/callback',
   '/api/integrations/slack/callback',
+  '/api/integrations/widget',
+  '/api/waitlist',
 
   '/api/webhooks/lemon-squeezy',
   '/api/webhooks/slack',
@@ -122,8 +123,8 @@ export async function proxy(request: NextRequest) {
 
   // Redirect authenticated users from marketing pages to projects
   if (user && isMarketingPath(pathname)) {
-    const projectsUrl = new URL('/projects', request.url)
-    const redirectResponse = NextResponse.redirect(projectsUrl)
+    const analyticsUrl = new URL('/projects', request.url)
+    const redirectResponse = NextResponse.redirect(analyticsUrl)
     forwardCookies(redirectResponse)
     return redirectResponse
   }

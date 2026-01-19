@@ -1,6 +1,6 @@
 import { IssuesPageContent } from '@/components/issues/issues-page'
 import { listIssues, getIssueById } from '@/lib/supabase/issues'
-import { listProjects } from '@/lib/projects/queries'
+import { listProjects } from '@/lib/supabase/projects'
 
 interface IssueDetailPageParams {
   params: Promise<{ issueId: string }>

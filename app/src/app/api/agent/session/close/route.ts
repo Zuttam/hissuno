@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { checkEnforcement } from '@/lib/billing/enforcement-service'
 import { getProjectById } from '@/lib/projects/keys'
 import { isOriginAllowed, verifyWidgetJWT } from '@/lib/utils/widget-auth'
 
@@ -129,10 +130,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    // Get session to verify it exists and check over-limit status
+    // Get session to verify it exists
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .select('id, project_id, status, is_over_limit')
+      .select('id, project_id, status')
       .eq('id', sessionId)
       .single()
 
@@ -165,17 +166,31 @@ export async function POST(request: NextRequest) {
     let reviewTriggered = false
     let runId: string | undefined
 
-    // Skip PM review for over-limit sessions (soft enforcement)
-    if (session.is_over_limit) {
-      console.log('[agent/session/close] Skipping PM review for over-limit session:', sessionId)
-      return addCorsHeaders(
-        NextResponse.json({
-          success: true,
-          reviewTriggered: false,
-          skippedReason: 'over_limit',
-        }),
-        origin
-      )
+    // Check analyzed sessions limit before triggering PM review
+    // Get project owner for limit check
+    const { data: projectRecord } = await supabase
+      .from('projects')
+      .select('user_id')
+      .eq('id', session.project_id)
+      .single()
+
+    if (projectRecord?.user_id) {
+      const limitResult = await checkEnforcement({
+        userId: projectRecord.user_id,
+        dimension: 'analyzed_sessions',
+      })
+
+      if (!limitResult.allowed) {
+        console.log('[agent/session/close] Skipping PM review - analyzed sessions limit reached:', sessionId)
+        return addCorsHeaders(
+          NextResponse.json({
+            success: true,
+            reviewTriggered: false,
+            skippedReason: 'limit_reached',
+          }),
+          origin
+        )
+      }
     }
 
     // Trigger async session review

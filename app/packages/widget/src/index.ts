@@ -14,7 +14,8 @@
  *       <YourApp />
  *       <HissunoWidget
  *         projectId="proj_xxx"
- *         publicKey="pk_live_xxx"
+ *         trigger="bubble"
+ *         display="sidepanel"
  *       />
  *     </div>
  *   );
@@ -25,26 +26,41 @@
  * ```tsx
  * <HissunoWidget
  *   projectId="proj_xxx"
- *   publicKey="pk_live_xxx"
- *   showBubble={false}
+ *   trigger="headless"
  *   renderTrigger={({ open, isOpen }) => (
  *     <button onClick={open}>Need help?</button>
  *   )}
  * />
  * ```
+ *
+ * @example Drawer badge trigger
+ * ```tsx
+ * <HissunoWidget
+ *   projectId="proj_xxx"
+ *   trigger="drawer-badge"
+ *   drawerBadgeLabel="Help"
+ *   display="dialog"
+ * />
+ * ```
  */
 
 // Main widget component
-export { HissunoWidget, SupportWidget } from './HissunoWidget';
+export { HissunoWidget } from './HissunoWidget';
+// Alias for backwards compatibility
+export { HissunoWidget as SupportWidget } from './HissunoWidget';
 
-// Sub-components for advanced usage
-export { ChatBubble } from './ChatBubble';
-export { ChatPopup } from './ChatPopup';
-export { ChatSidepanel } from './ChatSidepanel';
-export { ChatMessages } from './ChatMessages';
+// Trigger components for advanced usage
+export { ChatBubble, DrawerBadge } from './triggers';
 
-// Hook for custom implementations
-export { useHissunoChat } from './useHissunoChat';
+// Display components for advanced usage
+export { ChatPopup, ChatSidepanel, ChatDialog } from './displays';
+
+// Shared components for advanced usage
+export { ChatMessages, ConversationHistory, HistoryIcon } from './shared';
+
+// Hooks for custom implementations
+export { useHissunoChat, useKeyboardShortcut, formatShortcut, useResolvedTheme, useFocusTrap } from './hooks';
+export type { SessionEntry, UseHissunoChatOptions, UseHissunoChatReturn } from './hooks';
 
 // Re-export Message type from ai-sdk for loadSession usage
 export type { Message } from '@ai-sdk/react';
@@ -57,6 +73,7 @@ export type {
   BubbleOffset,
   TriggerRenderProps,
   ChatMessage,
-  WidgetVariant,
+  WidgetTrigger,
+  WidgetDisplay,
   WidgetSettings,
 } from './types';

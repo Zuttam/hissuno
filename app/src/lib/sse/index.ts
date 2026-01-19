@@ -75,10 +75,27 @@ export const SSE_HEADERS = {
 } as const
 
 /**
+ * Create CORS headers for widget-facing SSE endpoints
+ */
+export function createCorsHeaders(origin: string): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  }
+}
+
+/**
  * Create an SSE Response with standard headers
  */
-export function createSSEResponse(stream: ReadableStream): Response {
-  return new Response(stream, { headers: SSE_HEADERS })
+export function createSSEResponse(
+  stream: ReadableStream,
+  additionalHeaders?: Record<string, string>
+): Response {
+  const headers = additionalHeaders
+    ? { ...SSE_HEADERS, ...additionalHeaders }
+    : SSE_HEADERS
+  return new Response(stream, { headers })
 }
 
 /**
@@ -140,11 +157,17 @@ export function createSSEStream<T extends BaseSSEEvent = BaseSSEEvent>(
   let isClosed = false
   let controllerRef: ReadableStreamDefaultController | null = null
 
+  // Events that should not be logged (too noisy)
+  const silentEvents = new Set(['text-chunk', 'heartbeat', 'text-delta', 'message-chunk'])
+
   const safeEnqueue = (data: Uint8Array, eventType?: string) => {
     if (!isClosed && controllerRef) {
       try {
         controllerRef.enqueue(data)
-        console.debug(`${logPrefix} Enqueued event:`, eventType ?? 'unknown')
+        // Only log meaningful events, not streaming chunks
+        if (!silentEvents.has(eventType ?? '')) {
+          console.debug(`${logPrefix} Enqueued event:`, eventType ?? 'unknown')
+        }
       } catch (enqueueError) {
         console.error(`${logPrefix} Failed to enqueue:`, enqueueError)
         isClosed = true
@@ -211,19 +234,27 @@ export function createSSEStream<T extends BaseSSEEvent = BaseSSEEvent>(
 export function createSSEStreamWithExecutor<T extends BaseSSEEvent = BaseSSEEvent>(options: {
   logPrefix?: string
   executor: (controller: Omit<SSEStreamController<T>, 'stream'>) => Promise<void>
+  /** Additional headers to include in the response (e.g., CORS headers) */
+  headers?: Record<string, string>
 }): Response {
-  const { logPrefix = '[sse]', executor } = options
+  const { logPrefix = '[sse]', executor, headers } = options
   const encoder = new TextEncoder()
 
   let isClosed = false
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Events that should not be logged (too noisy)
+      const silentEvents = new Set(['text-chunk', 'heartbeat', 'text-delta', 'message-chunk'])
+
       const safeEnqueue = (data: Uint8Array, eventType?: string) => {
         if (!isClosed) {
           try {
             controller.enqueue(data)
-            console.log(`${logPrefix} Enqueued event:`, eventType ?? 'unknown')
+            // Only log meaningful events, not streaming chunks
+            if (!silentEvents.has(eventType ?? '')) {
+              console.log(`${logPrefix} Enqueued event:`, eventType ?? 'unknown')
+            }
           } catch (enqueueError) {
             console.error(`${logPrefix} Failed to enqueue:`, enqueueError)
             isClosed = true
@@ -265,5 +296,5 @@ export function createSSEStreamWithExecutor<T extends BaseSSEEvent = BaseSSEEven
     },
   })
 
-  return createSSEResponse(stream)
+  return createSSEResponse(stream, headers)
 }

@@ -3,31 +3,14 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo } from 'react'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 import { useProjects } from '@/hooks/use-projects'
-import { Button } from '@/components/ui/button'
-import { IconButton } from '@/components/ui/icon-button'
-import { RefreshIcon } from '@/components/ui/refresh-icon'
-import { Card } from '@/components/ui/card'
+import { Button, PageHeader } from '@/components/ui'
 import { FloatingCard } from '../ui/floating-card'
-
-function PlusIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={2}
-      stroke="currentColor"
-      className="h-8 w-8"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-    </svg>
-  )
-}
+import { ProjectsAnalyticsStrip } from '@/components/analytics'
 
 interface ProjectsProps {
-  initialProjects: ProjectWithCodebase[]
+  initialProjects: ProjectRecord[]
 }
 
 export function Projects({ initialProjects }: ProjectsProps) {
@@ -38,21 +21,24 @@ export function Projects({ initialProjects }: ProjectsProps) {
     return projects.map((project) => <ProjectCard key={project.id} project={project} />)
   }, [projects])
 
+  const router = useRouter()
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-      <header className="flex items-center gap-3">
-        <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-          Projects
-        </h1>
-        <IconButton
-          aria-label="Refresh projects"
-          variant="ghost"
-          size="md"
-          onClick={() => void refresh()}
-        >
-          <RefreshIcon />
-        </IconButton>
-      </header>
+      <PageHeader
+        title="Projects"
+        onRefresh={() => void refresh()}
+        actions={
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => router.push('/projects/new')}
+          >
+            Create
+          </Button>
+        }
+      />
+      <ProjectsAnalyticsStrip projects={projects} />
 
       {error && (
         <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-4 font-mono text-sm text-[color:var(--foreground)]">
@@ -67,7 +53,6 @@ export function Projects({ initialProjects }: ProjectsProps) {
       ) : (
         <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {projectCards}
-          <AddProjectCard />
         </section>
       )}
     </div>
@@ -75,7 +60,7 @@ export function Projects({ initialProjects }: ProjectsProps) {
 }
 
 interface ProjectCardProps {
-  project: ProjectWithCodebase
+  project: ProjectRecord
 }
 
 function ProjectCard({ project }: ProjectCardProps) {
@@ -107,24 +92,6 @@ function ProjectCard({ project }: ProjectCardProps) {
         </Button>
       </div>
     </FloatingCard>
-  )
-}
-
-function AddProjectCard() {
-  return (
-    <Card className="group flex h-full min-h-[180px] flex-col items-center justify-center rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-transparent p-6 transition-all duration-200 hover:border-[color:var(--border)] hover:-translate-y-0.5">
-      <Link
-        href="/projects/new"
-        className="flex flex-col items-center gap-3 text-center"
-      >
-        <span className="text-[color:var(--text-tertiary)] transition-colors group-hover:text-[color:var(--text-secondary)]">
-          <PlusIcon />
-        </span>
-        <span className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition-colors group-hover:text-[color:var(--foreground)]">
-          Create Project
-        </span>
-      </Link>
-    </Card>
   )
 }
 
