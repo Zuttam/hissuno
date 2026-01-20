@@ -38,7 +38,7 @@ export function CodebaseSource({
   return (
     <div>
       <ChannelRow
-        icon="/github.svg"
+        icon="/logos/github.svg"
         iconType="svg"
         name="GitHub Repository"
         description="Connect a GitHub repository to give your agent access to your codebase"

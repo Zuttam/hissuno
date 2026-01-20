@@ -1,12 +1,11 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import { Input, Select, Checkbox, CollapsibleSection } from '@/components/ui'
+import { Input, Select, CollapsibleSection, Button } from '@/components/ui'
 import type { SessionFilters, SessionSource } from '@/types/session'
-import { SESSION_SOURCE_INFO } from '@/types/session'
+import { SESSION_SOURCE_INFO, SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 import { useCustomTags } from '@/hooks/use-custom-tags'
-import { SessionTagFilter } from './session-tag-filter'
 
 interface SessionsFiltersProps {
   projects: ProjectRecord[]
@@ -14,14 +13,81 @@ interface SessionsFiltersProps {
   onFilterChange: (filters: SessionFilters) => void
 }
 
+interface FilterChipProps {
+  label: string
+  active: boolean
+  onClick: () => void
+}
+
+function FilterChip({ label, active, onClick }: FilterChipProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      selected={active}
+      onClick={onClick}
+      className="!rounded-full !px-2.5 !py-0.5 !text-[10px]"
+    >
+      {label}
+    </Button>
+  )
+}
+
+function FilterLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="mr-1 font-mono text-[10px] uppercase text-[color:var(--text-tertiary)]">
+      {children}
+    </span>
+  )
+}
+
 export function SessionsFilters({
   projects,
   filters,
   onFilterChange,
 }: SessionsFiltersProps) {
-  // Fetch custom tags for the selected project
   const { tags: customTags } = useCustomTags({ projectId: filters.projectId })
 
+  // Status handlers
+  const handleStatusToggle = useCallback(
+    (status: 'active' | 'closed') => {
+      onFilterChange({
+        ...filters,
+        status: filters.status === status ? undefined : status,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Tag handlers
+  const handleTagToggle = useCallback(
+    (tag: string) => {
+      const currentTags = filters.tags ?? []
+      const newTags = currentTags.includes(tag)
+        ? currentTags.filter((t) => t !== tag)
+        : [...currentTags, tag]
+      onFilterChange({ ...filters, tags: newTags.length > 0 ? newTags : undefined })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Source handlers
+  const handleSourceToggle = useCallback(
+    (source: SessionSource) => {
+      onFilterChange({
+        ...filters,
+        source: filters.source === source ? undefined : source,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Archived handler
+  const handleArchivedToggle = useCallback(() => {
+    onFilterChange({ ...filters, showArchived: !filters.showArchived || undefined })
+  }, [filters, onFilterChange])
+
+  // Project handler
   const handleProjectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       onFilterChange({ ...filters, projectId: e.target.value || undefined })
@@ -29,36 +95,7 @@ export function SessionsFilters({
     [filters, onFilterChange]
   )
 
-  const handleUserIdChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onFilterChange({ ...filters, userId: e.target.value || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
-  const handleSessionIdChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onFilterChange({ ...filters, sessionId: e.target.value || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
-  const handleStatusChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const value = e.target.value as 'active' | 'closed' | ''
-      onFilterChange({ ...filters, status: value || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
-  const handleSourceChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const value = e.target.value as SessionSource | ''
-      onFilterChange({ ...filters, source: value || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
+  // Date handlers
   const handleDateFromChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onFilterChange({ ...filters, dateFrom: e.target.value || undefined })
@@ -73,16 +110,24 @@ export function SessionsFilters({
     [filters, onFilterChange]
   )
 
-  const handleTagsChange = useCallback(
-    (tags: string[]) => {
-      onFilterChange({ ...filters, tags: tags.length > 0 ? tags : undefined })
+  // Search handlers
+  const handleUserIdChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onFilterChange({ ...filters, userId: e.target.value || undefined })
     },
     [filters, onFilterChange]
   )
 
-  const handleShowArchivedChange = useCallback(
-    (checked: boolean) => {
-      onFilterChange({ ...filters, showArchived: checked || undefined })
+  const handleSessionIdChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onFilterChange({ ...filters, sessionId: e.target.value || undefined })
+    },
+    [filters, onFilterChange]
+  )
+
+  const handleNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onFilterChange({ ...filters, name: e.target.value || undefined })
     },
     [filters, onFilterChange]
   )
@@ -96,6 +141,7 @@ export function SessionsFilters({
     if (filters.projectId) count++
     if (filters.userId) count++
     if (filters.sessionId) count++
+    if (filters.name) count++
     if (filters.status) count++
     if (filters.source) count++
     if (filters.dateFrom) count++
@@ -111,19 +157,91 @@ export function SessionsFilters({
     ? `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'} active`
     : undefined
 
-  return (
-    <CollapsibleSection title="Filters" collapsedSummary={collapsedSummary} defaultExpanded={false} variant="flat">
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Project
-          </label>
+  // All custom tag slugs
+  const customTagSlugs = useMemo(() => customTags.map((t) => t.slug), [customTags])
+
+  // Quick filters (collapsed state)
+  const quickFilters = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <FilterLabel>Status:</FilterLabel>
+      <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
+      <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
+      <span className="ml-2" />
+      <FilterLabel>Type:</FilterLabel>
+      {SESSION_TAGS.map((tag) => (
+        <FilterChip
+          key={tag}
+          label={SESSION_TAG_INFO[tag].label}
+          active={filters.tags?.includes(tag) ?? false}
+          onClick={() => handleTagToggle(tag)}
+        />
+      ))}
+    </div>
+  )
+
+  // Expanded filters (same style, more options)
+  const expandedFilters = (
+    <div className="flex flex-col gap-3">
+      {/* Row 1: Status + Type */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FilterLabel>Status:</FilterLabel>
+        <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
+        <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
+        <span className="ml-2" />
+        <FilterLabel>Type:</FilterLabel>
+        {SESSION_TAGS.map((tag) => (
+          <FilterChip
+            key={tag}
+            label={SESSION_TAG_INFO[tag].label}
+            active={filters.tags?.includes(tag) ?? false}
+            onClick={() => handleTagToggle(tag)}
+          />
+        ))}
+        {customTags.length > 0 && (
+          <>
+            <span className="ml-2" />
+            <FilterLabel>Custom:</FilterLabel>
+            {customTags.map((tag) => (
+              <FilterChip
+                key={tag.slug}
+                label={tag.name}
+                active={filters.tags?.includes(tag.slug) ?? false}
+                onClick={() => handleTagToggle(tag.slug)}
+              />
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Row 2: Source + Archived */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FilterLabel>Source:</FilterLabel>
+        {(Object.keys(SESSION_SOURCE_INFO) as SessionSource[]).map((source) => (
+          <FilterChip
+            key={source}
+            label={SESSION_SOURCE_INFO[source].label}
+            active={filters.source === source}
+            onClick={() => handleSourceToggle(source)}
+          />
+        ))}
+        <span className="ml-2" />
+        <FilterChip
+          label="Archived"
+          active={filters.showArchived ?? false}
+          onClick={handleArchivedToggle}
+        />
+      </div>
+
+      {/* Row 3: Project + Dates + Search */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex items-center gap-1">
+          <FilterLabel>Project:</FilterLabel>
           <Select
             value={filters.projectId || ''}
             onChange={handleProjectChange}
-            className="w-48"
+            className="h-6 w-36 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
           >
-            <option value="">All projects</option>
+            <option value="">All</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
@@ -131,119 +249,77 @@ export function SessionsFilters({
             ))}
           </Select>
         </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            User ID
-          </label>
-          <Input
-            type="text"
-            placeholder="Search user..."
-            value={filters.userId || ''}
-            onChange={handleUserIdChange}
-            className="w-40"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Session ID
-          </label>
-          <Input
-            type="text"
-            placeholder="Search session..."
-            value={filters.sessionId || ''}
-            onChange={handleSessionIdChange}
-            className="w-40"
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Status
-          </label>
-          <Select
-            value={filters.status || ''}
-            onChange={handleStatusChange}
-            className="w-32"
-          >
-            <option value="">All</option>
-            <option value="active">Active</option>
-            <option value="closed">Closed</option>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Source
-          </label>
-          <Select
-            value={filters.source || ''}
-            onChange={handleSourceChange}
-            className="w-32"
-          >
-            <option value="">All</option>
-            {(Object.keys(SESSION_SOURCE_INFO) as SessionSource[]).map((source) => (
-              <option key={source} value={source}>
-                {SESSION_SOURCE_INFO[source].label}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Tags
-          </label>
-          <SessionTagFilter
-            selectedTags={filters.tags ?? []}
-            onChange={handleTagsChange}
-            customTags={customTags}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            From
-          </label>
+        <div className="flex items-center gap-1">
+          <FilterLabel>From:</FilterLabel>
           <Input
             type="date"
             value={filters.dateFrom || ''}
             onChange={handleDateFromChange}
-            className="w-36"
+            className="h-6 w-32 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
           />
         </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            To
-          </label>
+        <div className="flex items-center gap-1">
+          <FilterLabel>To:</FilterLabel>
           <Input
             type="date"
             value={filters.dateTo || ''}
             onChange={handleDateToChange}
-            className="w-36"
+            className="h-6 w-32 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
           />
         </div>
-
-        <div className="flex items-center gap-2 self-end pb-2">
-          <Checkbox
-            checked={filters.showArchived || false}
-            onChange={handleShowArchivedChange}
-            label="Show archived"
+        <div className="flex items-center gap-1">
+          <FilterLabel>User:</FilterLabel>
+          <Input
+            type="text"
+            placeholder="ID..."
+            value={filters.userId || ''}
+            onChange={handleUserIdChange}
+            className="h-6 w-24 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
           />
         </div>
-
+        <div className="flex items-center gap-1">
+          <FilterLabel>Session:</FilterLabel>
+          <Input
+            type="text"
+            placeholder="ID..."
+            value={filters.sessionId || ''}
+            onChange={handleSessionIdChange}
+            className="h-6 w-24 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <FilterLabel>Name:</FilterLabel>
+          <Input
+            type="text"
+            placeholder="Search..."
+            value={filters.name || ''}
+            onChange={handleNameChange}
+            className="h-6 w-28 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
+          />
+        </div>
         {hasActiveFilters && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleClearFilters}
-            className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
+            className="!rounded-full !px-2.5 !py-0.5 !text-[10px]"
           >
-            Clear filters
-          </button>
+            Clear all
+          </Button>
         )}
       </div>
+    </div>
+  )
+
+  return (
+    <CollapsibleSection
+      title="Filters"
+      collapsedSummary={collapsedSummary}
+      collapsedContent={quickFilters}
+      defaultExpanded={false}
+      variant="flat"
+    >
+      {expandedFilters}
     </CollapsibleSection>
   )
 }

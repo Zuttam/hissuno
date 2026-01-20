@@ -78,6 +78,7 @@ export function SessionsPage({
     messages,
     isLoading: isLoadingDetail,
     refresh: refreshSessionDetail,
+    updateSession,
   } = useSessionDetail({
     sessionId: selectedSessionId,
   })
@@ -165,6 +166,7 @@ export function SessionsPage({
           isLoading={isLoadingDetail}
           onClose={handleCloseSidebar}
           onSessionUpdated={handleSessionUpdated}
+          onUpdateSession={updateSession}
           view={view}
           onViewChange={handleViewChange}
         />

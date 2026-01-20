@@ -32,11 +32,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ stats })
     }
 
+    const tagsParam = searchParams.get('tags')
     const filters: SessionFilters = {
       projectId: searchParams.get('projectId') || undefined,
       userId: searchParams.get('userId') || undefined,
       sessionId: searchParams.get('sessionId') || undefined,
+      name: searchParams.get('name') || undefined,
       status: (searchParams.get('status') as 'active' | 'closed') || undefined,
+      source: (searchParams.get('source') as SessionFilters['source']) || undefined,
+      tags: tagsParam ? tagsParam.split(',').filter(Boolean) : undefined,
       dateFrom: searchParams.get('dateFrom') || undefined,
       dateTo: searchParams.get('dateTo') || undefined,
       showArchived: searchParams.get('showArchived') === 'true',

@@ -15,7 +15,6 @@ import {
 import type {
   WidgetTrigger,
   WidgetDisplay,
-  WidgetVariant,
   WidgetTheme,
 } from '@/types/issue'
 import { ChannelRow } from './channel-row'
@@ -45,7 +44,7 @@ export interface WidgetData {
   shortcut: string
   drawerBadgeLabel: string
   // Legacy and shared settings
-  variant: WidgetVariant
+  variant: WidgetDisplay
   theme: WidgetTheme
   title: string
   initialMessage: string

@@ -3,15 +3,15 @@
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui'
 import { useWaterWebGLOptional } from '@/components/water-webgl/WaterWebGLContext'
-import { useWaitlist } from '@/components/landing/waitlist-context'
+import { useCTA } from '@/components/landing/cta-context'
 
 export function CTASection() {
   const water = useWaterWebGLOptional()
-  const { openWaitlistDialog } = useWaitlist()
+  const { openCTAOptions } = useCTA()
 
   const handleButtonClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
-    openWaitlistDialog()
+    openCTAOptions('cta_section')
   }
 
   return (
@@ -42,7 +42,7 @@ export function CTASection() {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.1 }}
         >
-          Join the waitlist to be first in line when we launch.
+          Book a call to see Hissuno in action, or join the waitlist.
         </motion.p>
         <motion.div
           className="mt-8"
@@ -56,7 +56,7 @@ export function CTASection() {
             onClick={handleButtonClick}
             className="bg-[var(--accent-selected)] hover:opacity-90"
           >
-            Join the Waitlist
+            Get Started
           </Button>
         </motion.div>
       </div>

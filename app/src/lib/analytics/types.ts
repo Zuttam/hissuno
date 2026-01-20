@@ -15,3 +15,15 @@ export interface OnboardingCompletedEventData {
   selectedUseCases: string[]
   utm?: UTMParams
 }
+
+export interface CTAEventData {
+  source: 'nav' | 'hero' | 'cta_section'
+  option?: 'book_call' | 'join_waitlist'
+  utm?: UTMParams
+}
+
+export interface CallBookingEventData {
+  eventUri?: string
+  inviteeUri?: string
+  utm?: UTMParams
+}

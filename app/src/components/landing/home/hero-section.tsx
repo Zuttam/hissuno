@@ -4,19 +4,19 @@ import Link from 'next/link'
 import { motion } from 'motion/react'
 import { Button, ThemeLogo } from '@/components/ui'
 import { useWaterWebGLOptional } from '@/components/water-webgl/WaterWebGLContext'
-import { useWaitlist } from '@/components/landing/waitlist-context'
+import { useCTA } from '@/components/landing/cta-context'
 
 export function HeroSection() {
   const water = useWaterWebGLOptional()
-  const { openWaitlistDialog } = useWaitlist()
+  const { openCTAOptions } = useCTA()
 
   const handleLogoClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
   }
 
-  const handleWaitlistClick = (e: React.MouseEvent) => {
+  const handleCTAClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
-    openWaitlistDialog()
+    openCTAOptions('hero')
   }
 
   return (
@@ -45,10 +45,10 @@ export function HeroSection() {
         <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
           <Button
             size="lg"
-            onClick={handleWaitlistClick}
+            onClick={handleCTAClick}
             className="w-full bg-[var(--accent-selected)] hover:opacity-90 sm:w-auto"
           >
-            Join the Waitlist
+            Get Started
           </Button>
         </div>
       </div>

@@ -51,7 +51,7 @@ function App() {
 | `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme (`auto` follows system preference) |
 | `userId` | `string` | - | End-user identifier for session tracking |
 | `userMetadata` | `Record<string, string>` | - | Additional user info (name, email, plan, etc.) |
-| `apiUrl` | `string` | `'/api/agent'` | Custom API endpoint URL |
+| `apiUrl` | `string` | `'/api/integrations/widget/chat'` | Custom API endpoint URL |
 | `title` | `string` | `'Support'` | Chat window title |
 | `placeholder` | `string` | `'Ask a question...'` | Input field placeholder |
 | `initialMessage` | `string` | `'Hi! How can I help?'` | First message shown to users |

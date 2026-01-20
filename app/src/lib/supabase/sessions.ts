@@ -2,7 +2,8 @@ import { cache } from 'react'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
 import { saveSessionMessage } from './session-messages'
-import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, CreateSessionInput } from '@/types/session'
+import { ensureSessionName, generateDefaultName } from '@/lib/sessions/name-generator'
+import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, CreateSessionInput, UpdateSessionInput } from '@/types/session'
 
 const selectSessionWithProject = '*, project:projects(id, name)'
 const selectSessionWithLinkedIssues = `
@@ -65,6 +66,7 @@ export async function upsertSession(params: {
 
 /**
  * Updates the last activity timestamp and increments message count for a session.
+ * Also triggers name generation after 3+ messages if no name exists.
  */
 export async function updateSessionActivity(sessionId: string): Promise<void> {
   if (!isServiceRoleConfigured()) {
@@ -73,17 +75,18 @@ export async function updateSessionActivity(sessionId: string): Promise<void> {
 
   try {
     const supabase = createAdminClient()
-    
-    // First get current message count
+
+    // First get current session state
     const { data: session } = await supabase
       .from('sessions')
-      .select('message_count, first_message_at')
+      .select('message_count, first_message_at, name, project_id')
       .eq('id', sessionId)
       .single()
 
+    const newMessageCount = (session?.message_count ?? 0) + 1
     const updates: Record<string, unknown> = {
       last_activity_at: new Date().toISOString(),
-      message_count: (session?.message_count ?? 0) + 1,
+      message_count: newMessageCount,
     }
 
     // Set first_message_at if not already set
@@ -95,6 +98,14 @@ export async function updateSessionActivity(sessionId: string): Promise<void> {
       .from('sessions')
       .update(updates)
       .eq('id', sessionId)
+
+    // Trigger name generation after 3+ messages if no name exists (fire-and-forget)
+    if (newMessageCount >= 3 && !session?.name && session?.project_id) {
+      void ensureSessionName({
+        sessionId,
+        projectId: session.project_id,
+      })
+    }
   } catch (error) {
     console.error('[supabase.sessions] error updating session activity', sessionId, error)
   }
@@ -161,8 +172,14 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     if (filters.sessionId) {
       query = query.ilike('id', `%${filters.sessionId}%`)
     }
+    if (filters.name) {
+      query = query.ilike('name', `%${filters.name}%`)
+    }
     if (filters.status) {
       query = query.eq('status', filters.status)
+    }
+    if (filters.source) {
+      query = query.eq('source', filters.source)
     }
     if (filters.tags && filters.tags.length > 0) {
       query = query.overlaps('tags', filters.tags)
@@ -461,6 +478,15 @@ export async function createManualSession(input: CreateSessionInput): Promise<Se
     const messageCount = input.messages?.length ?? 0
     const now = new Date()
 
+    // Use provided name or generate a default one
+    const sessionName =
+      input.name ||
+      generateDefaultName({
+        userId: input.user_id || null,
+        source: 'manual',
+        createdAt: now.toISOString(),
+      })
+
     const { data, error } = await supabase
       .from('sessions')
       .insert({
@@ -469,6 +495,7 @@ export async function createManualSession(input: CreateSessionInput): Promise<Se
         user_id: input.user_id || null,
         page_url: input.page_url || null,
         page_title: input.page_title || null,
+        name: sessionName,
         source: 'manual',
         status: 'active',
         message_count: messageCount,
@@ -571,6 +598,79 @@ export async function updateSessionArchiveStatus(
     return data as SessionRecord
   } catch (error) {
     console.error('[supabase.sessions] unexpected error updating session archive status', sessionId, error)
+    throw error
+  }
+}
+
+/**
+ * Updates a session. Requires authenticated user context.
+ */
+export async function updateSession(
+  sessionId: string,
+  input: UpdateSessionInput
+): Promise<SessionRecord | null> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase must be configured.')
+  }
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      throw new UnauthorizedError('Unable to resolve user context.')
+    }
+
+    // Get session and verify ownership
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('project_id')
+      .eq('id', sessionId)
+      .single()
+
+    if (!session) {
+      return null
+    }
+
+    const { data: project } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('id', session.project_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (!project) {
+      throw new UnauthorizedError('You do not have permission to update this session.')
+    }
+
+    // Build update object
+    const updates: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (input.name !== undefined) updates.name = input.name
+    if (input.status !== undefined) updates.status = input.status
+    if (input.user_id !== undefined) updates.user_id = input.user_id
+    if (input.user_metadata !== undefined) updates.user_metadata = input.user_metadata
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .update(updates)
+      .eq('id', sessionId)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[supabase.sessions] failed to update session', sessionId, error)
+      throw new Error('Unable to update session.')
+    }
+
+    return data as SessionRecord
+  } catch (error) {
+    console.error('[supabase.sessions] unexpected error updating session', sessionId, error)
     throw error
   }
 }

@@ -119,7 +119,7 @@ export function SessionTagFilter({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-9 w-48 items-center justify-between rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-3 text-sm transition hover:border-[color:var(--border)] focus:border-[color:var(--accent-primary)] focus:outline-none"
+        className="flex h-8 w-40 items-center justify-between rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-2.5 text-sm transition hover:border-[color:var(--border)] focus:border-[color:var(--accent-primary)] focus:outline-none"
       >
         <span className="truncate text-[color:var(--text-secondary)]">
           {selectedTags.length === 0

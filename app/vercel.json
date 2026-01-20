@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/session-lifecycle",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}

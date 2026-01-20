@@ -1,4 +1,4 @@
-import type { WidgetTrigger, WidgetDisplay, WidgetVariant, WidgetTheme, WidgetPosition } from '@/types/issue'
+import type { WidgetTrigger, WidgetDisplay, WidgetTheme, WidgetPosition } from '@/types/issue'
 
 /**
  * Widget settings subset of ProjectSettingsRecord
@@ -10,7 +10,7 @@ export interface WidgetSettings {
   widget_shortcut: string | null
   widget_drawer_badge_label: string
   // Legacy and shared settings
-  widget_variant: WidgetVariant
+  widget_variant: WidgetDisplay
   widget_theme: WidgetTheme
   widget_position: WidgetPosition
   widget_title: string

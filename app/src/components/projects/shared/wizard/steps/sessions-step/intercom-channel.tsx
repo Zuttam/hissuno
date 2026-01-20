@@ -5,7 +5,7 @@ import { ChannelRow } from './channel-row'
 export function IntercomChannel() {
   return (
     <ChannelRow
-      icon="/intercom.svg"
+      icon="/logos/intercom.svg"
       iconType="svg"
       name="Intercom"
       description="Import customer conversations from Intercom to enhance support insights"

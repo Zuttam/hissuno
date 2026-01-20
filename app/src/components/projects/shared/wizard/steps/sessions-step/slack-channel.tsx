@@ -22,7 +22,7 @@ export function SlackChannel({ integration }: SlackChannelProps) {
   return (
     <div>
       <ChannelRow
-        icon="/slack.svg"
+        icon="/logos/slack.svg"
         iconType="svg"
         name="Slack Agent"
         description="Connect Slack to receive and respond to customer sessions via your workspace"

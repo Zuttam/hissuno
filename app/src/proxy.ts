@@ -8,8 +8,7 @@ const PUBLIC_PATH_PREFIXES = [
   '/legal',
 
   '/auth/callback',
-  '/api/auth',
-  '/api/agent',
+  '/api/cron',
   '/api/integrations/github/callback',
   '/api/integrations/slack/callback',
   '/api/integrations/widget',

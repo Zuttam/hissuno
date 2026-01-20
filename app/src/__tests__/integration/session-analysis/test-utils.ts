@@ -85,6 +85,7 @@ export function createMockSession(
     user_metadata: testCase.session.userMetadata || null,
     page_url: testCase.session.pageUrl || null,
     page_title: testCase.session.title,
+    name: null,
     source: 'widget',
     message_count: testCase.session.messages.length,
     status: 'closed',
