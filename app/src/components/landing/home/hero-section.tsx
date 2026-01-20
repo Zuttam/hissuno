@@ -20,7 +20,7 @@ export function HeroSection() {
   }
 
   return (
-    <section className="relative overflow-hidden px-6 py-16 md:px-12 md:py-24">
+    <section className="relative overflow-hidden px-6 py-8 md:px-12 md:py-12">
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         {/* Interactive logo that triggers ripples */}
         <motion.div

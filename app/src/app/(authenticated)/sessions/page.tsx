@@ -1,6 +1,6 @@
 import { SessionsPage } from '@/components/sessions/sessions-page'
 import { listSessions } from '@/lib/supabase/sessions'
-import { listProjects } from '@/lib/projects/queries'
+import { listProjects } from '@/lib/supabase/projects'
 
 interface SessionsPageParams {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>

@@ -729,6 +729,7 @@ Call this after generating the spec content.`,
         .update({
           product_spec: spec,
           product_spec_generated_at: new Date().toISOString(),
+          status: 'ready', // Auto-transition to ready when spec is generated
           updated_at: new Date().toISOString(),
         })
         .eq('id', issueId)

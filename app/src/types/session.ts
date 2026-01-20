@@ -79,8 +79,6 @@ export interface SessionRecord {
   idle_prompt_sent_at: string | null
   scheduled_close_at: string | null
   is_archived: boolean
-  /** True if session was created when account was over session limit. PM review is skipped. */
-  is_over_limit: boolean
   created_at: string
   updated_at: string
 }
@@ -149,6 +147,7 @@ export interface SessionFilters {
   userId?: string
   sessionId?: string
   status?: SessionStatus
+  source?: SessionSource
   tags?: string[]
   dateFrom?: string
   dateTo?: string
@@ -190,17 +189,6 @@ export interface CustomTagRecord {
   position: number
   created_at: string
   updated_at: string
-}
-
-/**
- * Input for creating/updating a custom tag
- */
-export interface CustomTagInput {
-  name: string
-  slug: string
-  description: string
-  color?: string
-  position?: number
 }
 
 /**

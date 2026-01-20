@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { enforceLimit, LimitExceededError } from '@/lib/billing/enforcement-service'
 import type { SessionTag } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -109,6 +110,27 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
     if (sessionError || !session) {
       return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
+    }
+
+    // Enforce analyzed sessions limit for project owner
+    const { data: project } = await supabase
+      .from('projects')
+      .select('user_id')
+      .eq('id', session.project_id)
+      .single()
+
+    if (project?.user_id) {
+      try {
+        await enforceLimit({
+          userId: project.user_id,
+          dimension: 'analyzed_sessions',
+        })
+      } catch (error) {
+        if (error instanceof LimitExceededError) {
+          return NextResponse.json(error.toResponse(), { status: 429 })
+        }
+        throw error
+      }
     }
 
     // Check for existing running review

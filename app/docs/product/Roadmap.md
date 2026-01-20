@@ -16,7 +16,7 @@
 
 [x] Deploy to prod
     - resend
-    - supabase
+    - supabas
     - vercel (enable cron)
     - slack
     - lemon squeezy 
@@ -24,40 +24,43 @@
     - openai 
     - posthog
 
-
-
 ## Phase 3
 
-[] Add widget variants
-  - right side drawer (sticky badge)
-  - headless
-  - dialog with shortcut (cmd+k)  
-[] npm deploy widget
-[] Find alternative to cron (session lifecycle)
-[] Analytics
+[x] Add widget variants: right side drawer (sticky badge), headless, dialog with shortcut (cmd+k)
+[x] Analytics
+[x] npm deploy widget
+[x] Improve issues: specs generation, filters, layout, fix streaming bug
+[x] Make hissuno mobile friendly 
+
 
 ## Phase 4
-
-[] Improve landing page
-[] work on ads 
-    - YouTube
-    - Google 
-    - ChatGPT
-    - LinkedIn
-[] setup google, openai and linkedin tracking
+[] Find alternative to cron (session lifecycle)
+[] Issues Integration with Jira
+[] Improve onboarding
 [] Improve welcome email visualization
-[] Improve project layout and edit
-[] Issues Integration (linear, jira)
 
 ## Phase 5
 
-- Sessions Improvements
-  - slack read threads (only read)
-  - Gong integration
-  - Intercom integration
-  - Email agent
-- Support Actions items (not issues)
-- Alerts (email, slack)
-- Coding agent
-- Docs portal
+[] Improve landing page
+[] work on ads 
+  [] YouTube / Google
+  [] LinkedIn
 
+[] setup google, openai and linkedin tracking
+[] Improve project layout and edit: tabs + edit, show integrations 
+
+
+
+## Phase 5
+
+[] Sessions Improvements
+  [] slack read threads (only read)
+  [] Gong integration
+  [] Intercom integration
+  [] Email agent
+
+[] Support Actions items (not issues)
+[] Alerts (email, slack)
+[] Coding agent
+[] Docs portal
+[] Issues Integration with Linear

@@ -41,6 +41,27 @@ export function SessionSidebar({
   } = useSessionReview({ sessionId: session?.id ?? null })
   const [showReviewResult, setShowReviewResult] = useState(false)
   const [localTags, setLocalTags] = useState<string[]>(session?.tags ?? [])
+  const [isArchiving, setIsArchiving] = useState(false)
+
+  const handleArchiveToggle = useCallback(async () => {
+    if (!session) return
+    setIsArchiving(true)
+    try {
+      const response = await fetch(`/api/sessions/${session.id}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_archived: !session.is_archived }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to update archive status')
+      }
+      onSessionUpdated?.()
+    } catch (err) {
+      console.error('[session-sidebar] archive toggle failed:', err)
+    } finally {
+      setIsArchiving(false)
+    }
+  }, [session, onSessionUpdated])
 
   // Sync local tags with session tags
   useEffect(() => {
@@ -106,6 +127,51 @@ export function SessionSidebar({
             >
               {view === 'messages' ? 'View Details →' : '← Messages'}
             </button>
+            {session && (
+              <button
+                type="button"
+                onClick={handleArchiveToggle}
+                disabled={isArchiving}
+                className="rounded-[4px] p-1.5 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={session.is_archived ? 'Unarchive session' : 'Archive session'}
+                title={session.is_archived ? 'Unarchive' : 'Archive'}
+              >
+                {session.is_archived ? (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="2" y="4" width="20" height="5" rx="2" />
+                    <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+                    <path d="M12 13v4" />
+                    <path d="m9 16 3 3 3-3" />
+                  </svg>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="2" y="4" width="20" height="5" rx="2" />
+                    <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+                    <path d="M10 13h4" />
+                  </svg>
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -145,7 +211,7 @@ export function SessionSidebar({
             <div className="flex-1 overflow-y-auto">
               {/* Session Details */}
               <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-                <SessionDetails session={session} onSessionUpdated={onSessionUpdated} />
+                <SessionDetails session={session} />
               </div>
 
               {/* Tags Section */}
@@ -185,31 +251,10 @@ export function SessionSidebar({
 
 interface SessionDetailsProps {
   session: SessionWithProject
-  onSessionUpdated?: () => void
 }
 
-function SessionDetails({ session, onSessionUpdated }: SessionDetailsProps) {
-  const [isArchiving, setIsArchiving] = useState(false)
+function SessionDetails({ session }: SessionDetailsProps) {
   const sourceInfo = SESSION_SOURCE_INFO[session.source as SessionSource] || SESSION_SOURCE_INFO.widget
-
-  const handleArchiveToggle = useCallback(async () => {
-    setIsArchiving(true)
-    try {
-      const response = await fetch(`/api/sessions/${session.id}/archive`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_archived: !session.is_archived }),
-      })
-      if (!response.ok) {
-        throw new Error('Failed to update archive status')
-      }
-      onSessionUpdated?.()
-    } catch (err) {
-      console.error('[session-sidebar] archive toggle failed:', err)
-    } finally {
-      setIsArchiving(false)
-    }
-  }, [session.id, session.is_archived, onSessionUpdated])
 
   return (
     <div className="space-y-4">
@@ -316,16 +361,6 @@ function SessionDetails({ session, onSessionUpdated }: SessionDetailsProps) {
           </p>
         </div>
       </div>
-
-      {/* Archive Button */}
-      <button
-        type="button"
-        onClick={handleArchiveToggle}
-        disabled={isArchiving}
-        className="w-full rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {isArchiving ? 'Updating...' : session.is_archived ? 'Unarchive Session' : 'Archive Session'}
-      </button>
     </div>
   )
 }

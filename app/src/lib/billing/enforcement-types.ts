@@ -9,17 +9,12 @@
 /**
  * Limit dimension identifiers
  *
+ * - 'analyzed_sessions': Sessions that have been PM reviewed (pm_reviewed_at IS NOT NULL)
+ * - 'projects': Total projects owned by user
+ *
  * Add new dimensions here as needed (e.g., 'issues', 'team_members')
  */
-export type LimitDimension = 'sessions' | 'projects'
-
-/**
- * Enforcement mode determines behavior when limit is reached
- *
- * - 'hard': Block the action entirely (for manual creation)
- * - 'soft': Allow but mark as over-limit (for external channels)
- */
-export type EnforcementMode = 'hard' | 'soft'
+export type LimitDimension = 'analyzed_sessions' | 'projects'
 
 /**
  * Result of an enforcement check
@@ -49,12 +44,10 @@ export interface EnforcementResult {
 export interface EnforcementCheckOptions {
   /** User to check limits for */
   userId: string
-  /** Project context (for session checks) */
+  /** Project context (optional, for future use) */
   projectId?: string
   /** Which dimension to check */
   dimension: LimitDimension
-  /** Enforcement mode */
-  mode: EnforcementMode
   /** How many units to add (default 1) */
   increment?: number
 }

@@ -5,22 +5,41 @@ type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info'
 
 export interface BadgeProps extends ComponentPropsWithoutRef<'span'> {
   variant?: BadgeVariant
+  /** Use filled background (same as card background) instead of transparent */
+  filled?: boolean
 }
 
-const variantClasses: Record<BadgeVariant, string> = {
-  default: 'border-[color:var(--border)] bg-transparent text-[color:var(--text-secondary)]',
-  success: 'border-[color:var(--accent-success)] bg-transparent text-[color:var(--accent-success)]',
-  warning: 'border-[color:var(--accent-warning)] bg-transparent text-[color:var(--accent-warning)]',
-  danger: 'border-[color:var(--accent-danger)] bg-transparent text-[color:var(--accent-danger)]',
-  info: 'border-[color:var(--accent-primary)] bg-transparent text-[color:var(--accent-primary)]',
+const variantClasses: Record<BadgeVariant, { transparent: string; filled: string }> = {
+  default: {
+    transparent: 'border-[color:var(--border-subtle)] bg-transparent text-[color:var(--text-secondary)]',
+    filled: 'border-[color:var(--border-subtle)] bg-[color:var(--background)] text-[color:var(--text-secondary)]',
+  },
+  success: {
+    transparent: 'border-[color:var(--accent-success)] bg-transparent text-[color:var(--accent-success)]',
+    filled: 'border-[color:var(--accent-success)] bg-[color:var(--background)] text-[color:var(--accent-success)]',
+  },
+  warning: {
+    transparent: 'border-[color:var(--accent-warning)] bg-transparent text-[color:var(--accent-warning)]',
+    filled: 'border-[color:var(--accent-warning)] bg-[color:var(--background)] text-[color:var(--accent-warning)]',
+  },
+  danger: {
+    transparent: 'border-[color:var(--accent-danger)] bg-transparent text-[color:var(--accent-danger)]',
+    filled: 'border-[color:var(--accent-danger)] bg-[color:var(--background)] text-[color:var(--accent-danger)]',
+  },
+  info: {
+    transparent: 'border-[color:var(--accent-primary)] bg-transparent text-[color:var(--accent-primary)]',
+    filled: 'border-[color:var(--accent-primary)] bg-[color:var(--background)] text-[color:var(--accent-primary)]',
+  },
 }
 
-export function Badge({ variant = 'default', className, children, ...props }: BadgeProps) {
+export function Badge({ variant = 'default', filled = false, className, children, ...props }: BadgeProps) {
+  const variantStyle = variantClasses[variant]
+
   return (
     <span
       className={cn(
         'inline-flex items-center rounded-[4px] border-2 px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider',
-        variantClasses[variant],
+        filled ? variantStyle.filled : variantStyle.transparent,
         className
       )}
       {...props}

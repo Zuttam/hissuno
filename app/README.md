@@ -240,9 +240,10 @@ packages/
 
 ```
 /api/agent/                    # Main chat endpoint
-/api/agent/widget/             # Widget settings
 /api/agent/stream/             # SSE streaming
 /api/agent/session/close/      # Close session, trigger review
+
+/api/integrations/widget/      # Widget settings
 
 /api/projects/                 # Project CRUD
 /api/projects/[id]/knowledge/  # Knowledge analysis

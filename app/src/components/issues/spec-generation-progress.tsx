@@ -47,6 +47,15 @@ function getProgressMessages(events: SpecGenerationEvent[], limit = 5): string[]
 }
 
 /**
+ * Get the latest progress message to show as current activity
+ */
+function getLatestProgressMessage(events: SpecGenerationEvent[]): string | null {
+  const progressEvents = events.filter((e) => e.type === 'step-progress' && e.message)
+  if (progressEvents.length === 0) return null
+  return progressEvents[progressEvents.length - 1].message!
+}
+
+/**
  * Progress indicator for spec generation with real-time updates
  */
 export function SpecGenerationProgress({
@@ -60,6 +69,7 @@ export function SpecGenerationProgress({
   const [showLivePreview, setShowLivePreview] = useState(false)
 
   const currentStep = getCurrentStep(events)
+  const latestProgress = getLatestProgressMessage(events)
   const progressMessages = getProgressMessages(events)
   const hasError = events.some((e) => e.type === 'error')
   const isComplete = events.some((e) => e.type === 'workflow-finish')
@@ -118,13 +128,14 @@ export function SpecGenerationProgress({
                   ? 'Generation failed'
                   : 'Specification generated'}
             </p>
-            {(totalSteps > 1 || !isProcessing) && (
+            {isProcessing && latestProgress && (
+              <p className="text-xs text-[color:var(--accent-selected)]">
+                {latestProgress}
+              </p>
+            )}
+            {!isProcessing && (
               <p className="text-xs text-[color:var(--text-secondary)]">
-                {isProcessing
-                  ? `${completedSteps} of ${totalSteps} steps completed`
-                  : hasError
-                    ? 'Please try again'
-                    : 'View below'}
+                {hasError ? 'Please try again' : 'View below'}
               </p>
             )}
           </div>

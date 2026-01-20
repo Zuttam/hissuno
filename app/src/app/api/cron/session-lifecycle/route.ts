@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { checkEnforcement } from '@/lib/billing/enforcement-service'
 import { mastra } from '@/mastra'
 import type { WorkflowOutput } from '@/mastra/workflows/session-review/schemas'
 
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
     // =========================================
     const { data: sessionsToClose, error: closeError } = await supabase
       .from('sessions')
-      .select('id, project_id, status, is_over_limit')
+      .select('id, project_id, status')
       .in('status', ['closing_soon', 'awaiting_idle_response'])
       .lte('scheduled_close_at', now.toISOString())
 
@@ -71,10 +72,24 @@ export async function GET(request: NextRequest) {
 
           results.sessionsClosed++
 
-          // Skip PM review for over-limit sessions (soft enforcement)
-          if (session.is_over_limit) {
-            console.log(`${LOG_PREFIX} Skipping PM review for over-limit session ${session.id}`)
-            continue
+          // Check analyzed sessions limit before triggering PM review
+          // Get project owner for limit check
+          const { data: project } = await supabase
+            .from('projects')
+            .select('user_id')
+            .eq('id', session.project_id)
+            .single()
+
+          if (project?.user_id) {
+            const limitResult = await checkEnforcement({
+              userId: project.user_id,
+              dimension: 'analyzed_sessions',
+            })
+
+            if (!limitResult.allowed) {
+              console.log(`${LOG_PREFIX} Skipping PM review for session ${session.id} - analyzed sessions limit reached`)
+              continue
+            }
           }
 
           // Trigger PM review - create record and execute workflow

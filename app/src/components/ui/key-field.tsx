@@ -52,14 +52,14 @@ export function KeyField({
 
   if (compact) {
     return (
-      <div className={cn('flex items-center gap-2', className)}>
-        <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+      <div className={cn('flex items-center gap-2 min-w-0 max-w-full', className)}>
+        <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)] flex-shrink-0">
           {label}:
         </span>
-        <code className="font-mono text-xs text-[color:var(--foreground)]">
+        <code className="font-mono text-xs text-[color:var(--foreground)] truncate min-w-0">
           {displayValue}
         </code>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-shrink-0">
           {isSecret && !disabled && (
             <button
               type="button"

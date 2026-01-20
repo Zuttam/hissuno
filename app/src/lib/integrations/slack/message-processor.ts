@@ -8,7 +8,6 @@ import { RuntimeContext } from '@mastra/core/runtime-context'
 import { createAdminClient } from '@/lib/supabase/server'
 import { upsertSession, updateSessionActivity } from '@/lib/supabase/sessions'
 import { triggerChatRun, updateChatRunStatus, type ChatMessage } from '@/lib/agent/chat-run-service'
-import { checkSessionLimitSoft } from '@/lib/billing/enforcement-service'
 import { mastra } from '@/mastra'
 import type { SupportAgentContext } from '@/app/api/agent/route'
 import { SlackClient, type SlackMessage } from './client'
@@ -126,21 +125,7 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
   if (userName) userMetadata.name = userName
   if (userDisplayName) userMetadata.display_name = userDisplayName
 
-  // Get project owner for limit check
-  const { data: project } = await supabase
-    .from('projects')
-    .select('user_id')
-    .eq('id', projectId)
-    .single()
-
-  // Check session limit for project owner (soft enforcement)
-  let isOverLimit = false
-  if (project?.user_id) {
-    const limitResult = await checkSessionLimitSoft(project.user_id, projectId)
-    isOverLimit = limitResult.isOverLimit
-  }
-
-  // Upsert session
+  // Upsert session (limits are enforced at analysis time, not session creation)
   await upsertSession({
     id: sessionId,
     projectId,
@@ -149,7 +134,6 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
     pageUrl: null, // No page URL for Slack
     pageTitle: `Slack: #${channelId}`,
     source: 'slack',
-    isOverLimit,
   })
 
   // Create thread session mapping
@@ -386,21 +370,7 @@ export async function processSlackMessage(params: ProcessMessageParams): Promise
   if (userInfo?.real_name) userMetadata.name = userInfo.real_name
   if (userInfo?.profile.display_name) userMetadata.display_name = userInfo.profile.display_name
 
-  // Get project owner for limit check
-  const { data: project } = await supabase
-    .from('projects')
-    .select('user_id')
-    .eq('id', projectId)
-    .single()
-
-  // Check session limit for project owner (soft enforcement)
-  let isOverLimit = false
-  if (project?.user_id) {
-    const limitResult = await checkSessionLimitSoft(project.user_id, projectId)
-    isOverLimit = limitResult.isOverLimit
-  }
-
-  // Upsert session with external participant info
+  // Upsert session with external participant info (limits are enforced at analysis time)
   await upsertSession({
     id: sessionId,
     projectId,
@@ -409,7 +379,6 @@ export async function processSlackMessage(params: ProcessMessageParams): Promise
     pageUrl: null,
     pageTitle: `Slack: External conversation`,
     source: 'slack',
-    isOverLimit,
   })
 
   // Create or update thread session

@@ -1,12 +1,12 @@
 'use client'
 
-import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 import type { IntegrationStats } from '@/lib/supabase/sessions'
 import { useProjectDetail } from '@/hooks/use-projects'
 import { FloatingCard } from '@/components/ui/floating-card'
+import { ProjectsAnalyticsStrip } from '@/components/analytics'
 import { ProjectHeader } from './project-header'
 import { ProjectSessionsCard } from './project-sessions-card'
 import { ProjectIssuesCard } from './project-issues-card'
@@ -15,7 +15,7 @@ import { TestAgentDialog } from './test-agent-dialog'
 
 interface ProjectDetailProps {
   projectId: string
-  initialProject: ProjectWithCodebase
+  initialProject: ProjectRecord
 }
 
 export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps) {
@@ -65,28 +65,21 @@ export function ProjectDetail({ projectId, initialProject }: ProjectDetailProps)
   return (
     <div>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-        <nav className="font-mono text-sm text-[color:var(--text-secondary)]">
-          <Link href="/projects" className="hover:text-[color:var(--foreground)]">
-            ← Back to projects
-          </Link>
-        </nav>
-
         {error && (
           <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-4 font-mono text-sm text-[color:var(--foreground)]">
             {error}
           </div>
         )}
 
-        <FloatingCard floating="gentle" className="p-8">
-          <ProjectHeader
-            project={project ?? initialProject}
-            integrationStats={integrationStats}
-            isLoading={isLoading}
-            onRefresh={refresh}
-            onTestAgent={handleOpenTestAgent}
-            onEditProject={handleEditProject}
-          />
-        </FloatingCard>
+        <ProjectHeader
+          project={project ?? initialProject}
+          integrationStats={integrationStats}
+          isLoading={isLoading}
+          onRefresh={refresh}
+          onTestAgent={handleOpenTestAgent}
+          onEditProject={handleEditProject}
+        />
+        <ProjectsAnalyticsStrip projectId={projectId} />
         <FloatingCard floating="gentle">
           <KnowledgeManagementCard
             projectId={projectId}

@@ -3,14 +3,14 @@
 import { useState, useCallback, useRef } from 'react'
 import { Dialog, Button, Select, Input, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils/class'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 import type { CreateSessionInput, SessionTag, CreateMessageInput } from '@/types/session'
 import { SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
 
 interface CreateSessionDialogProps {
   open: boolean
   onClose: () => void
-  projects: ProjectWithCodebase[]
+  projects: ProjectRecord[]
   onCreateSession: (input: CreateSessionInput) => Promise<unknown>
 }
 

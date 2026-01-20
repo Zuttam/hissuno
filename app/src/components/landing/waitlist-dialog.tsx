@@ -155,7 +155,7 @@ export function WaitlistDialog() {
             type="submit"
             loading={isLoading}
             disabled={isLoading}
-            className="w-full bg-[var(--accent-teal)] hover:bg-[var(--accent-teal-hover)]"
+            className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
           >
             Join the Waitlist
           </Button>

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getProjectById } from '@/lib/projects/queries'
+import { getProjectById } from '@/lib/supabase/projects'
 import { getProjectSettings } from '@/lib/supabase/issues'
 import { ProjectWizard } from '@/components/projects/project-wizard'
 import type { ProjectWizardFormData, KnowledgeSourceInput } from '@/components/projects/shared/wizard/steps'
@@ -66,9 +66,14 @@ export default async function EditProjectPage({
 
     // Widget settings
     widget: {
-      variant: settings?.widget_variant ?? 'popup',
+      // New trigger/display model
+      triggerType: settings?.widget_trigger_type ?? 'bubble',
+      displayType: settings?.widget_display_type ?? 'sidepanel',
+      shortcut: settings?.widget_shortcut ?? 'mod+k',
+      drawerBadgeLabel: settings?.widget_drawer_badge_label ?? 'Support',
+      // Legacy and shared settings
+      variant: settings?.widget_variant ?? 'sidepanel',
       theme: settings?.widget_theme ?? 'light',
-      position: settings?.widget_position ?? 'bottom-right',
       title: settings?.widget_title ?? 'Support',
       initialMessage: settings?.widget_initial_message ?? 'Hi! How can I help you today?',
       allowedOrigins: settings?.allowed_origins ?? [],

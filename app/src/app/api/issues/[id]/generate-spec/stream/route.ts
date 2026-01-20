@@ -29,7 +29,11 @@ type SpecSSEEventType =
   | 'tool-start'      // Tool invocation started
   | 'tool-finish'     // Tool invocation completed
   | 'workflow-finish'
+  | 'heartbeat'       // Keep-alive signal
   | 'error'
+
+// Heartbeat interval in milliseconds (15 seconds)
+const HEARTBEAT_INTERVAL_MS = 15_000
 
 interface SpecSSEEvent extends BaseSSEEvent {
   type: SpecSSEEventType
@@ -133,6 +137,19 @@ export async function GET(_request: Request, context: RouteContext) {
           emit(createSSEEvent(type, options) as SpecSSEEvent)
         }
 
+        // Set up heartbeat interval to keep connection alive
+        const heartbeatInterval = setInterval(() => {
+          if (!isClosed()) {
+            emitEvent('heartbeat', { message: 'keep-alive' })
+          }
+        }, HEARTBEAT_INTERVAL_MS)
+
+        // Helper to clean up heartbeat and close stream
+        const cleanup = () => {
+          clearInterval(heartbeatInterval)
+          close()
+        }
+
         // Send initial connected event
         console.log(`${LOG_PREFIX} Sending connected event...`)
         emitEvent('connected', { message: 'Connected to spec generation stream' })
@@ -148,7 +165,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
         try {
           if (isClosed()) {
-            close()
+            cleanup()
             return
           }
 
@@ -172,6 +189,22 @@ export async function GET(_request: Request, context: RouteContext) {
             runtimeContext,
           })
 
+          // Map tool names to user-friendly step descriptions
+          const toolStepDescriptions: Record<string, string> = {
+            'generate-product-spec': 'Gathering issue context and sessions...',
+            'search-knowledge': 'Searching knowledge base...',
+            'get-knowledge-package': 'Loading knowledge package...',
+            'list-codebase-files': 'Exploring codebase structure...',
+            'search-codebase-files': 'Searching codebase for patterns...',
+            'read-codebase-file': 'Analyzing code implementation...',
+            'web-search': 'Researching best practices...',
+            'save-product-spec': 'Saving specification...',
+          }
+
+          // Track which tools have been started to avoid duplicate messages
+          const startedTools = new Set<string>()
+          let hasStartedWriting = false
+
           // Stream text chunks and tool events in real-time
           for await (const part of stream.fullStream) {
             if (isClosed()) break
@@ -179,33 +212,58 @@ export async function GET(_request: Request, context: RouteContext) {
             // Handle different event types from fullStream
             const partType = (part as { type?: string }).type
 
+            // Mastra events have nested payload structure
+            const payload = (part as { payload?: Record<string, unknown> }).payload
+
             switch (partType) {
               case 'text-delta':
+                // Emit "Writing specification..." on first text chunk
+                if (!hasStartedWriting) {
+                  hasStartedWriting = true
+                  emitEvent('step-progress', {
+                    message: 'Writing specification...',
+                  })
+                }
                 emitEvent('text-chunk', {
                   data: { content: (part as { textDelta?: string }).textDelta },
                 })
                 break
-              case 'tool-call':
+              case 'tool-call': {
+                // Tool name is in payload.toolName for Mastra events
+                const toolName = (payload?.toolName as string) ?? (part as { toolName?: string }).toolName
                 emitEvent('tool-start', {
                   data: {
-                    toolName: (part as { toolName?: string }).toolName,
-                    args: (part as { args?: unknown }).args,
+                    toolName,
+                    args: payload?.args ?? (part as { args?: unknown }).args,
                   },
                 })
+                // Emit step-progress with friendly message when a new tool starts
+                if (toolName && !startedTools.has(toolName)) {
+                  startedTools.add(toolName)
+                  const stepMessage = toolStepDescriptions[toolName]
+                  if (stepMessage) {
+                    emitEvent('step-progress', {
+                      message: stepMessage,
+                    })
+                  }
+                }
                 break
-              case 'tool-result':
+              }
+              case 'tool-result': {
+                const resultToolName = (payload?.toolName as string) ?? (part as { toolName?: string }).toolName
                 emitEvent('tool-finish', {
                   data: {
-                    toolName: (part as { toolName?: string }).toolName,
-                    result: (part as { result?: unknown }).result,
+                    toolName: resultToolName,
+                    result: payload?.result ?? (part as { result?: unknown }).result,
                   },
                 })
                 break
+              }
             }
           }
 
           if (isClosed()) {
-            close()
+            cleanup()
             return
           }
 
@@ -248,7 +306,7 @@ export async function GET(_request: Request, context: RouteContext) {
             throw new Error('Spec was not saved to database')
           }
 
-          close()
+          cleanup()
         } catch (error) {
           console.error(`${LOG_PREFIX} stream error`, error)
 
@@ -272,7 +330,7 @@ export async function GET(_request: Request, context: RouteContext) {
             message: 'Spec generation encountered an issue. Please try again.',
           })
 
-          close()
+          cleanup()
         }
       },
     })

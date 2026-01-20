@@ -1,14 +1,19 @@
 import type { ReactNode } from 'react';
 
 /**
- * Position options for the bubble
+ * Position options for the bubble trigger
  */
 export type BubblePosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
 /**
- * Widget display variant
+ * Widget trigger types - what activates the widget
  */
-export type WidgetVariant = 'popup' | 'sidepanel';
+export type WidgetTrigger = 'bubble' | 'drawer-badge' | 'headless';
+
+/**
+ * Widget display types - how the chat UI appears
+ */
+export type WidgetDisplay = 'popup' | 'sidepanel' | 'dialog';
 
 /**
  * Offset configuration for bubble positioning
@@ -46,10 +51,30 @@ export interface HissunoWidgetProps {
   widgetToken?: string;
 
   /**
-   * Widget display variant
-   * @default "popup"
+   * Widget trigger type - what activates the widget
+   * - 'bubble': Floating 56x56 button at configurable corner position
+   * - 'drawer-badge': Vertical tab fixed to right edge with rotated label
+   * - 'headless': No visual element, keyboard-only activation
+   * @default "bubble"
    */
-  variant?: WidgetVariant;
+  trigger?: WidgetTrigger;
+
+  /**
+   * Widget display type - how the chat UI appears
+   * - 'popup': Corner modal (380x520px)
+   * - 'sidepanel': Full-height right drawer (400px)
+   * - 'dialog': Centered modal with blur backdrop
+   * @default "sidepanel"
+   */
+  display?: WidgetDisplay;
+
+  /**
+   * Keyboard shortcut to open/toggle the widget
+   * Supports 'mod+k' (cmd on Mac, ctrl on Windows/Linux), 'ctrl+shift+p', etc.
+   * Set to false to disable keyboard activation
+   * @default "mod+k"
+   */
+  shortcut?: string | false;
 
   /**
    * Whether to fetch default settings from the server
@@ -84,23 +109,39 @@ export interface HissunoWidgetProps {
   theme?: 'light' | 'dark' | 'auto';
 
   /**
-   * Whether to show the floating bubble trigger
-   * Set to false when using a custom trigger
-   * @default true
-   */
-  showBubble?: boolean;
-
-  /**
    * Position of the floating bubble on the page
+   * Only applies when trigger='bubble'
    * @default "bottom-right"
    */
   bubblePosition?: BubblePosition;
 
   /**
    * Offset from the edge of the screen in pixels
+   * Only applies when trigger='bubble'
    * @default { x: 20, y: 20 }
    */
   bubbleOffset?: BubbleOffset;
+
+  /**
+   * Label text for the drawer badge trigger
+   * Only applies when trigger='drawer-badge'
+   * @default "Support"
+   */
+  drawerBadgeLabel?: string;
+
+  /**
+   * Width of the dialog display
+   * Only applies when display='dialog'
+   * @default 600
+   */
+  dialogWidth?: number;
+
+  /**
+   * Height of the dialog display
+   * Only applies when display='dialog'
+   * @default 500
+   */
+  dialogHeight?: number;
 
   /**
    * Custom render function for the trigger element
@@ -122,7 +163,7 @@ export interface HissunoWidgetProps {
 
   /**
    * Initial message shown when the chat opens
-   * @default "Hi! 👋 How can I help you today?"
+   * @default "Hi! How can I help you today?"
    */
   initialMessage?: string;
 
@@ -182,11 +223,14 @@ export interface ChatMessage {
  * Widget settings fetched from server
  */
 export interface WidgetSettings {
-  variant: WidgetVariant;
+  trigger: WidgetTrigger;
+  display: WidgetDisplay;
+  shortcut: string | false;
   theme: 'light' | 'dark' | 'auto';
   position: BubblePosition;
   title: string;
   initialMessage: string;
+  drawerBadgeLabel?: string;
   tokenRequired?: boolean;
   blocked?: boolean;
 }

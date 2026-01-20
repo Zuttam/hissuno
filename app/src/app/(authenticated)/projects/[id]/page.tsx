@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { ProjectDetail } from '@/components/projects/project-detail'
-import { getProjectById } from '@/lib/projects/queries'
+import { getProjectById } from '@/lib/supabase/projects'
 
 interface ProjectPageParams {
   id: string

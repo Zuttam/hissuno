@@ -73,10 +73,10 @@ export interface Subscription {
  * Usage metrics for current billing period
  */
 export interface UsageMetrics {
-  /** Number of sessions used this period */
-  sessionsUsed: number
-  /** Session limit for this user (from subscription). null = unlimited */
-  sessionsLimit: number | null
+  /** Number of analyzed sessions this period (sessions with pm_reviewed_at set) */
+  analyzedSessionsUsed: number
+  /** Analyzed session limit for this user (from subscription). null = unlimited */
+  analyzedSessionsLimit: number | null
   /** Number of projects created */
   projectsUsed: number
   /** Project limit for this user (from subscription). null = unlimited */

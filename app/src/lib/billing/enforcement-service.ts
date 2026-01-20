@@ -2,7 +2,8 @@
  * Subscription enforcement service
  *
  * Centralized limit checking and enforcement for subscription dimensions.
- * Supports both hard enforcement (blocking) and soft enforcement (degraded mode).
+ * Enforces limits at analysis time (PM review) rather than session creation,
+ * allowing unlimited support conversations while metering analyzed sessions.
  */
 
 import { getBillingInfo } from './billing-service'
@@ -67,7 +68,7 @@ function getLimitForDimension(
   }
 
   switch (dimension) {
-    case 'sessions':
+    case 'analyzed_sessions':
       return subscription!.sessions_limit
     case 'projects':
       return subscription!.projects_limit
@@ -88,8 +89,8 @@ function getLimitForDimension(
  */
 function getUsageForDimension(usage: UsageMetrics, dimension: LimitDimension): number {
   switch (dimension) {
-    case 'sessions':
-      return usage.sessionsUsed
+    case 'analyzed_sessions':
+      return usage.analyzedSessionsUsed
     case 'projects':
       return usage.projectsUsed
     // Add new dimensions here:
@@ -108,7 +109,7 @@ function getUsageForDimension(usage: UsageMetrics, dimension: LimitDimension): n
 export async function checkEnforcement(
   options: EnforcementCheckOptions
 ): Promise<EnforcementResult> {
-  const { userId, dimension, mode, increment = 1 } = options
+  const { userId, dimension, increment = 1 } = options
 
   const billingInfo = await getBillingInfo(userId)
   const { subscription, usage } = billingInfo
@@ -133,12 +134,10 @@ export async function checkEnforcement(
   const isAtLimit = current >= limit
   const remaining = Math.max(0, limit - current)
 
-  // Determine if action is allowed based on mode
-  // - hard: block if would exceed
-  // - soft: always allow (for external channels like widget/slack)
-  const allowed = mode === 'soft' ? true : !wouldExceed
+  // Block if would exceed
+  const allowed = !wouldExceed
 
-  const dimensionLabel = dimension.replace('_', ' ')
+  const dimensionLabel = dimension.replace(/_/g, ' ')
   const message = wouldExceed
     ? `${dimensionLabel.charAt(0).toUpperCase() + dimensionLabel.slice(1)} limit reached (${current}/${limit}). Upgrade your plan to continue.`
     : `${remaining} ${dimensionLabel} remaining`
@@ -164,16 +163,19 @@ export async function checkEnforcement(
 }
 
 /**
- * Enforce a limit with hard mode - throws LimitExceededError if not allowed
+ * Enforce a limit - throws LimitExceededError if not allowed
  *
- * Use this for manual creation endpoints (projects, manual sessions)
+ * Use this for:
+ * - Manual session review triggers
+ * - Project creation
+ * - Any action that should be blocked when limit is reached
  *
  * @throws LimitExceededError if limit would be exceeded
  */
 export async function enforceLimit(
-  options: Omit<EnforcementCheckOptions, 'mode'>
+  options: EnforcementCheckOptions
 ): Promise<EnforcementResult> {
-  const result = await checkEnforcement({ ...options, mode: 'hard' })
+  const result = await checkEnforcement(options)
 
   if (!result.allowed) {
     console.log(`${LOG_PREFIX} limit exceeded`, {
@@ -186,40 +188,6 @@ export async function enforceLimit(
   }
 
   return result
-}
-
-/**
- * Check session limit with soft enforcement for external channels
- *
- * Use this for widget and Slack sessions - they should still be created
- * but marked as over_limit so PM review is skipped.
- *
- * @returns Object with allowed (always true) and isOverLimit flag
- */
-export async function checkSessionLimitSoft(
-  userId: string,
-  projectId: string
-): Promise<{ allowed: true; isOverLimit: boolean }> {
-  const result = await checkEnforcement({
-    userId,
-    projectId,
-    dimension: 'sessions',
-    mode: 'soft',
-  })
-
-  if (result.isOverLimit) {
-    console.log(`${LOG_PREFIX} session over limit (soft enforcement)`, {
-      userId,
-      projectId,
-      current: result.current,
-      limit: result.limit,
-    })
-  }
-
-  return {
-    allowed: true,
-    isOverLimit: result.isOverLimit,
-  }
 }
 
 // Re-export error class for consumers

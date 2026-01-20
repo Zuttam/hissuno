@@ -1,42 +1,68 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
-import { WizardStepHeader } from '@/components/ui'
-import type { StepProps } from '../types'
-import type { WidgetVariant, WidgetTheme, WidgetPosition } from '@/types/issue'
+import { useCallback, useEffect, useState } from 'react'
+import { Divider, WizardStepHeader } from '@/components/ui'
+import type { StepProps, CustomTagConfig } from '../types'
 import { WidgetChannel } from './widget-channel'
+import type { WidgetData } from './widget-channel'
 import { SlackChannel } from './slack-channel'
 import { GongChannel } from './gong-channel'
 import { IntercomChannel } from './intercom-channel'
 import { CustomTagsSection } from './custom-tags-section'
+import type { LocalCustomTag } from './custom-tags-section'
 import { useCustomTags } from '@/hooks/use-custom-tags'
+import type { TagColorVariant } from '@/types/session'
 
-interface WidgetData {
-  variant: WidgetVariant
-  theme: WidgetTheme
-  position: WidgetPosition
-  title: string
-  initialMessage: string
-  allowedOrigins: string[]
-  tokenRequired: boolean
-  idleTimeoutMinutes: number
-  goodbyeDelaySeconds: number
-  idleResponseTimeoutSeconds: number
-}
+const MAX_TAGS = 10
 
 export function SessionsStep({ context, onValidationChange, title, description }: StepProps) {
   const { formData, setFormData, integrations, mode, projectId } = context
 
+  // Track whether we've initialized local tags from server
+  const [hasInitializedTags, setHasInitializedTags] = useState(false)
+
   // Custom tags hook (only active in edit mode when we have a projectId)
   const {
-    tags: customTags,
+    tags: serverTags,
     isLoading: isLoadingTags,
     error: tagsError,
-    canAddMore,
-    createTag,
-    updateTag,
-    deleteTag,
   } = useCustomTags({ projectId })
+
+  // Local tags state - initialized from formData or server
+  const localTags: LocalCustomTag[] = formData.customTags.map((tag) => ({
+    id: tag.id,
+    name: tag.name,
+    slug: tag.slug,
+    description: tag.description,
+    color: tag.color as TagColorVariant,
+    position: tag.position,
+  }))
+
+  // Initialize local tags from server when tags are fetched
+  useEffect(() => {
+    if (mode === 'edit' && projectId && serverTags.length > 0 && !hasInitializedTags) {
+      const serverTagsAsConfig: CustomTagConfig[] = serverTags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        slug: tag.slug,
+        description: tag.description,
+        color: tag.color as TagColorVariant,
+        position: tag.position,
+      }))
+      setFormData((prev) => ({
+        ...prev,
+        customTags: serverTagsAsConfig,
+      }))
+      setHasInitializedTags(true)
+    }
+  }, [mode, projectId, serverTags, hasInitializedTags, setFormData])
+
+  // Also mark as initialized if there are no server tags but loading is complete
+  useEffect(() => {
+    if (mode === 'edit' && projectId && !isLoadingTags && serverTags.length === 0 && !hasInitializedTags) {
+      setHasInitializedTags(true)
+    }
+  }, [mode, projectId, isLoadingTags, serverTags.length, hasInitializedTags])
 
   // Sessions step is always valid (optional)
   useEffect(() => {
@@ -53,6 +79,27 @@ export function SessionsStep({ context, onValidationChange, title, description }
     [setFormData]
   )
 
+  // Handle tags change - update formData
+  const handleTagsChange = useCallback(
+    (tags: LocalCustomTag[]) => {
+      const tagsAsConfig: CustomTagConfig[] = tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        slug: tag.slug,
+        description: tag.description,
+        color: tag.color,
+        position: tag.position,
+      }))
+      setFormData((prev) => ({
+        ...prev,
+        customTags: tagsAsConfig,
+      }))
+    },
+    [setFormData]
+  )
+
+  const canAddMoreTags = localTags.length < MAX_TAGS
+
   return (
     <div>
       <WizardStepHeader title={title} description={description} />
@@ -68,7 +115,7 @@ export function SessionsStep({ context, onValidationChange, title, description }
             onWidgetChange={handleWidgetChange}
           />
 
-          <div className="border-b border-[color:var(--border-subtle)] w-full" />
+          <Divider />
 
           <SlackChannel
             integration={{
@@ -89,13 +136,11 @@ export function SessionsStep({ context, onValidationChange, title, description }
             Custom Classification Tags
           </h3>
           <CustomTagsSection
-            tags={customTags}
-            isLoading={isLoadingTags}
+            tags={localTags}
+            onTagsChange={handleTagsChange}
+            canAddMore={canAddMoreTags}
+            isLoading={isLoadingTags && !hasInitializedTags}
             error={tagsError}
-            canAddMore={canAddMore}
-            onCreateTag={createTag}
-            onUpdateTag={updateTag}
-            onDeleteTag={deleteTag}
           />
         </div>
       )}

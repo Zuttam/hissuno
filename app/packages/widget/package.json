@@ -1,25 +1,32 @@
 {
   "name": "@hissuno/widget",
   "version": "0.1.0",
-  "description": "Embeddable support agent widget for Hissuno platform",
+  "description": "Embeddable AI-powered support chat widget for Hissuno platform",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     },
     "./styles.css": "./dist/styles.css"
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": [
+    "*.css"
   ],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --external react && cp src/styles.css dist/styles.css",
     "dev": "tsup src/index.ts --format cjs,esm --dts --external react --watch",
     "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "peerDependencies": {
     "react": ">=18.0.0",
@@ -39,12 +46,20 @@
     "widget",
     "support",
     "ai",
-    "chat"
+    "chat",
+    "customer-support",
+    "chatbot",
+    "react"
   ],
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hissuno/widget"
-  }
+    "url": "git+https://github.com/hissuno/hissuno.git",
+    "directory": "app/packages/widget"
+  },
+  "bugs": {
+    "url": "https://github.com/hissuno/hissuno/issues"
+  },
+  "homepage": "https://github.com/hissuno/hissuno/tree/main/app/packages/widget#readme"
 }
 

@@ -1,13 +1,19 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { ChatBubble } from './ChatBubble';
-import { ChatPopup } from './ChatPopup';
-import { ChatSidepanel } from './ChatSidepanel';
-import { ConversationHistory } from './ConversationHistory';
-import { useHissunoChat } from './useHissunoChat';
-import type { SessionEntry } from './useHissunoChat';
-import type { HissunoWidgetProps, WidgetSettings, WidgetVariant, BubblePosition } from './types';
+import React, { useState, useCallback, useEffect, Component, type ErrorInfo, type ReactNode } from 'react';
+import { ChatBubble, DrawerBadge } from './triggers';
+import { ChatPopup, ChatSidepanel, ChatDialog } from './displays';
+import { ConversationHistory } from './shared';
+import { useHissunoChat, useKeyboardShortcut, useResolvedTheme } from './hooks';
+import type { SessionEntry } from './hooks';
+import type {
+  HissunoWidgetProps,
+  WidgetSettings,
+  WidgetTrigger,
+  WidgetDisplay,
+  BubblePosition,
+} from './types';
+import { validateTrigger, validateDisplay, validatePosition, validateTheme } from './utils';
 
 const DEFAULT_API_URL = '/api/agent';
 
@@ -39,15 +45,19 @@ const DEFAULT_API_URL = '/api/agent';
 export function HissunoWidget({
   projectId,
   widgetToken,
-  variant: propVariant,
+  trigger: propTrigger,
+  display: propDisplay,
+  shortcut: propShortcut,
   fetchDefaults = true,
   userId,
   userMetadata,
   apiUrl = DEFAULT_API_URL,
   theme: propTheme,
-  showBubble = true,
   bubblePosition: propBubblePosition,
   bubbleOffset,
+  drawerBadgeLabel: propDrawerBadgeLabel,
+  dialogWidth: propDialogWidth,
+  dialogHeight: propDialogHeight,
   renderTrigger,
   title: propTitle,
   placeholder = 'Ask a question or report an issue...',
@@ -63,18 +73,47 @@ export function HissunoWidget({
   const [sessionHistory, setSessionHistory] = useState<SessionEntry[]>([]);
 
   // Fetch widget settings from server if enabled (must be called before any conditional returns)
-  const { settings: serverSettings, blocked, loading: settingsLoading, error: settingsError } = useWidgetSettings(projectId || '', fetchDefaults && !!projectId, apiUrl, widgetToken);
+  const {
+    settings: serverSettings,
+    blocked,
+    loading: settingsLoading,
+    error: settingsError,
+  } = useWidgetSettings(projectId || '', fetchDefaults && !!projectId, apiUrl, widgetToken);
 
-  // Debug: log settings
-  console.log('[HissunoWidget] serverSettings:', serverSettings, 'propVariant:', propVariant);
+  // Resolve trigger type (props > server > default)
+  const resolveTrigger = (): WidgetTrigger => {
+    if (propTrigger) return propTrigger;
+    if (renderTrigger) return 'headless'; // Custom trigger means headless
+    if (serverSettings?.trigger) return serverSettings.trigger;
+    return 'bubble';
+  };
+  const resolvedTrigger = resolveTrigger();
 
-  // Merge props with server defaults (props always win)
-  const resolvedVariant: WidgetVariant = propVariant ?? serverSettings?.variant ?? 'popup';
-  console.log('[HissunoWidget] resolvedVariant:', resolvedVariant);
+  // Resolve display type (props > server > default)
+  const resolveDisplay = (): WidgetDisplay => {
+    if (propDisplay) return propDisplay;
+    if (serverSettings?.display) return serverSettings.display;
+    return 'sidepanel';
+  };
+  const resolvedDisplay = resolveDisplay();
+
+  // Resolve shortcut (props > server > default)
+  const resolvedShortcut = propShortcut !== undefined
+    ? propShortcut
+    : serverSettings?.shortcut !== undefined
+      ? serverSettings.shortcut
+      : 'mod+k';
+
   const resolvedBaseTheme = propTheme ?? serverSettings?.theme ?? 'light';
-  const resolvedBubblePosition: BubblePosition = propBubblePosition ?? serverSettings?.position ?? 'bottom-right';
+  const resolvedBubblePosition: BubblePosition =
+    propBubblePosition ?? serverSettings?.position ?? 'bottom-right';
   const resolvedTitle = propTitle ?? serverSettings?.title ?? 'Support';
-  const resolvedInitialMessage = propInitialMessage ?? serverSettings?.initialMessage ?? "Hi! 👋 How can I help you today?";
+  const resolvedInitialMessage =
+    propInitialMessage ?? serverSettings?.initialMessage ?? "Hi! How can I help you today?";
+  const resolvedDrawerBadgeLabel =
+    propDrawerBadgeLabel ?? serverSettings?.drawerBadgeLabel ?? 'Support';
+  const resolvedDialogWidth = propDialogWidth ?? 600;
+  const resolvedDialogHeight = propDialogHeight ?? 500;
 
   const {
     messages,
@@ -117,16 +156,22 @@ export function HissunoWidget({
     setIsHistoryOpen(false);
   }, []);
 
-  const handleSelectSession = useCallback((sessionId: string) => {
-    loadSession(sessionId);
-    setIsHistoryOpen(false);
-  }, [loadSession]);
+  const handleSelectSession = useCallback(
+    (sessionId: string) => {
+      loadSession(sessionId);
+      setIsHistoryOpen(false);
+    },
+    [loadSession]
+  );
 
-  const handleDeleteSession = useCallback((sessionId: string) => {
-    deleteSession(sessionId);
-    // Refresh the list after deletion
-    setSessionHistory(getSessionHistory());
-  }, [deleteSession, getSessionHistory]);
+  const handleDeleteSession = useCallback(
+    (sessionId: string) => {
+      deleteSession(sessionId);
+      // Refresh the list after deletion
+      setSessionHistory(getSessionHistory());
+    },
+    [deleteSession, getSessionHistory]
+  );
 
   const open = useCallback(() => {
     setIsOpen(true);
@@ -146,6 +191,13 @@ export function HissunoWidget({
       open();
     }
   }, [isOpen, open, close]);
+
+  // Keyboard shortcut
+  useKeyboardShortcut({
+    shortcut: resolvedShortcut,
+    onTrigger: toggle,
+    enabled: true,
+  });
 
   // Handle defaultOpen changes
   useEffect(() => {
@@ -193,7 +245,7 @@ export function HissunoWidget({
 
   // Don't render until settings are loaded (when fetchDefaults is enabled)
   if (settingsLoading) {
-    return null;
+    return <div className="hissuno-widget hissuno-widget-loading" />;
   }
 
   // If origin is blocked, don't render the widget
@@ -210,111 +262,103 @@ export function HissunoWidget({
 
   // Warn if token is required but not provided
   if (serverSettings?.tokenRequired && !widgetToken) {
-    console.warn('[HissunoWidget] This project requires a widgetToken for secure authentication. Requests may fail.');
+    console.warn(
+      '[HissunoWidget] This project requires a widgetToken for secure authentication. Requests may fail.'
+    );
   }
 
-  return (
-    <div className={`hissuno-widget ${className ?? ''}`}>
-      {/* Custom trigger or default bubble */}
-      {renderTrigger ? (
-        renderTrigger({ open, close, toggle, isOpen })
-      ) : showBubble ? (
-        <ChatBubble
-          isOpen={isOpen}
-          onClick={toggle}
-          position={resolvedBubblePosition}
-          offset={bubbleOffset}
-          theme={resolvedTheme}
-        />
-      ) : null}
-
-      {/* Chat popup or sidepanel */}
-      {resolvedVariant === 'sidepanel' ? (
-        <ChatSidepanel
-          isOpen={isOpen}
-          onClose={close}
-          messages={messages}
-          input={input}
-          setInput={setInput}
-          handleSubmit={handleSubmit}
-          isLoading={isLoading}
-          isStreaming={isStreaming}
-          streamingContent={streamingContent}
-          error={error}
-          title={resolvedTitle}
-          placeholder={placeholder}
-          theme={resolvedTheme}
-          onClearHistory={clearHistory}
-          onCancelChat={cancelChat}
-          onOpenHistory={canShowHistory ? handleOpenHistory : undefined}
-          isHistoryOpen={isHistoryOpen}
-          sessionHistory={sessionHistory}
-          currentSessionId={currentSessionId}
-          onCloseHistory={handleCloseHistory}
-          onSelectSession={handleSelectSession}
-          onDeleteSession={handleDeleteSession}
-        />
-      ) : (
-        <ChatPopup
-          isOpen={isOpen}
-          onClose={close}
-          messages={messages}
-          input={input}
-          setInput={setInput}
-          handleSubmit={handleSubmit}
-          isLoading={isLoading}
-          isStreaming={isStreaming}
-          streamingContent={streamingContent}
-          error={error}
-          title={resolvedTitle}
-          placeholder={placeholder}
-          theme={resolvedTheme}
-          position={resolvedBubblePosition}
-          offset={bubbleOffset}
-          onClearHistory={clearHistory}
-          onCancelChat={cancelChat}
-          onOpenHistory={canShowHistory ? handleOpenHistory : undefined}
-          isHistoryOpen={isHistoryOpen}
-          sessionHistory={sessionHistory}
-          currentSessionId={currentSessionId}
-          onCloseHistory={handleCloseHistory}
-          onSelectSession={handleSelectSession}
-          onDeleteSession={handleDeleteSession}
-        />
-      )}
-    </div>
-  );
-}
-
-/**
- * Hook to resolve 'auto' theme to 'light' or 'dark' based on system preference
- */
-function useResolvedTheme(theme: 'light' | 'dark' | 'auto'): 'light' | 'dark' {
-  const [resolved, setResolved] = useState<'light' | 'dark'>(() => {
-    if (theme !== 'auto') return theme;
-    if (typeof window === 'undefined') return 'light';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
-      ? 'dark'
-      : 'light';
-  });
-
-  useEffect(() => {
-    if (theme !== 'auto') {
-      setResolved(theme);
-      return;
+  // Render the appropriate trigger
+  const renderWidgetTrigger = () => {
+    // Custom trigger takes priority
+    if (renderTrigger) {
+      return renderTrigger({ open, close, toggle, isOpen });
     }
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => {
-      setResolved(e.matches ? 'dark' : 'light');
-    };
+    switch (resolvedTrigger) {
+      case 'bubble':
+        return (
+          <ChatBubble
+            isOpen={isOpen}
+            onClick={toggle}
+            position={resolvedBubblePosition}
+            offset={bubbleOffset}
+            theme={resolvedTheme}
+          />
+        );
+      case 'drawer-badge':
+        return (
+          <DrawerBadge
+            isOpen={isOpen}
+            onClick={toggle}
+            label={resolvedDrawerBadgeLabel}
+            theme={resolvedTheme}
+          />
+        );
+      case 'headless':
+      default:
+        return null;
+    }
+  };
 
-    setResolved(mediaQuery.matches ? 'dark' : 'light');
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme]);
+  // Common display props
+  const displayProps = {
+    isOpen,
+    onClose: close,
+    messages,
+    input,
+    setInput,
+    handleSubmit,
+    isLoading,
+    isStreaming,
+    streamingContent,
+    error,
+    title: resolvedTitle,
+    placeholder,
+    theme: resolvedTheme,
+    onClearHistory: clearHistory,
+    onCancelChat: cancelChat,
+    onOpenHistory: canShowHistory ? handleOpenHistory : undefined,
+    isHistoryOpen,
+    sessionHistory,
+    currentSessionId,
+    onCloseHistory: handleCloseHistory,
+    onSelectSession: handleSelectSession,
+    onDeleteSession: handleDeleteSession,
+  };
 
-  return resolved;
+  // Render the appropriate display
+  const renderDisplay = () => {
+    switch (resolvedDisplay) {
+      case 'popup':
+        return (
+          <ChatPopup
+            {...displayProps}
+            position={resolvedBubblePosition}
+            offset={bubbleOffset}
+          />
+        );
+      case 'dialog':
+        return (
+          <ChatDialog
+            {...displayProps}
+            width={resolvedDialogWidth}
+            height={resolvedDialogHeight}
+          />
+        );
+      case 'sidepanel':
+      default:
+        return <ChatSidepanel {...displayProps} />;
+    }
+  };
+
+  return (
+    <WidgetErrorBoundary>
+      <div className={`hissuno-widget ${className ?? ''}`}>
+        {renderWidgetTrigger()}
+        {renderDisplay()}
+      </div>
+    </WidgetErrorBoundary>
+  );
 }
 
 /**
@@ -341,8 +385,8 @@ function useWidgetSettings(
     setLoading(true);
     setError(false);
 
-    // Widget settings endpoint is under /api/agent/widget
-    const settingsUrl = `${apiUrl}/widget?projectId=${encodeURIComponent(projectId)}`;
+    // Widget settings endpoint is at /api/integrations/widget (separate from agent API)
+    const settingsUrl = `${apiUrl.replace(/\/api\/agent\/?$/, '/api/integrations/widget')}?projectId=${encodeURIComponent(projectId)}`;
 
     const controller = new AbortController();
 
@@ -364,8 +408,20 @@ function useWidgetSettings(
       })
       .then((data) => {
         if (data) {
-          console.log('[HissunoWidget] Fetched settings:', data);
-          setSettings(data as WidgetSettings);
+          // Validate all enum values from server to prevent injection
+          const mappedSettings: WidgetSettings = {
+            trigger: validateTrigger(data.trigger, 'bubble'),
+            display: validateDisplay(data.display, 'sidepanel'),
+            shortcut: data.shortcut ?? 'mod+k',
+            theme: validateTheme(data.theme, 'light'),
+            position: validatePosition(data.position, 'bottom-right'),
+            title: typeof data.title === 'string' ? data.title : 'Support',
+            initialMessage: typeof data.initialMessage === 'string' ? data.initialMessage : "Hi! How can I help you today?",
+            drawerBadgeLabel: typeof data.drawerBadgeLabel === 'string' ? data.drawerBadgeLabel : 'Support',
+            tokenRequired: Boolean(data.tokenRequired),
+            blocked: Boolean(data.blocked),
+          };
+          setSettings(mappedSettings);
           if (data.blocked) {
             setBlocked(true);
           }
@@ -384,10 +440,35 @@ function useWidgetSettings(
     return () => controller.abort();
   }, [projectId, enabled, apiUrl]);
 
-  return { settings, blocked, loading, error };
+  // Compute effective loading state: true if we should be loading but don't have results yet
+  // This handles the case where `enabled` changes from false to true between renders
+  const effectiveLoading = loading || (enabled && !settings && !error && !blocked);
+
+  return { settings, blocked, loading: effectiveLoading, error };
 }
 
 /**
- * Alias for HissunoWidget for backward compatibility
+ * Error boundary to prevent widget errors from crashing the consumer's app
  */
-export const SupportWidget = HissunoWidget;
+class WidgetErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error('[HissunoWidget] Error:', error, errorInfo);
+  }
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return null; // Silent failure - don't disrupt the host app
+    }
+    return this.props.children;
+  }
+}
+

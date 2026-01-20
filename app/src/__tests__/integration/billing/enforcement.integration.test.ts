@@ -44,7 +44,7 @@ function resetMockDatabase() {
 const emailsSent: { to: string; subject: string; dimension: string }[] = []
 
 // Mock billing service
-const mockGetBillingInfo = vi.fn<[string], Promise<BillingInfo>>()
+const mockGetBillingInfo = vi.fn<(userId: string) => Promise<BillingInfo>>()
 
 vi.mock('@/lib/billing/billing-service', () => ({
   getBillingInfo: (userId: string) => mockGetBillingInfo(userId),
@@ -101,7 +101,6 @@ vi.mock('@/lib/email/resend', () => ({
 import {
   checkEnforcement,
   enforceLimit,
-  checkSessionLimitSoft,
   LimitExceededError,
 } from '@/lib/billing/enforcement-service'
 import { sendLimitNotificationIfNeeded } from '@/lib/billing/limit-notifications'
@@ -130,7 +129,7 @@ function createSubscription(overrides: Partial<Subscription> = {}): Subscription
 
 function createBillingInfo(options: {
   subscription?: Partial<Subscription> | null
-  sessionsUsed?: number
+  analyzedSessionsUsed?: number
   projectsUsed?: number
   periodStart?: string
   periodEnd?: string
@@ -148,8 +147,8 @@ function createBillingInfo(options: {
       ? { id: subscription.plan_id, name: subscription.plan_name } as Plan
       : null,
     usage: {
-      sessionsUsed: options.sessionsUsed ?? 0,
-      sessionsLimit: subscription?.sessions_limit ?? null,
+      analyzedSessionsUsed: options.analyzedSessionsUsed ?? 0,
+      analyzedSessionsLimit: subscription?.sessions_limit ?? null,
       projectsUsed: options.projectsUsed ?? 0,
       projectsLimit: subscription?.projects_limit ?? null,
       periodStart,
@@ -188,14 +187,14 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: 1000, plan_name: 'pro' },
-          sessionsUsed: 999,
+          analyzedSessionsUsed: 999,
         })
       )
 
       // First session should be allowed
       const result1 = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
       expect(result1.allowed).toBe(true)
       expect(result1.remaining).toBe(1)
@@ -204,7 +203,7 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: 1000, plan_name: 'pro' },
-          sessionsUsed: 1000,
+          analyzedSessionsUsed: 1000,
         })
       )
 
@@ -212,7 +211,7 @@ describe('Billing Enforcement Integration', () => {
       await expect(
         enforceLimit({
           userId: 'user-123',
-          dimension: 'sessions',
+          dimension: 'analyzed_sessions',
         })
       ).rejects.toThrow(LimitExceededError)
     })
@@ -221,13 +220,13 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: null, plan_name: 'unlimited' },
-          sessionsUsed: 50000,
+          analyzedSessionsUsed: 50000,
         })
       )
 
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
 
       expect(result.allowed).toBe(true)
@@ -240,7 +239,7 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: null,
-          sessionsUsed: 0,
+          analyzedSessionsUsed: 0,
         })
       )
 
@@ -248,25 +247,11 @@ describe('Billing Enforcement Integration', () => {
       await expect(
         enforceLimit({
           userId: 'user-123',
-          dimension: 'sessions',
+          dimension: 'analyzed_sessions',
         })
       ).rejects.toThrow(LimitExceededError)
     })
 
-    it('should soft enforce for external channels (widget/slack)', async () => {
-      mockGetBillingInfo.mockResolvedValue(
-        createBillingInfo({
-          subscription: { sessions_limit: 100 },
-          sessionsUsed: 150, // Already over limit
-        })
-      )
-
-      const result = await checkSessionLimitSoft('user-123', 'project-123')
-
-      // Should allow but flag
-      expect(result.allowed).toBe(true)
-      expect(result.isOverLimit).toBe(true)
-    })
   })
 
   // ==========================================================================
@@ -279,7 +264,7 @@ describe('Billing Enforcement Integration', () => {
 
       const billingInfo = createBillingInfo({
         subscription: { sessions_limit: 100 },
-        sessionsUsed: 100,
+        analyzedSessionsUsed: 100,
         periodStart: '2026-01-01T00:00:00Z',
       })
       mockGetBillingInfo.mockResolvedValue(billingInfo)
@@ -287,7 +272,7 @@ describe('Billing Enforcement Integration', () => {
       const result: EnforcementResult = {
         allowed: false,
         isOverLimit: true,
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
         current: 100,
         limit: 100,
         remaining: 0,
@@ -298,7 +283,7 @@ describe('Billing Enforcement Integration', () => {
 
       expect(emailsSent).toHaveLength(1)
       expect(emailsSent[0].to).toBe('test@example.com')
-      expect(emailsSent[0].dimension).toBe('sessions')
+      expect(emailsSent[0].dimension).toBe('analyzed_sessions')
     })
 
     it('should NOT send duplicate notification in same billing period', async () => {
@@ -306,7 +291,7 @@ describe('Billing Enforcement Integration', () => {
 
       const billingInfo = createBillingInfo({
         subscription: { sessions_limit: 100 },
-        sessionsUsed: 100,
+        analyzedSessionsUsed: 100,
         periodStart: '2026-01-01T00:00:00Z',
       })
       mockGetBillingInfo.mockResolvedValue(billingInfo)
@@ -314,7 +299,7 @@ describe('Billing Enforcement Integration', () => {
       const result: EnforcementResult = {
         allowed: false,
         isOverLimit: true,
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
         current: 100,
         limit: 100,
         remaining: 0,
@@ -336,7 +321,7 @@ describe('Billing Enforcement Integration', () => {
       // First period: January
       const billingInfoJan = createBillingInfo({
         subscription: { sessions_limit: 100 },
-        sessionsUsed: 100,
+        analyzedSessionsUsed: 100,
         periodStart: '2026-01-01T00:00:00Z',
       })
       mockGetBillingInfo.mockResolvedValue(billingInfoJan)
@@ -344,7 +329,7 @@ describe('Billing Enforcement Integration', () => {
       const result: EnforcementResult = {
         allowed: false,
         isOverLimit: true,
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
         current: 100,
         limit: 100,
         remaining: 0,
@@ -357,7 +342,7 @@ describe('Billing Enforcement Integration', () => {
       // New period: February
       const billingInfoFeb = createBillingInfo({
         subscription: { sessions_limit: 100 },
-        sessionsUsed: 100,
+        analyzedSessionsUsed: 100,
         periodStart: '2026-02-01T00:00:00Z',
       })
       mockGetBillingInfo.mockResolvedValue(billingInfoFeb)
@@ -371,7 +356,7 @@ describe('Billing Enforcement Integration', () => {
 
       const billingInfo = createBillingInfo({
         subscription: { sessions_limit: 100, projects_limit: 5 },
-        sessionsUsed: 100,
+        analyzedSessionsUsed: 100,
         projectsUsed: 5,
         periodStart: '2026-01-01T00:00:00Z',
       })
@@ -381,7 +366,7 @@ describe('Billing Enforcement Integration', () => {
       await sendLimitNotificationIfNeeded('user-123', {
         allowed: false,
         isOverLimit: true,
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
         current: 100,
         limit: 100,
         remaining: 0,
@@ -400,7 +385,7 @@ describe('Billing Enforcement Integration', () => {
       })
 
       expect(emailsSent).toHaveLength(2)
-      expect(emailsSent[0].dimension).toBe('sessions')
+      expect(emailsSent[0].dimension).toBe('analyzed_sessions')
       expect(emailsSent[1].dimension).toBe('projects')
     })
 
@@ -410,7 +395,7 @@ describe('Billing Enforcement Integration', () => {
       const result: EnforcementResult = {
         allowed: true,
         isOverLimit: false,
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
         current: 10000,
         limit: null, // Unlimited
         remaining: null,
@@ -433,27 +418,27 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: 100, plan_name: 'basic' },
-          sessionsUsed: 100,
+          analyzedSessionsUsed: 100,
         })
       )
 
       // Should be blocked before upgrade
       await expect(
-        enforceLimit({ userId: 'user-123', dimension: 'sessions' })
+        enforceLimit({ userId: 'user-123', dimension: 'analyzed_sessions' })
       ).rejects.toThrow(LimitExceededError)
 
       // Simulate upgrade to Pro (1000 sessions)
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: 1000, plan_name: 'pro' },
-          sessionsUsed: 100, // Same usage, higher limit
+          analyzedSessionsUsed: 100, // Same usage, higher limit
         })
       )
 
       // Should be allowed immediately after upgrade
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
 
       expect(result.allowed).toBe(true)
@@ -498,27 +483,27 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: 1000, plan_name: 'pro' },
-          sessionsUsed: 1000,
+          analyzedSessionsUsed: 1000,
         })
       )
 
       // Blocked before upgrade
       await expect(
-        enforceLimit({ userId: 'user-123', dimension: 'sessions' })
+        enforceLimit({ userId: 'user-123', dimension: 'analyzed_sessions' })
       ).rejects.toThrow(LimitExceededError)
 
       // Upgrade to Unlimited plan
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: null, plan_name: 'unlimited' },
-          sessionsUsed: 1000,
+          analyzedSessionsUsed: 1000,
         })
       )
 
       // Allowed immediately
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
 
       expect(result.allowed).toBe(true)
@@ -557,7 +542,7 @@ describe('Billing Enforcement Integration', () => {
             plan_name: 'pro',
             current_period_end: currentPeriodEnd,
           },
-          sessionsUsed: 500,
+          analyzedSessionsUsed: 500,
           periodEnd: currentPeriodEnd,
         })
       )
@@ -565,7 +550,7 @@ describe('Billing Enforcement Integration', () => {
       // User can still create sessions up to 1000
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
 
       expect(result.allowed).toBe(true)
@@ -584,14 +569,14 @@ describe('Billing Enforcement Integration', () => {
             sessions_limit: 1000, // Old limit still active
             plan_name: 'pro', // Still shows pro until renewal
           },
-          sessionsUsed: 200,
+          analyzedSessionsUsed: 200,
         })
       )
 
       // Can create more sessions, even though new plan would only allow 100
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
 
       expect(result.allowed).toBe(true)
@@ -609,14 +594,14 @@ describe('Billing Enforcement Integration', () => {
             sessions_limit: 100, // New (lower) limit now active
             plan_name: 'basic',
           },
-          sessionsUsed: 0, // Usage resets with new period
+          analyzedSessionsUsed: 0, // Usage resets with new period
         })
       )
 
       // Can create up to 100 sessions in new period
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
 
       expect(result.allowed).toBe(true)
@@ -636,13 +621,13 @@ describe('Billing Enforcement Integration', () => {
             sessions_limit: 1000,
             plan_name: 'pro',
           },
-          sessionsUsed: 500,
+          analyzedSessionsUsed: 500,
         })
       )
 
       let result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
       expect(result.allowed).toBe(true)
       expect(result.remaining).toBe(500)
@@ -654,13 +639,13 @@ describe('Billing Enforcement Integration', () => {
             sessions_limit: 100,
             plan_name: 'basic',
           },
-          sessionsUsed: 0, // Reset for new period
+          analyzedSessionsUsed: 0, // Reset for new period
         })
       )
 
       result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
       expect(result.allowed).toBe(true)
       expect(result.limit).toBe(100)
@@ -718,7 +703,7 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: null, // No active subscription (cancelled past period end)
-          sessionsUsed: 0,
+          analyzedSessionsUsed: 0,
         })
       )
 
@@ -726,7 +711,7 @@ describe('Billing Enforcement Integration', () => {
       await expect(
         enforceLimit({
           userId: 'user-123',
-          dimension: 'sessions',
+          dimension: 'analyzed_sessions',
         })
       ).rejects.toThrow(LimitExceededError)
     })
@@ -740,13 +725,13 @@ describe('Billing Enforcement Integration', () => {
             sessions_limit: 100,
             current_period_end: futureDate,
           },
-          sessionsUsed: 50,
+          analyzedSessionsUsed: 50,
         })
       )
 
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
 
       expect(result.allowed).toBe(true)
@@ -777,13 +762,13 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: 0 },
-          sessionsUsed: 0,
+          analyzedSessionsUsed: 0,
         })
       )
 
       // Even with 0 used, can't add to a 0 limit
       await expect(
-        enforceLimit({ userId: 'user-123', dimension: 'sessions' })
+        enforceLimit({ userId: 'user-123', dimension: 'analyzed_sessions' })
       ).rejects.toThrow(LimitExceededError)
     })
 
@@ -791,13 +776,13 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: null },
-          sessionsUsed: 1000000,
+          analyzedSessionsUsed: 1000000,
         })
       )
 
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'sessions',
+        dimension: 'analyzed_sessions',
       })
 
       expect(result.allowed).toBe(true)
@@ -811,14 +796,14 @@ describe('Billing Enforcement Integration', () => {
             sessions_limit: 100,
             projects_limit: null, // Unlimited
           },
-          sessionsUsed: 100,
+          analyzedSessionsUsed: 100,
           projectsUsed: 50,
         })
       )
 
       // Sessions blocked
       await expect(
-        enforceLimit({ userId: 'user-123', dimension: 'sessions' })
+        enforceLimit({ userId: 'user-123', dimension: 'analyzed_sessions' })
       ).rejects.toThrow(LimitExceededError)
 
       // Projects allowed
@@ -834,15 +819,15 @@ describe('Billing Enforcement Integration', () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: { sessions_limit: 100 },
-          sessionsUsed: 50,
+          analyzedSessionsUsed: 50,
         })
       )
 
       // Simulate rapid requests
       const results = await Promise.all([
-        checkEnforcement({ userId: 'user-123', dimension: 'sessions', mode: 'hard' }),
-        checkEnforcement({ userId: 'user-123', dimension: 'sessions', mode: 'hard' }),
-        checkEnforcement({ userId: 'user-123', dimension: 'sessions', mode: 'hard' }),
+        checkEnforcement({ userId: 'user-123', dimension: 'analyzed_sessions' }),
+        checkEnforcement({ userId: 'user-123', dimension: 'analyzed_sessions' }),
+        checkEnforcement({ userId: 'user-123', dimension: 'analyzed_sessions' }),
       ])
 
       // All should be allowed (snapshot of usage at time of check)

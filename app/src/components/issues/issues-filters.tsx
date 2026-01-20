@@ -1,12 +1,12 @@
 'use client'
 
-import { useCallback } from 'react'
-import { Input, Select, Checkbox } from '@/components/ui'
+import { useCallback, useMemo } from 'react'
+import { Input, Select, Checkbox, CollapsibleSection } from '@/components/ui'
 import type { IssueFilters, IssueType, IssuePriority, IssueStatus } from '@/types/issue'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 
 interface IssuesFiltersProps {
-  projects: ProjectWithCodebase[]
+  projects: ProjectRecord[]
   filters: IssueFilters
   onFilterChange: (filters: IssueFilters) => void
 }
@@ -62,16 +62,25 @@ export function IssuesFilters({
     onFilterChange({})
   }, [onFilterChange])
 
-  const hasActiveFilters =
-    filters.projectId ||
-    filters.type ||
-    filters.priority ||
-    filters.status ||
-    filters.search ||
-    filters.showArchived
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (filters.projectId) count++
+    if (filters.type) count++
+    if (filters.priority) count++
+    if (filters.status) count++
+    if (filters.search) count++
+    if (filters.showArchived) count++
+    return count
+  }, [filters])
+
+  const hasActiveFilters = activeFilterCount > 0
+
+  const collapsedSummary = hasActiveFilters
+    ? `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'} active`
+    : undefined
 
   return (
-    <div className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-4">
+    <CollapsibleSection title="Filters" collapsedSummary={collapsedSummary} defaultExpanded={false} variant="flat">
       <div className="flex flex-wrap items-end gap-4">
         <div className="flex flex-col gap-1">
           <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
@@ -134,6 +143,7 @@ export function IssuesFilters({
           >
             <option value="">All</option>
             <option value="open">Open</option>
+            <option value="ready">Ready</option>
             <option value="in_progress">In Progress</option>
             <option value="resolved">Resolved</option>
             <option value="closed">Closed</option>
@@ -171,6 +181,6 @@ export function IssuesFilters({
           </button>
         )}
       </div>
-    </div>
+    </CollapsibleSection>
   )
 }

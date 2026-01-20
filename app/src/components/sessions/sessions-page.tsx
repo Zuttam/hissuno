@@ -2,22 +2,21 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import type { SessionWithProject, SessionFilters } from '@/types/session'
-import type { ProjectWithCodebase } from '@/lib/projects/queries'
+import type { ProjectRecord } from '@/lib/supabase/projects'
 import { useSessions, useSessionDetail } from '@/hooks/use-sessions'
 import { SessionsFilters } from './sessions-filters'
 import { SessionsTable } from './sessions-table'
 import { SessionSidebar } from './session-sidebar'
 import { CreateSessionDialog } from './create-session-dialog'
-import { IconButton } from '@/components/ui/icon-button'
-import { RefreshIcon } from '@/components/ui/refresh-icon'
-import { Button } from '@/components/ui/button'
+import { Button, PageHeader } from '@/components/ui'
 import { FloatingCard } from '@/components/ui/floating-card'
+import { AnalyticsStrip } from '@/components/analytics'
 
 type SessionView = 'messages' | 'details'
 
 interface SessionsPageProps {
   initialSessions: SessionWithProject[]
-  projects: ProjectWithCodebase[]
+  projects: ProjectRecord[]
   initialProjectFilter?: string
   initialSessionId?: string
   initialView?: SessionView
@@ -116,30 +115,22 @@ export function SessionsPage({
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
-      <FloatingCard floating="gentle" variant="default" className="flex flex-col gap-8">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="font-mono text-3xl font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-              Sessions
-            </h1>
-            <IconButton
-              aria-label="Refresh sessions"
-              variant="ghost"
-              size="md"
-              onClick={() => void refresh()}
-            >
-              <RefreshIcon />
-            </IconButton>
-          </div>
+      <PageHeader
+        title="Sessions"
+        onRefresh={() => void refresh()}
+        actions={
           <Button
             variant="primary"
-            size="sm"
+            size="md"
             onClick={() => setShowCreateDialog(true)}
           >
             Create
           </Button>
-        </header>
+        }
+      />
 
+      <AnalyticsStrip type="sessions" projectId={filters.projectId} />
+      <FloatingCard floating="gentle" variant="default" className="flex flex-col gap-6">
         <SessionsFilters
           projects={projects}
           filters={filters}
