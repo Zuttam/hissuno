@@ -21,12 +21,30 @@ const LOG_PREFIX = '[session-review.stream]'
 export type SessionReviewSSEEventType =
   | 'connected'
   | 'review-start'
+  // Classification phase
   | 'classify-start'
   | 'classify-progress'
   | 'classify-finish'
-  | 'pm-review-start'
-  | 'pm-review-progress'
-  | 'pm-review-finish'
+  // PM Review multi-step phase
+  | 'prepare-context-start'
+  | 'prepare-context-progress'
+  | 'prepare-context-finish'
+  | 'find-duplicates-start'
+  | 'find-duplicates-progress'
+  | 'find-duplicates-finish'
+  | 'analyze-impact-start'
+  | 'analyze-impact-progress'
+  | 'analyze-impact-finish'
+  | 'estimate-effort-start'
+  | 'estimate-effort-progress'
+  | 'estimate-effort-finish'
+  | 'pm-decision-start'
+  | 'pm-decision-progress'
+  | 'pm-decision-finish'
+  | 'execute-decision-start'
+  | 'execute-decision-progress'
+  | 'execute-decision-finish'
+  // Completion
   | 'review-finish'
   | 'error'
 
@@ -35,8 +53,13 @@ export type SessionReviewSSEEventType =
  */
 export interface SessionReviewSSEEvent extends BaseSSEEvent {
   type: SessionReviewSSEEventType
+  stepName?: string // Human-readable step name
   tags?: SessionTag[]
   result?: SessionReviewResult
+  // Step-specific data
+  duplicateCount?: number
+  impactScore?: number
+  effortEstimate?: string
 }
 
 /**
@@ -159,10 +182,28 @@ export async function GET(_request: Request, context: RouteContext) {
               break
 
             case 'workflow-step-start':
-              if (stepId === 'classify-session') {
-                emitEvent('classify-start', { stepId, message: 'Starting classification...' })
-              } else if (stepId === 'pm-review') {
-                emitEvent('pm-review-start', { stepId, message: 'Starting PM review...' })
+              switch (stepId) {
+                case 'classify-session':
+                  emitEvent('classify-start', { stepId, stepName: 'Classification', message: 'Analyzing session...' })
+                  break
+                case 'prepare-pm-context':
+                  emitEvent('prepare-context-start', { stepId, stepName: 'Preparing Context', message: 'Loading session data...' })
+                  break
+                case 'find-duplicates':
+                  emitEvent('find-duplicates-start', { stepId, stepName: 'Finding Duplicates', message: 'Searching similar issues...' })
+                  break
+                case 'analyze-impact':
+                  emitEvent('analyze-impact-start', { stepId, stepName: 'Impact Analysis', message: 'Analyzing system impact...' })
+                  break
+                case 'estimate-effort':
+                  emitEvent('estimate-effort-start', { stepId, stepName: 'Effort Estimation', message: 'Estimating complexity...' })
+                  break
+                case 'pm-decision':
+                  emitEvent('pm-decision-start', { stepId, stepName: 'PM Decision', message: 'Making decision...' })
+                  break
+                case 'execute-decision':
+                  emitEvent('execute-decision-start', { stepId, stepName: 'Executing', message: 'Applying decision...' })
+                  break
               }
               break
 
@@ -173,36 +214,102 @@ export async function GET(_request: Request, context: RouteContext) {
                 (payload as { type?: string; message?: string })
 
               if (output?.type === 'progress') {
-                if (stepId === 'classify-session') {
-                  emitEvent('classify-progress', {
-                    stepId,
-                    message: output?.message ?? 'Processing...',
-                  })
-                } else if (stepId === 'pm-review') {
-                  emitEvent('pm-review-progress', {
-                    stepId,
-                    message: output?.message ?? 'Processing...',
-                  })
+                const progressMessage = output?.message ?? 'Processing...'
+                switch (stepId) {
+                  case 'classify-session':
+                    emitEvent('classify-progress', { stepId, stepName: 'Classification', message: progressMessage })
+                    break
+                  case 'prepare-pm-context':
+                    emitEvent('prepare-context-progress', { stepId, stepName: 'Preparing Context', message: progressMessage })
+                    break
+                  case 'find-duplicates':
+                    emitEvent('find-duplicates-progress', { stepId, stepName: 'Finding Duplicates', message: progressMessage })
+                    break
+                  case 'analyze-impact':
+                    emitEvent('analyze-impact-progress', { stepId, stepName: 'Impact Analysis', message: progressMessage })
+                    break
+                  case 'estimate-effort':
+                    emitEvent('estimate-effort-progress', { stepId, stepName: 'Effort Estimation', message: progressMessage })
+                    break
+                  case 'pm-decision':
+                    emitEvent('pm-decision-progress', { stepId, stepName: 'PM Decision', message: progressMessage })
+                    break
+                  case 'execute-decision':
+                    emitEvent('execute-decision-progress', { stepId, stepName: 'Executing', message: progressMessage })
+                    break
                 }
               }
               break
             }
 
             case 'workflow-step-result':
-            case 'workflow-step-finish':
-              if (stepId === 'classify-session') {
-                // Extract tags from step result
-                const stepResult = payload?.result as { tags?: SessionTag[] } | undefined
-                currentTags = stepResult?.tags ?? []
-                emitEvent('classify-finish', {
-                  stepId,
-                  message: `Applied ${currentTags.length} tag(s)`,
-                  tags: currentTags,
-                })
-              } else if (stepId === 'pm-review') {
-                emitEvent('pm-review-finish', { stepId, message: 'PM review complete' })
+            case 'workflow-step-finish': {
+              const stepResult = payload?.result as Record<string, unknown> | undefined
+              switch (stepId) {
+                case 'classify-session': {
+                  currentTags = (stepResult?.tags as SessionTag[]) ?? []
+                  emitEvent('classify-finish', {
+                    stepId,
+                    stepName: 'Classification',
+                    message: `Applied ${currentTags.length} tag(s)`,
+                    tags: currentTags,
+                  })
+                  break
+                }
+                case 'prepare-pm-context':
+                  emitEvent('prepare-context-finish', {
+                    stepId,
+                    stepName: 'Preparing Context',
+                    message: 'Context loaded',
+                  })
+                  break
+                case 'find-duplicates': {
+                  const similarIssues = (stepResult?.similarIssues as unknown[]) ?? []
+                  emitEvent('find-duplicates-finish', {
+                    stepId,
+                    stepName: 'Finding Duplicates',
+                    message: `Found ${similarIssues.length} similar issue(s)`,
+                    duplicateCount: similarIssues.length,
+                  })
+                  break
+                }
+                case 'analyze-impact': {
+                  const impact = stepResult?.impactAnalysis as { impactScore?: number } | null
+                  emitEvent('analyze-impact-finish', {
+                    stepId,
+                    stepName: 'Impact Analysis',
+                    message: impact?.impactScore ? `Impact: ${impact.impactScore}/5` : 'Impact analyzed',
+                    impactScore: impact?.impactScore,
+                  })
+                  break
+                }
+                case 'estimate-effort': {
+                  const effort = stepResult?.effortEstimation as { estimate?: string } | null
+                  emitEvent('estimate-effort-finish', {
+                    stepId,
+                    stepName: 'Effort Estimation',
+                    message: effort?.estimate ? `Effort: ${effort.estimate}` : 'Effort estimated',
+                    effortEstimate: effort?.estimate,
+                  })
+                  break
+                }
+                case 'pm-decision':
+                  emitEvent('pm-decision-finish', {
+                    stepId,
+                    stepName: 'PM Decision',
+                    message: 'Decision made',
+                  })
+                  break
+                case 'execute-decision':
+                  emitEvent('execute-decision-finish', {
+                    stepId,
+                    stepName: 'Executing',
+                    message: 'Decision applied',
+                  })
+                  break
               }
               break
+            }
 
             case 'workflow-finish':
             case 'workflow-canceled': {

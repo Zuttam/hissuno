@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbo",
     "build:widget": "cd packages/widget && npm run build",
     "build": "npm run build:widget && next build",
     "start": "next start",

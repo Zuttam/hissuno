@@ -7,7 +7,7 @@
  */
 
 import { getBillingInfo } from './billing-service'
-import { sendLimitNotificationIfNeeded } from './limit-notifications'
+import { sendLimitNotificationIfNeeded } from '@/lib/notifications/limit-notifications'
 import type { Subscription, UsageMetrics } from '@/types/billing'
 import type {
   EnforcementCheckOptions,

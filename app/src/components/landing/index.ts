@@ -1,19 +1,17 @@
 // Utilities
 export { UTMCapture } from './utm-capture'
 
-// Waitlist
-export { WaitlistProvider, useWaitlist } from './waitlist-context'
-export { WaitlistDialog } from './waitlist-dialog'
-
-// CTA Options
+// CTA (unified context for all CTA flows)
 export { CTAProvider, useCTA } from './cta-context'
 export { CTAOptionsDialog } from './cta-options-dialog'
+export { WaitlistDialog } from './waitlist-dialog'
+export { ThankYouModal } from './thank-you-modal'
 
 // Navigation
 export { MarketingNav } from './marketing-nav'
 
 // Home page sections
-export { HeroSection, FeaturesSection, ValuePropsSection, CommunitySection, CTASection } from './home'
+export { HeroSection, FeaturesSection, ValuePropsSection, CommunitySection, CTASection, MistOverlay } from './home'
 
 // Tool-specific landing pages
 export {

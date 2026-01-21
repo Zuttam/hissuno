@@ -137,6 +137,13 @@ export function createMockIssue(
     is_archived: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    // Impact/effort fields
+    affected_areas: [],
+    impact_score: null,
+    impact_analysis: null,
+    effort_estimate: null,
+    effort_reasoning: null,
+    affected_files: [],
   }
 }
 

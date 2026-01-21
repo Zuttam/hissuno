@@ -2,10 +2,12 @@ import { headers as nextHeaders } from 'next/headers'
 
 export const USER_ID_HEADER = 'x-user-id'
 export const USER_EMAIL_HEADER = 'x-user-email'
+export const USER_NAME_HEADER = 'x-user-name'
 
 export interface SessionUser {
   id: string
   email: string | null
+  name: string | null
 }
 
 export class UnauthorizedError extends Error {
@@ -56,6 +58,7 @@ async function extractUserFromHeaders(headersLike?: HeadersInput | Promise<Heade
   return {
     id,
     email: source.get(USER_EMAIL_HEADER),
+    name: source.get(USER_NAME_HEADER),
   }
 }
 

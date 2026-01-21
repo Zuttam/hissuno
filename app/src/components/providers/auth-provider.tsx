@@ -44,15 +44,21 @@ export function AuthProvider({ children, initialUser = null }: AuthProviderProps
       setUser(session?.user ?? null)
       setIsLoading(false)
 
-      // PostHog user identification (only with consent)
-      const consent = localStorage.getItem('hissuno_cookie_consent')
-      if (session?.user && consent === 'accepted') {
+      // PostHog user identification
+      // Authenticated users have implicitly accepted terms by registering
+      if (session?.user) {
+        // Auto-set consent for authenticated users (registration = acceptance)
+        const consentKey = 'hissuno_cookie_consent'
+        if (!localStorage.getItem(consentKey)) {
+          localStorage.setItem(consentKey, 'accepted')
+        }
+
         posthog.identify(session.user.id, {
           email: session.user.email,
           signup_method: session.user.app_metadata?.provider || 'email',
           created_at: session.user.created_at,
         })
-      } else if (!session?.user) {
+      } else {
         posthog.reset()
       }
     })

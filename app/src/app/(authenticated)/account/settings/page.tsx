@@ -1,15 +1,20 @@
 import { ChangePasswordForm } from '@/components/account/change-password-form'
 import { ProfileSection } from '@/components/account/profile-section'
-import { Heading } from '@/components/ui'
+import { Heading, PageHeader } from '@/components/ui'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { getSessionUser } from '@/lib/auth/server'
+import { Page } from 'openai/pagination.mjs'
 
 export default async function AccountSettingsPage() {
   const user = await getSessionUser()
 
   return (
-    <div className="mx-auto w-full max-w-6xl pt-4">
-      <div className="grid gap-8 lg:grid-cols-[1fr,1fr]">
+    <div className="mx-auto w-full max-w-6xl ">
+      <div className="my-8">
+      <PageHeader title="Account Settings" />
+      </div>
+
+      <div className="flex flex-col gap-8">
         <ProfileSection email={user?.email} />
         <FloatingCard
           floating="gentle"

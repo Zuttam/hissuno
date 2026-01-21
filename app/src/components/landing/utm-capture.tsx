@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { parseUTMFromObject, storeUTM } from '@/lib/analytics'
+import { parseUTMFromObject, storeUTM } from '@/lib/event_tracking'
 
 interface UTMCaptureProps {
   searchParams: Record<string, string | string[] | undefined>

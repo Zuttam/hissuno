@@ -311,6 +311,22 @@ import type { SessionWithProject } from '@/types/session'
 }
 ```
 
+### Marketing-Only Accent Colors
+
+The following CSS variables are reserved for marketing pages only:
+- `--accent-teal` / `--accent-teal-hover`
+- `--accent-warm`
+- `--accent-coral`
+
+**Rule**: These colors must ONLY be used in:
+- `app/src/app/(marketing)/` routes
+- `app/src/components/landing/` components
+
+For app pages (authenticated, auth), use the standard accent colors:
+- `--accent-primary` / `--accent-primary-hover` - primary actions
+- `--accent-selected` / `--accent-selected-hover` - selected states
+- `--accent-success` / `--accent-warning` / `--accent-danger` / `--accent-info` - semantic states
+
 ### Tailwind with CSS Variables
 
 ```tsx
@@ -359,6 +375,7 @@ export const listProjects = cache(async (): Promise<ProjectWithCodebase[]> => {
 5. **FormData**: Prefer FormData over JSON for POST requests with optional file uploads.
 6. **Void promises**: Use `void` prefix for fire-and-forget: `void fetchData()`.
 7. **No relative imports**: always use absolute import paths starting with the '@' to reference the root
+8. **Use existing UI components**: Before creating any UI element (buttons, headers, text, cards, dialogs, etc.), ALWAYS check `@/components/ui` for existing components. Never create elements from scratch when a reusable component exists.
 
 ## Environment Variables
 

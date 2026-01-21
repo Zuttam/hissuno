@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { getStoredUTM } from '@/lib/analytics'
+import { getStoredUTM } from '@/lib/event_tracking'
 
 interface GoogleSignInButtonProps {
   redirectTo?: string

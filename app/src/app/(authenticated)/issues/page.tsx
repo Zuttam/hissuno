@@ -1,5 +1,4 @@
-import { IssuesPageContent } from '@/components/issues/issues-page'
-import { listIssues } from '@/lib/supabase/issues'
+import { redirect } from 'next/navigation'
 import { listProjects } from '@/lib/supabase/projects'
 
 interface IssuesPageParams {
@@ -9,19 +8,20 @@ interface IssuesPageParams {
 export default async function IssuesPage({ searchParams }: IssuesPageParams) {
   const params = await searchParams
   const projectId = typeof params.project === 'string' ? params.project : undefined
-  const issueId = typeof params.issue === 'string' ? params.issue : undefined
 
-  const [issues, projects] = await Promise.all([
-    listIssues({ projectId, limit: 50 }),
-    listProjects(),
-  ])
+  // If project is specified in query params, redirect to that project's issues
+  if (projectId) {
+    redirect(`/projects/${projectId}/issues`)
+  }
 
-  return (
-    <IssuesPageContent
-      initialIssues={issues}
-      projects={projects}
-      initialProjectFilter={projectId}
-      initialIssueId={issueId}
-    />
-  )
+  // Otherwise, get the first project and redirect there
+  const projects = await listProjects()
+
+  if (projects.length > 0) {
+    // Redirect to the first project's issues page
+    redirect(`/projects/${projects[0].id}/issues`)
+  }
+
+  // If no projects, redirect to projects page to create one
+  redirect('/projects')
 }

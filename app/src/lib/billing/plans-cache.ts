@@ -95,11 +95,11 @@ function isCacheValid(cache: PlansCache | undefined): boolean {
 export async function getPlans(): Promise<Plan[]> {
   // Check cache first
   if (isCacheValid(globalForCache.plansCache)) {
-    console.log('[plans-cache] returning cached plans')
+    console.debug('[plans-cache] returning cached plans')
     return globalForCache.plansCache!.plans
   }
 
-  console.log('[plans-cache] fetching plans from Lemon Squeezy')
+  console.debug('[plans-cache] fetching plans from Lemon Squeezy')
 
   try {
     configureLemonSqueezy()
@@ -167,7 +167,7 @@ export async function getPlans(): Promise<Plan[]> {
       timestamp: Date.now(),
     }
 
-    console.log(`[plans-cache] cached ${plans.length} plans`)
+    console.debug(`[plans-cache] cached ${plans.length} plans`)
     return plans
   } catch (error) {
     console.error('[plans-cache] unexpected error', error)

@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge } from '@/components/ui'
-import type { IssueWithProject, IssueType, IssuePriority, IssueStatus } from '@/types/issue'
+import type { IssueWithProject, IssueType, IssuePriority, IssueStatus, EffortEstimate } from '@/types/issue'
 
 interface IssuesTableProps {
   issues: IssueWithProject[]
@@ -35,6 +35,12 @@ export function IssuesTable({
             </th>
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Priority
+            </th>
+            <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+              Impact
+            </th>
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+              Effort
             </th>
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Status
@@ -112,6 +118,12 @@ function IssueRow({ issue, isSelected, onSelect, onArchive }: IssueRowProps) {
       </td>
       <td className="px-3 py-2">
         <PriorityBadge priority={issue.priority} isManual={issue.priority_manual_override} />
+      </td>
+      <td className="px-3 py-2 text-center">
+        <ImpactBadge score={issue.impact_score} />
+      </td>
+      <td className="px-3 py-2">
+        <EffortBadge effort={issue.effort_estimate} />
       </td>
       <td className="px-3 py-2">
         <StatusBadge status={issue.status} />
@@ -216,6 +228,61 @@ function PriorityBadge({ priority, isManual }: { priority: IssuePriority; isManu
         </span>
       )}
     </span>
+  )
+}
+
+function ImpactBadge({ score }: { score: number | null }) {
+  if (score === null) {
+    return <span className="text-[color:var(--text-secondary)]">-</span>
+  }
+
+  // Color based on impact level
+  const getColor = (s: number) => {
+    if (s >= 4) return 'text-[color:var(--accent-danger)]'
+    if (s >= 3) return 'text-[color:var(--accent-warning)]'
+    return 'text-[color:var(--text-secondary)]'
+  }
+
+  return (
+    <span className={`font-bold ${getColor(score)}`} title={`Impact score: ${score}/5`}>
+      {score}/5
+    </span>
+  )
+}
+
+function EffortBadge({ effort }: { effort: EffortEstimate | null }) {
+  if (!effort) {
+    return <span className="text-[color:var(--text-secondary)]">-</span>
+  }
+
+  const labels: Record<EffortEstimate, string> = {
+    trivial: 'XS',
+    small: 'S',
+    medium: 'M',
+    large: 'L',
+    xlarge: 'XL',
+  }
+
+  const descriptions: Record<EffortEstimate, string> = {
+    trivial: 'Trivial (<1 hour)',
+    small: 'Small (1-4 hours)',
+    medium: 'Medium (1-2 days)',
+    large: 'Large (3-5 days)',
+    xlarge: 'XLarge (1+ week)',
+  }
+
+  const variants: Record<EffortEstimate, 'success' | 'default' | 'warning' | 'danger' | 'info'> = {
+    trivial: 'success',
+    small: 'success',
+    medium: 'default',
+    large: 'warning',
+    xlarge: 'danger',
+  }
+
+  return (
+    <Badge variant={variants[effort]} title={descriptions[effort]}>
+      {labels[effort]}
+    </Badge>
   )
 }
 

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useProjects } from '@/hooks/use-projects'
 import { DropdownButton } from '@/components/ui'
+import { CreateProjectDialog } from '@/components/projects/create-project-dialog'
 
 function isProjectsActive(pathname: string) {
   return pathname === '/projects' || pathname.startsWith('/projects/')
@@ -12,11 +13,21 @@ function isProjectsActive(pathname: string) {
 
 export function ProjectsDropdown() {
   const [open, setOpen] = useState(false)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
-  const { projects, isLoading } = useProjects()
+  const { projects, isLoading, refresh: refreshProjects } = useProjects()
 
   const active = isProjectsActive(pathname)
+
+  const handleCreateProject = () => {
+    setOpen(false)
+    setShowCreateDialog(true)
+  }
+
+  const handleProjectCreated = () => {
+    void refreshProjects()
+  }
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -80,8 +91,26 @@ export function ProjectsDropdown() {
               </div>
             </>
           ) : null}
+
+          <div className="my-1 border-t border-[color:var(--border-subtle)]" />
+          <button
+            type="button"
+            onClick={handleCreateProject}
+            className="flex w-full items-center gap-2 px-2 py-1 font-mono text-xs text-[color:var(--accent-primary)] transition hover:bg-[color:var(--surface-hover)]"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Create project
+          </button>
         </div>
       ) : null}
+
+      <CreateProjectDialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onProjectCreated={handleProjectCreated}
+      />
     </div>
   )
 }

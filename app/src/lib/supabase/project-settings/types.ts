@@ -35,6 +35,7 @@ export interface IssueSettings {
   issue_tracking_enabled: boolean
   issue_spec_threshold: number
   spec_guidelines: string | null
+  pm_dedup_include_closed: boolean
 }
 
 /**
@@ -87,4 +88,5 @@ export const DEFAULT_ISSUE_SETTINGS: IssueSettings = {
   issue_tracking_enabled: true,
   issue_spec_threshold: 3,
   spec_guidelines: null,
+  pm_dedup_include_closed: false,
 }

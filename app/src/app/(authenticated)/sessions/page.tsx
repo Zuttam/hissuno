@@ -1,5 +1,4 @@
-import { SessionsPage } from '@/components/sessions/sessions-page'
-import { listSessions } from '@/lib/supabase/sessions'
+import { redirect } from 'next/navigation'
 import { listProjects } from '@/lib/supabase/projects'
 
 interface SessionsPageParams {
@@ -9,19 +8,20 @@ interface SessionsPageParams {
 export default async function SessionsRoute({ searchParams }: SessionsPageParams) {
   const params = await searchParams
   const projectId = typeof params.project === 'string' ? params.project : undefined
-  const sessionId = typeof params.session === 'string' ? params.session : undefined
 
-  const [sessions, projects] = await Promise.all([
-    listSessions({ projectId, limit: 50 }),
-    listProjects(),
-  ])
+  // If project is specified in query params, redirect to that project's sessions
+  if (projectId) {
+    redirect(`/projects/${projectId}/sessions`)
+  }
 
-  return (
-    <SessionsPage
-      initialSessions={sessions}
-      projects={projects}
-      initialProjectFilter={projectId}
-      initialSessionId={sessionId}
-    />
-  )
+  // Otherwise, get the first project and redirect there
+  const projects = await listProjects()
+
+  if (projects.length > 0) {
+    // Redirect to the first project's sessions page
+    redirect(`/projects/${projects[0].id}/sessions`)
+  }
+
+  // If no projects, redirect to projects page to create one
+  redirect('/projects')
 }

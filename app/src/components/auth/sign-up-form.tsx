@@ -6,7 +6,7 @@ import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { signUpAction, type AuthActionState } from '@/lib/auth/actions'
 import { GoogleSignInButton } from './google-sign-in-button'
-import { trackSignupStarted, getStoredUTM, storePreselectedUseCase } from '@/lib/analytics'
+import { trackSignupStarted, getStoredUTM, storePreselectedUseCase } from '@/lib/event_tracking'
 import { Divider } from '@/components/ui/divider'
 
 const initialState: AuthActionState = {}

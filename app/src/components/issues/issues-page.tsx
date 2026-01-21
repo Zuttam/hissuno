@@ -11,6 +11,8 @@ import { CreateIssueDialog } from './create-issue-dialog'
 import { Button, PageHeader } from '@/components/ui'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { AnalyticsStrip } from '@/components/analytics'
+import { generateCSV, formatDateForCSV, formatArrayForCSV, type CSVColumn } from '@/lib/utils/csv'
+import { downloadAsCSV, generateExportFilename } from '@/lib/utils/download'
 
 interface IssuesPageContentProps {
   initialIssues: IssueWithProject[]
@@ -90,19 +92,54 @@ export function IssuesPageContent({
     await archiveIssue(issue.id, !issue.is_archived)
   }, [archiveIssue])
 
+  const handleExportCSV = useCallback(() => {
+    if (issues.length === 0) return
+
+    const columns: CSVColumn<IssueWithProject>[] = [
+      { key: 'title', header: 'Title' },
+      { key: 'type', header: 'Type' },
+      { key: 'project.name', header: 'Project', transform: (v) => (v as string) || '' },
+      { key: 'priority', header: 'Priority' },
+      { key: 'status', header: 'Status' },
+      { key: 'upvote_count', header: 'Upvotes', transform: (v) => String(v ?? 0) },
+      { key: 'description', header: 'Description' },
+      { key: 'affected_areas', header: 'Affected Areas', transform: (v) => formatArrayForCSV(v as string[]) },
+      { key: 'impact_score', header: 'Impact Score', transform: (v) => v != null ? String(v) : '' },
+      { key: 'effort_estimate', header: 'Effort Estimate', transform: (v) => (v as string) || '' },
+      { key: 'is_archived', header: 'Archived', transform: (v) => v ? 'Yes' : 'No' },
+      { key: 'created_at', header: 'Created', transform: (v) => formatDateForCSV(v as string) },
+      { key: 'updated_at', header: 'Updated', transform: (v) => formatDateForCSV(v as string) },
+    ]
+
+    const csv = generateCSV(issues, columns)
+    const selectedProject = projects.find((p) => p.id === filters.projectId)
+    const filename = generateExportFilename('issues', selectedProject?.name || 'all')
+    downloadAsCSV(csv, filename)
+  }, [issues, filters.projectId, projects])
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8">
       <PageHeader
         title="Issues"
         onRefresh={() => void refresh()}
         actions={
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setShowCreateDialog(true)}
-          >
-            Create
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={handleExportCSV}
+              disabled={issues.length === 0}
+            >
+              Export CSV
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setShowCreateDialog(true)}
+            >
+              Create
+            </Button>
+          </div>
         }
       />
 

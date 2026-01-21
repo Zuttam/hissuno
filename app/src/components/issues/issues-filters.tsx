@@ -9,6 +9,7 @@ interface IssuesFiltersProps {
   projects: ProjectRecord[]
   filters: IssueFilters
   onFilterChange: (filters: IssueFilters) => void
+  hideProjectFilter?: boolean
 }
 
 interface FilterChipProps {
@@ -69,6 +70,7 @@ export function IssuesFilters({
   projects,
   filters,
   onFilterChange,
+  hideProjectFilter = false,
 }: IssuesFiltersProps) {
   // Status handler
   const handleStatusToggle = useCallback(
@@ -217,21 +219,23 @@ export function IssuesFilters({
 
       {/* Row 3: Project + Search */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-1">
-          <FilterLabel>Project:</FilterLabel>
-          <Select
-            value={filters.projectId || ''}
-            onChange={handleProjectChange}
-            className="h-6 w-36 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
-          >
-            <option value="">All</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {!hideProjectFilter && (
+          <div className="flex items-center gap-1">
+            <FilterLabel>Project:</FilterLabel>
+            <Select
+              value={filters.projectId || ''}
+              onChange={handleProjectChange}
+              className="h-6 w-36 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
+            >
+              <option value="">All</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div className="flex items-center gap-1">
           <FilterLabel>Search:</FilterLabel>
           <Input

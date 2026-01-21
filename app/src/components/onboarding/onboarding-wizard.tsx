@@ -24,7 +24,7 @@ import {
   utmContentToUseCase,
   clearStoredUTM,
   clearPreselectedUseCase,
-} from '@/lib/analytics'
+} from '@/lib/event_tracking'
 
 export function OnboardingWizard() {
   const router = useRouter()

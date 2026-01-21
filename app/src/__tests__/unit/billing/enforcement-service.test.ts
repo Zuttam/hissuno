@@ -23,7 +23,7 @@ vi.mock('@/lib/billing/billing-service', () => ({
   getBillingInfo: (userId: string) => mockGetBillingInfo(userId),
 }))
 
-vi.mock('@/lib/billing/limit-notifications', () => ({
+vi.mock('@/lib/notifications/limit-notifications', () => ({
   sendLimitNotificationIfNeeded: (...args: unknown[]) => mockSendLimitNotificationIfNeeded(...args),
 }))
 

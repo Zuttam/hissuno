@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui'
 import { ResizableTable, useColumnStyle, type ColumnConfig } from '@/components/ui/resizable-table'
 import type { SessionWithProject } from '@/types/session'
 import { SESSION_SOURCE_INFO, type SessionSource } from '@/types/session'
-import { SessionTagList } from './session-tag-badge'
+import { SessionTagList } from './session-tags'
 
 interface SessionsTableProps {
   sessions: SessionWithProject[]

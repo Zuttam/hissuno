@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
       projectId: string
       userId: string
       nonce: string
+      redirectUrl?: string
       returnStep?: string
       mode?: string
     }
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Invalid state parameter.')
     }
 
-    const { projectId, userId, returnStep = 'sessions', mode = 'edit' } = stateData
+    const { projectId, userId, redirectUrl, returnStep = 'sessions', mode = 'edit' } = stateData
 
     if (!projectId || !userId) {
       return redirectWithError('Invalid state data.')
@@ -119,7 +120,13 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Failed to save Slack connection.')
     }
 
-    // Redirect based on mode
+    // Redirect based on redirectUrl (new) or mode (legacy)
+    if (redirectUrl) {
+      // New flow: use explicit redirect URL from state (already has slack=connected)
+      return NextResponse.redirect(redirectUrl)
+    }
+
+    // Legacy flow: construct URL based on mode/returnStep
     let successUrl: URL
     if (mode === 'create') {
       // Redirect back to create wizard with step

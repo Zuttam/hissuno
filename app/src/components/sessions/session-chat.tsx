@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect } from 'react'
-import { KnowledgeViewer } from '@/components/projects/project-detail/knowledge-viewer'
+import { KnowledgeViewer } from '@/components/knowledge/knowledge-viewer'
 import type { ChatMessage } from '@/types/session'
 
 interface SessionChatProps {

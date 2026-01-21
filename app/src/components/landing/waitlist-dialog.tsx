@@ -1,20 +1,23 @@
 'use client'
 
 import { useState, FormEvent } from 'react'
-import { Dialog } from '@/components/ui'
-import { Button } from '@/components/ui'
-import { useWaitlist } from './waitlist-context'
+import { useRouter } from 'next/navigation'
+import { Dialog, Button } from '@/components/ui'
+import { useCTA } from './cta-context'
 
 // Strict email regex (RFC 5322 simplified)
-const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+const EMAIL_REGEX =
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
 
 export function WaitlistDialog() {
-  const { isOpen, closeWaitlistDialog } = useWaitlist()
+  const router = useRouter()
+  const { activeDialog, showThankYou, closeDialog } = useCTA()
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isSuccess, setIsSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lastSubmitTime, setLastSubmitTime] = useState(0)
+
+  const isOpen = activeDialog === 'waitlist'
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -64,8 +67,11 @@ export function WaitlistDialog() {
         throw new Error(data.error || 'Failed to join waitlist.')
       }
 
-      setIsSuccess(true)
+      // Success - navigate to thank you page
       setEmail('')
+      closeDialog()
+      showThankYou('waitlist')
+      router.push('/thank-you?type=waitlist')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
@@ -74,93 +80,65 @@ export function WaitlistDialog() {
   }
 
   const handleClose = () => {
-    closeWaitlistDialog()
+    closeDialog()
     // Reset state after animation
     setTimeout(() => {
       setEmail('')
       setError(null)
-      setIsSuccess(false)
     }, 300)
   }
 
   return (
     <Dialog open={isOpen} onClose={handleClose} title="Join the Waitlist">
-      {isSuccess ? (
-        <div className="space-y-4 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent-teal)]/10">
-            <svg
-              className="h-6 w-6 text-[var(--accent-teal)]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <div className="space-y-2">
-            <p className="text-lg font-medium text-[var(--foreground)]">
-              You&apos;re on the list!
-            </p>
-            <p className="text-sm text-[var(--text-secondary)]">
-              We&apos;ll notify you when Hissuno is ready for you.
-            </p>
-          </div>
-          <Button onClick={handleClose} variant="secondary" className="mt-4">
-            Close
-          </Button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <p className="text-sm text-[var(--text-secondary)]">
-            Be the first to know when Hissuno launches. Enter your email below.
-          </p>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="text-sm text-[var(--text-secondary)]">
+          Be the first to know when Hissuno launches. Enter your email below.
+        </p>
 
-          <div className="space-y-2">
-            <label htmlFor="waitlist-email" className="sr-only">
-              Email address
-            </label>
-            <input
-              id="waitlist-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
-              autoComplete="email"
-              required
-              disabled={isLoading}
-              className="w-full rounded-[4px] border-2 border-[var(--border-subtle)] bg-[var(--surface)] px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent-teal)] focus:outline-none disabled:opacity-50"
-            />
-          </div>
-
-          {/* Honeypot field - hidden from real users, attracts bots */}
-          <div className="absolute -left-[9999px] opacity-0" aria-hidden="true">
-            <label htmlFor="waitlist-website">Website</label>
-            <input
-              id="waitlist-website"
-              name="website"
-              type="text"
-              tabIndex={-1}
-              autoComplete="off"
-            />
-          </div>
-
-          {error && (
-            <p className="text-sm text-[var(--accent-danger)]" role="alert">
-              {error}
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            loading={isLoading}
+        <div className="space-y-2">
+          <label htmlFor="waitlist-email" className="sr-only">
+            Email address
+          </label>
+          <input
+            id="waitlist-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            autoComplete="email"
+            required
             disabled={isLoading}
-            className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
-          >
-            Join the Waitlist
-          </Button>
-        </form>
-      )}
+            className="w-full rounded-[4px] border-2 border-[var(--border-subtle)] bg-[var(--surface)] px-4 py-3 text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:border-[var(--accent-teal)] focus:outline-none disabled:opacity-50"
+          />
+        </div>
+
+        {/* Honeypot field - hidden from real users, attracts bots */}
+        <div className="absolute -left-[9999px] opacity-0" aria-hidden="true">
+          <label htmlFor="waitlist-website">Website</label>
+          <input
+            id="waitlist-website"
+            name="website"
+            type="text"
+            tabIndex={-1}
+            autoComplete="off"
+          />
+        </div>
+
+        {error && (
+          <p className="text-sm text-[var(--accent-danger)]" role="alert">
+            {error}
+          </p>
+        )}
+
+        <Button
+          type="submit"
+          loading={isLoading}
+          disabled={isLoading}
+          className="w-full bg-[var(--accent-primary)] hover:bg-[var(--accent-primary-hover)]"
+        >
+          Join the Waitlist
+        </Button>
+      </form>
     </Dialog>
   )
 }

@@ -203,8 +203,8 @@ export function WaterPlane() {
     return new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uBaseColor: { value: new THREE.Color('#7dd3e8') },  // Light turquoise (ocean)
-        uDeepColor: { value: new THREE.Color('#5ec4db') },  // Slightly deeper turquoise
+        uBaseColor: { value: new THREE.Color('#faf9f7') },  // Warm white
+        uDeepColor: { value: new THREE.Color('#f5f3f0') },  // Soft off-white
         uRippleColor: { value: new THREE.Color('#ffffff') },
         uResolution: { value: new THREE.Vector2(1920, 1080) },
         uRipples: { value: rippleUniforms },
@@ -238,8 +238,8 @@ export function WaterPlane() {
       const rippleIntensityCSS = styles.getPropertyValue('--water-ripple-intensity').trim()
       const backgroundColorCSS = styles.getPropertyValue('--water-background').trim()
 
-      material.uniforms.uBaseColor.value.set(baseColor || '#7dd3e8')
-      material.uniforms.uDeepColor.value.set(deepColor || '#5ec4db')
+      material.uniforms.uBaseColor.value.set(baseColor || '#faf9f7')
+      material.uniforms.uDeepColor.value.set(deepColor || '#f5f3f0')
       material.uniforms.uRippleColor.value.set(rippleColor || '#ffffff')
       material.uniforms.uCausticColor.value.set(causticColor || '#ffffff')
       material.uniforms.uBackgroundColor.value.set(backgroundColorCSS || '#fafafa')

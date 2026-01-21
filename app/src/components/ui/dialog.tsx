@@ -6,10 +6,10 @@ import { cn } from '@/lib/utils/class'
 export type DialogSize = 'md' | 'lg' | 'xl' | '2xl'
 
 const sizeClasses: Record<DialogSize, string> = {
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-2xl',
-  '2xl': 'max-w-3xl',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+  '2xl': 'max-w-5xl',
 }
 
 export interface DialogProps {
