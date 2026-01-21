@@ -51,10 +51,11 @@
 [] Improve landing page
 [] work on ads 
   [] YouTube / Google
-  [] LinkedIn
-[] setup google and linkedin tracking (including join the waitlist and calendly)
+  [] Meta
+[] setup google and meta tracking (including join the waitlist and calendly)
 
 ### Platform
+[x] Move hissuno LS store out of test and update secrets 
 [] Improve layout: module tabs under project, settings and edit mode
 [] Test limits (analyzed sessions)
 

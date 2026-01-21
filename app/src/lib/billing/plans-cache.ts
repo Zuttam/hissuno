@@ -36,17 +36,17 @@ interface PlanMetadata {
 }
 
 function getPlanMetadata(): Record<string, PlanMetadata> {
-  const basicId = process.env.LEMONSQUEEZY_VARIANT_ID_BASIC || '1203367'
-  const proId = process.env.LEMONSQUEEZY_VARIANT_ID_PRO || '1208310'
-  const maxId = process.env.LEMONSQUEEZY_VARIANT_ID_MAX || '1208312'
+  const basicId = process.env.LEMONSQUEEZY_VARIANT_ID_BASIC
+  const proId = process.env.LEMONSQUEEZY_VARIANT_ID_PRO
+  const maxId = process.env.LEMONSQUEEZY_VARIANT_ID_MAX
 
   const metadata: Record<string, PlanMetadata> = {}
 
   if (basicId) {
     metadata[basicId] = {
       name: 'basic',
-      limits: { sessions_limit: 100, projects_limit: 1 },
-      features: ['100 sessions/month', '1 project', 'Community support'],
+      limits: { sessions_limit: 200, projects_limit: 1 },
+      features: ['200 analyzed sessions/month', '1 project', 'Community support'],
       is_recommended: false,
       sort_order: 1,
     }
@@ -56,7 +56,7 @@ function getPlanMetadata(): Record<string, PlanMetadata> {
     metadata[proId] = {
       name: 'pro',
       limits: { sessions_limit: 1000, projects_limit: 5 },
-      features: ['1,000 sessions/month', '5 projects', 'Priority support', 'Custom branding'],
+      features: ['1,000 analyzed sessions/month', '5 projects', 'Priority support', 'Custom branding'],
       is_recommended: true,
       sort_order: 2,
     }
