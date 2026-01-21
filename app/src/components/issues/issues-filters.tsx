@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import { Input, Select, Checkbox, CollapsibleSection } from '@/components/ui'
+import { Input, Select, CollapsibleSection, Button } from '@/components/ui'
 import type { IssueFilters, IssueType, IssuePriority, IssueStatus } from '@/types/issue'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 
@@ -11,11 +11,104 @@ interface IssuesFiltersProps {
   onFilterChange: (filters: IssueFilters) => void
 }
 
+interface FilterChipProps {
+  label: string
+  active: boolean
+  onClick: () => void
+}
+
+function FilterChip({ label, active, onClick }: FilterChipProps) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      selected={active}
+      onClick={onClick}
+      className="!rounded-full !px-2.5 !py-0.5 !text-[10px]"
+    >
+      {label}
+    </Button>
+  )
+}
+
+function FilterLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="mr-1 font-mono text-[10px] uppercase text-[color:var(--text-tertiary)]">
+      {children}
+    </span>
+  )
+}
+
+const STATUS_OPTIONS: { value: IssueStatus; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'ready', label: 'Ready' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'closed', label: 'Closed' },
+]
+
+const QUICK_STATUS_OPTIONS: { value: IssueStatus; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'ready', label: 'Ready' },
+  { value: 'in_progress', label: 'In Progress' },
+]
+
+const TYPE_OPTIONS: { value: IssueType; label: string }[] = [
+  { value: 'bug', label: 'Bug' },
+  { value: 'feature_request', label: 'Feature' },
+  { value: 'change_request', label: 'Change' },
+]
+
+const PRIORITY_OPTIONS: { value: IssuePriority; label: string }[] = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+]
+
 export function IssuesFilters({
   projects,
   filters,
   onFilterChange,
 }: IssuesFiltersProps) {
+  // Status handler
+  const handleStatusToggle = useCallback(
+    (status: IssueStatus) => {
+      onFilterChange({
+        ...filters,
+        status: filters.status === status ? undefined : status,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Type handler
+  const handleTypeToggle = useCallback(
+    (type: IssueType) => {
+      onFilterChange({
+        ...filters,
+        type: filters.type === type ? undefined : type,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Priority handler
+  const handlePriorityToggle = useCallback(
+    (priority: IssuePriority) => {
+      onFilterChange({
+        ...filters,
+        priority: filters.priority === priority ? undefined : priority,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Archived handler
+  const handleArchivedToggle = useCallback(() => {
+    onFilterChange({ ...filters, showArchived: !filters.showArchived || undefined })
+  }, [filters, onFilterChange])
+
+  // Project handler
   const handleProjectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
       onFilterChange({ ...filters, projectId: e.target.value || undefined })
@@ -23,37 +116,10 @@ export function IssuesFilters({
     [filters, onFilterChange]
   )
 
-  const handleTypeChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      onFilterChange({ ...filters, type: (e.target.value as IssueType) || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
-  const handlePriorityChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      onFilterChange({ ...filters, priority: (e.target.value as IssuePriority) || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
-  const handleStatusChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      onFilterChange({ ...filters, status: (e.target.value as IssueStatus) || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
+  // Search handler
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onFilterChange({ ...filters, search: e.target.value || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
-  const handleShowArchivedChange = useCallback(
-    (checked: boolean) => {
-      onFilterChange({ ...filters, showArchived: checked || undefined })
     },
     [filters, onFilterChange]
   )
@@ -79,19 +145,86 @@ export function IssuesFilters({
     ? `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'} active`
     : undefined
 
-  return (
-    <CollapsibleSection title="Filters" collapsedSummary={collapsedSummary} defaultExpanded={false} variant="flat">
-      <div className="flex flex-wrap items-end gap-4">
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Project
-          </label>
+  // Quick filters (collapsed state)
+  const quickFilters = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <FilterLabel>Status:</FilterLabel>
+      {QUICK_STATUS_OPTIONS.map((opt) => (
+        <FilterChip
+          key={opt.value}
+          label={opt.label}
+          active={filters.status === opt.value}
+          onClick={() => handleStatusToggle(opt.value)}
+        />
+      ))}
+      <span className="ml-2" />
+      <FilterLabel>Type:</FilterLabel>
+      {TYPE_OPTIONS.map((opt) => (
+        <FilterChip
+          key={opt.value}
+          label={opt.label}
+          active={filters.type === opt.value}
+          onClick={() => handleTypeToggle(opt.value)}
+        />
+      ))}
+    </div>
+  )
+
+  // Expanded filters (same style, more options)
+  const expandedFilters = (
+    <div className="flex flex-col gap-3">
+      {/* Row 1: Status + Type */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FilterLabel>Status:</FilterLabel>
+        {STATUS_OPTIONS.map((opt) => (
+          <FilterChip
+            key={opt.value}
+            label={opt.label}
+            active={filters.status === opt.value}
+            onClick={() => handleStatusToggle(opt.value)}
+          />
+        ))}
+        <span className="ml-2" />
+        <FilterLabel>Type:</FilterLabel>
+        {TYPE_OPTIONS.map((opt) => (
+          <FilterChip
+            key={opt.value}
+            label={opt.label}
+            active={filters.type === opt.value}
+            onClick={() => handleTypeToggle(opt.value)}
+          />
+        ))}
+      </div>
+
+      {/* Row 2: Priority + Archived */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FilterLabel>Priority:</FilterLabel>
+        {PRIORITY_OPTIONS.map((opt) => (
+          <FilterChip
+            key={opt.value}
+            label={opt.label}
+            active={filters.priority === opt.value}
+            onClick={() => handlePriorityToggle(opt.value)}
+          />
+        ))}
+        <span className="ml-2" />
+        <FilterChip
+          label="Archived"
+          active={filters.showArchived ?? false}
+          onClick={handleArchivedToggle}
+        />
+      </div>
+
+      {/* Row 3: Project + Search */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex items-center gap-1">
+          <FilterLabel>Project:</FilterLabel>
           <Select
             value={filters.projectId || ''}
             onChange={handleProjectChange}
-            className="w-48"
+            className="h-6 w-36 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
           >
-            <option value="">All projects</option>
+            <option value="">All</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
@@ -99,88 +232,39 @@ export function IssuesFilters({
             ))}
           </Select>
         </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Type
-          </label>
-          <Select
-            value={filters.type || ''}
-            onChange={handleTypeChange}
-            className="w-40"
-          >
-            <option value="">All types</option>
-            <option value="bug">Bug</option>
-            <option value="feature_request">Feature Request</option>
-            <option value="change_request">Change Request</option>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Priority
-          </label>
-          <Select
-            value={filters.priority || ''}
-            onChange={handlePriorityChange}
-            className="w-32"
-          >
-            <option value="">All</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Status
-          </label>
-          <Select
-            value={filters.status || ''}
-            onChange={handleStatusChange}
-            className="w-32"
-          >
-            <option value="">All</option>
-            <option value="open">Open</option>
-            <option value="ready">Ready</option>
-            <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
-          </Select>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Search
-          </label>
+        <div className="flex items-center gap-1">
+          <FilterLabel>Search:</FilterLabel>
           <Input
             type="text"
             placeholder="Search issues..."
             value={filters.search || ''}
             onChange={handleSearchChange}
-            className="w-48"
+            className="h-6 w-40 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
           />
         </div>
-
-        <div className="flex items-center gap-2 self-end pb-2">
-          <Checkbox
-            checked={filters.showArchived || false}
-            onChange={handleShowArchivedChange}
-            label="Show archived"
-          />
-        </div>
-
         {hasActiveFilters && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleClearFilters}
-            className="rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-transparent px-3 py-2 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
+            className="!rounded-full !px-2.5 !py-0.5 !text-[10px]"
           >
-            Clear filters
-          </button>
+            Clear all
+          </Button>
         )}
       </div>
+    </div>
+  )
+
+  return (
+    <CollapsibleSection
+      title="Filters"
+      collapsedSummary={collapsedSummary}
+      collapsedContent={quickFilters}
+      defaultExpanded={false}
+      variant="flat"
+    >
+      {expandedFilters}
     </CollapsibleSection>
   )
 }

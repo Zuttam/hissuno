@@ -24,7 +24,7 @@ export function CommunitySection() {
               whileHover={{ rotate: [0, -10, 10, 0] }}
               transition={{ duration: 0.5 }}
             >
-              <Image src="/slack.svg" alt="Slack" width={40} height={40} />
+              <Image src="/logos/slack.svg" alt="Slack" width={40} height={40} />
             </motion.div>
             <div className="flex-1">
               <h3 className="font-mono text-lg font-semibold text-[var(--foreground)]">

@@ -58,6 +58,8 @@ export interface IssueWithSessions extends IssueWithProject {
     page_url: string | null
     message_count: number
     created_at: string
+    name: string | null
+    source: 'widget' | 'slack' | 'intercom' | 'gong' | 'api' | 'manual'
   }[]
 }
 
@@ -79,12 +81,6 @@ export type WidgetTrigger = 'bubble' | 'drawer-badge' | 'headless'
  * Widget display types - how the chat UI appears
  */
 export type WidgetDisplay = 'popup' | 'sidepanel' | 'dialog'
-
-/**
- * Widget display variants (legacy, use WidgetDisplay)
- * @deprecated Use WidgetDisplay instead
- */
-export type WidgetVariant = 'popup' | 'sidepanel'
 
 /**
  * Widget theme options
@@ -110,7 +106,7 @@ export interface ProjectSettingsRecord {
   widget_shortcut: string | null
   widget_drawer_badge_label: string
   // Legacy widget settings
-  widget_variant: WidgetVariant
+  widget_variant: WidgetDisplay
   widget_theme: WidgetTheme
   widget_position: WidgetPosition
   widget_title: string

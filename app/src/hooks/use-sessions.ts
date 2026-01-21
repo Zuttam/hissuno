@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { SessionWithProject, SessionWithMessages, SessionFilters, ChatMessage, CreateSessionInput } from '@/types/session'
+import type { SessionWithProject, SessionWithMessages, SessionFilters, ChatMessage, CreateSessionInput, UpdateSessionInput } from '@/types/session'
 
 interface UseSessionsState {
   sessions: SessionWithProject[]
@@ -33,7 +33,10 @@ export function useSessions({
       if (filters.projectId) params.set('projectId', filters.projectId)
       if (filters.userId) params.set('userId', filters.userId)
       if (filters.sessionId) params.set('sessionId', filters.sessionId)
+      if (filters.name) params.set('name', filters.name)
       if (filters.status) params.set('status', filters.status)
+      if (filters.source) params.set('source', filters.source)
+      if (filters.tags && filters.tags.length > 0) params.set('tags', filters.tags.join(','))
       if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
       if (filters.dateTo) params.set('dateTo', filters.dateTo)
       if (filters.showArchived) params.set('showArchived', 'true')
@@ -57,7 +60,7 @@ export function useSessions({
     } finally {
       setIsLoading(false)
     }
-  }, [filters.projectId, filters.userId, filters.sessionId, filters.status, filters.dateFrom, filters.dateTo, filters.showArchived, filters.limit, filters.offset])
+  }, [filters.projectId, filters.userId, filters.sessionId, filters.name, filters.status, filters.source, filters.tags, filters.dateFrom, filters.dateTo, filters.showArchived, filters.limit, filters.offset])
 
   const createSession = useCallback(async (input: CreateSessionInput): Promise<SessionWithProject | null> => {
     try {
@@ -130,6 +133,7 @@ interface UseSessionDetailState {
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
+  updateSession: (input: UpdateSessionInput) => Promise<boolean>
 }
 
 export function useSessionDetail({
@@ -172,6 +176,30 @@ export function useSessionDetail({
     }
   }, [sessionId])
 
+  const updateSessionFn = useCallback(async (input: UpdateSessionInput): Promise<boolean> => {
+    if (!sessionId) return false
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+
+      if (!response.ok) {
+        return false
+      }
+
+      const payload = await response.json()
+      if (payload.session) {
+        setSession((prev) => prev ? { ...prev, ...payload.session } : payload.session)
+      }
+      return true
+    } catch {
+      return false
+    }
+  }, [sessionId])
+
   useEffect(() => {
     void fetchSession()
   }, [fetchSession])
@@ -183,7 +211,8 @@ export function useSessionDetail({
       isLoading,
       error,
       refresh: fetchSession,
+      updateSession: updateSessionFn,
     }),
-    [session, messages, isLoading, error, fetchSession]
+    [session, messages, isLoading, error, fetchSession, updateSessionFn]
   )
 }

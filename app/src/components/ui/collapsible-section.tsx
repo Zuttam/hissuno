@@ -7,6 +7,8 @@ type CollapsibleSectionVariant = 'default' | 'flat'
 interface CollapsibleSectionProps {
   title: string
   collapsedSummary?: string
+  /** Content to show below the header when collapsed (e.g., quick filters) */
+  collapsedContent?: React.ReactNode
   defaultExpanded?: boolean
   variant?: CollapsibleSectionVariant
   children: React.ReactNode
@@ -25,7 +27,7 @@ const variantStyles: Record<CollapsibleSectionVariant, { container: string; cont
 }
 
 const CollapsibleSection = forwardRef<HTMLDivElement, CollapsibleSectionProps>(
-  ({ title, collapsedSummary, defaultExpanded = true, variant = 'default', children, className = '' }, ref) => {
+  ({ title, collapsedSummary, collapsedContent, defaultExpanded = true, variant = 'default', children, className = '' }, ref) => {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded)
     const styles = variantStyles[variant]
 
@@ -41,7 +43,7 @@ const CollapsibleSection = forwardRef<HTMLDivElement, CollapsibleSectionProps>(
               {title}
             </span>
             {!isExpanded && collapsedSummary && (
-              <span className="font-mono text-sm text-[color:var(--foreground)]">
+              <span className="font-mono text-xs text-[color:var(--foreground)]">
                 {collapsedSummary}
               </span>
             )}
@@ -56,10 +58,16 @@ const CollapsibleSection = forwardRef<HTMLDivElement, CollapsibleSectionProps>(
           </svg>
         </button>
 
-        {isExpanded && (
+        {isExpanded ? (
           <div className={styles.content}>
             {children}
           </div>
+        ) : (
+          collapsedContent && (
+            <div className={variant === 'default' ? 'px-3 pb-3' : 'pt-2'}>
+              {collapsedContent}
+            </div>
+          )
         )}
       </div>
     )

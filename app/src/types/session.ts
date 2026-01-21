@@ -67,6 +67,7 @@ export interface SessionRecord {
   user_metadata: Record<string, string> | null
   page_url: string | null
   page_title: string | null
+  name: string | null
   source: SessionSource
   message_count: number
   status: SessionStatus
@@ -146,6 +147,7 @@ export interface SessionFilters {
   projectId?: string
   userId?: string
   sessionId?: string
+  name?: string
   status?: SessionStatus
   source?: SessionSource
   tags?: string[]
@@ -172,8 +174,19 @@ export interface CreateSessionInput {
   user_id?: string
   page_url?: string
   page_title?: string
+  name?: string
   tags?: SessionTag[]
   messages?: CreateMessageInput[]
+}
+
+/**
+ * Input for updating a session
+ */
+export interface UpdateSessionInput {
+  name?: string | null
+  status?: SessionStatus
+  user_id?: string | null
+  user_metadata?: Record<string, string> | null
 }
 
 /**

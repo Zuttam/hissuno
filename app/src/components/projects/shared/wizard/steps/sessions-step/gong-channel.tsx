@@ -5,7 +5,7 @@ import { ChannelRow } from './channel-row'
 export function GongChannel() {
   return (
     <ChannelRow
-      icon="/gong.svg"
+      icon="/logos/gong.svg"
       iconType="svg"
       name="Gong"
       description="Sync customer call recordings and transcripts from Gong for AI analysis"

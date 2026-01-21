@@ -15,7 +15,7 @@ import type {
 } from './types';
 import { validateTrigger, validateDisplay, validatePosition, validateTheme } from './utils';
 
-const DEFAULT_API_URL = '/api/agent';
+const DEFAULT_API_URL = '/api/integrations/widget/chat';
 
 /**
  * HissunoWidget - Embeddable support agent widget
@@ -78,7 +78,7 @@ export function HissunoWidget({
     blocked,
     loading: settingsLoading,
     error: settingsError,
-  } = useWidgetSettings(projectId || '', fetchDefaults && !!projectId, apiUrl, widgetToken);
+  } = useWidgetSettings(projectId || '', fetchDefaults && !!projectId, apiUrl ?? DEFAULT_API_URL, widgetToken);
 
   // Resolve trigger type (props > server > default)
   const resolveTrigger = (): WidgetTrigger => {
@@ -385,8 +385,8 @@ function useWidgetSettings(
     setLoading(true);
     setError(false);
 
-    // Widget settings endpoint is at /api/integrations/widget (separate from agent API)
-    const settingsUrl = `${apiUrl.replace(/\/api\/agent\/?$/, '/api/integrations/widget')}?projectId=${encodeURIComponent(projectId)}`;
+    // Widget settings endpoint is at /api/integrations/widget (separate from chat API)
+    const settingsUrl = `${apiUrl.replace(/\/chat\/?$/, '')}?projectId=${encodeURIComponent(projectId)}`;
 
     const controller = new AbortController();
 

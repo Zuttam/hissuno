@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Spinner, Select, MarkdownContent } from '@/components/ui'
+import { Spinner, Select, MarkdownContent, Badge } from '@/components/ui'
 import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType } from '@/types/issue'
 import { useIssueDetail } from '@/hooks/use-issues'
 import { useSpecGeneration } from '@/hooks/use-spec-generation'
@@ -202,25 +202,7 @@ export function IssueSidebar({
               {issue.sessions && issue.sessions.length > 0 ? (
                 <div className="space-y-2">
                   {issue.sessions.map((session) => (
-                    <Link
-                      key={session.id}
-                      href={`/sessions?session=${session.id}`}
-                      className="block rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 transition hover:border-[color:var(--accent-primary)] hover:bg-[color:var(--surface-hover)]"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs text-[color:var(--foreground)]">
-                          {session.id.slice(0, 12)}...
-                        </span>
-                        <span className="text-xs text-[color:var(--text-secondary)]">
-                          {session.message_count} messages
-                        </span>
-                      </div>
-                      {session.page_url && (
-                        <span className="mt-1 block truncate text-xs text-[color:var(--text-secondary)]">
-                          {session.page_url}
-                        </span>
-                      )}
-                    </Link>
+                    <LinkedSessionCard key={session.id} session={session} />
                   ))}
                 </div>
               ) : (
@@ -398,4 +380,70 @@ function formatDateTime(dateString: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
+}
+
+function formatRelativeDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    if (diffHours === 0) {
+      const diffMinutes = Math.floor(diffMs / (1000 * 60))
+      return diffMinutes <= 1 ? 'just now' : `${diffMinutes}m ago`
+    }
+    return `${diffHours}h ago`
+  }
+  if (diffDays === 1) return 'yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  return `${Math.floor(diffDays / 30)}mo ago`
+}
+
+const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
+  widget: 'info',
+  slack: 'warning',
+  intercom: 'success',
+  gong: 'default',
+  api: 'default',
+  manual: 'default',
+}
+
+interface LinkedSessionCardProps {
+  session: IssueWithSessions['sessions'][number]
+}
+
+function LinkedSessionCard({ session }: LinkedSessionCardProps) {
+  const sourceVariant = SOURCE_BADGE_VARIANTS[session.source] || 'default'
+  const sourceLabel = session.source.charAt(0).toUpperCase() + session.source.slice(1)
+
+  return (
+    <Link
+      href={`/sessions?session=${session.id}`}
+      className="block rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 transition hover:border-[color:var(--accent-primary)] hover:bg-[color:var(--surface-hover)]"
+    >
+      {/* Session Name */}
+      <p className="truncate text-sm font-medium text-[color:var(--foreground)]">
+        {session.name || 'Unnamed Session'}
+      </p>
+
+      {/* Source badge, User ID, and Date */}
+      <div className="mt-1.5 flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
+        <Badge variant={sourceVariant}>
+          {sourceLabel}
+        </Badge>
+        {session.user_id && (
+          <>
+            <span className="truncate font-mono" title={session.user_id}>
+              {session.user_id.length > 12 ? `${session.user_id.slice(0, 12)}...` : session.user_id}
+            </span>
+            <span>|</span>
+          </>
+        )}
+        <span>{formatRelativeDate(session.created_at)}</span>
+      </div>
+    </Link>
+  )
 }

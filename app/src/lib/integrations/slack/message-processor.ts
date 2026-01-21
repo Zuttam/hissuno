@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { upsertSession, updateSessionActivity } from '@/lib/supabase/sessions'
 import { triggerChatRun, updateChatRunStatus, type ChatMessage } from '@/lib/agent/chat-run-service'
 import { mastra } from '@/mastra'
-import type { SupportAgentContext } from '@/app/api/agent/route'
+import type { SupportAgentContext } from '@/types/agent'
 import { SlackClient, type SlackMessage } from './client'
 import { getOrCreateThreadSession, updateThreadSessionLastMessage } from './index'
 

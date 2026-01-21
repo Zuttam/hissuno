@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { ensureSessionName } from '@/lib/sessions/name-generator'
 
 export const runtime = 'nodejs'
 
@@ -89,6 +90,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { status: 500, headers: corsHeaders }
       )
     }
+
+    // Ensure session has a name (fire-and-forget)
+    void ensureSessionName({
+      sessionId,
+      projectId: session.project_id,
+    })
 
     let reviewTriggered = false
     let runId: string | undefined

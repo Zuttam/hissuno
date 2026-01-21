@@ -1,0 +1,15 @@
+name: Session Lifecycle Cron
+
+on:
+  schedule:
+    - cron: '*/10 * * * *' # Every 10 minutes
+  workflow_dispatch: {} # Allow manual triggers
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger session lifecycle
+        run: |
+          curl -sf -X GET "${{ secrets.CRON_URL }}/api/cron/session-lifecycle" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

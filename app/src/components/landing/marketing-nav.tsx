@@ -2,11 +2,11 @@
 
 import Link from 'next/link'
 import { ThemeLogo, Button, ThemeToggle } from '@/components/ui'
-import { useWaitlist } from './waitlist-context'
+import { useCTA } from './cta-context'
 import { useRouter } from 'next/navigation'
 
 export function MarketingNav() {
-  const { openWaitlistDialog } = useWaitlist()
+  const { openCTAOptions } = useCTA()
   const router = useRouter()
 
   const handleSignInClick = () => {
@@ -34,7 +34,7 @@ export function MarketingNav() {
           </Button>
           <Button
             size="sm"
-            onClick={openWaitlistDialog}
+            onClick={() => openCTAOptions('nav')}
             className="bg-[var(--accent-selected)] hover:opacity-90 py-2"
           >
             Get Started

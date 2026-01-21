@@ -16,7 +16,7 @@ const selectIssueWithSessions = `
   *,
   project:projects(id, name),
   issue_sessions(
-    session:sessions(id, user_id, page_url, message_count, created_at)
+    session:sessions(id, user_id, page_url, message_count, created_at, name, source)
   )
 `
 

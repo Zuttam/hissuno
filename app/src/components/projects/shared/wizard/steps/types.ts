@@ -2,7 +2,6 @@ import type { KnowledgeSourceType } from '@/lib/knowledge/types'
 import type {
   WidgetTrigger,
   WidgetDisplay,
-  WidgetVariant,
   WidgetTheme,
 } from '@/types/issue'
 import type { TagColorVariant } from '@/types/session'
@@ -104,7 +103,7 @@ export interface WidgetConfig {
   shortcut: string
   drawerBadgeLabel: string
   // Legacy and shared settings
-  variant: WidgetVariant
+  variant: WidgetDisplay
   theme: WidgetTheme
   title: string
   initialMessage: string

@@ -97,8 +97,7 @@ export interface HissunoWidgetProps {
   userMetadata?: Record<string, string>;
 
   /**
-   * The URL of your Hissuno API endpoint
-   * @default "/api/agent"
+   * Optional: The URL of your Hissuno API endpoint
    */
   apiUrl?: string;
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { checkEnforcement } from '@/lib/billing/enforcement-service'
+import { ensureSessionName } from '@/lib/sessions/name-generator'
 import { mastra } from '@/mastra'
 import type { WorkflowOutput } from '@/mastra/workflows/session-review/schemas'
 
@@ -71,6 +72,12 @@ export async function GET(request: NextRequest) {
             .eq('id', session.id)
 
           results.sessionsClosed++
+
+          // Ensure session has a name before PM review
+          await ensureSessionName({
+            sessionId: session.id,
+            projectId: session.project_id,
+          })
 
           // Check analyzed sessions limit before triggering PM review
           // Get project owner for limit check

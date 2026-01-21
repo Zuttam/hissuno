@@ -40,7 +40,7 @@ export interface UseHissunoChatOptions {
   projectId: string;
   /** JWT token for secure widget authentication */
   widgetToken?: string;
-  /** Custom API endpoint URL (default: '/api/agent') */
+  /** Custom API endpoint URL (default: '/api/integrations/widget/chat') */
   apiUrl?: string;
   /** Initial assistant message shown when chat opens */
   initialMessage?: string;
@@ -271,7 +271,7 @@ function deleteSessionFromRegistry(projectId: string, userId: string, sessionId:
 export function useHissunoChat({
   projectId,
   widgetToken,
-  apiUrl = '/api/agent',
+  apiUrl = '/api/integrations/widget/chat',
   initialMessage,
   headers = {},
   userId,
@@ -474,7 +474,7 @@ export function useHissunoChat({
   useEffect(() => {
     if (sessionClosedRef.current || !sessionId) return;
 
-    const updatesUrl = `${apiUrl}/session/updates?sessionId=${encodeURIComponent(sessionId)}&projectId=${encodeURIComponent(projectId)}`;
+    const updatesUrl = `${apiUrl}/updates?sessionId=${encodeURIComponent(sessionId)}&projectId=${encodeURIComponent(projectId)}`;
 
     const connectUpdates = () => {
       if (updatesEventSourceRef.current) return;
@@ -681,7 +681,7 @@ export function useHissunoChat({
     }
 
     try {
-      await fetch(`${apiUrl}/session/close`, {
+      await fetch(`${apiUrl}/close`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -698,7 +698,7 @@ export function useHissunoChat({
   // Cancel ongoing chat
   const cancelChat = useCallback(async () => {
     try {
-      const cancelUrl = `${apiUrl}/cancel`;
+      const cancelUrl = `${apiUrl}/stream/cancel`;
       const response = await fetch(cancelUrl, {
         method: 'POST',
         headers: {
@@ -758,7 +758,7 @@ export function useHissunoChat({
       if (!sessionId || sessionClosedRef.current) return;
 
       // Use sendBeacon for reliable delivery on page unload
-      const url = `${apiUrl}/session/close`;
+      const url = `${apiUrl}/close`;
       const data = JSON.stringify({ sessionId, projectId });
       navigator.sendBeacon(url, data);
     };

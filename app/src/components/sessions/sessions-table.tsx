@@ -80,6 +80,7 @@ function SessionRow({
   columns,
 }: SessionRowProps) {
   const truncatedId = session.id.length > 12 ? `${session.id.slice(0, 12)}...` : session.id
+  const displayName = session.name || truncatedId
   const truncatedPage = session.page_title
     ? session.page_title.length > 30
       ? `${session.page_title.slice(0, 30)}...`
@@ -101,9 +102,16 @@ function SessionRow({
       } ${session.is_archived ? 'opacity-60' : ''}`}
     >
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'session', columns)}>
-        <span className="text-[color:var(--foreground)]" title={session.id}>
-          {truncatedId}
-        </span>
+        <div className="flex flex-col">
+          <span className="text-[color:var(--foreground)]" title={session.name || session.id}>
+            {displayName}
+          </span>
+          {session.name && (
+            <span className="text-[10px] text-[color:var(--text-tertiary)]" title={session.id}>
+              {truncatedId}
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'user', columns)}>
         <span className="text-[color:var(--text-secondary)]">{session.user_id || '-'}</span>

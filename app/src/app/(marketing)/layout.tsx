@@ -4,6 +4,8 @@ import { WaterWebGLProvider, WaterCanvas } from '@/components/water-webgl'
 import { ThemeLogo } from '@/components/ui'
 import { WaitlistProvider } from '@/components/landing/waitlist-context'
 import { WaitlistDialog } from '@/components/landing/waitlist-dialog'
+import { CTAProvider } from '@/components/landing/cta-context'
+import { CTAOptionsDialog } from '@/components/landing/cta-options-dialog'
 import { MarketingNav } from '@/components/landing/marketing-nav'
 
 
@@ -17,6 +19,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
   return (
     <WaterWebGLProvider>
     <WaitlistProvider>
+    <CTAProvider>
       <div className="min-h-screen" suppressHydrationWarning>
         <WaterCanvas />
 
@@ -54,8 +57,10 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         </footer>
       </div>
 
-      {/* Waitlist Dialog */}
+      {/* Dialogs */}
       <WaitlistDialog />
+      <CTAOptionsDialog />
+    </CTAProvider>
     </WaitlistProvider>
   </WaterWebGLProvider>
   )

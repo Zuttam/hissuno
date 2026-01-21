@@ -11,7 +11,7 @@ export function IntegrationsSection() {
 
       <div className="flex flex-col">
         <ChannelRow
-          icon="/jira.svg"
+          icon="/logos/jira.svg"
           iconType="svg"
           name="Jira"
           description="Sync issues with your Jira projects"
@@ -23,7 +23,7 @@ export function IntegrationsSection() {
         <div className="border-b border-[color:var(--border-subtle)] w-full" />
 
         <ChannelRow
-          icon="/linear.svg"
+          icon="/logos/linear.svg"
           iconType="svg"
           name="Linear"
           description="Connect to Linear for seamless issue management"
