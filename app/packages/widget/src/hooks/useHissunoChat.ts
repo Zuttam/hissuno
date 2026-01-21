@@ -281,7 +281,7 @@ export function useHissunoChat({
   onSessionClose,
 }: UseHissunoChatOptions): UseHissunoChatReturn {
   const hasInitialized = useRef(false);
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionClosedRef = useRef(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const updatesEventSourceRef = useRef<EventSource | null>(null);
