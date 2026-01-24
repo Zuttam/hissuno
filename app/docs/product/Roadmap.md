@@ -49,10 +49,7 @@
 
 ### Marketing
 [x] Improve landing page
-[] work on ads 
-  [] YouTube / Google
-  [] Meta
-[] setup google and meta tracking (including join the waitlist and calendly)
+[x] setup google and meta tracking (including join the waitlist and calendly)
 
 ### Platform
 [x] Improve layout: module tabs under project, settings and edit mode
@@ -76,6 +73,11 @@
 
 ## Phase 6
 
+### Marketing
+[] Launch Ad campaigns for join and demo CTA (google and meta)
+[] Test pixel
+
+
 ### Support
 [] Email agent
 [] Slack read only mode for channels 
@@ -96,10 +98,10 @@
 [] Improve onboarding 
 [] Improve welcome email visualization
 
+## Phase 7
+
 ### Marketing
 [] Docs portal
-
-## Phase 7
 
 ### Sessions
 [] Intercom integration
