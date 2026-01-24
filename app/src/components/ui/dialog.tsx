@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useCallback, ReactNode } from 'react'
+import { useEffect, useCallback, ReactNode, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils/class'
 
 export type DialogSize = 'md' | 'lg' | 'xl' | '2xl'
@@ -22,6 +23,8 @@ export interface DialogProps {
 }
 
 export function Dialog({ open, onClose, title, children, className, size = 'md' }: DialogProps) {
+  const [mounted, setMounted] = useState(false)
+
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -30,6 +33,10 @@ export function Dialog({ open, onClose, title, children, className, size = 'md' 
     },
     [onClose]
   )
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (open) {
@@ -43,9 +50,9 @@ export function Dialog({ open, onClose, title, children, className, size = 'md' 
     }
   }, [open, handleEscape])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  const dialogContent = (
     <>
       {/* Backdrop */}
       <div
@@ -103,4 +110,7 @@ export function Dialog({ open, onClose, title, children, className, size = 'md' 
       </div>
     </>
   )
+
+  // Use portal to render dialog at document.body level, escaping any parent stacking contexts
+  return createPortal(dialogContent, document.body)
 }

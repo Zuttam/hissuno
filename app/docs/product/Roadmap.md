@@ -111,6 +111,7 @@
 [] Alerts and weekly reports(email, slack)
 
 ### Issues
+[] Draft response email to the user
 [] Support Actions items (not necessary code related)
 
 ## Phase 8
