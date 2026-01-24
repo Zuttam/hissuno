@@ -9,12 +9,30 @@ import type { SessionTag } from '@/types/session'
 export type SessionReviewSSEEventType =
   | 'connected'
   | 'review-start'
+  // Classification phase
   | 'classify-start'
   | 'classify-progress'
   | 'classify-finish'
-  | 'pm-review-start'
-  | 'pm-review-progress'
-  | 'pm-review-finish'
+  // PM Review multi-step phase
+  | 'prepare-context-start'
+  | 'prepare-context-progress'
+  | 'prepare-context-finish'
+  | 'find-duplicates-start'
+  | 'find-duplicates-progress'
+  | 'find-duplicates-finish'
+  | 'analyze-impact-start'
+  | 'analyze-impact-progress'
+  | 'analyze-impact-finish'
+  | 'estimate-effort-start'
+  | 'estimate-effort-progress'
+  | 'estimate-effort-finish'
+  | 'pm-decision-start'
+  | 'pm-decision-progress'
+  | 'pm-decision-finish'
+  | 'execute-decision-start'
+  | 'execute-decision-progress'
+  | 'execute-decision-finish'
+  // Completion
   | 'review-finish'
   | 'error'
 
@@ -28,8 +46,36 @@ export interface SessionReviewSSEEvent {
   message?: string
   tags?: SessionTag[]
   result?: SessionReviewResult
+  // Step-specific data
+  duplicateCount?: number
+  impactScore?: number
+  effortEstimate?: string
   timestamp: string
 }
+
+/**
+ * Workflow step state
+ */
+export interface WorkflowStep {
+  id: string
+  name: string
+  status: 'pending' | 'running' | 'completed' | 'error'
+  message?: string
+  data?: Record<string, unknown>
+}
+
+/**
+ * Initial workflow steps configuration
+ */
+const INITIAL_WORKFLOW_STEPS: WorkflowStep[] = [
+  { id: 'classify-session', name: 'Classification', status: 'pending' },
+  { id: 'prepare-pm-context', name: 'Preparing Context', status: 'pending' },
+  { id: 'find-duplicates', name: 'Finding Duplicates', status: 'pending' },
+  { id: 'analyze-impact', name: 'Impact Analysis', status: 'pending' },
+  { id: 'estimate-effort', name: 'Effort Estimation', status: 'pending' },
+  { id: 'pm-decision', name: 'PM Decision', status: 'pending' },
+  { id: 'execute-decision', name: 'Executing', status: 'pending' },
+]
 
 /**
  * Combined result of session review (classification + PM review)
@@ -65,16 +111,30 @@ interface UseSessionReviewOptions {
   sessionId: string | null
 }
 
+/**
+ * Limit exceeded error details from 429 response
+ */
+export interface LimitExceededErrorDetails {
+  message: string
+  current: number
+  limit: number
+  upgradeUrl: string
+}
+
 interface UseSessionReviewState {
   isReviewing: boolean
   events: SessionReviewSSEEvent[]
   result: SessionReviewResult | null
   error: string | null
+  limitError: LimitExceededErrorDetails | null
   currentPhase: 'classify' | 'pm-review' | null
   progressMessage: string | null
   tags: SessionTag[]
+  steps: WorkflowStep[]
+  currentStepId: string | null
   triggerReview: () => Promise<void>
   refresh: () => Promise<void>
+  clearLimitError: () => void
 }
 
 /**
@@ -90,8 +150,17 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
   const [currentPhase, setCurrentPhase] = useState<'classify' | 'pm-review' | null>(null)
   const [progressMessage, setProgressMessage] = useState<string | null>(null)
   const [tags, setTags] = useState<SessionTag[]>([])
+  const [limitError, setLimitError] = useState<LimitExceededErrorDetails | null>(null)
+  const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_WORKFLOW_STEPS)
+  const [currentStepId, setCurrentStepId] = useState<string | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
   const mountedRef = useRef(true)
+
+  // Helper to reset steps to initial state
+  const resetSteps = useCallback(() => {
+    setSteps(INITIAL_WORKFLOW_STEPS.map((s) => ({ ...s, status: 'pending' as const, message: undefined, data: undefined })))
+    setCurrentStepId(null)
+  }, [])
 
   // Connect to SSE stream
   const connectToStream = useCallback(() => {
@@ -106,6 +175,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
     setEvents([])
     setError(null)
     setProgressMessage(null)
+    resetSteps()
 
     const eventSource = new EventSource(`/api/sessions/${sessionId}/review/stream`)
     eventSourceRef.current = eventSource
@@ -117,7 +187,64 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
         const data = JSON.parse(event.data) as SessionReviewSSEEvent
         setEvents((prev) => [...prev, data])
 
-        // Track current phase and progress
+        // Map event type to step ID for step tracking
+        const eventTypeToStepId: Record<string, string> = {
+          'classify-start': 'classify-session',
+          'classify-progress': 'classify-session',
+          'classify-finish': 'classify-session',
+          'prepare-context-start': 'prepare-pm-context',
+          'prepare-context-progress': 'prepare-pm-context',
+          'prepare-context-finish': 'prepare-pm-context',
+          'find-duplicates-start': 'find-duplicates',
+          'find-duplicates-progress': 'find-duplicates',
+          'find-duplicates-finish': 'find-duplicates',
+          'analyze-impact-start': 'analyze-impact',
+          'analyze-impact-progress': 'analyze-impact',
+          'analyze-impact-finish': 'analyze-impact',
+          'estimate-effort-start': 'estimate-effort',
+          'estimate-effort-progress': 'estimate-effort',
+          'estimate-effort-finish': 'estimate-effort',
+          'pm-decision-start': 'pm-decision',
+          'pm-decision-progress': 'pm-decision',
+          'pm-decision-finish': 'pm-decision',
+          'execute-decision-start': 'execute-decision',
+          'execute-decision-progress': 'execute-decision',
+          'execute-decision-finish': 'execute-decision',
+        }
+
+        const stepId = eventTypeToStepId[data.type]
+
+        // Track step status
+        if (data.type.endsWith('-start') && stepId) {
+          setCurrentStepId(stepId)
+          setSteps((prev) =>
+            prev.map((s) => (s.id === stepId ? { ...s, status: 'running' as const, message: data.message } : s))
+          )
+        } else if (data.type.endsWith('-progress') && stepId) {
+          setSteps((prev) =>
+            prev.map((s) => (s.id === stepId ? { ...s, message: data.message } : s))
+          )
+        } else if (data.type.endsWith('-finish') && stepId) {
+          setSteps((prev) =>
+            prev.map((s) =>
+              s.id === stepId
+                ? {
+                    ...s,
+                    status: 'completed' as const,
+                    message: data.message,
+                    data: {
+                      tagCount: data.tags?.length,
+                      duplicateCount: data.duplicateCount,
+                      impactScore: data.impactScore,
+                      effort: data.effortEstimate,
+                    },
+                  }
+                : s
+            )
+          )
+        }
+
+        // Track legacy current phase for backwards compat
         if (data.type === 'classify-start') {
           setCurrentPhase('classify')
           setProgressMessage(data.message ?? 'Starting classification...')
@@ -129,14 +256,16 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
           if (data.tags) {
             setTags(data.tags)
           }
-        } else if (data.type === 'pm-review-start') {
-          setCurrentPhase('pm-review')
-          setProgressMessage(data.message ?? 'Starting PM review...')
-        } else if (data.type === 'pm-review-progress') {
-          setProgressMessage(data.message ?? 'Processing...')
-        } else if (data.type === 'pm-review-finish') {
-          setCurrentPhase(null)
-          setProgressMessage(null)
+        } else if (data.type.startsWith('prepare-context-') || data.type.startsWith('find-duplicates-') ||
+                   data.type.startsWith('analyze-impact-') || data.type.startsWith('estimate-effort-') ||
+                   data.type.startsWith('pm-decision-') || data.type.startsWith('execute-decision-')) {
+          // Set PM review phase for all PM-related steps
+          if (data.type.endsWith('-start')) {
+            setCurrentPhase('pm-review')
+            setProgressMessage(data.message ?? 'Processing...')
+          } else if (data.type.endsWith('-progress')) {
+            setProgressMessage(data.message ?? 'Processing...')
+          }
         }
 
         // Handle completion
@@ -146,6 +275,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
           setIsReviewing(false)
           setCurrentPhase(null)
           setProgressMessage(null)
+          setCurrentStepId(null)
           if (data.result) {
             setResult(data.result)
             setTags(data.result.tags || [])
@@ -159,6 +289,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
           setIsReviewing(false)
           setCurrentPhase(null)
           setProgressMessage(null)
+          setCurrentStepId(null)
           setError(data.message ?? 'Review failed')
         }
       } catch (err) {
@@ -175,7 +306,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
         // Don't set error here - stream might have completed normally
       }
     }
-  }, [sessionId])
+  }, [sessionId, resetSteps])
 
   // Fetch current review status
   const fetchStatus = useCallback(async () => {
@@ -214,9 +345,11 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
     if (!sessionId || isReviewing) return
 
     setError(null)
+    setLimitError(null)
     setResult(null)
     setEvents([])
     setTags([])
+    resetSteps()
     setIsReviewing(true)
 
     try {
@@ -232,6 +365,17 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
           connectToStream()
           return
         }
+        // Handle billing limit exceeded (429)
+        if (response.status === 429 && data.code === 'LIMIT_EXCEEDED') {
+          setLimitError({
+            message: data.error,
+            current: data.details?.current ?? 0,
+            limit: data.details?.limit ?? 0,
+            upgradeUrl: data.details?.upgradeUrl ?? '/account/billing',
+          })
+          setIsReviewing(false)
+          return
+        }
         throw new Error(data.error ?? 'Failed to start review')
       }
 
@@ -241,7 +385,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
       setError(err instanceof Error ? err.message : 'Failed to start review')
       setIsReviewing(false)
     }
-  }, [sessionId, isReviewing, connectToStream])
+  }, [sessionId, isReviewing, connectToStream, resetSteps])
 
   // Check for running review on mount and when sessionId changes
   useEffect(() => {
@@ -257,18 +401,26 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
     }
   }, [fetchStatus])
 
+  const clearLimitError = useCallback(() => {
+    setLimitError(null)
+  }, [])
+
   return useMemo(
     () => ({
       isReviewing,
       events,
       result,
       error,
+      limitError,
       currentPhase,
       progressMessage,
       tags,
+      steps,
+      currentStepId,
       triggerReview,
       refresh: fetchStatus,
+      clearLimitError,
     }),
-    [isReviewing, events, result, error, currentPhase, progressMessage, tags, triggerReview, fetchStatus]
+    [isReviewing, events, result, error, limitError, currentPhase, progressMessage, tags, steps, currentStepId, triggerReview, fetchStatus, clearLimitError]
   )
 }

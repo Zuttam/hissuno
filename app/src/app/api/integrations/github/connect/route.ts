@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { UnauthorizedError } from '@/lib/auth/server'
+import { UnauthorizedError, getSafeRedirectPath } from '@/lib/auth/server'
 
 export const runtime = 'nodejs'
 
@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
 
     // Get query params
     const projectId = request.nextUrl.searchParams.get('projectId')
+    // Support both nextUrl (new) and returnUrl (legacy) for backward compatibility
+    const nextUrl =
+      request.nextUrl.searchParams.get('nextUrl') || request.nextUrl.searchParams.get('returnUrl')
     const returnStep = request.nextUrl.searchParams.get('returnStep') || 'knowledge'
     const mode = request.nextUrl.searchParams.get('mode') || 'edit'
 
@@ -59,17 +62,36 @@ export async function GET(request: NextRequest) {
     // Generate state with projectId and full redirectUrl for CSRF protection
     const nonce = crypto.randomUUID()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const redirectUrl =
-      mode === 'edit'
-        ? `${appUrl}/projects/${projectId}/edit?restored=true&step=${returnStep}&github=connected`
-        : `${appUrl}/projects/new?restored=true&step=${returnStep}&github=connected`
+
+    // Determine redirect URL - use explicit nextUrl if provided and valid
+    let finalRedirectUrl: string
+    if (nextUrl) {
+      const safePath = getSafeRedirectPath(nextUrl)
+      // Security: ensure returnUrl is for the same project
+      if (safePath.includes(projectId)) {
+        const url = new URL(safePath, appUrl)
+        if (!url.searchParams.has('github')) {
+          url.searchParams.set('github', 'connected')
+        }
+        finalRedirectUrl = url.toString()
+      } else {
+        // Fallback to knowledge page if nextUrl doesn't match project
+        finalRedirectUrl = `${appUrl}/projects/${projectId}/knowledge?github=connected`
+      }
+    } else {
+      // Legacy behavior for backward compatibility (wizard flows)
+      finalRedirectUrl =
+        mode === 'edit'
+          ? `${appUrl}/projects/${projectId}/edit?restored=true&step=${returnStep}&github=connected`
+          : `${appUrl}/projects/new?restored=true&step=${returnStep}&github=connected`
+    }
 
     const state = Buffer.from(
       JSON.stringify({
         projectId,
         userId: user.id,
         nonce,
-        redirectUrl,
+        redirectUrl: finalRedirectUrl,
       })
     ).toString('base64url')
 

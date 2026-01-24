@@ -1,34 +1,66 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import type { CTAEventData } from '@/lib/analytics/types'
+import type { CTAEventData } from '@/lib/event_tracking/types'
 
 type CTASource = CTAEventData['source']
+type CTADialog = 'options' | 'waitlist' | 'thank-you' | null
+type ThankYouType = 'waitlist' | 'call'
 
 interface CTAContextValue {
-  isOptionsOpen: boolean
+  // Current active dialog
+  activeDialog: CTADialog
   source: CTASource | null
+  thankYouType: ThankYouType | null
+
+  // Actions
   openCTAOptions: (source: CTASource) => void
-  closeCTAOptions: () => void
+  openWaitlistDialog: () => void
+  showThankYou: (type: ThankYouType) => void
+  closeDialog: () => void
 }
 
 const CTAContext = createContext<CTAContextValue | null>(null)
 
 export function CTAProvider({ children }: { children: ReactNode }) {
-  const [isOptionsOpen, setIsOptionsOpen] = useState(false)
+  const [activeDialog, setActiveDialog] = useState<CTADialog>(null)
   const [source, setSource] = useState<CTASource | null>(null)
+  const [thankYouType, setThankYouType] = useState<ThankYouType | null>(null)
 
   const openCTAOptions = useCallback((ctaSource: CTASource) => {
     setSource(ctaSource)
-    setIsOptionsOpen(true)
+    setActiveDialog('options')
   }, [])
 
-  const closeCTAOptions = useCallback(() => {
-    setIsOptionsOpen(false)
+  const openWaitlistDialog = useCallback(() => {
+    setActiveDialog('waitlist')
+  }, [])
+
+  const showThankYou = useCallback((type: ThankYouType) => {
+    setThankYouType(type)
+    setActiveDialog('thank-you')
+  }, [])
+
+  const closeDialog = useCallback(() => {
+    setActiveDialog(null)
+    // Reset thank you type after animation completes
+    setTimeout(() => {
+      setThankYouType(null)
+    }, 300)
   }, [])
 
   return (
-    <CTAContext.Provider value={{ isOptionsOpen, source, openCTAOptions, closeCTAOptions }}>
+    <CTAContext.Provider
+      value={{
+        activeDialog,
+        source,
+        thankYouType,
+        openCTAOptions,
+        openWaitlistDialog,
+        showThankYou,
+        closeDialog,
+      }}
+    >
       {children}
     </CTAContext.Provider>
   )

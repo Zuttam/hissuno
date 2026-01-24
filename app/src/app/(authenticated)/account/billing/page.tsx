@@ -3,7 +3,7 @@ import { getSessionUser } from '@/lib/auth/server'
 import { isLemonSqueezyConfigured } from '@/lib/billing/lemon-squeezy'
 import { getBillingInfo } from '@/lib/billing/billing-service'
 import { getPlans } from '@/lib/billing/plans-cache'
-import { AccountBillingContent } from '@/components/billing'
+import { BillingPageContent } from '@/components/billing/billing-page-content'
 
 export default async function BillingSettingsPage() {
   const user = await getSessionUser()
@@ -38,7 +38,7 @@ export default async function BillingSettingsPage() {
         src="https://assets.lemonsqueezy.com/lemon.js"
         strategy="lazyOnload"
       />
-      <AccountBillingContent initialBillingInfo={billingInfo} plans={plans} />
+      <BillingPageContent initialBillingInfo={billingInfo} plans={plans} />
     </div>
   )
 }

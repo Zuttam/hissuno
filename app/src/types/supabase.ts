@@ -178,6 +178,51 @@ export type Database = {
           },
         ]
       }
+      issue_embeddings: {
+        Row: {
+          created_at: string
+          embedding: string
+          id: string
+          issue_id: string
+          project_id: string
+          text_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          embedding: string
+          id?: string
+          issue_id: string
+          project_id: string
+          text_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          embedding?: string
+          id?: string
+          issue_id?: string
+          project_id?: string
+          text_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_embeddings_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: true
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_embeddings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_sessions: {
         Row: {
           created_at: string
@@ -267,9 +312,15 @@ export type Database = {
       }
       issues: {
         Row: {
+          affected_areas: string[] | null
+          affected_files: string[] | null
           created_at: string
           description: string
+          effort_estimate: string | null
+          effort_reasoning: string | null
           id: string
+          impact_analysis: Json | null
+          impact_score: number | null
           is_archived: boolean
           priority: string
           priority_manual_override: boolean | null
@@ -283,9 +334,15 @@ export type Database = {
           upvote_count: number | null
         }
         Insert: {
+          affected_areas?: string[] | null
+          affected_files?: string[] | null
           created_at?: string
           description: string
+          effort_estimate?: string | null
+          effort_reasoning?: string | null
           id?: string
+          impact_analysis?: Json | null
+          impact_score?: number | null
           is_archived?: boolean
           priority?: string
           priority_manual_override?: boolean | null
@@ -299,9 +356,15 @@ export type Database = {
           upvote_count?: number | null
         }
         Update: {
+          affected_areas?: string[] | null
+          affected_files?: string[] | null
           created_at?: string
           description?: string
+          effort_estimate?: string | null
+          effort_reasoning?: string | null
           id?: string
+          impact_analysis?: Json | null
+          impact_score?: number | null
           is_archived?: boolean
           priority?: string
           priority_manual_override?: boolean | null
@@ -547,17 +610,22 @@ export type Database = {
           created_at: string
           issue_spec_threshold: number | null
           issue_tracking_enabled: boolean | null
+          pm_dedup_include_closed: boolean | null
           project_id: string
           session_goodbye_delay_seconds: number | null
           session_idle_response_timeout_seconds: number | null
           session_idle_timeout_minutes: number | null
           spec_guidelines: string | null
           updated_at: string
+          widget_display_type: string | null
+          widget_drawer_badge_label: string | null
           widget_initial_message: string | null
           widget_position: string | null
+          widget_shortcut: string | null
           widget_theme: string | null
           widget_title: string | null
           widget_token_required: boolean | null
+          widget_trigger_type: string | null
           widget_variant: string | null
         }
         Insert: {
@@ -565,17 +633,22 @@ export type Database = {
           created_at?: string
           issue_spec_threshold?: number | null
           issue_tracking_enabled?: boolean | null
+          pm_dedup_include_closed?: boolean | null
           project_id: string
           session_goodbye_delay_seconds?: number | null
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
           spec_guidelines?: string | null
           updated_at?: string
+          widget_display_type?: string | null
+          widget_drawer_badge_label?: string | null
           widget_initial_message?: string | null
           widget_position?: string | null
+          widget_shortcut?: string | null
           widget_theme?: string | null
           widget_title?: string | null
           widget_token_required?: boolean | null
+          widget_trigger_type?: string | null
           widget_variant?: string | null
         }
         Update: {
@@ -583,17 +656,22 @@ export type Database = {
           created_at?: string
           issue_spec_threshold?: number | null
           issue_tracking_enabled?: boolean | null
+          pm_dedup_include_closed?: boolean | null
           project_id?: string
           session_goodbye_delay_seconds?: number | null
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
           spec_guidelines?: string | null
           updated_at?: string
+          widget_display_type?: string | null
+          widget_drawer_badge_label?: string | null
           widget_initial_message?: string | null
           widget_position?: string | null
+          widget_shortcut?: string | null
           widget_theme?: string | null
           widget_title?: string | null
           widget_token_required?: boolean | null
+          widget_trigger_type?: string | null
           widget_variant?: string | null
         }
         Relationships: [
@@ -746,9 +824,9 @@ export type Database = {
           id: string
           idle_prompt_sent_at: string | null
           is_archived: boolean
-          is_over_limit: boolean | null
           last_activity_at: string | null
           message_count: number | null
+          name: string | null
           page_title: string | null
           page_url: string | null
           pm_reviewed_at: string | null
@@ -769,9 +847,9 @@ export type Database = {
           id: string
           idle_prompt_sent_at?: string | null
           is_archived?: boolean
-          is_over_limit?: boolean | null
           last_activity_at?: string | null
           message_count?: number | null
+          name?: string | null
           page_title?: string | null
           page_url?: string | null
           pm_reviewed_at?: string | null
@@ -792,9 +870,9 @@ export type Database = {
           id?: string
           idle_prompt_sent_at?: string | null
           is_archived?: boolean
-          is_over_limit?: boolean | null
           last_activity_at?: string | null
           message_count?: number | null
+          name?: string | null
           page_title?: string | null
           page_url?: string | null
           pm_reviewed_at?: string | null
@@ -1116,11 +1194,36 @@ export type Database = {
         }
         Relationships: []
       }
+      waitlist: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          ip_address: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          ip_address?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          ip_address?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_waitlist_rate_limit: {
+        Args: { client_ip: string }
+        Returns: boolean
+      }
       generate_project_key: {
         Args: { prefix: string; random_length: number }
         Returns: string
@@ -1140,6 +1243,26 @@ export type Database = {
           parent_headings: string[]
           section_heading: string
           similarity: number
+        }[]
+      }
+      search_similar_issues: {
+        Args: {
+          p_exclude_issue_id?: string
+          p_include_closed?: boolean
+          p_issue_type?: string
+          p_limit?: number
+          p_project_id: string
+          p_query_embedding: string
+          p_similarity_threshold?: number
+        }
+        Returns: {
+          description: string
+          issue_id: string
+          similarity: number
+          status: string
+          title: string
+          type: string
+          upvote_count: number
         }[]
       }
     }

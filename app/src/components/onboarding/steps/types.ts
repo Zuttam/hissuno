@@ -1,4 +1,3 @@
-import type { ProjectStepId } from '@/components/projects/shared/wizard/steps/types'
 
 // ============================================
 // Step IDs
@@ -62,7 +61,6 @@ export interface UseCaseOptionInfo {
   label: string
   description: string
   /** References project wizard step IDs for feature association */
-  relatedSteps: ProjectStepId[]
 }
 
 /**
@@ -135,26 +133,22 @@ export const USE_CASE_OPTIONS: UseCaseOptionInfo[] = [
   {
     id: 'knowledge',
     label: 'Build support agent knowledge',
-    description: 'Build support agent knowledge from codebase and more',
-    relatedSteps: ['knowledge'],
+    description: 'Build support agent knowledge from codebase and more'
   },
   {
     id: 'slack',
     label: 'Customer success in Slack',
     description: 'Integrate a customer success AI agent in Slack',
-    relatedSteps: ['sessions'],
   },
   {
     id: 'triage',
     label: 'Automated triage',
     description: 'Automated triage of customer conversations',
-    relatedSteps: ['sessions', 'issues'],
   },
   {
     id: 'specs',
     label: 'Product specs automation',
     description: 'Automate product specs and code changes from customer requests',
-    relatedSteps: ['issues'],
   },
 ]
 

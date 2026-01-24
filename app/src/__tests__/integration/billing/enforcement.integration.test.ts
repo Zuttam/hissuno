@@ -103,7 +103,7 @@ import {
   enforceLimit,
   LimitExceededError,
 } from '@/lib/billing/enforcement-service'
-import { sendLimitNotificationIfNeeded } from '@/lib/billing/limit-notifications'
+import { sendLimitNotificationIfNeeded } from '@/lib/notifications/limit-notifications'
 
 // ============================================================================
 // TEST HELPERS

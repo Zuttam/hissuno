@@ -19,6 +19,24 @@ export type IssuePriority = 'low' | 'medium' | 'high'
 export type IssueStatus = 'open' | 'ready' | 'in_progress' | 'resolved' | 'closed'
 
 /**
+ * Effort estimation levels
+ */
+export type EffortEstimate = 'trivial' | 'small' | 'medium' | 'large' | 'xlarge'
+
+/**
+ * Impact analysis for an issue
+ */
+export interface IssueImpactAnalysis {
+  affectedAreas: Array<{
+    area: string
+    category: string
+    relevance: number
+  }>
+  impactScore: number
+  reasoning: string
+}
+
+/**
  * Issue record from the database
  */
 export interface IssueRecord {
@@ -34,6 +52,15 @@ export interface IssueRecord {
   product_spec: string | null
   product_spec_generated_at: string | null
   is_archived: boolean
+  // Impact analysis
+  affected_areas: string[]
+  impact_score: number | null
+  impact_analysis: IssueImpactAnalysis | null
+  // Effort estimation
+  effort_estimate: EffortEstimate | null
+  effort_reasoning: string | null
+  affected_files: string[]
+  // Timestamps
   created_at: string
   updated_at: string
 }
@@ -100,6 +127,7 @@ export interface ProjectSettingsRecord {
   issue_spec_threshold: number
   issue_tracking_enabled: boolean
   spec_guidelines: string | null
+  pm_dedup_include_closed: boolean
   // Widget settings (new trigger/display model)
   widget_trigger_type: WidgetTrigger
   widget_display_type: WidgetDisplay
@@ -205,6 +233,9 @@ export interface PMReviewResult {
   skipReason?: string
   thresholdMet?: boolean
   specGenerated?: boolean
+  // Enriched fields from multi-step workflow
+  impactScore?: number
+  effortEstimate?: EffortEstimate
 }
 
 /**

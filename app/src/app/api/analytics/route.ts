@@ -5,6 +5,7 @@ import {
   getOverallAnalytics,
   getSessionsStripAnalytics,
   getIssuesStripAnalytics,
+  getImpactFlowAnalytics,
   type AnalyticsPeriod,
 } from '@/lib/supabase/analytics'
 
@@ -43,6 +44,11 @@ export async function GET(request: NextRequest) {
 
     if (type === 'issues-strip') {
       const data = await getIssuesStripAnalytics(period, projectId)
+      return NextResponse.json({ data })
+    }
+
+    if (type === 'impact-flow') {
+      const data = await getImpactFlowAnalytics(period, projectId)
       return NextResponse.json({ data })
     }
 

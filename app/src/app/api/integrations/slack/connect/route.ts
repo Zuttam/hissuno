@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { UnauthorizedError } from '@/lib/auth/server'
+import { UnauthorizedError, getSafeRedirectPath } from '@/lib/auth/server'
 import { getSlackOAuthUrl, SLACK_OAUTH_SCOPES } from '@/lib/integrations/slack'
 
 export const runtime = 'nodejs'
@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
 
     // Get query params
     const projectId = request.nextUrl.searchParams.get('projectId')
+    const nextUrl = request.nextUrl.searchParams.get('nextUrl')
     const returnStep = request.nextUrl.searchParams.get('returnStep') || 'sessions'
     const mode = request.nextUrl.searchParams.get('mode') || 'edit'
 
@@ -60,15 +61,30 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Not authorized to modify this project' }, { status: 403 })
     }
 
-    // Generate state with projectId, returnStep, mode, and nonce for CSRF protection
+    // Generate state with projectId and redirect info for CSRF protection
     const nonce = crypto.randomUUID()
+
+    // Determine redirect URL - use explicit nextUrl if provided and valid
+    let redirectUrl: string | undefined
+    if (nextUrl) {
+      const safePath = getSafeRedirectPath(nextUrl)
+      // Security: ensure nextUrl is for the same project
+      if (safePath.includes(projectId)) {
+        const url = new URL(safePath, appUrl)
+        if (!url.searchParams.has('slack')) {
+          url.searchParams.set('slack', 'connected')
+        }
+        redirectUrl = url.toString()
+      }
+    }
+
     const state = Buffer.from(
       JSON.stringify({
         projectId,
         userId: user.id,
         nonce,
-        returnStep,
-        mode,
+        // Include redirectUrl if explicitly provided, otherwise use legacy mode/returnStep
+        ...(redirectUrl ? { redirectUrl } : { returnStep, mode }),
       })
     ).toString('base64url')
 

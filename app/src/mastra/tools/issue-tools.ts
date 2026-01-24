@@ -221,13 +221,13 @@ Use this to retrieve the conversation history before analyzing a session.`,
 })
 
 /**
- * Find similar issues for deduplication
+ * Find similar issues for deduplication using semantic similarity
  */
 export const findSimilarIssuesTool = createTool({
   id: 'find-similar-issues',
-  description: `Search for existing issues similar to the one being created.
-Returns ranked list of potential duplicates with similarity scores.
-Use this before creating a new issue to check for duplicates.`,
+  description: `Search for existing issues semantically similar to the one being created.
+Uses AI-powered semantic similarity to find potential duplicates.
+Returns ranked list with similarity scores (0.7+ is a definitive match).`,
   inputSchema: z.object({
     projectId: z.string().describe('The project ID to search within'),
     title: z.string().describe('The proposed issue title'),
@@ -235,6 +235,10 @@ Use this before creating a new issue to check for duplicates.`,
     type: z
       .enum(['bug', 'feature_request', 'change_request'])
       .describe('The issue type'),
+    includeClosed: z
+      .boolean()
+      .optional()
+      .describe('Include closed/resolved issues for regression detection'),
   }),
   outputSchema: z.object({
     similarIssues: z.array(
@@ -252,73 +256,92 @@ Use this before creating a new issue to check for duplicates.`,
     error: z.string().optional(),
   }),
   execute: async ({ context }) => {
-    const { projectId, title, description, type } = context
+    const { projectId, title, description, type, includeClosed = false } = context
 
     try {
-      const supabase = createAdminClient()
+      const { searchSimilarIssues } = await import('@/lib/issues/embedding-service')
 
-      // Get open/in_progress issues of the same type for this project
-      const { data: issues, error } = await supabase
-        .from('issues')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('type', type)
-        .in('status', ['open', 'in_progress'])
-        .order('upvote_count', { ascending: false })
+      const results = await searchSimilarIssues(projectId, title, description, {
+        type,
+        limit: 5,
+        threshold: 0.5, // Return anything above 50% for consideration
+        includeClosed,
+      })
 
-      if (error) {
+      const scoredIssues = results.map((r) => {
+        // Determine match reason based on semantic similarity
+        let matchReason = 'Some similarity'
+        if (r.similarity > 0.85) matchReason = 'Very high semantic similarity - likely duplicate'
+        else if (r.similarity > 0.7) matchReason = 'High semantic similarity - probable duplicate'
+        else if (r.similarity > 0.6) matchReason = 'Moderate similarity - related issue'
+        else if (r.similarity > 0.5) matchReason = 'Some similarity - possibly related'
+
         return {
-          similarIssues: [],
-          hasSimilar: false,
-          error: `Failed to search issues: ${error.message}`,
+          issueId: r.issueId,
+          title: r.title,
+          description: r.description,
+          upvoteCount: r.upvoteCount,
+          status: r.status,
+          similarityScore: Math.round(r.similarity * 100) / 100,
+          matchReason,
         }
-      }
-
-      if (!issues || issues.length === 0) {
-        return {
-          similarIssues: [],
-          hasSimilar: false,
-        }
-      }
-
-      // Calculate similarity for each issue
-      const newIssueText = `${title} ${description}`
-      const scoredIssues = issues
-        .map((issue) => {
-          const existingText = `${issue.title} ${issue.description}`
-          const score = calculateSimilarity(newIssueText, existingText)
-
-          // Determine match reason
-          let matchReason = 'Low similarity'
-          if (score > 0.8) matchReason = 'Very similar title and description'
-          else if (score > 0.6) matchReason = 'Similar description'
-          else if (score > 0.4) matchReason = 'Some keyword overlap'
-          else if (score > 0.3) matchReason = 'Minor keyword overlap'
-
-          return {
-            issueId: issue.id,
-            title: issue.title,
-            description: issue.description,
-            upvoteCount: issue.upvote_count,
-            status: issue.status,
-            similarityScore: Math.round(score * 100) / 100,
-            matchReason,
-          }
-        })
-        .filter((i) => i.similarityScore > 0.3)
-        .sort((a, b) => b.similarityScore - a.similarityScore)
-        .slice(0, 5)
+      })
 
       return {
         similarIssues: scoredIssues,
-        hasSimilar: scoredIssues.some((i) => i.similarityScore > 0.7),
+        hasSimilar: scoredIssues.some((i) => i.similarityScore >= 0.7),
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      return {
-        similarIssues: [],
-        hasSimilar: false,
-        error: message,
+      console.error('[find-similar-issues] Error:', message)
+
+      // Fall back to keyword-based search if embedding search fails
+      try {
+        const supabase = createAdminClient()
+        const { data: issues } = await supabase
+          .from('issues')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('type', type)
+          .in('status', ['open', 'in_progress'])
+          .order('upvote_count', { ascending: false })
+          .limit(10)
+
+        if (!issues || issues.length === 0) {
+          return { similarIssues: [], hasSimilar: false }
+        }
+
+        // Fallback to Jaccard similarity
+        const newIssueText = `${title} ${description}`
+        const scoredIssues = issues
+          .map((issue) => {
+            const existingText = `${issue.title} ${issue.description}`
+            const score = calculateSimilarity(newIssueText, existingText)
+
+            let matchReason = 'Low keyword overlap'
+            if (score > 0.6) matchReason = 'Similar keywords'
+            else if (score > 0.4) matchReason = 'Some keyword overlap'
+
+            return {
+              issueId: issue.id,
+              title: issue.title,
+              description: issue.description,
+              upvoteCount: issue.upvote_count,
+              status: issue.status,
+              similarityScore: Math.round(score * 100) / 100,
+              matchReason,
+            }
+          })
+          .filter((i) => i.similarityScore > 0.3)
+          .sort((a, b) => b.similarityScore - a.similarityScore)
+          .slice(0, 5)
+
+        return {
+          similarIssues: scoredIssues,
+          hasSimilar: scoredIssues.some((i) => i.similarityScore > 0.7),
+        }
+      } catch {
+        return { similarIssues: [], hasSimilar: false, error: message }
       }
     }
   },
@@ -396,6 +419,15 @@ Only use this after confirming no similar issues exist.`,
         .from('sessions')
         .update({ pm_reviewed_at: new Date().toISOString() })
         .eq('id', sessionId)
+
+      // Generate and store embedding for semantic search
+      try {
+        const { upsertIssueEmbedding } = await import('@/lib/issues/embedding-service')
+        await upsertIssueEmbedding(issue.id, projectId, title, description)
+      } catch (embedError) {
+        // Non-blocking - issue still created successfully
+        console.error('[create-issue] Failed to embed issue:', embedError)
+      }
 
       return {
         issueId: issue.id,

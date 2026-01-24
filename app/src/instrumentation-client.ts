@@ -4,6 +4,12 @@ declare global {
   interface Window {
     dataLayer: unknown[]
     gtag?: (...args: unknown[]) => void
+    fbq?: (
+      command: 'track' | 'trackCustom' | 'init',
+      eventName: string,
+      parameters?: Record<string, unknown>
+    ) => void
+    _fbq?: typeof Window.prototype.fbq
   }
 }
 
@@ -42,12 +48,42 @@ if (consent === 'accepted') {
 
     // Initialize dataLayer
     window.dataLayer = window.dataLayer || []
-    function gtag(...args: unknown[]) {
+    const gtag = (...args: unknown[]) => {
       window.dataLayer.push(args)
     }
     window.gtag = gtag
     gtag('js', new Date())
     gtag('config', googleAdsId)
+  }
+}
+
+// Initialize Meta Pixel only with consent
+if (consent === 'accepted') {
+  const metaPixelId = process.env.NEXT_PUBLIC_META_PIXEL_ID
+  if (metaPixelId) {
+    // Initialize fbq function and queue
+    ;(function (f: Window, b: Document, e: string, v: string, t?: HTMLScriptElement, s?: Element | null) {
+      if (f.fbq) return
+      const n: any = (f.fbq = function (...args: any[]) {
+        n.callMethod ? n.callMethod.apply(n, args) : n.queue.push(args)
+      })
+      if (!f._fbq) f._fbq = n
+      n.push = n
+      n.loaded = true
+      n.version = '2.0'
+      n.queue = []
+      t = b.createElement(e) as HTMLScriptElement
+      t.async = true
+      t.src = v
+      s = b.getElementsByTagName(e)[0]
+      s?.parentNode?.insertBefore(t, s)
+    })(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js')
+
+    // Initialize pixel
+    window.fbq?.('init', metaPixelId)
+
+    // Track initial PageView
+    window.fbq?.('track', 'PageView')
   }
 }
 
@@ -57,8 +93,17 @@ export function onRouterTransitionStart(
   navigationType: 'push' | 'replace' | 'traverse'
 ): void {
   // PostHog auto-captures with capture_pageview: true
-  // Google Ads page_view (only with consent)
-  if (consent === 'accepted' && window.gtag) {
-    window.gtag('event', 'page_view', { page_path: url, navigation_type: navigationType })
+
+  // Only track with consent
+  if (consent === 'accepted') {
+    // Google Ads page_view
+    if (window.gtag) {
+      window.gtag('event', 'page_view', { page_path: url, navigation_type: navigationType })
+    }
+
+    // Meta Pixel PageView
+    if (window.fbq) {
+      window.fbq('track', 'PageView')
+    }
   }
 }

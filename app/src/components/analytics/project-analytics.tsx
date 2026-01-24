@@ -1,9 +1,10 @@
 'use client'
 
-import { useProjectAnalytics } from '@/hooks/use-analytics'
+import { useProjectAnalytics, useImpactFlowAnalytics } from '@/hooks/use-analytics'
 import { PeriodSelector } from './period-selector'
 import { StatCard, StatCardGrid } from './stat-card'
 import { LineChart, BarChart } from './charts'
+import { ImpactFlowGraph } from './impact-flow-graph'
 import { Spinner } from '@/components/ui/spinner'
 
 const TAG_LABEL_MAP: Record<string, string> = {
@@ -44,6 +45,14 @@ export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
   const { data, isLoading, error, period, setPeriod } = useProjectAnalytics({
     projectId,
   })
+  const {
+    data: impactFlowData,
+    isLoading: impactFlowLoading,
+    error: impactFlowError,
+  } = useImpactFlowAnalytics({
+    period,
+    projectId,
+  })
 
   if (isLoading) {
     return (
@@ -67,10 +76,7 @@ export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="font-mono text-lg font-semibold uppercase text-[color:var(--foreground)]">
-          Analytics
-        </h3>
+      <div className="flex items-center justify-end">
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
@@ -171,6 +177,16 @@ export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
         ) : (
           <EmptyChartState />
         )}
+      </ChartCard>
+
+      {/* Impact Flow Graph */}
+      <ChartCard title="Customer Impact Flow">
+        <ImpactFlowGraph
+          data={impactFlowData}
+          isLoading={impactFlowLoading}
+          error={impactFlowError}
+          projectId={projectId}
+        />
       </ChartCard>
     </div>
   )

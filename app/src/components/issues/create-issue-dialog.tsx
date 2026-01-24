@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { Dialog, Button, Select, Input, Textarea } from '@/components/ui'
-import { SessionTagList } from '@/components/sessions/session-tag-badge'
+import { SessionTagList } from '@/components/sessions/session-tags'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 import type { CreateIssueInput, IssueType, IssuePriority } from '@/types/issue'
 import type { SessionWithProject } from '@/types/session'
@@ -101,14 +101,12 @@ export function CreateIssueDialog({
 
         const result = await onCreateIssue(input)
         if (result) {
-          // Reset form and close
-          setProjectId(projects[0]?.id ?? '')
+          // Reset form for next issue
           setType('bug')
           setTitle('')
           setDescription('')
           setPriority('low')
           setSelectedSessionIds([])
-          onClose()
         } else {
           setError('Failed to create issue. Please try again.')
         }

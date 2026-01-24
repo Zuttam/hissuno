@@ -5,44 +5,50 @@
 
 :root {
   color-scheme: light;
-  /* Wireframe grayscale palette */
+  /* Light wireframe palette - soft gray background */
   --background: #fafafa;
   --foreground: #1a1a1a;
-  --border: #2a2a2a;
-  --border-subtle: #e5e5e5;
-  --surface: #fafafa;
-  --surface-hover: #f5f5f5;
+  --border: #2f2f2f;
+  --border-subtle: #d5d5d5;
+  --surface: #f0f0f0;
+  --surface-hover: #e5e5e5;
   --text-secondary: #666666;
   --text-tertiary: #999999;
 
   /* Accent colors */
-  --accent-primary: #3a3a3a;
-  --accent-primary-hover: #2a2a2a;
+  --accent-primary: #2f2f2f;
+  --accent-primary-hover: #1a1a1a;
   --accent-selected: #2563eb;
   --accent-selected-hover: #1d4ed8;
   --accent-success: #10b981;
-  --accent-warning: #ff9900;
-  --accent-danger: #ff3333;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  --accent-info: #3b82f6;
 
-  /* Warm accent colors - friendly and welcoming */
+  /* Marketing-only accent colors - use ONLY in (marketing) routes and landing components */
   --accent-teal: #14b8a6;
   --accent-teal-hover: #0d9488;
   --accent-warm: #f59e0b;
   --accent-coral: #fb7185;
 
   /* Chat message colors */
-  --user-message-bg: #3a3a3a;
+  --user-message-bg: #2f2f2f;
 
-  /* Water colors - ocean/turquoise with transparency */
-  --water-base: #fafafa;
-  --water-deep: #5ec4db;
+  /* Water colors - subtle for light wireframe */
+  --water-base: #f5f5f5;
+  --water-deep: #f0f0f0;
   --water-ripple: #ffffff;
-  --water-opacity: 0.3;
-  --water-ripple-intensity: 4.0;
-  --water-caustic: #ffffff;
-  --water-caustic-intensity: 1.0;
-  --water-caustic-sharpness: 0.6;
+  --water-opacity: 0.5;
+  --water-ripple-intensity: 3.0;
+  --water-caustic: #e5e5e5;
+  --water-caustic-intensity: 1.2;
+  --water-caustic-sharpness: 0.4;
   --water-background: #fafafa;
+
+  /* Card styling */
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(0, 0, 0, 0.1);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 
 .dark {
@@ -65,8 +71,9 @@
   --accent-success: #34d399;
   --accent-warning: #ffaa33;
   --accent-danger: #ff5555;
+  --accent-info: #60a5fa;
 
-  /* Warm accent colors - brighter for dark mode */
+  /* Marketing-only accent colors - brighter for dark mode */
   --accent-teal: #2dd4bf;
   --accent-teal-hover: #5eead4;
   --accent-warm: #fbbf24;

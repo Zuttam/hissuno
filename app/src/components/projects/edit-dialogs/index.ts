@@ -1,0 +1,7 @@
+export { EditDialog, type EditDialogProps } from './edit-dialog'
+export { IssuesSettingsDialog, type IssuesSettings } from './issues-settings-dialog'
+export { SessionsSettingsDialog } from './sessions-settings-dialog'
+export { ProjectDetailsDialog } from './project-details-dialog'
+export { WidgetConfigDialog } from './widget-config-dialog'
+export { SlackConfigDialog } from './slack-config-dialog'
+export { KnowledgeSourcesDialog } from './knowledge-sources-dialog'

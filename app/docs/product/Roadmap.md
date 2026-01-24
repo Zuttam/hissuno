@@ -48,65 +48,76 @@
 ## Phase 5
 
 ### Marketing
-[] Improve landing page
+[x] Improve landing page
 [] work on ads 
   [] YouTube / Google
   [] Meta
 [] setup google and meta tracking (including join the waitlist and calendly)
 
 ### Platform
+[x] Improve layout: module tabs under project, settings and edit mode
+[x] Test limits (analyzed sessions)
+[x] Simplify Project creation - Just provide name and description (check limits + enforcement)
 [x] Move hissuno LS store out of test and update secrets 
-[] Improve layout: module tabs under project, settings and edit mode
-[] Test limits (analyzed sessions)
+
+### Analytics
+[x] Add waterfall graph of customer impact on issues
+
+### Issues
+[x] Improve analysis with code
+  [x] Deduplication 
+  [x] Sensitivity / Impact
+  [x] Add estimation (effort) 
+[x] Export CSV 
+
+### Sessions
+[x] Export CSV 
 
 
 ## Phase 6
 
 ### Support
+[] Email agent
 [] Slack read only mode for channels 
 [] Slack auto response (no need to tag in thread)
 
-### Issues
-[] Jira Integration
-
-
-## Phase 7
-
-### Support
-[] Unify agents and knowledge into "Support" (including API, edit, and detail pages)
-[] Email agent
-
 ### Sessions
-[] Support participants identification 
-[] Gong integration
+[] Identify participants
+[] Gong integration (API Access - https://gong.app.gong.io/settings/api/documentation#overview)
 
-### Issues  
-[] Support Actions items (not issues)
+### Issues 
+[] Jira Integration 
+[] Calculate issue upvotes over time and alert or change priority if there's an anomaly
 [] Lieaner Integration
 
 ### Platform
+[] Project multi-users access and RBAC
 [] Add invite link support 
-[] Improve onboarding
+[] Improve onboarding 
 [] Improve welcome email visualization
 
 ### Marketing
 [] Docs portal
 
+## Phase 7
 
-## Phase 8
-
-### Sessions Module
+### Sessions
 [] Intercom integration
-  
-
-### Code module
-[] Create initial implementation 
 
 ### Platform 
 [] API Access (via secret key)
-[] Alerts (email, slack)
+[] Alerts and weekly reports(email, slack)
 
-## Phase 9
+### Issues
+[] Support Actions items (not necessary code related)
+
+## Phase 8
 
 ### Marketing
 [] Product Hunt
+
+### Sessions
+[] Facebook community channels
+
+### Code
+[] Create initial implementation 

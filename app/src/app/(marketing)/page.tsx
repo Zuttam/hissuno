@@ -5,6 +5,7 @@ import {
   CommunitySection,
   CTASection,
   UTMCapture,
+  MistOverlay,
 } from '@/components/landing'
 
 interface MarketingPageProps {
@@ -18,6 +19,9 @@ export default async function MarketingPage({ searchParams }: MarketingPageProps
     <>
       {/* Client component to capture UTM params */}
       <UTMCapture searchParams={resolvedParams} />
+
+      {/* Atmospheric mist overlay for light mode */}
+      <MistOverlay />
 
       <HeroSection />
       <FeaturesSection />

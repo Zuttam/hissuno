@@ -241,6 +241,12 @@ describe('Utility Functions', () => {
         is_archived: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        affected_areas: [],
+        impact_score: null,
+        impact_analysis: null,
+        effort_estimate: null,
+        effort_reasoning: null,
+        affected_files: [],
       }
 
       store.addIssue(issue)
@@ -264,6 +270,12 @@ describe('Utility Functions', () => {
         is_archived: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        affected_areas: [],
+        impact_score: null,
+        impact_analysis: null,
+        effort_estimate: null,
+        effort_reasoning: null,
+        affected_files: [],
       }
 
       store.addIssue(issue)
@@ -287,6 +299,12 @@ describe('Utility Functions', () => {
         product_spec: null,
         product_spec_generated_at: null,
         is_archived: false,
+        affected_areas: [],
+        impact_score: null,
+        impact_analysis: null,
+        effort_estimate: null,
+        effort_reasoning: null,
+        affected_files: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

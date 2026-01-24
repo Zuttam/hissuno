@@ -1,28 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { EffectComposer, Noise, Vignette } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
+import { useThemePreference } from '@/hooks/use-theme-preference'
 
 export function PostEffects() {
-  const [isDarkMode, setIsDarkMode] = useState(true)
-
-  // Detect theme changes
-  useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.documentElement.classList.contains('dark'))
-    }
-
-    checkDarkMode()
-
-    const observer = new MutationObserver(checkDarkMode)
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    })
-
-    return () => observer.disconnect()
-  }, [])
+  const { resolvedTheme } = useThemePreference()
+  const isDarkMode = resolvedTheme === 'dark'
 
   // Skip post-effects in light mode to preserve transparency
   if (!isDarkMode) {

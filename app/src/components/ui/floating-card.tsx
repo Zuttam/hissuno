@@ -1,11 +1,6 @@
 'use client'
 
-import {
-  useRef,
-  useEffect,
-  useId,
-  type ReactNode,
-} from 'react'
+import { useRef, useEffect, useId, type ReactNode } from 'react'
 import { motion, useSpring, useTransform } from 'motion/react'
 import { cn } from '@/lib/utils/class'
 import {
@@ -13,6 +8,7 @@ import {
   type RippleEvent,
 } from '@/components/water-webgl/WaterWebGLContext'
 import { cardBaseClasses } from './card'
+import { useThemePreference } from '@/hooks/use-theme-preference'
 
 // Floating preset type - controls ambient drift behavior
 export type FloatingPreset = 'none' | 'gentle' | 'moderate' | 'active' | boolean
@@ -46,14 +42,40 @@ const FLOATING_PRESETS = {
 } as const
 
 // Shadow configurations for each variant
+// Light mode uses warm teal-gray shadows for onsen atmosphere
+// Dark mode uses neutral shadows
 const SHADOW_CONFIGS = {
-  default: {
-    base: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04)',
-    hover: '0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06)',
+  light: {
+    default: {
+      base: '0 4px 12px rgba(45, 80, 75, 0.06), 0 2px 4px rgba(45, 80, 75, 0.03)',
+      hover: '0 8px 24px rgba(45, 80, 75, 0.10), 0 4px 8px rgba(45, 80, 75, 0.05)',
+    },
+    elevated: {
+      base: '0 8px 16px rgba(45, 80, 75, 0.05), 0 16px 32px rgba(45, 80, 75, 0.06), 0 2px 4px rgba(45, 80, 75, 0.03)',
+      hover: '0 12px 24px rgba(45, 80, 75, 0.08), 0 24px 48px rgba(45, 80, 75, 0.08), 0 2px 4px rgba(45, 80, 75, 0.03)',
+    },
   },
-  elevated: {
-    base: '0 8px 16px rgba(0, 0, 0, 0.06), 0 16px 32px rgba(0, 0, 0, 0.08), 0 32px 64px rgba(0, 0, 0, 0.10), 0 2px 4px rgba(0, 0, 0, 0.04)',
-    hover: '0 12px 24px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.10), 0 48px 96px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.04)',
+  dark: {
+    default: {
+      base: '0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04)',
+      hover: '0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06)',
+    },
+    elevated: {
+      base: [
+        '0 1px 2px rgba(0, 0, 0, 0.3)', // Tight contact shadow
+        '0 4px 8px rgba(0, 0, 0, 0.25)', // Close shadow
+        '0 12px 24px rgba(0, 0, 0, 0.25)', // Mid-range diffuse
+        '0 24px 48px rgba(0, 0, 0, 0.20)', // Far ambient
+        'inset 0 1px 0 rgba(255, 255, 255, 0.03)', // Subtle top highlight
+      ].join(', '),
+      hover: [
+        '0 2px 4px rgba(0, 0, 0, 0.3)', // Tight contact shadow
+        '0 8px 16px rgba(0, 0, 0, 0.28)', // Close shadow
+        '0 20px 40px rgba(0, 0, 0, 0.28)', // Mid-range diffuse
+        '0 40px 80px rgba(0, 0, 0, 0.22)', // Far ambient
+        'inset 0 1px 0 rgba(255, 255, 255, 0.05)', // Subtle top highlight
+      ].join(', '),
+    },
   },
 } as const
 
@@ -81,6 +103,8 @@ export function FloatingCard({
   const ref = useRef<HTMLElement>(null)
   const water = useWaterWebGLOptional()
   const componentId = useId()
+  const { resolvedTheme } = useThemePreference()
+  const isDarkMode = resolvedTheme === 'dark'
 
   // Resolve floating preset (handle boolean for backward compatibility)
   const resolvedFloating: 'none' | 'gentle' | 'moderate' | 'active' =
@@ -176,8 +200,9 @@ export function FloatingCard({
     return water.subscribeToRipples(componentId, getRect, handleRipple)
   }, [respondToRipple, water, componentId, nudgeX, nudgeY, tilt])
 
-  // Get shadow config based on variant
-  const shadowConfig = SHADOW_CONFIGS[variant]
+  // Get shadow config based on variant and theme
+  const themeConfig = isDarkMode ? SHADOW_CONFIGS.dark : SHADOW_CONFIGS.light
+  const shadowConfig = themeConfig[variant]
 
   return (
     <motion.section

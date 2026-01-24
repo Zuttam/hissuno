@@ -1,33 +1,28 @@
-import { IssuesPageContent } from '@/components/issues/issues-page'
-import { listIssues, getIssueById } from '@/lib/supabase/issues'
+import { redirect } from 'next/navigation'
+import { getIssueById } from '@/lib/supabase/issues'
 import { listProjects } from '@/lib/supabase/projects'
 
 interface IssueDetailPageParams {
   params: Promise<{ issueId: string }>
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
-export default async function IssueDetailPage({ params, searchParams }: IssueDetailPageParams) {
+export default async function IssueDetailPage({ params }: IssueDetailPageParams) {
   const { issueId } = await params
-  const searchParamsResolved = await searchParams
-  const projectId = typeof searchParamsResolved.project === 'string' ? searchParamsResolved.project : undefined
 
-  // Fetch the issue to get its project_id for filtering
+  // Get issue to determine its project
   const issue = await getIssueById(issueId)
 
-  const [issues, projects] = await Promise.all([
-    listIssues({ projectId, limit: 50 }),
-    listProjects(),
-  ])
+  if (issue?.project_id) {
+    // Redirect to the new project-scoped issue page
+    redirect(`/projects/${issue.project_id}/issues?issue=${issueId}`)
+  }
 
-  // If issue not in the initial list, we still pass the issueId
-  // The component will handle fetching the issue details via the sidebar
-  return (
-    <IssuesPageContent
-      initialIssues={issues}
-      projects={projects}
-      initialProjectFilter={projectId ?? issue?.project_id}
-      initialIssueId={issueId}
-    />
-  )
+  // If issue not found or no project, redirect to projects list
+  const projects = await listProjects()
+
+  if (projects.length > 0) {
+    redirect(`/projects/${projects[0].id}/issues`)
+  }
+
+  redirect('/projects')
 }

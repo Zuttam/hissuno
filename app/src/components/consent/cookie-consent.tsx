@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui'
 
-const CONSENT_KEY = 'hissuno_cookie_consent'
+export const CONSENT_KEY = 'hissuno_cookie_consent'
 
 type ConsentStatus = 'pending' | 'accepted' | 'declined'
 

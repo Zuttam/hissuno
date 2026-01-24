@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { USER_EMAIL_HEADER, USER_ID_HEADER } from '@/lib/auth/server'
+import { USER_EMAIL_HEADER, USER_ID_HEADER, USER_NAME_HEADER } from '@/lib/auth/server'
 
 const PUBLIC_PATH_PREFIXES = [
   '/login',
@@ -73,6 +73,9 @@ export async function proxy(request: NextRequest) {
     })
   }
 
+  // Fetch user profile for name and onboarding status (used in multiple places below)
+  let userProfile: { full_name: string | null; onboarding_completed: boolean } | null = null
+
   if (user?.id) {
     requestHeaders.set(USER_ID_HEADER, user.id)
     supabaseResponse.headers.set(USER_ID_HEADER, user.id)
@@ -84,11 +87,29 @@ export async function proxy(request: NextRequest) {
       requestHeaders.delete(USER_EMAIL_HEADER)
       supabaseResponse.headers.delete(USER_EMAIL_HEADER)
     }
+
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('full_name, onboarding_completed')
+      .eq('user_id', user.id)
+      .single()
+    userProfile = data
+
+    const userName = userProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || null
+    if (userName) {
+      requestHeaders.set(USER_NAME_HEADER, userName)
+      supabaseResponse.headers.set(USER_NAME_HEADER, userName)
+    } else {
+      requestHeaders.delete(USER_NAME_HEADER)
+      supabaseResponse.headers.delete(USER_NAME_HEADER)
+    }
   } else {
     requestHeaders.delete(USER_ID_HEADER)
     requestHeaders.delete(USER_EMAIL_HEADER)
+    requestHeaders.delete(USER_NAME_HEADER)
     supabaseResponse.headers.delete(USER_ID_HEADER)
     supabaseResponse.headers.delete(USER_EMAIL_HEADER)
+    supabaseResponse.headers.delete(USER_NAME_HEADER)
   }
 
   const pathname = request.nextUrl.pathname
@@ -128,17 +149,11 @@ export async function proxy(request: NextRequest) {
     return redirectResponse
   }
 
-  // Check if authenticated user has completed onboarding
+  // Check if authenticated user has completed onboarding (using profile fetched earlier)
   // Skip this check for the onboarding page itself to avoid redirect loops
   const isOnboardingPath = pathname === '/onboarding' || pathname.startsWith('/onboarding/')
   if (user && !isPublicPath(pathname) && !isApiRoute && !isOnboardingPath) {
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('onboarding_completed')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile || !profile.onboarding_completed) {
+    if (!userProfile || !userProfile.onboarding_completed) {
       const onboardingUrl = new URL('/onboarding', request.url)
       const redirectResponse = NextResponse.redirect(onboardingUrl)
       forwardCookies(redirectResponse)

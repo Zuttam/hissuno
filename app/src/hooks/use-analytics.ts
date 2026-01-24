@@ -7,6 +7,7 @@ import type {
   ProjectAnalytics,
   SessionsStripAnalytics,
   IssuesStripAnalytics,
+  ImpactFlowGraphData,
 } from '@/lib/supabase/analytics'
 
 interface UseAnalyticsOptions {
@@ -263,5 +264,74 @@ export function useIssuesStripAnalytics({
       refresh: fetchAnalytics,
     }),
     [data, isLoading, error, fetchAnalytics]
+  )
+}
+
+interface UseImpactFlowAnalyticsOptions {
+  period?: AnalyticsPeriod
+  projectId?: string
+}
+
+interface UseImpactFlowAnalyticsState {
+  data: ImpactFlowGraphData | null
+  isLoading: boolean
+  error: string | null
+  period: AnalyticsPeriod
+  setPeriod: (period: AnalyticsPeriod) => void
+  refresh: () => Promise<void>
+}
+
+export function useImpactFlowAnalytics({
+  period: initialPeriod = '30d',
+  projectId,
+}: UseImpactFlowAnalyticsOptions = {}): UseImpactFlowAnalyticsState {
+  const [data, setData] = useState<ImpactFlowGraphData | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [period, setPeriod] = useState<AnalyticsPeriod>(initialPeriod)
+
+  const fetchAnalytics = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams()
+      params.set('type', 'impact-flow')
+      params.set('period', period)
+      if (projectId) params.set('projectId', projectId)
+
+      const response = await fetch(`/api/analytics?${params.toString()}`, {
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const message = typeof payload?.error === 'string' ? payload.error : 'Failed to load impact flow analytics.'
+        throw new Error(message)
+      }
+
+      const payload = await response.json()
+      setData(payload.data ?? null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unexpected error loading impact flow analytics.'
+      setError(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [period, projectId])
+
+  useEffect(() => {
+    void fetchAnalytics()
+  }, [fetchAnalytics])
+
+  return useMemo(
+    () => ({
+      data,
+      isLoading,
+      error,
+      period,
+      setPeriod,
+      refresh: fetchAnalytics,
+    }),
+    [data, isLoading, error, period, fetchAnalytics]
   )
 }

@@ -5,7 +5,7 @@ export { Heading, type HeadingProps, type HeadingSize, type HeadingLevel } from 
 export { Text, type TextProps, type TextSize, type TextVariant } from './text'
 export { Card } from './card'
 export { Checkbox } from './checkbox'
-export { Dialog } from './dialog'
+export { Dialog, type DialogSize, type DialogProps } from './dialog'
 export { IconButton } from './icon-button'
 export { PlusIcon } from './plus-icon'
 export { ChipInput } from './chip-input'

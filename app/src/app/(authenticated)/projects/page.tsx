@@ -1,7 +1,7 @@
-import { Projects } from '@/components/projects/projects'
+import { ProjectsRedirect } from '@/components/projects/projects-redirect'
 import { listProjects } from '@/lib/supabase/projects'
 
 export default async function ProjectsIndexPage() {
   const projects = await listProjects()
-  return <Projects initialProjects={projects} />
+  return <ProjectsRedirect initialProjects={projects} />
 }

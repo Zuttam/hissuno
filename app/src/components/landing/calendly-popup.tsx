@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { PopupModal, useCalendlyEventListener } from 'react-calendly'
-import { trackCallBookingStarted, trackCallBookingCompleted } from '@/lib/analytics/events'
+import { trackCallBookingStarted, trackCallBookingCompleted } from '@/lib/event_tracking/events'
 
 interface CalendlyPopupProps {
   isOpen: boolean

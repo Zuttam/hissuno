@@ -1,8 +1,5 @@
-export { AnalyticsDashboard } from './analytics-dashboard'
-export { AnalyticsHeader } from './analytics-header'
 export { PeriodSelector } from './period-selector'
 export { StatCard, StatCardGrid } from './stat-card'
 export { AnalyticsStrip } from './analytics-strip'
 export { ProjectAnalytics } from './project-analytics'
-export { ProjectsAnalyticsStrip } from './projects-analytics-strip'
 export * from './charts'
