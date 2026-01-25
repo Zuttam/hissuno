@@ -13,12 +13,31 @@ function extractParam(value: string | string[] | undefined) {
   return value
 }
 
+// Map error codes to user-friendly messages
+function getErrorMessage(error: string | undefined, errorDescription: string | undefined): string | undefined {
+  if (!error && !errorDescription) return undefined
+
+  // Check for signup_disabled error
+  if (error === 'access_denied' && errorDescription?.includes('signup_disabled')) {
+    return 'Sign ups are currently disabled. Please contact support if you need an account.'
+  }
+
+  // Use error description if available, otherwise use error code
+  return errorDescription || error
+}
+
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const resolvedSearchParams =
     await (searchParams ??
       Promise.resolve<Record<string, string | string[] | undefined>>({}))
   const redirectTo = getSafeRedirectPath(extractParam(resolvedSearchParams?.redirectTo))
-  const message = extractParam(resolvedSearchParams?.message)
+
+  // Handle both 'message' (legacy) and 'error'/'error_description' (OAuth) params
+  const messageParam = extractParam(resolvedSearchParams?.message)
+  const errorParam = extractParam(resolvedSearchParams?.error)
+  const errorDescriptionParam = extractParam(resolvedSearchParams?.error_description)
+
+  const message = messageParam || getErrorMessage(errorParam, errorDescriptionParam)
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-linear-to-br from-slate-100 via-white to-slate-200 px-4 py-16 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">

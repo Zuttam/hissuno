@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Dialog } from '@/components/ui'
 import { useCTA } from './cta-context'
 import { CalendlyPopup } from './calendly-popup'
@@ -9,10 +9,19 @@ import { trackCTAOptionsViewed, trackCTAOptionSelected } from '@/lib/event_track
 
 export function CTAOptionsDialog() {
   const router = useRouter()
-  const { activeDialog, source, openWaitlistDialog, showThankYou, closeDialog } = useCTA()
+  const searchParams = useSearchParams()
+  const { activeDialog, source, openCTAOptions, openWaitlistDialog, showThankYou, closeDialog } = useCTA()
   const [isCalendlyOpen, setIsCalendlyOpen] = useState(false)
 
   const isOpen = activeDialog === 'options'
+
+  // Auto-open when ?cta=<source> is in URL (e.g., ?cta=login from "Request access" link)
+  useEffect(() => {
+    const ctaSource = searchParams.get('cta') as typeof source
+    if (ctaSource) {
+      openCTAOptions(ctaSource)
+    }
+  }, [searchParams, openCTAOptions])
 
   // Track when modal opens
   useEffect(() => {

@@ -67,8 +67,8 @@ export function LoginForm({ redirectTo, message }: LoginFormProps) {
 
         <p className="text-center text-sm text-[--text-secondary]">
           Need an account?{' '}
-          <Link className="font-semibold text-[--foreground] underline" href="/sign-up">
-            Sign up
+          <Link className="font-semibold text-[--foreground] underline" href="/?cta=login">
+            Request access
           </Link>
         </p>
       </form>

@@ -151,6 +151,25 @@ export async function proxy(request: NextRequest) {
     return redirectResponse
   }
 
+  // Handle OAuth errors on root URL (Supabase may redirect here with error params)
+  // Redirect to login page with error params preserved
+  if (!user && isMarketingPath(pathname)) {
+    const errorParam = request.nextUrl.searchParams.get('error')
+    const errorDescription = request.nextUrl.searchParams.get('error_description')
+    const errorCode = request.nextUrl.searchParams.get('error_code')
+
+    if (errorParam || errorDescription || errorCode) {
+      const loginUrl = new URL('/login', request.url)
+      if (errorParam) loginUrl.searchParams.set('error', errorParam)
+      if (errorDescription) loginUrl.searchParams.set('error_description', errorDescription)
+      if (errorCode) loginUrl.searchParams.set('error_code', errorCode)
+
+      const redirectResponse = NextResponse.redirect(loginUrl)
+      forwardCookies(redirectResponse)
+      return redirectResponse
+    }
+  }
+
   // Check if authenticated user has completed onboarding (using profile fetched earlier)
   // Skip this check for the onboarding page itself to avoid redirect loops
   const isOnboardingPath = pathname === '/onboarding' || pathname.startsWith('/onboarding/')
