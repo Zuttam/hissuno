@@ -5,11 +5,17 @@
  * - Creates new issue with embedding, impact, and effort data
  * - Upvotes existing issue and checks spec threshold
  * - Marks session as reviewed
+ *
+ * Uses the shared issues-service layer for all operations.
  */
 
 import { createStep } from '@mastra/core/workflows'
 import { z } from 'zod'
-import { createAdminClient } from '@/lib/supabase/server'
+import {
+  createIssueAdmin,
+  upvoteIssueAdmin,
+  markSessionReviewedAdmin,
+} from '@/lib/issues/issues-service'
 import {
   preparedPMContextSchema,
   similarIssueSchema,
@@ -43,25 +49,22 @@ export const executeDecision = createStep({
       projectId,
       tags,
       tagsApplied,
-      settings,
       decision,
       impactAnalysis,
       effortEstimation,
+      localCodePath,
+      codebaseLeaseId,
+      codebaseCommitSha,
     } = inputData
 
     logger?.info('[execute-decision] Starting', { sessionId, action: decision.action })
     await writer?.write({ type: 'progress', message: `Executing: ${decision.action}...` })
 
-    const supabase = createAdminClient()
-
-    // Always mark session as PM reviewed
-    await supabase
-      .from('sessions')
-      .update({ pm_reviewed_at: new Date().toISOString() })
-      .eq('id', sessionId)
-
     // Handle skip action
     if (decision.action === 'skip') {
+      // Mark session as reviewed even when skipping
+      await markSessionReviewedAdmin(sessionId)
+
       logger?.info('[execute-decision] Skipped', { reason: decision.skipReason })
       await writer?.write({ type: 'progress', message: 'No action taken' })
 
@@ -72,6 +75,9 @@ export const executeDecision = createStep({
         tagsApplied,
         action: 'skipped' as const,
         skipReason: decision.skipReason,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
 
@@ -79,67 +85,49 @@ export const executeDecision = createStep({
     if (decision.action === 'upvote' && decision.existingIssueId) {
       const issueId = decision.existingIssueId
 
-      // Get current issue state
-      const { data: issue, error: issueError } = await supabase
-        .from('issues')
-        .select('id, title, upvote_count, priority_manual_override, priority, product_spec')
-        .eq('id', issueId)
-        .single()
+      try {
+        // Use the service layer for upvote
+        const result = await upvoteIssueAdmin(issueId, sessionId)
 
-      if (issueError || !issue) {
-        logger?.error('[execute-decision] Issue not found for upvote', { issueId })
+        await writer?.write({
+          type: 'progress',
+          message: `Upvoted issue (now ${result.newUpvoteCount} votes)`,
+        })
+
+        logger?.info('[execute-decision] Upvoted', {
+          issueId,
+          newUpvoteCount: result.newUpvoteCount,
+          thresholdMet: result.thresholdMet,
+        })
+
+        return {
+          sessionId,
+          projectId,
+          tags,
+          tagsApplied,
+          action: 'upvoted' as const,
+          issueId,
+          issueTitle: '', // Title not returned from upvote, but not critical
+          thresholdMet: result.thresholdMet,
+          localCodePath,
+          codebaseLeaseId,
+          codebaseCommitSha,
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        logger?.error('[execute-decision] Upvote failed', { issueId, error: message })
+
         return {
           sessionId,
           projectId,
           tags,
           tagsApplied,
           action: 'skipped' as const,
-          skipReason: `Issue not found: ${issueId}`,
+          skipReason: `Failed to upvote issue: ${message}`,
+          localCodePath,
+          codebaseLeaseId,
+          codebaseCommitSha,
         }
-      }
-
-      // Calculate new values
-      const newUpvoteCount = (issue.upvote_count ?? 1) + 1
-      const newPriority = issue.priority_manual_override
-        ? issue.priority
-        : calculatePriority(newUpvoteCount)
-
-      // Update the issue
-      await supabase
-        .from('issues')
-        .update({
-          upvote_count: newUpvoteCount,
-          priority: newPriority,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', issueId)
-
-      // Link session to issue
-      await supabase
-        .from('issue_sessions')
-        .insert({ issue_id: issueId, session_id: sessionId })
-        .select()
-        .maybeSingle()
-
-      // Check if spec threshold met
-      const thresholdMet = newUpvoteCount >= settings.issueSpecThreshold && !issue.product_spec
-
-      await writer?.write({
-        type: 'progress',
-        message: `Upvoted issue (now ${newUpvoteCount} votes)`,
-      })
-
-      logger?.info('[execute-decision] Upvoted', { issueId, newUpvoteCount, thresholdMet })
-
-      return {
-        sessionId,
-        projectId,
-        tags,
-        tagsApplied,
-        action: 'upvoted' as const,
-        issueId,
-        issueTitle: issue.title,
-        thresholdMet,
       }
     }
 
@@ -147,82 +135,73 @@ export const executeDecision = createStep({
     if (decision.action === 'create' && decision.newIssue) {
       const { type, title, description, priority } = decision.newIssue
 
-      // Create the issue with impact and effort data
-      const { data: issue, error: issueError } = await supabase
-        .from('issues')
-        .insert({
-          project_id: projectId,
+      try {
+        // Use the service layer for create (handles DB + embeddings)
+        const { issue } = await createIssueAdmin({
+          projectId,
+          sessionId,
           type,
           title,
           description,
           priority,
-          upvote_count: 1,
-          status: 'open',
-          // Impact analysis
-          affected_areas: impactAnalysis?.affectedAreas.map((a) => a.area) ?? [],
-          impact_score: impactAnalysis?.impactScore ?? null,
-          impact_analysis: impactAnalysis ?? null,
-          // Effort estimation
-          effort_estimate: effortEstimation?.estimate ?? null,
-          effort_reasoning: effortEstimation?.reasoning ?? null,
-          affected_files: effortEstimation?.affectedFiles ?? [],
+          impactAnalysis,
+          effortEstimation: effortEstimation
+            ? {
+                estimate: effortEstimation.estimate,
+                reasoning: effortEstimation.reasoning,
+                affectedFiles: effortEstimation.affectedFiles,
+              }
+            : null,
         })
-        .select('id')
-        .single()
 
-      if (issueError || !issue) {
-        logger?.error('[execute-decision] Failed to create issue', { error: issueError?.message })
+        await writer?.write({
+          type: 'progress',
+          message: `Created issue: ${title}`,
+        })
+
+        logger?.info('[execute-decision] Created', {
+          issueId: issue.id,
+          type,
+          impactScore: impactAnalysis?.impactScore,
+          effort: effortEstimation?.estimate,
+        })
+
+        return {
+          sessionId,
+          projectId,
+          tags,
+          tagsApplied,
+          action: 'created' as const,
+          issueId: issue.id,
+          issueTitle: title,
+          impactScore: impactAnalysis?.impactScore,
+          effortEstimate: effortEstimation?.estimate,
+          localCodePath,
+          codebaseLeaseId,
+          codebaseCommitSha,
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        logger?.error('[execute-decision] Create failed', { error: message })
+
         return {
           sessionId,
           projectId,
           tags,
           tagsApplied,
           action: 'skipped' as const,
-          skipReason: `Failed to create issue: ${issueError?.message}`,
+          skipReason: `Failed to create issue: ${message}`,
+          localCodePath,
+          codebaseLeaseId,
+          codebaseCommitSha,
         }
-      }
-
-      // Link session to issue
-      await supabase.from('issue_sessions').insert({
-        issue_id: issue.id,
-        session_id: sessionId,
-      })
-
-      // Generate and store embedding for semantic search
-      try {
-        const { upsertIssueEmbedding } = await import('@/lib/issues/embedding-service')
-        await upsertIssueEmbedding(issue.id, projectId, title, description)
-      } catch (embedError) {
-        logger?.warn('[execute-decision] Failed to embed issue', { error: embedError })
-      }
-
-      await writer?.write({
-        type: 'progress',
-        message: `Created issue: ${title}`,
-      })
-
-      logger?.info('[execute-decision] Created', {
-        issueId: issue.id,
-        type,
-        impactScore: impactAnalysis?.impactScore,
-        effort: effortEstimation?.estimate,
-      })
-
-      return {
-        sessionId,
-        projectId,
-        tags,
-        tagsApplied,
-        action: 'created' as const,
-        issueId: issue.id,
-        issueTitle: title,
-        impactScore: impactAnalysis?.impactScore,
-        effortEstimate: effortEstimation?.estimate,
       }
     }
 
     // Fallback
     logger?.warn('[execute-decision] Invalid decision, skipping')
+    await markSessionReviewedAdmin(sessionId)
+
     return {
       sessionId,
       projectId,
@@ -230,15 +209,9 @@ export const executeDecision = createStep({
       tagsApplied,
       action: 'skipped' as const,
       skipReason: 'Invalid decision format',
+      localCodePath,
+      codebaseLeaseId,
+      codebaseCommitSha,
     }
   },
 })
-
-/**
- * Calculate priority based on upvote count
- */
-function calculatePriority(upvoteCount: number): 'low' | 'medium' | 'high' {
-  if (upvoteCount >= 5) return 'high'
-  if (upvoteCount >= 3) return 'medium'
-  return 'low'
-}

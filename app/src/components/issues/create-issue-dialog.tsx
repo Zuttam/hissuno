@@ -42,7 +42,7 @@ export function CreateIssueDialog({
     const fetchSessions = async () => {
       setIsLoadingSessions(true)
       try {
-        const response = await fetch(`/api/sessions?projectId=${projectId}&limit=50`)
+        const response = await fetch(`/api/projects/${projectId}/sessions?limit=50`)
         if (response.ok) {
           const data = await response.json()
           setAvailableSessions(data.sessions ?? [])

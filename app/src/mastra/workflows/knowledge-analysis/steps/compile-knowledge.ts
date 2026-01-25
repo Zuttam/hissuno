@@ -26,7 +26,7 @@ export const compileKnowledge = createStep({
 
     await writer?.write({ type: 'progress', message: 'Compiling knowledge packages...' })
 
-    const { analysisResults, codebaseAnalysis, hasCodebase } = inputData
+    const { analysisResults, codebaseAnalysis, hasCodebase, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
     const agent = mastra?.getAgent('knowledgeCompilerAgent')
 
     // Combine all analysis content
@@ -49,6 +49,9 @@ export const compileKnowledge = createStep({
         technical: '# Technical Knowledge Base\n\nNo content available for analysis.',
         faq: '# FAQ\n\nNo content available for analysis.',
         how_to: '# How-To Guides\n\nNo content available for analysis.',
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
 
@@ -62,6 +65,9 @@ export const compileKnowledge = createStep({
         technical: `# Technical Knowledge Base\n\n${codebaseAnalysis || combinedContent}`,
         faq: `# FAQ\n\n${combinedContent}`,
         how_to: `# How-To Guides\n\n${combinedContent}`,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
 
@@ -100,15 +106,20 @@ For each category, provide a complete markdown document. Return the result as a 
 
       await writer?.write({ type: 'progress', message: 'Knowledge packages compiled successfully' })
 
-      return (
-        response.object ?? {
-          business: '# Business Knowledge Base\n\nNo business knowledge extracted.',
-          product: '# Product Knowledge Base\n\nNo product knowledge extracted.',
-          technical: '# Technical Knowledge Base\n\nNo technical knowledge extracted.',
-          faq: '# FAQ\n\nNo FAQ content extracted.',
-          how_to: '# How-To Guides\n\nNo how-to content extracted.',
-        }
-      )
+      const result = response.object ?? {
+        business: '# Business Knowledge Base\n\nNo business knowledge extracted.',
+        product: '# Product Knowledge Base\n\nNo product knowledge extracted.',
+        technical: '# Technical Knowledge Base\n\nNo technical knowledge extracted.',
+        faq: '# FAQ\n\nNo FAQ content extracted.',
+        how_to: '# How-To Guides\n\nNo how-to content extracted.',
+      }
+
+      return {
+        ...result,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       console.error('[compile-knowledge] Error:', message)
@@ -118,6 +129,9 @@ For each category, provide a complete markdown document. Return the result as a 
         technical: `# Technical Knowledge Base\n\nCompilation error: ${message}`,
         faq: `# FAQ\n\nCompilation error: ${message}`,
         how_to: `# How-To Guides\n\nCompilation error: ${message}`,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
   },

@@ -41,7 +41,7 @@ export function SessionSidebar({
     triggerReview,
     limitError,
     clearLimitError,
-  } = useSessionReview({ sessionId: session?.id ?? null })
+  } = useSessionReview({ projectId: session?.project_id ?? null, sessionId: session?.id ?? null })
   const [showReviewResult, setShowReviewResult] = useState(false)
   const [localTags, setLocalTags] = useState<string[]>(session?.tags ?? [])
   const [isArchiving, setIsArchiving] = useState(false)
@@ -50,7 +50,7 @@ export function SessionSidebar({
     if (!session) return
     setIsArchiving(true)
     try {
-      const response = await fetch(`/api/sessions/${session.id}/archive`, {
+      const response = await fetch(`/api/projects/${session.project_id}/sessions/${session.id}/archive`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_archived: !session.is_archived }),
@@ -220,6 +220,7 @@ export function SessionSidebar({
               {/* Tags Section */}
               <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
                 <SessionTagEditor
+                  projectId={session.project_id}
                   sessionId={session.id}
                   currentTags={localTags}
                   onTagsUpdated={handleTagsUpdated}

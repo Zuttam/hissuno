@@ -7,7 +7,7 @@
  */
 
 import { createStep } from '@mastra/core/workflows'
-import { workflowInputSchema, classifyOutputSchema } from '../schemas'
+import { workflowContextWithCodebaseSchema, classifyOutputSchema } from '../schemas'
 import { updateSessionTags } from '@/lib/supabase/sessions'
 import { getProjectCustomTags } from '@/lib/supabase/custom-tags'
 import { SESSION_TAGS, type CustomTagRecord } from '@/types/session'
@@ -15,7 +15,7 @@ import { SESSION_TAGS, type CustomTagRecord } from '@/types/session'
 export const classifySession = createStep({
   id: 'classify-session',
   description: 'Analyze session and apply classification tags',
-  inputSchema: workflowInputSchema,
+  inputSchema: workflowContextWithCodebaseSchema,
   outputSchema: classifyOutputSchema,
   execute: async ({ inputData, mastra, writer }) => {
     const logger = mastra?.getLogger()
@@ -24,7 +24,7 @@ export const classifySession = createStep({
       throw new Error('Input data not found')
     }
 
-    const { sessionId, projectId } = inputData
+    const { sessionId, projectId, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
     logger?.info('[classify-session] Starting', { sessionId, projectId })
     await writer?.write({ type: 'progress', message: 'Starting session classification...' })
 
@@ -38,6 +38,9 @@ export const classifySession = createStep({
         tags: [] as string[],
         tagsApplied: false,
         reasoning: 'Tagging agent not configured',
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
 
@@ -167,6 +170,9 @@ Return a JSON object with:
         tags,
         tagsApplied,
         reasoning,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -178,6 +184,9 @@ Return a JSON object with:
         tags: [] as string[],
         tagsApplied: false,
         reasoning: `Classification error: ${message}`,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
   },

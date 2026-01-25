@@ -55,7 +55,7 @@ export const sanitizeKnowledge = createStep({
 
     await writer?.write({ type: 'progress', message: 'Scanning for sensitive information...' })
 
-    const { business, product, technical, faq, how_to } = inputData
+    const { business, product, technical, faq, how_to, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
     const agent = mastra?.getAgent('securityScannerAgent')
 
     // Track redaction stats
@@ -83,6 +83,9 @@ export const sanitizeKnowledge = createStep({
           byCategory: { business: 0, product: 0, technical: 0, faq: 0, how_to: 0 },
           types: [],
         },
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
 
@@ -184,6 +187,10 @@ Return the sanitized content maintaining the exact same structure and formatting
         byCategory: redactionStats,
         types: Array.from(allTypes),
       },
+      // Pass through codebase lease fields
+      localCodePath,
+      codebaseLeaseId,
+      codebaseCommitSha,
     }
   },
 })

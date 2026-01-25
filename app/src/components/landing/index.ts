@@ -26,3 +26,12 @@ export {
   SUPPORTED_TOOLS,
 } from './tool-landing'
 export type { ToolConfig } from './tool-landing'
+
+// Roadmap page
+export {
+  RoadmapHeroSection,
+  RoadmapTimeline,
+  RoadmapPhaseCard,
+  RoadmapItem,
+  RoadmapCTASection,
+} from './roadmap'

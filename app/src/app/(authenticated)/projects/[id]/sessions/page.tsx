@@ -106,6 +106,7 @@ export default function ProjectSessionsPage() {
     refresh: refreshSessionDetail,
     updateSession,
   } = useSessionDetail({
+    projectId,
     sessionId: selectedSessionId,
   })
 

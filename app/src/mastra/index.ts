@@ -4,6 +4,7 @@ import { PinoLogger } from '@mastra/loggers';
 import { PostgresStore } from '@mastra/pg';
 import { knowledgeAnalysisWorkflow } from './workflows/knowledge-analysis';
 import { sessionReviewWorkflow } from './workflows/session-review';
+import { specGenerationWorkflow } from './workflows/spec-generation';
 import { supportAgent } from './agents/support-agent';
 import { codebaseAnalyzerAgent } from './agents/codebase-analyzer-agent';
 import { webScraperAgent } from './agents/web-scraper-agent';
@@ -12,6 +13,8 @@ import { productManagerAgent } from './agents/product-manager-agent';
 import { specWriterAgent } from './agents/spec-writer-agent';
 import { securityScannerAgent } from './agents/security-scanner-agent';
 import { taggingAgent } from './agents/tagging-agent';
+import { technicalAnalystAgent } from './agents/technical-analyst-agent';
+import { responseClassifierAgent } from './agents/response-classifier-agent';
 
 // Cache only the PostgresStore to prevent duplicate DB connections during Next.js HMR
 // Mastra instance itself is recreated on each reload so config changes (new agents, etc.) take effect
@@ -32,7 +35,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const mastra = new Mastra({
-  workflows: { knowledgeAnalysisWorkflow, sessionReviewWorkflow },
+  workflows: { knowledgeAnalysisWorkflow, sessionReviewWorkflow, specGenerationWorkflow },
   agents: {
     supportAgent,
     codebaseAnalyzerAgent,
@@ -42,6 +45,8 @@ export const mastra = new Mastra({
     specWriterAgent,
     securityScannerAgent,
     taggingAgent,
+    technicalAnalystAgent,
+    responseClassifierAgent,
   },
   storage,
   logger: new PinoLogger({

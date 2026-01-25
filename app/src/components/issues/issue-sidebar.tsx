@@ -10,12 +10,14 @@ import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
 
 interface IssueSidebarProps {
+  projectId: string
   issueId: string
   onClose: () => void
   onIssueUpdated?: () => void
 }
 
 export function IssueSidebar({
+  projectId,
   issueId,
   onClose,
   onIssueUpdated,
@@ -25,14 +27,14 @@ export function IssueSidebar({
     isLoading,
     updateIssue,
     refresh: refreshIssue,
-  } = useIssueDetail({ issueId })
+  } = useIssueDetail({ projectId, issueId })
   const [isArchiving, setIsArchiving] = useState(false)
 
   const handleArchiveToggle = useCallback(async () => {
     if (!issue) return
     setIsArchiving(true)
     try {
-      const response = await fetch(`/api/issues/${issue.id}/archive`, {
+      const response = await fetch(`/api/projects/${projectId}/issues/${issue.id}/archive`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_archived: !issue.is_archived }),
@@ -46,7 +48,7 @@ export function IssueSidebar({
     } finally {
       setIsArchiving(false)
     }
-  }, [issue, onIssueUpdated])
+  }, [projectId, issue, onIssueUpdated])
 
   const {
     isGenerating: isGeneratingSpec,
@@ -56,6 +58,7 @@ export function IssueSidebar({
     startGeneration: handleGenerateSpec,
     cancelGeneration: handleCancelSpec,
   } = useSpecGeneration({
+    projectId,
     issueId,
     onComplete: () => {
       refreshIssue()

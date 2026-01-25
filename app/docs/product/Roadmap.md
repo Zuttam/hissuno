@@ -77,24 +77,19 @@
 [] Launch Ad campaigns for join and demo CTA (google and meta)
 [] Test pixel
 
-
 ### Support
-[] Email agent
-[] Slack read only mode for channels 
+
 [] Slack auto response (no need to tag in thread)
 
 ### Sessions
-[] Identify participants
-[] Gong integration (API Access - https://gong.app.gong.io/settings/api/documentation#overview)
+[] Slack as source only (read only sessions from channels)
+[] Intercom integration (API Key - https://developers.intercom.com/docs/references/rest-api/api.intercom.io)
+[] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
 
 ### Issues 
 [] Jira Integration 
-[] Calculate issue upvotes over time and alert or change priority if there's an anomaly
-[] Lieaner Integration
 
 ### Platform
-[] Project multi-users access and RBAC
-[] Add invite link support 
 [] Improve onboarding 
 [] Improve welcome email visualization
 
@@ -103,16 +98,25 @@
 ### Marketing
 [] Docs portal
 
+### Support
+[] Email agent
+
 ### Sessions
-[] Intercom integration
+[] Improve participants identification
+  [] show additional details in a more clean way
+  [] Show additioanl participants (multi user conversations) 
+
 
 ### Platform 
-[] API Access (via secret key)
+[] Project multi-users access and RBAC
+[] Add invite link support 
 [] Alerts and weekly reports(email, slack)
 
 ### Issues
 [] Draft response email to the user
 [] Support Actions items (not necessary code related)
+[] Calculate issue upvotes over time and alert or change priority if there's an anomaly
+[] Lieaner Integration
 
 ## Phase 8
 
@@ -124,3 +128,6 @@
 
 ### Code
 [] Create initial implementation 
+
+### Platform
+[] API Access (via secret key)

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useProject } from '@/components/providers/project-provider'
-import { KnowledgeManagementCard } from '@/components/knowledge/knowledge-management-card'
+import { KnowledgeManagementCard } from '@/components/projects/knowledge/knowledge-management-card'
 import { TestAgentDialog } from '@/components/projects/test-agent-dialog'
 import { KnowledgeSourcesDialog } from '@/components/projects/edit-dialogs/knowledge-sources-dialog'
 import { FloatingCard } from '@/components/ui/floating-card'

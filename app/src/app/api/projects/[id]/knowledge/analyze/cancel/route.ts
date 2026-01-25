@@ -28,7 +28,7 @@ async function resolveUser() {
 /**
  * POST /api/projects/[id]/knowledge/analyze/cancel
  * Cancel/abort a running or stuck analysis
- * 
+ *
  * This will:
  * 1. Find the latest running analysis for the project
  * 2. Mark it as 'cancelled'

@@ -20,6 +20,7 @@ export interface SpecGenerationEvent {
 }
 
 interface UseSpecGenerationOptions {
+  projectId: string
   issueId: string
   /** Called when spec generation completes successfully */
   onComplete?: () => void
@@ -41,6 +42,7 @@ interface UseSpecGenerationReturn {
 const CONNECTION_TIMEOUT_MS = 60_000
 
 export function useSpecGeneration({
+  projectId,
   issueId,
   onComplete,
 }: UseSpecGenerationOptions): UseSpecGenerationReturn {
@@ -101,7 +103,7 @@ export function useSpecGeneration({
     try {
       // Include runId in the stream URL
       const eventSource = new EventSource(
-        `/api/issues/${issueId}/generate-spec/stream?runId=${runId}`
+        `/api/projects/${projectId}/issues/${issueId}/generate-spec/stream?runId=${runId}`
       )
       eventSourceRef.current = eventSource
 
@@ -181,7 +183,7 @@ export function useSpecGeneration({
       setIsGenerating(false)
       setError('Failed to connect to server. Please try again.')
     }
-  }, [issueId, onComplete, cleanup, resetConnectionTimeout, isGenerating])
+  }, [projectId, issueId, onComplete, cleanup, resetConnectionTimeout, isGenerating])
 
   // Start spec generation
   const startGeneration = useCallback(async () => {
@@ -195,7 +197,7 @@ export function useSpecGeneration({
 
     try {
       const response = await fetch(
-        `/api/issues/${issueId}/generate-spec`,
+        `/api/projects/${projectId}/issues/${issueId}/generate-spec`,
         { method: 'POST' }
       )
 
@@ -219,7 +221,7 @@ export function useSpecGeneration({
       setError(message)
       setIsGenerating(false)
     }
-  }, [issueId, connectToStream])
+  }, [projectId, issueId, connectToStream])
 
   // Cancel spec generation
   const cancelGeneration = useCallback(async () => {
@@ -227,7 +229,7 @@ export function useSpecGeneration({
 
     try {
       const response = await fetch(
-        `/api/issues/${issueId}/generate-spec/cancel`,
+        `/api/projects/${projectId}/issues/${issueId}/generate-spec/cancel`,
         { method: 'POST' }
       )
 
@@ -245,7 +247,7 @@ export function useSpecGeneration({
       const message = err instanceof Error ? err.message : 'Failed to cancel'
       setError(message)
     }
-  }, [issueId, cleanup])
+  }, [projectId, issueId, cleanup])
 
   return {
     isGenerating,

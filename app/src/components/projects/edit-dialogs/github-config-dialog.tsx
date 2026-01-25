@@ -127,15 +127,15 @@ export function GitHubConfigDialog({
             <Alert variant="success">
               Connected to GitHub: <strong>{status.accountLogin || 'Unknown'}</strong>
             </Alert>
-            <p className="text-sm text-[color:var(--text-secondary)]">
-              Your codebase is connected for knowledge analysis.
-            </p>
-            <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={handleRefresh}>
+              Refresh Status
+            </Button>
+
+            {/* Danger Zone */}
+            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
+              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">Danger Zone</h4>
               <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
                 Disconnect
-              </Button>
-              <Button variant="secondary" onClick={handleRefresh}>
-                Refresh Status
               </Button>
             </div>
           </div>

@@ -39,6 +39,12 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 </div>
                 <div className="flex items-center gap-4">
                   <Link
+                    href="/roadmap"
+                    className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
+                  >
+                    Roadmap
+                  </Link>
+                  <Link
                     href="/legal/terms"
                     className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
                   >

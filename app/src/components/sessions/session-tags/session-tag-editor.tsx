@@ -47,6 +47,7 @@ interface TagOption {
 }
 
 interface SessionTagEditorProps {
+  projectId: string
   sessionId: string
   /** Array of current tag slugs (native or custom) */
   currentTags: string[]
@@ -63,6 +64,7 @@ interface SessionTagEditorProps {
  * Supports both native tags and custom tags.
  */
 export function SessionTagEditor({
+  projectId,
   sessionId,
   currentTags,
   onTagsUpdated,
@@ -124,7 +126,7 @@ export function SessionTagEditor({
       setIsOpen(false)
 
       try {
-        const response = await fetch(`/api/sessions/${sessionId}/tags`, {
+        const response = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/tags`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tags: newTags }),
@@ -141,7 +143,7 @@ export function SessionTagEditor({
         setIsSaving(false)
       }
     },
-    [sessionId, currentTags, onTagsUpdated, disabled, isSaving]
+    [projectId, sessionId, currentTags, onTagsUpdated, disabled, isSaving]
   )
 
   const handleRemoveTag = useCallback(
@@ -152,7 +154,7 @@ export function SessionTagEditor({
       setIsSaving(true)
 
       try {
-        const response = await fetch(`/api/sessions/${sessionId}/tags`, {
+        const response = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/tags`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tags: newTags }),
@@ -169,7 +171,7 @@ export function SessionTagEditor({
         setIsSaving(false)
       }
     },
-    [sessionId, currentTags, onTagsUpdated, disabled, isSaving]
+    [projectId, sessionId, currentTags, onTagsUpdated, disabled, isSaving]
   )
 
   return (

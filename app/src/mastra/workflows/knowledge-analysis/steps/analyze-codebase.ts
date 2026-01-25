@@ -6,12 +6,12 @@
  */
 
 import { createStep } from '@mastra/core/workflows'
-import { workflowInputSchema, analyzeCodebaseOutputSchema } from '../schemas'
+import { workflowContextWithCodebaseSchema, analyzeCodebaseOutputSchema } from '../schemas'
 
 export const analyzeCodebase = createStep({
   id: 'analyze-codebase',
   description: 'Analyze source code to extract product and technical knowledge using agent tools',
-  inputSchema: workflowInputSchema,
+  inputSchema: workflowContextWithCodebaseSchema,
   outputSchema: analyzeCodebaseOutputSchema,
   execute: async ({ inputData, mastra, writer }) => {
     const logger = mastra?.getLogger()
@@ -20,7 +20,7 @@ export const analyzeCodebase = createStep({
       throw new Error('Input data not found')
     }
 
-    const { projectId, sources, localCodePath, analysisScope } = inputData
+    const { projectId, sources, localCodePath, analysisScope, codebaseLeaseId, codebaseCommitSha } = inputData
     logger?.info('[analyze-codebase] Starting', { projectId, localCodePath, analysisScope })
 
     // Emit progress event
@@ -35,6 +35,9 @@ export const analyzeCodebase = createStep({
         sources,
         codebaseAnalysis: '',
         hasCodebase: false,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
 
@@ -47,6 +50,9 @@ export const analyzeCodebase = createStep({
         sources,
         codebaseAnalysis: '[Codebase analysis skipped: Agent not configured]',
         hasCodebase: true,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
 
@@ -112,6 +118,9 @@ Be efficient with your tool usage - you don't need to read every file. Focus on 
         sources,
         codebaseAnalysis: analysis,
         hasCodebase: true,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -121,6 +130,9 @@ Be efficient with your tool usage - you don't need to read every file. Focus on 
         sources,
         codebaseAnalysis: `[Codebase analysis error: ${message}]`,
         hasCodebase: true,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
   },

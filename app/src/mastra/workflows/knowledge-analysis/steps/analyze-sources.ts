@@ -24,7 +24,7 @@ export const analyzeSources = createStep({
       throw new Error('Input data not found')
     }
 
-    const { sources, codebaseAnalysis, hasCodebase } = inputData
+    const { sources, codebaseAnalysis, hasCodebase, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
     const results: AnalysisResult[] = []
 
     await writer?.write({ type: 'progress', message: `Analyzing ${sources.length} knowledge source(s)...` })
@@ -218,15 +218,19 @@ Please extract and organize:
     }
 
     const successCount = results.filter(r => !r.error).length
-    await writer?.write({ 
-      type: 'progress', 
-      message: `Completed analyzing ${successCount}/${sources.length} sources` 
+    await writer?.write({
+      type: 'progress',
+      message: `Completed analyzing ${successCount}/${sources.length} sources`
     })
 
     return {
       analysisResults: results,
       codebaseAnalysis,
       hasCodebase,
+      // Pass through codebase lease fields
+      localCodePath,
+      codebaseLeaseId,
+      codebaseCommitSha,
     }
   },
 })

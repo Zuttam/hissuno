@@ -210,8 +210,6 @@ export async function POST(request: Request) {
           projectId: id,
           userId: user.id,
           supabase,
-          // Skip GitHub sync since we already synced above during project creation
-          skipGitHubSync: Boolean(hasGitHubSource),
         })
 
         if (analysisResult.success) {

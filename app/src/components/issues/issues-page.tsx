@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import type { IssueWithProject, IssueFilters } from '@/types/issue'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 import { useIssues } from '@/hooks/use-issues'
@@ -92,6 +92,12 @@ export function IssuesPageContent({
     await archiveIssue(issue.id, !issue.is_archived)
   }, [archiveIssue])
 
+  // Find selected issue to get projectId for sidebar
+  const selectedIssue = useMemo(
+    () => (selectedIssueId ? issues.find(i => i.id === selectedIssueId) : null),
+    [issues, selectedIssueId]
+  )
+
   const handleExportCSV = useCallback(() => {
     if (issues.length === 0) return
 
@@ -171,9 +177,10 @@ export function IssuesPageContent({
         )}
       </FloatingCard>
 
-      {selectedIssueId && (
+      {selectedIssue && (
         <IssueSidebar
-          issueId={selectedIssueId}
+          projectId={selectedIssue.project_id}
+          issueId={selectedIssue.id}
           onClose={handleCloseSidebar}
           onIssueUpdated={handleIssueUpdated}
         />

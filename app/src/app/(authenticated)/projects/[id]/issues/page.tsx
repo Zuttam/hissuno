@@ -192,8 +192,9 @@ export default function ProjectIssuesPage() {
         )}
       </FloatingCard>
 
-      {selectedIssueId && (
+      {selectedIssueId && projectId && (
         <IssueSidebar
+          projectId={projectId}
           issueId={selectedIssueId}
           onClose={handleCloseSidebar}
           onIssueUpdated={handleIssueUpdated}

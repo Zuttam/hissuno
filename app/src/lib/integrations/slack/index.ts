@@ -395,3 +395,154 @@ export const SLACK_OAUTH_SCOPES = [
   'users:read',
   'users:read.email',
 ]
+
+/**
+ * Channel mode types
+ */
+export type ChannelMode = 'interactive' | 'passive'
+export type CaptureScope = 'external_only' | 'all'
+
+/**
+ * Slack channel with mode information
+ */
+export type SlackChannelWithMode = {
+  id: string
+  channelId: string
+  channelName: string | null
+  channelType: string
+  channelMode: ChannelMode
+  captureScope: CaptureScope
+  workspaceTokenId: string
+  workspacePrimaryDomain: string | null
+}
+
+/**
+ * Get Slack channel with mode information
+ */
+export async function getSlackChannelWithMode(
+  supabase: SupabaseClient<Database> | AnySupabase,
+  workspaceId: string,
+  channelId: string
+): Promise<SlackChannelWithMode | null> {
+  const client = supabase as AnySupabase
+  const { data, error } = await client
+    .from('slack_channels')
+    .select(`
+      id,
+      channel_id,
+      channel_name,
+      channel_type,
+      channel_mode,
+      capture_scope,
+      workspace_token_id,
+      workspace_primary_domain,
+      slack_workspace_tokens!inner(id, workspace_id)
+    `)
+    .eq('slack_workspace_tokens.workspace_id', workspaceId)
+    .eq('channel_id', channelId)
+    .single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return {
+    id: data.id,
+    channelId: data.channel_id,
+    channelName: data.channel_name,
+    channelType: data.channel_type || 'channel',
+    channelMode: (data.channel_mode as ChannelMode) || 'interactive',
+    captureScope: (data.capture_scope as CaptureScope) || 'external_only',
+    workspaceTokenId: data.workspace_token_id,
+    workspacePrimaryDomain: data.workspace_primary_domain,
+  }
+}
+
+/**
+ * Thread session with response tracking
+ */
+export type ThreadSessionWithTracking = {
+  id: string
+  sessionId: string
+  lastResponderType: 'bot' | 'user' | null
+  lastBotResponseTs: string | null
+  hasExternalParticipants: boolean
+}
+
+/**
+ * Get thread session for response tracking
+ */
+export async function getThreadSession(
+  supabase: SupabaseClient<Database> | AnySupabase,
+  channelDbId: string,
+  threadTs: string
+): Promise<ThreadSessionWithTracking | null> {
+  const client = supabase as AnySupabase
+  const { data, error } = await client
+    .from('slack_thread_sessions')
+    .select('id, session_id, last_responder_type, last_bot_response_ts, has_external_participants')
+    .eq('channel_id', channelDbId)
+    .eq('thread_ts', threadTs)
+    .single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return {
+    id: data.id,
+    sessionId: data.session_id,
+    lastResponderType: data.last_responder_type as 'bot' | 'user' | null,
+    lastBotResponseTs: data.last_bot_response_ts,
+    hasExternalParticipants: data.has_external_participants || false,
+  }
+}
+
+/**
+ * Update thread session responder tracking
+ */
+export async function updateThreadSessionResponder(
+  supabase: SupabaseClient<Database> | AnySupabase,
+  threadSessionId: string,
+  responderType: 'bot' | 'user',
+  botResponseTs?: string
+): Promise<void> {
+  const client = supabase as AnySupabase
+  const updateData: Record<string, unknown> = {
+    last_responder_type: responderType,
+  }
+
+  if (responderType === 'bot' && botResponseTs) {
+    updateData.last_bot_response_ts = botResponseTs
+  }
+
+  await client.from('slack_thread_sessions').update(updateData).eq('id', threadSessionId)
+}
+
+/**
+ * Update channel mode
+ */
+export async function updateSlackChannelMode(
+  supabase: SupabaseClient<Database> | AnySupabase,
+  channelDbId: string,
+  mode: ChannelMode,
+  captureScope?: CaptureScope
+): Promise<{ success: boolean; error?: string }> {
+  const client = supabase as AnySupabase
+  const updateData: Record<string, unknown> = {
+    channel_mode: mode,
+  }
+
+  if (captureScope !== undefined) {
+    updateData.capture_scope = captureScope
+  }
+
+  const { error } = await client.from('slack_channels').update(updateData).eq('id', channelDbId)
+
+  if (error) {
+    console.error('[slack.updateSlackChannelMode] Failed:', error)
+    return { success: false, error: 'Failed to update channel mode.' }
+  }
+
+  return { success: true }
+}

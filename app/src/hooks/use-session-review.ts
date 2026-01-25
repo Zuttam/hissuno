@@ -108,6 +108,7 @@ export interface SessionReviewStatusResponse {
 }
 
 interface UseSessionReviewOptions {
+  projectId: string | null
   sessionId: string | null
 }
 
@@ -127,8 +128,6 @@ interface UseSessionReviewState {
   result: SessionReviewResult | null
   error: string | null
   limitError: LimitExceededErrorDetails | null
-  currentPhase: 'classify' | 'pm-review' | null
-  progressMessage: string | null
   tags: SessionTag[]
   steps: WorkflowStep[]
   currentStepId: string | null
@@ -142,13 +141,11 @@ interface UseSessionReviewState {
  * Handles both classification and PM review phases.
  * Automatically reconnects to running reviews on mount/page refresh.
  */
-export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSessionReviewState {
+export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptions): UseSessionReviewState {
   const [isReviewing, setIsReviewing] = useState(false)
   const [events, setEvents] = useState<SessionReviewSSEEvent[]>([])
   const [result, setResult] = useState<SessionReviewResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [currentPhase, setCurrentPhase] = useState<'classify' | 'pm-review' | null>(null)
-  const [progressMessage, setProgressMessage] = useState<string | null>(null)
   const [tags, setTags] = useState<SessionTag[]>([])
   const [limitError, setLimitError] = useState<LimitExceededErrorDetails | null>(null)
   const [steps, setSteps] = useState<WorkflowStep[]>(INITIAL_WORKFLOW_STEPS)
@@ -164,7 +161,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
 
   // Connect to SSE stream
   const connectToStream = useCallback(() => {
-    if (!sessionId) return
+    if (!projectId || !sessionId) return
 
     // Close existing connection
     if (eventSourceRef.current) {
@@ -174,10 +171,9 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
 
     setEvents([])
     setError(null)
-    setProgressMessage(null)
     resetSteps()
 
-    const eventSource = new EventSource(`/api/sessions/${sessionId}/review/stream`)
+    const eventSource = new EventSource(`/api/projects/${projectId}/sessions/${sessionId}/review/stream`)
     eventSourceRef.current = eventSource
 
     eventSource.onmessage = (event) => {
@@ -244,28 +240,9 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
           )
         }
 
-        // Track legacy current phase for backwards compat
-        if (data.type === 'classify-start') {
-          setCurrentPhase('classify')
-          setProgressMessage(data.message ?? 'Starting classification...')
-        } else if (data.type === 'classify-progress') {
-          setProgressMessage(data.message ?? 'Processing...')
-        } else if (data.type === 'classify-finish') {
-          setCurrentPhase(null)
-          setProgressMessage(null)
-          if (data.tags) {
-            setTags(data.tags)
-          }
-        } else if (data.type.startsWith('prepare-context-') || data.type.startsWith('find-duplicates-') ||
-                   data.type.startsWith('analyze-impact-') || data.type.startsWith('estimate-effort-') ||
-                   data.type.startsWith('pm-decision-') || data.type.startsWith('execute-decision-')) {
-          // Set PM review phase for all PM-related steps
-          if (data.type.endsWith('-start')) {
-            setCurrentPhase('pm-review')
-            setProgressMessage(data.message ?? 'Processing...')
-          } else if (data.type.endsWith('-progress')) {
-            setProgressMessage(data.message ?? 'Processing...')
-          }
+        // Update tags when classification finishes
+        if (data.type === 'classify-finish' && data.tags) {
+          setTags(data.tags)
         }
 
         // Handle completion
@@ -273,8 +250,6 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
           eventSource.close()
           eventSourceRef.current = null
           setIsReviewing(false)
-          setCurrentPhase(null)
-          setProgressMessage(null)
           setCurrentStepId(null)
           if (data.result) {
             setResult(data.result)
@@ -287,8 +262,6 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
           eventSource.close()
           eventSourceRef.current = null
           setIsReviewing(false)
-          setCurrentPhase(null)
-          setProgressMessage(null)
           setCurrentStepId(null)
           setError(data.message ?? 'Review failed')
         }
@@ -306,11 +279,11 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
         // Don't set error here - stream might have completed normally
       }
     }
-  }, [sessionId, resetSteps])
+  }, [projectId, sessionId, resetSteps])
 
   // Fetch current review status
   const fetchStatus = useCallback(async () => {
-    if (!sessionId) {
+    if (!projectId || !sessionId) {
       setIsReviewing(false)
       setResult(null)
       setTags([])
@@ -318,7 +291,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
     }
 
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/review`)
+      const response = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/review`)
       if (!response.ok) return
 
       const data = (await response.json()) as SessionReviewStatusResponse
@@ -338,11 +311,11 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
     } catch (err) {
       console.error('[useSessionReview] Failed to fetch status:', err)
     }
-  }, [sessionId, connectToStream])
+  }, [projectId, sessionId, connectToStream])
 
   // Trigger new review
   const triggerReview = useCallback(async () => {
-    if (!sessionId || isReviewing) return
+    if (!projectId || !sessionId || isReviewing) return
 
     setError(null)
     setLimitError(null)
@@ -353,7 +326,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
     setIsReviewing(true)
 
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/review`, {
+      const response = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/review`, {
         method: 'POST',
       })
 
@@ -385,7 +358,7 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
       setError(err instanceof Error ? err.message : 'Failed to start review')
       setIsReviewing(false)
     }
-  }, [sessionId, isReviewing, connectToStream, resetSteps])
+  }, [projectId, sessionId, isReviewing, connectToStream, resetSteps])
 
   // Check for running review on mount and when sessionId changes
   useEffect(() => {
@@ -412,8 +385,6 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
       result,
       error,
       limitError,
-      currentPhase,
-      progressMessage,
       tags,
       steps,
       currentStepId,
@@ -421,6 +392,6 @@ export function useSessionReview({ sessionId }: UseSessionReviewOptions): UseSes
       refresh: fetchStatus,
       clearLimitError,
     }),
-    [isReviewing, events, result, error, limitError, currentPhase, progressMessage, tags, steps, currentStepId, triggerReview, fetchStatus, clearLimitError]
+    [isReviewing, events, result, error, limitError, tags, steps, currentStepId, triggerReview, fetchStatus, clearLimitError]
   )
 }

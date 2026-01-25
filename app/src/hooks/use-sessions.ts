@@ -26,11 +26,16 @@ export function useSessions({
   const [error, setError] = useState<string | null>(null)
 
   const fetchSessions = useCallback(async () => {
+    if (!filters.projectId) {
+      setSessions([])
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (filters.projectId) params.set('projectId', filters.projectId)
       if (filters.userId) params.set('userId', filters.userId)
       if (filters.sessionId) params.set('sessionId', filters.sessionId)
       if (filters.name) params.set('name', filters.name)
@@ -43,7 +48,7 @@ export function useSessions({
       if (filters.limit) params.set('limit', String(filters.limit))
       if (filters.offset) params.set('offset', String(filters.offset))
 
-      const url = `/api/sessions${params.toString() ? `?${params.toString()}` : ''}`
+      const url = `/api/projects/${filters.projectId}/sessions${params.toString() ? `?${params.toString()}` : ''}`
       const response = await fetch(url, { cache: 'no-store' })
 
       if (!response.ok) {
@@ -63,8 +68,10 @@ export function useSessions({
   }, [filters.projectId, filters.userId, filters.sessionId, filters.name, filters.status, filters.source, filters.tags, filters.dateFrom, filters.dateTo, filters.showArchived, filters.limit, filters.offset])
 
   const createSession = useCallback(async (input: CreateSessionInput): Promise<SessionWithProject | null> => {
+    if (!filters.projectId) return null
+
     try {
-      const response = await fetch('/api/sessions', {
+      const response = await fetch(`/api/projects/${filters.projectId}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -85,8 +92,10 @@ export function useSessions({
   }, [])
 
   const archiveSession = useCallback(async (sessionId: string, isArchived: boolean): Promise<boolean> => {
+    if (!filters.projectId) return false
+
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/archive`, {
+      const response = await fetch(`/api/projects/${filters.projectId}/sessions/${sessionId}/archive`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_archived: isArchived }),
@@ -124,6 +133,7 @@ export function useSessions({
 }
 
 interface UseSessionDetailOptions {
+  projectId?: string | null
   sessionId?: string | null
 }
 
@@ -137,15 +147,16 @@ interface UseSessionDetailState {
 }
 
 export function useSessionDetail({
+  projectId,
   sessionId,
 }: UseSessionDetailOptions): UseSessionDetailState {
   const [session, setSession] = useState<SessionWithProject | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(Boolean(sessionId))
+  const [isLoading, setIsLoading] = useState<boolean>(Boolean(sessionId && projectId))
   const [error, setError] = useState<string | null>(null)
 
   const fetchSession = useCallback(async () => {
-    if (!sessionId) {
+    if (!sessionId || !projectId) {
       setSession(null)
       setMessages([])
       setIsLoading(false)
@@ -157,7 +168,7 @@ export function useSessionDetail({
     setError(null)
 
     try {
-      const response = await fetch(`/api/sessions/${sessionId}`, { cache: 'no-store' })
+      const response = await fetch(`/api/projects/${projectId}/sessions/${sessionId}`, { cache: 'no-store' })
       if (!response.ok) {
         const payload = await response.json().catch(() => null)
         const message = typeof payload?.error === 'string' ? payload.error : 'Failed to load session.'
@@ -174,13 +185,13 @@ export function useSessionDetail({
     } finally {
       setIsLoading(false)
     }
-  }, [sessionId])
+  }, [projectId, sessionId])
 
   const updateSessionFn = useCallback(async (input: UpdateSessionInput): Promise<boolean> => {
-    if (!sessionId) return false
+    if (!projectId || !sessionId) return false
 
     try {
-      const response = await fetch(`/api/sessions/${sessionId}`, {
+      const response = await fetch(`/api/projects/${projectId}/sessions/${sessionId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -198,7 +209,7 @@ export function useSessionDetail({
     } catch {
       return false
     }
-  }, [sessionId])
+  }, [projectId, sessionId])
 
   useEffect(() => {
     void fetchSession()

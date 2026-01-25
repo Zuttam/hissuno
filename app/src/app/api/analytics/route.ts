@@ -6,6 +6,7 @@ import {
   getSessionsStripAnalytics,
   getIssuesStripAnalytics,
   getImpactFlowAnalytics,
+  getProjectAnalytics,
   type AnalyticsPeriod,
 } from '@/lib/supabase/analytics'
 
@@ -17,8 +18,8 @@ export const runtime = 'nodejs'
  *
  * Query params:
  * - period: '7d' | '30d' | '90d' | 'all' (default: '30d')
- * - projectId: optional project ID to filter to
- * - type: 'overall' | 'sessions-strip' | 'issues-strip' (default: 'overall')
+ * - projectId: optional project ID to filter to (required for type=project)
+ * - type: 'overall' | 'sessions-strip' | 'issues-strip' | 'impact-flow' | 'project' (default: 'overall')
  */
 export async function GET(request: NextRequest) {
   if (!isSupabaseConfigured()) {
@@ -49,6 +50,14 @@ export async function GET(request: NextRequest) {
 
     if (type === 'impact-flow') {
       const data = await getImpactFlowAnalytics(period, projectId)
+      return NextResponse.json({ data })
+    }
+
+    if (type === 'project') {
+      if (!projectId) {
+        return NextResponse.json({ error: 'projectId is required for type=project.' }, { status: 400 })
+      }
+      const data = await getProjectAnalytics(projectId, period)
       return NextResponse.json({ data })
     }
 

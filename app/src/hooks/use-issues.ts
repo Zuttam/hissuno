@@ -26,11 +26,16 @@ export function useIssues({
   const [error, setError] = useState<string | null>(null)
 
   const fetchIssues = useCallback(async () => {
+    if (!filters.projectId) {
+      setIssues([])
+      setIsLoading(false)
+      return
+    }
+
     setIsLoading(true)
     setError(null)
     try {
       const params = new URLSearchParams()
-      if (filters.projectId) params.set('projectId', filters.projectId)
       if (filters.type) params.set('type', filters.type)
       if (filters.priority) params.set('priority', filters.priority)
       if (filters.status) params.set('status', filters.status)
@@ -39,7 +44,7 @@ export function useIssues({
       if (filters.limit) params.set('limit', String(filters.limit))
       if (filters.offset) params.set('offset', String(filters.offset))
 
-      const url = `/api/issues${params.toString() ? `?${params.toString()}` : ''}`
+      const url = `/api/projects/${filters.projectId}/issues${params.toString() ? `?${params.toString()}` : ''}`
       const response = await fetch(url, { cache: 'no-store' })
 
       if (!response.ok) {
@@ -59,8 +64,10 @@ export function useIssues({
   }, [filters.projectId, filters.type, filters.priority, filters.status, filters.search, filters.showArchived, filters.limit, filters.offset])
 
   const createIssue = useCallback(async (input: CreateIssueInput): Promise<IssueWithProject | null> => {
+    if (!filters.projectId) return null
+
     try {
-      const response = await fetch('/api/issues', {
+      const response = await fetch(`/api/projects/${filters.projectId}/issues`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -81,8 +88,10 @@ export function useIssues({
   }, [])
 
   const archiveIssue = useCallback(async (issueId: string, isArchived: boolean): Promise<boolean> => {
+    if (!filters.projectId) return false
+
     try {
-      const response = await fetch(`/api/issues/${issueId}/archive`, {
+      const response = await fetch(`/api/projects/${filters.projectId}/issues/${issueId}/archive`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_archived: isArchived }),
@@ -120,6 +129,7 @@ export function useIssues({
 }
 
 interface UseIssueDetailOptions {
+  projectId?: string | null
   issueId?: string | null
 }
 
@@ -134,14 +144,15 @@ interface UseIssueDetailState {
 }
 
 export function useIssueDetail({
+  projectId,
   issueId,
 }: UseIssueDetailOptions): UseIssueDetailState {
   const [issue, setIssue] = useState<IssueWithSessions | null>(null)
-  const [isLoading, setIsLoading] = useState<boolean>(Boolean(issueId))
+  const [isLoading, setIsLoading] = useState<boolean>(Boolean(issueId && projectId))
   const [error, setError] = useState<string | null>(null)
 
   const fetchIssue = useCallback(async () => {
-    if (!issueId) {
+    if (!issueId || !projectId) {
       setIssue(null)
       setIsLoading(false)
       setError(null)
@@ -152,7 +163,7 @@ export function useIssueDetail({
     setError(null)
 
     try {
-      const response = await fetch(`/api/issues/${issueId}`, { cache: 'no-store' })
+      const response = await fetch(`/api/projects/${projectId}/issues/${issueId}`, { cache: 'no-store' })
       if (!response.ok) {
         const payload = await response.json().catch(() => null)
         const message = typeof payload?.error === 'string' ? payload.error : 'Failed to load issue.'
@@ -167,13 +178,13 @@ export function useIssueDetail({
     } finally {
       setIsLoading(false)
     }
-  }, [issueId])
+  }, [projectId, issueId])
 
   const updateIssueFn = useCallback(async (updates: Partial<IssueWithSessions>): Promise<boolean> => {
-    if (!issueId) return false
+    if (!projectId || !issueId) return false
 
     try {
-      const response = await fetch(`/api/issues/${issueId}`, {
+      const response = await fetch(`/api/projects/${projectId}/issues/${issueId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -191,13 +202,13 @@ export function useIssueDetail({
     } catch {
       return false
     }
-  }, [issueId])
+  }, [projectId, issueId])
 
   const deleteIssueFn = useCallback(async (): Promise<boolean> => {
-    if (!issueId) return false
+    if (!projectId || !issueId) return false
 
     try {
-      const response = await fetch(`/api/issues/${issueId}`, {
+      const response = await fetch(`/api/projects/${projectId}/issues/${issueId}`, {
         method: 'DELETE',
       })
 
@@ -205,13 +216,13 @@ export function useIssueDetail({
     } catch {
       return false
     }
-  }, [issueId])
+  }, [projectId, issueId])
 
   const generateSpecFn = useCallback(async (): Promise<{ success: boolean; spec?: string }> => {
-    if (!issueId) return { success: false }
+    if (!projectId || !issueId) return { success: false }
 
     try {
-      const response = await fetch(`/api/issues/${issueId}/generate-spec`, {
+      const response = await fetch(`/api/projects/${projectId}/issues/${issueId}/generate-spec`, {
         method: 'POST',
       })
 
@@ -235,7 +246,7 @@ export function useIssueDetail({
     } catch {
       return { success: false }
     }
-  }, [issueId])
+  }, [projectId, issueId])
 
   useEffect(() => {
     void fetchIssue()

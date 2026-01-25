@@ -464,48 +464,7 @@ describe('triggerKnowledgeAnalysis', () => {
     })
   })
 
-  describe('GitHub Sync', () => {
-    it('skips GitHub sync when skipGitHubSync is true', async () => {
-      const { syncGitHubCodebase } = await import('@/lib/codebase')
-
-      const mockSupabase = createMockSupabase({
-        projects: {
-          data: {
-            id: 'project-123',
-            source_code: null, // Not used - source_code is joined via knowledge_sources
-          },
-          error: null,
-        },
-        knowledge_sources: {
-          data: [
-            {
-              id: 'source-1',
-              type: 'codebase',
-              enabled: true,
-              source_code: {
-                id: 'sc-1',
-                kind: 'github',
-                repository_url: 'https://github.com/test/repo',
-                repository_branch: 'main',
-              },
-            },
-          ],
-          error: null,
-        },
-        project_analyses_insert: {
-          data: { id: 'analysis-123', metadata: {} },
-          error: null,
-        },
-      })
-
-      await triggerKnowledgeAnalysis({
-        projectId: 'project-123',
-        userId: 'user-123',
-        supabase: mockSupabase,
-        skipGitHubSync: true,
-      })
-
-      expect(syncGitHubCodebase).not.toHaveBeenCalled()
-    })
-  })
+  // Note: GitHub sync is now handled inside the workflow via the prepare-codebase step,
+  // so the skipGitHubSync parameter no longer exists. Codebase sync tests should be
+  // integration tests that test the full workflow execution.
 })

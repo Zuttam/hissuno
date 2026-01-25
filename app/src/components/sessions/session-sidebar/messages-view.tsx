@@ -27,7 +27,7 @@ export function MessagesView({ session, messages, onMessageSent }: MessagesViewP
       setIsSending(true)
 
       try {
-        const response = await fetch(`/api/sessions/${session.id}/messages`, {
+        const response = await fetch(`/api/projects/${session.project_id}/sessions/${session.id}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
