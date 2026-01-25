@@ -6,6 +6,8 @@ const PUBLIC_PATH_PREFIXES = [
   '/login',
   '/sign-up',
   '/legal',
+  '/thank-you',
+  '/roadmap',
 
   '/auth/callback',
   '/api/cron',

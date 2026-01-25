@@ -57,9 +57,10 @@ export function trackSignupCompleted(userId: string, data: SignupEventData): voi
 
   // Google Ads - conversion (YouTube)
   const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
-  if (googleAdsId) {
+  const signupLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_LABEL_SIGNUP
+  if (googleAdsId && signupLabel) {
     window.gtag?.('event', 'conversion', {
-      send_to: `${googleAdsId}/signup`,
+      send_to: `${googleAdsId}/${signupLabel}`,
       value: 1.0,
       currency: 'USD',
     })
@@ -91,9 +92,10 @@ export function trackOnboardingCompleted(data: OnboardingCompletedEventData): vo
 
   // Google Ads - conversion (YouTube)
   const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
-  if (googleAdsId) {
+  const onboardingLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_LABEL_ONBOARDING
+  if (googleAdsId && onboardingLabel) {
     window.gtag?.('event', 'conversion', {
-      send_to: `${googleAdsId}/onboarding`,
+      send_to: `${googleAdsId}/${onboardingLabel}`,
       value: 5.0,
       currency: 'USD',
     })
@@ -196,26 +198,6 @@ export function trackCallBookingCompleted(data: CallBookingEventData): void {
 
   // PostHog
   posthog.capture('call_booking_completed', properties)
-
-  // Google Ads - conversion
-  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
-  if (googleAdsId) {
-    window.gtag?.('event', 'conversion', {
-      send_to: `${googleAdsId}/call_booking`,
-      value: 10.0,
-      currency: 'USD',
-    })
-  }
-
-  window.gtag?.('event', 'purchase', { value: 10.0, currency: 'USD' })
-
-  // Meta Pixel - Schedule event (standard event for appointment booking)
-  window.fbq?.('track', 'Schedule', {
-    content_name: 'Call Booking Completed',
-    content_category: 'Demo',
-    value: 10.0,
-    currency: 'USD',
-  })
 }
 
 /**
@@ -233,9 +215,10 @@ export function trackThankYouPageViewed(data: ThankYouEventData): void {
 
   // Google Ads - conversion (key for optimization)
   const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
-  if (googleAdsId) {
+  const thankYouLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_LABEL_THANK_YOU || 'p6Z7CJ_ivewbEMjU0dRC'
+  if (googleAdsId && thankYouLabel) {
     window.gtag?.('event', 'conversion', {
-      send_to: `${googleAdsId}/thank_you`,
+      send_to: `${googleAdsId}/${thankYouLabel}`,
       value: data.type === 'call' ? 10.0 : 5.0,
       currency: 'USD',
     })

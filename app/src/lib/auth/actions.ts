@@ -94,7 +94,7 @@ export async function signOutAction() {
   const supabase = await createClient()
   await supabase.auth.signOut()
   await refreshAuthDependentPaths()
-  redirect('/login')
+  redirect('/')
 }
 
 export async function updatePasswordAction(
