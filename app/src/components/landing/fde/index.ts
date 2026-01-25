@@ -1,0 +1,5 @@
+export { FDEHeroSection } from './fde-hero-section'
+export { FDEFeaturesSection } from './fde-features-section'
+export { FDEValuePropsSection } from './fde-value-props-section'
+export { FDEQuotesSection } from './fde-quotes-section'
+export { FDECTASection } from './fde-cta-section'

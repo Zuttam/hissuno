@@ -32,6 +32,7 @@ interface KnowledgePackageRow {
   storage_path: string
   version: number
   generated_at: string
+  named_package_id: string | null
 }
 
 /**
@@ -113,6 +114,7 @@ export async function embedKnowledgePackage(pkg: KnowledgePackageRow): Promise<E
     const records = chunks.map((chunk, i) => ({
       project_id: pkg.project_id,
       package_id: pkg.id,
+      named_package_id: pkg.named_package_id,
       category: pkg.category,
       chunk_index: chunk.index,
       chunk_text: chunk.text,
@@ -160,18 +162,28 @@ export async function embedKnowledgePackage(pkg: KnowledgePackageRow): Promise<E
  * Embed all knowledge packages for a project
  * Called after knowledge analysis workflow completes
  */
-export async function embedProjectKnowledge(projectId: string): Promise<EmbeddingResult> {
+export async function embedProjectKnowledge(
+  projectId: string,
+  options: { namedPackageId?: string } = {}
+): Promise<EmbeddingResult> {
+  const { namedPackageId } = options
   const supabase = createAdminClient()
   let totalChunks = 0
   const allErrors: string[] = []
 
-  console.log(`[embedding-service] Starting embedding for project ${projectId}`)
+  console.log(`[embedding-service] Starting embedding for project ${projectId}${namedPackageId ? `, package ${namedPackageId}` : ''}`)
 
-  // Fetch all packages for the project
-  const { data: packages, error: fetchError } = await supabase
+  // Fetch packages for the project (optionally filtered by named package)
+  let query = supabase
     .from('knowledge_packages')
-    .select('id, project_id, category, storage_path, version, generated_at')
+    .select('id, project_id, category, storage_path, version, generated_at, named_package_id')
     .eq('project_id', projectId)
+
+  if (namedPackageId) {
+    query = query.eq('named_package_id', namedPackageId)
+  }
+
+  const { data: packages, error: fetchError } = await query
 
   if (fetchError || !packages) {
     return {
@@ -231,6 +243,7 @@ export async function searchKnowledgeEmbeddings(
   projectId: string,
   query: string,
   options: {
+    namedPackageId?: string
     categories?: KnowledgeCategory[]
     limit?: number
     similarityThreshold?: number
@@ -246,19 +259,20 @@ export async function searchKnowledgeEmbeddings(
   }>
 > {
   // Default threshold of 0.5 - configurable via options, no DB changes needed
-  const { categories, limit = 5, similarityThreshold = 0.5 } = options
+  const { namedPackageId, categories, limit = 5, similarityThreshold = 0.5 } = options
   const supabase = createAdminClient()
 
   // Generate query embedding
   const queryEmbedding = await embedQuery(query)
 
   console.log(`[embedding-service] Searching for "${query}" in project ${projectId}`)
-  console.log(`[embedding-service] Options: categories=${categories?.join(',') ?? 'all'}, limit=${limit}, threshold=${similarityThreshold}`)
+  console.log(`[embedding-service] Options: namedPackageId=${namedPackageId ?? 'all'}, categories=${categories?.join(',') ?? 'all'}, limit=${limit}, threshold=${similarityThreshold}`)
 
   // Call the search function
   const { data, error } = await supabase.rpc('search_knowledge_embeddings', {
     p_project_id: projectId,
     p_query_embedding: formatEmbeddingForPgVector(queryEmbedding),
+    p_named_package_id: namedPackageId ?? null,
     p_categories: categories ?? null,
     p_limit: limit,
     p_similarity_threshold: similarityThreshold,

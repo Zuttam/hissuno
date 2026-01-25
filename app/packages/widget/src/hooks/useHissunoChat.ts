@@ -52,6 +52,8 @@ export interface UseHissunoChatOptions {
   userMetadata?: Record<string, string>;
   /** Custom session ID (auto-generated if not provided) */
   sessionId?: string;
+  /** Override the knowledge package used for this chat session (for testing) */
+  packageId?: string;
   /** Inactivity timeout in ms before auto-closing session (default: 30 minutes) */
   inactivityTimeout?: number;
   /** Callback when session is closed */
@@ -277,6 +279,7 @@ export function useHissunoChat({
   userId,
   userMetadata,
   sessionId: providedSessionId,
+  packageId,
   inactivityTimeout = DEFAULT_INACTIVITY_TIMEOUT,
   onSessionClose,
 }: UseHissunoChatOptions): UseHissunoChatReturn {
@@ -722,6 +725,9 @@ export function useHissunoChat({
         eventSourceRef.current = null;
       }
 
+      // Reset connecting flag so new messages can be sent
+      isConnectingRef.current = false;
+
       setIsLoading(false);
       setIsStreaming(false);
       setStreamingContent('');
@@ -817,6 +823,7 @@ export function useHissunoChat({
             pageTitle,
             sessionId,
             widgetToken,
+            packageId,
           }),
         });
 
@@ -838,7 +845,7 @@ export function useHissunoChat({
         setIsLoading(false);
       }
     },
-    [input, messages, apiUrl, headers, projectId, widgetToken, userId, userMetadata, pageUrl, pageTitle, sessionId, connectToStream]
+    [input, messages, apiUrl, headers, projectId, widgetToken, userId, userMetadata, pageUrl, pageTitle, sessionId, packageId, connectToStream]
   );
 
   return useMemo(

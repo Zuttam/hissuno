@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
 import Link from 'next/link'
 import { WaterWebGLProvider, WaterCanvas } from '@/components/water-webgl'
 import { CTAProvider } from '@/components/landing/cta-context'
-import { CTAOptionsDialog } from '@/components/landing/cta-options-dialog'
 import { WaitlistDialog } from '@/components/landing/waitlist-dialog'
 import { ThankYouModal } from '@/components/landing/thank-you-modal'
 import { MarketingNav } from '@/components/landing/marketing-nav'
@@ -18,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <WaterWebGLProvider>
+    <WaterWebGLProvider enableClickRipples>
       <CTAProvider>
         <div className="min-h-screen" suppressHydrationWarning>
           <WaterCanvas />
@@ -46,6 +44,18 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                     AI Support
                   </Link>
                   <Link
+                    href="/landing/pm-copilot"
+                    className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
+                  >
+                    PM Co-Pilot
+                  </Link>
+                  <Link
+                    href="/landing/fde"
+                    className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
+                  >
+                    AI Engineer
+                  </Link>
+                  <Link
                     href="/landing/roadmap"
                     className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
                   >
@@ -70,9 +80,6 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Dialogs */}
-        <Suspense fallback={null}>
-          <CTAOptionsDialog />
-        </Suspense>
         <WaitlistDialog />
         <ThankYouModal />
         <CookieConsentBanner />

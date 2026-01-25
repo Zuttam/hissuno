@@ -39,11 +39,22 @@ interface WaterWebGLContextValue {
     getRect: () => DOMRect,
     callback: (event: RippleEvent, distance: number, angle: number) => void
   ) => () => void
+
+  // Whether click-triggered ripples are enabled (for global click handlers)
+  clickRipplesEnabled: boolean
 }
 
 const WaterWebGLContext = createContext<WaterWebGLContextValue | null>(null)
 
-export function WaterWebGLProvider({ children }: { children: ReactNode }) {
+interface WaterWebGLProviderProps {
+  children: ReactNode
+  enableClickRipples?: boolean
+}
+
+export function WaterWebGLProvider({
+  children,
+  enableClickRipples = false,
+}: WaterWebGLProviderProps) {
   const rippleEventsRef = useRef<RippleEvent[]>([])
   const subscribersRef = useRef<Map<string, RippleSubscriber>>(new Map())
 
@@ -109,7 +120,12 @@ export function WaterWebGLProvider({ children }: { children: ReactNode }) {
 
   return (
     <WaterWebGLContext.Provider
-      value={{ rippleEventsRef, triggerRipple, subscribeToRipples }}
+      value={{
+        rippleEventsRef,
+        triggerRipple,
+        subscribeToRipples,
+        clickRipplesEnabled: enableClickRipples,
+      }}
     >
       {children}
     </WaterWebGLContext.Provider>

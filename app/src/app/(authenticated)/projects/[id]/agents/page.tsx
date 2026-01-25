@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { useProject } from '@/components/providers/project-provider'
 import { TestAgentDialog } from '@/components/projects/test-agent-dialog'
 import { FloatingCard } from '@/components/ui/floating-card'
-import { Button, Heading, Alert, Spinner, Input, Select, PageHeader } from '@/components/ui'
+import { Button, Heading, Alert, Spinner, Input, Select, PageHeader, FormField } from '@/components/ui'
+import { PackageSelector } from '@/components/projects/knowledge/package-selector'
 
 interface AgentSettings {
   supportAgent: {
     toneOfVoice: string
     brandGuidelines: string
+    packageId: string | null
   }
   pmAgent: {
     classificationGuidelines: string
@@ -25,6 +27,7 @@ export default function AgentsPage() {
     supportAgent: {
       toneOfVoice: 'professional',
       brandGuidelines: '',
+      packageId: null,
     },
     pmAgent: {
       classificationGuidelines: '',
@@ -43,12 +46,19 @@ export default function AgentsPage() {
 
     const fetchSettings = async () => {
       try {
-        const response = await fetch(`/api/projects/${projectId}/settings`)
-        if (response.ok) {
-          const data = await response.json()
+        // Fetch both general settings and support agent settings
+        const [settingsRes, supportAgentRes] = await Promise.all([
+          fetch(`/api/projects/${projectId}/settings`),
+          fetch(`/api/projects/${projectId}/settings/support-agent`),
+        ])
+
+        if (settingsRes.ok) {
+          const data = await settingsRes.json()
           if (data.settings) {
-            setSettings({
+            setSettings((prev) => ({
+              ...prev,
               supportAgent: {
+                ...prev.supportAgent,
                 toneOfVoice: data.settings.support_agent_tone ?? 'professional',
                 brandGuidelines: data.settings.brand_guidelines ?? '',
               },
@@ -57,7 +67,20 @@ export default function AgentsPage() {
                 specGuidelines: data.settings.spec_guidelines ?? '',
                 autoSpecThreshold: data.settings.auto_spec_threshold ?? 3,
               },
-            })
+            }))
+          }
+        }
+
+        if (supportAgentRes.ok) {
+          const data = await supportAgentRes.json()
+          if (data.settings) {
+            setSettings((prev) => ({
+              ...prev,
+              supportAgent: {
+                ...prev.supportAgent,
+                packageId: data.settings.support_agent_package_id ?? null,
+              },
+            }))
           }
         }
       } catch (err) {
@@ -78,19 +101,29 @@ export default function AgentsPage() {
     setSuccessMessage(null)
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/settings`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          support_agent_tone: settings.supportAgent.toneOfVoice,
-          brand_guidelines: settings.supportAgent.brandGuidelines,
-          classification_guidelines: settings.pmAgent.classificationGuidelines,
-          spec_guidelines: settings.pmAgent.specGuidelines,
-          auto_spec_threshold: settings.pmAgent.autoSpecThreshold,
+      // Save both general settings and support agent package setting
+      const [settingsRes, supportAgentRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/settings`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            support_agent_tone: settings.supportAgent.toneOfVoice,
+            brand_guidelines: settings.supportAgent.brandGuidelines,
+            classification_guidelines: settings.pmAgent.classificationGuidelines,
+            spec_guidelines: settings.pmAgent.specGuidelines,
+            auto_spec_threshold: settings.pmAgent.autoSpecThreshold,
+          }),
         }),
-      })
+        fetch(`/api/projects/${projectId}/settings/support-agent`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            support_agent_package_id: settings.supportAgent.packageId,
+          }),
+        }),
+      ])
 
-      if (!response.ok) {
+      if (!settingsRes.ok || !supportAgentRes.ok) {
         throw new Error('Failed to save settings')
       }
 
@@ -161,10 +194,24 @@ export default function AgentsPage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-              <div>
-                <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
-                  Tone of Voice
-                </label>
+              <FormField
+                label="Knowledge Package"
+                description="Select which knowledge package the agent uses for responses"
+              >
+                <PackageSelector
+                  projectId={projectId}
+                  value={settings.supportAgent.packageId}
+                  onChange={(packageId) => setSettings({
+                    ...settings,
+                    supportAgent: { ...settings.supportAgent, packageId }
+                  })}
+                />
+              </FormField>
+
+              <FormField
+                label="Tone of Voice"
+                description="The overall tone the agent uses in responses"
+              >
                 <Select
                   value={settings.supportAgent.toneOfVoice}
                   onChange={(e) => setSettings({
@@ -177,10 +224,7 @@ export default function AgentsPage() {
                   <option value="technical">Technical</option>
                   <option value="casual">Casual</option>
                 </Select>
-                <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                  The overall tone the agent uses in responses
-                </p>
-              </div>
+              </FormField>
             </div>
 
             <div>

@@ -7,24 +7,24 @@ import { WaterReveal } from '@/components/landing/water-reveal'
 const FEATURES = [
   {
     id: 'widget',
-    title: 'Website Widget',
+    title: 'Web Widget',
     description:
-      'Drop in a script tag. Customers get instant answers without waiting for you.',
+      'Embed in 2 minutes. No training required. Customers get instant, accurate answers 24/7.',
     icon: '/window.svg',
   },
   {
     id: 'slack',
-    title: 'Slack Channels',
+    title: 'Slack Integration',
     description:
-      'Add Hissuno to your community or support channel. It responds in threads, keeps conversations organized.',
+      'Works in your community and support channels. Responds in threads, keeps conversations organized.',
     icon: '/logos/slack.svg',
   },
   {
-    id: 'issues',
-    title: 'Every Conversation Becomes an Issue',
+    id: 'email',
+    title: 'Email Support',
     description:
-      'When customers report bugs or request features, Hissuno creates issues automatically. Nothing gets lost.',
-    icon: '/logos/linear.svg',
+      'Connect Gmail or Outlook. AI responds to support emails while you supervise and approve.',
+    icon: '/logos/gmail.svg',
   },
 ]
 
@@ -34,8 +34,14 @@ export function SupportFeaturesSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Works Everywhere Your Customers Are
+            Multi-Channel Support
           </h2>
+        </WaterReveal>
+
+        <WaterReveal preset="text" delay={0.15}>
+          <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
+            Meet customers where they are — web, Slack, or email
+          </p>
         </WaterReveal>
 
         <div className="mt-12 grid gap-6 md:grid-cols-3">

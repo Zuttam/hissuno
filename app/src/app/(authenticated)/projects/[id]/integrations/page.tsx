@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useProject } from '@/components/providers/project-provider'
+import { useSupportWidget } from '@/components/providers/support-widget-provider'
 import { WidgetConfigDialog } from '@/components/projects/edit-dialogs/widget-config-dialog'
 import { SlackConfigDialog } from '@/components/projects/edit-dialogs/slack-config-dialog'
 import { GitHubConfigDialog } from '@/components/projects/edit-dialogs/github-config-dialog'
+import { IntercomConfigDialog } from '@/components/projects/edit-dialogs/intercom-config-dialog'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { Badge, Button, Spinner, PageHeader } from '@/components/ui'
 
@@ -18,7 +20,7 @@ interface Integration {
   description: string
   status: IntegrationStatus
   icon: React.ReactNode
-  category: 'sessions' | 'issues' | 'development'
+  category: 'sessions' | 'issues' | 'development' | 'analytics'
   comingSoon?: boolean
 }
 
@@ -66,28 +68,40 @@ function IntercomIcon() {
   return <Image src="/logos/intercom.svg" alt="Intercom" width={32} height={32} />
 }
 
+function AmplitudeIcon() {
+  return <Image src="/logos/amplitude.svg" alt="Amplitude" width={32} height={32} />
+}
+
+function PostHogIcon() {
+  return <Image src="/logos/posthog.svg" alt="PostHog" width={32} height={32} />
+}
+
 export default function IntegrationsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { project, projectId, isLoading: isLoadingProject } = useProject()
+  const { openWithPrompt } = useSupportWidget()
   const [showWidgetDialog, setShowWidgetDialog] = useState(false)
   const [showSlackDialog, setShowSlackDialog] = useState(false)
   const [showGithubDialog, setShowGithubDialog] = useState(false)
+  const [showIntercomDialog, setShowIntercomDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [widgetStats, setWidgetStats] = useState<{ isActive: boolean } | null>(null)
   const [slackConnected, setSlackConnected] = useState(false)
   const [githubConnected, setGithubConnected] = useState(false)
+  const [intercomConnected, setIntercomConnected] = useState(false)
 
   // Refresh integration statuses - defined early so it can be used in useEffect
   const refreshStatuses = useCallback(async () => {
     if (!projectId) return
 
     try {
-      const [widgetRes, slackRes, githubRes] = await Promise.all([
+      const [widgetRes, slackRes, githubRes, intercomRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/sessions?stats=true`),
         fetch(`/api/integrations/slack?projectId=${projectId}`),
         fetch(`/api/integrations/github?projectId=${projectId}`),
+        fetch(`/api/integrations/intercom?projectId=${projectId}`),
       ])
 
       if (widgetRes.ok) {
@@ -103,6 +117,11 @@ export default function IntegrationsPage() {
       if (githubRes.ok) {
         const data = await githubRes.json()
         setGithubConnected(data.connected)
+      }
+
+      if (intercomRes.ok) {
+        const data = await intercomRes.json()
+        setIntercomConnected(data.connected)
       }
     } catch (err) {
       console.error('[integrations] Failed to refresh statuses:', err)
@@ -121,6 +140,8 @@ export default function IntegrationsPage() {
       setShowSlackDialog(true)
     } else if (dialog === 'github') {
       setShowGithubDialog(true)
+    } else if (dialog === 'intercom') {
+      setShowIntercomDialog(true)
     }
 
     // Handle OAuth return - clean up URL and refresh status
@@ -152,16 +173,24 @@ export default function IntegrationsPage() {
     }
   }
 
+  const handleCloseIntercomDialog = () => {
+    setShowIntercomDialog(false)
+    if (searchParams.get('dialog')) {
+      router.replace(`/projects/${projectId}/integrations`)
+    }
+  }
+
   // Fetch integration statuses
   useEffect(() => {
     if (!projectId) return
 
     const fetchStatuses = async () => {
       try {
-        const [widgetRes, slackRes, githubRes] = await Promise.all([
+        const [widgetRes, slackRes, githubRes, intercomRes] = await Promise.all([
           fetch(`/api/sessions?projectId=${projectId}&stats=true`),
           fetch(`/api/integrations/slack?projectId=${projectId}`),
           fetch(`/api/integrations/github?projectId=${projectId}`),
+          fetch(`/api/integrations/intercom?projectId=${projectId}`),
         ])
 
         if (widgetRes.ok) {
@@ -177,6 +206,11 @@ export default function IntegrationsPage() {
         if (githubRes.ok) {
           const data = await githubRes.json()
           setGithubConnected(data.connected)
+        }
+
+        if (intercomRes.ok) {
+          const data = await intercomRes.json()
+          setIntercomConnected(data.connected)
         }
       } catch (err) {
         console.error('[integrations] Failed to fetch statuses:', err)
@@ -220,10 +254,9 @@ export default function IntegrationsPage() {
         id: 'intercom',
         name: 'Intercom',
         description: 'Sync conversations from Intercom',
-        status: 'not_connected',
+        status: intercomConnected ? 'active' : 'not_connected',
         icon: <IntercomIcon />,
         category: 'sessions',
-        comingSoon: true,
       },
       {
         id: 'github',
@@ -251,18 +284,42 @@ export default function IntegrationsPage() {
         category: 'issues',
         comingSoon: true,
       },
+      {
+        id: 'amplitude',
+        name: 'Amplitude',
+        description: 'Connect product analytics data to enhance customer insights',
+        status: 'not_connected',
+        icon: <AmplitudeIcon />,
+        category: 'analytics',
+        comingSoon: true,
+      },
+      {
+        id: 'posthog',
+        name: 'PostHog',
+        description: 'Sync user behavior data for deeper session context',
+        status: 'not_connected',
+        icon: <PostHogIcon />,
+        category: 'analytics',
+        comingSoon: true,
+      },
     ])
-  }, [widgetStats, slackConnected, githubConnected])
+  }, [widgetStats, slackConnected, githubConnected, intercomConnected])
 
   const sessionIntegrations = integrations.filter(i => i.category === 'sessions')
   const issueIntegrations = integrations.filter(i => i.category === 'issues')
   const developmentIntegrations = integrations.filter(i => i.category === 'development')
+  const analyticsIntegrations = integrations.filter(i => i.category === 'analytics')
 
   // Handler for opening integration dialogs - updates URL for consistent tracking
   const handleConfigureIntegration = (integrationId: string) => {
-    if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github') {
+    if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github' || integrationId === 'intercom') {
       router.push(`/projects/${projectId}/integrations?dialog=${integrationId}`)
     }
+  }
+
+  // Handler for missing integration link - opens support widget with pre-filled prompt
+  const handleMissingIntegration = () => {
+    openWithPrompt("Hey I'm missing an integration in hissuno... ")
   }
 
   // Show loading state
@@ -279,9 +336,18 @@ export default function IntegrationsPage() {
 
   return (
     <>
-      <PageHeader title="Integrations" />
+      <PageHeader
+        title="Integrations"
+        actions={
+          <button
+            onClick={handleMissingIntegration}
+            className="mr-4 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--foreground)] transition-colors"
+          >
+            Missing integration?
+          </button>
+        }
+      />
 
-    
       {/* Session Sources */}
       <div>
         <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] mb-4">
@@ -330,6 +396,22 @@ export default function IntegrationsPage() {
         </div>
       </div>
 
+      {/* Behavioral Analysis */}
+      <div>
+        <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] mb-4">
+          Behavioral Analysis
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          {analyticsIntegrations.map((integration) => (
+            <IntegrationCard
+              key={integration.id}
+              integration={integration}
+              onConfigure={() => handleConfigureIntegration(integration.id)}
+            />
+          ))}
+        </div>
+      </div>
+
       <WidgetConfigDialog
         open={showWidgetDialog}
         onClose={handleCloseWidgetDialog}
@@ -349,6 +431,13 @@ export default function IntegrationsPage() {
       <GitHubConfigDialog
         open={showGithubDialog}
         onClose={handleCloseGithubDialog}
+        projectId={projectId}
+        onStatusChanged={refreshStatuses}
+      />
+
+      <IntercomConfigDialog
+        open={showIntercomDialog}
+        onClose={handleCloseIntercomDialog}
         projectId={projectId}
         onStatusChanged={refreshStatuses}
       />

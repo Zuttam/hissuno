@@ -2,37 +2,34 @@
 
 import { motion } from 'motion/react'
 import Image from 'next/image'
-import { Mail } from 'lucide-react'
-import { Button, ThemeLogo } from '@/components/ui'
+import { Button } from '@/components/ui'
 import { useWaterWebGLOptional } from '@/components/water-webgl/WaterWebGLContext'
 import { useCTA } from '@/components/landing/cta-context'
 import { WATER_EASINGS } from '@/components/landing/scroll-animation-config'
 
-type Integration =
-  | { name: string; logo: string; isImage: true }
-  | { name: string; icon: typeof Mail; isImage: false }
+interface Integration {
+  name: string
+  logo: string
+}
 
 const INTEGRATIONS: Integration[] = [
-  { name: 'Slack', logo: '/logos/slack.svg', isImage: true },
-  { name: 'Email', icon: Mail, isImage: false },
-  { name: 'Linear', logo: '/logos/linear.svg', isImage: true },
-  { name: 'GitHub', logo: '/logos/github.svg', isImage: true },
-  { name: 'Intercom', logo: '/logos/intercom.svg', isImage: true },
-  { name: 'Gong', logo: '/logos/gong.svg', isImage: true },
-  { name: 'Jira', logo: '/logos/jira.svg', isImage: true },
+  { name: 'Slack', logo: '/logos/slack.svg' },
+  { name: 'Gmail', logo: '/logos/gmail.svg' },
+  { name: 'Linear', logo: '/logos/linear.svg' },
+  { name: 'GitHub', logo: '/logos/github.svg' },
+  { name: 'Intercom', logo: '/logos/intercom.svg' },
+  { name: 'Gong', logo: '/logos/gong.svg' },
+  { name: 'Jira', logo: '/logos/jira.svg' },
 ]
 
 export function HeroSection() {
   const water = useWaterWebGLOptional()
-  const { openCTAOptions } = useCTA()
+  const { openWaitlist } = useCTA()
 
-  const handleLogoClick = (e: React.MouseEvent) => {
-    water?.triggerRipple(e.clientX, e.clientY, 1.5)
-  }
 
   const handleCTAClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
-    openCTAOptions('hero')
+    openWaitlist('hero')
   }
 
   // Hero uses timed animations (not scroll-triggered) since it's above the fold
@@ -56,28 +53,16 @@ export function HeroSection() {
         {...heroAnimation}
         transition={{ duration: 1.2, ease: WATER_EASINGS.float, delay: 0.2 }}
         className="relative z-10 mx-auto max-w-4xl text-center">
-        {/* Interactive logo that triggers ripples */}
-        <div
-          className="mx-auto mb-8 w-fit cursor-pointer"
-          onClick={handleLogoClick}
-        >
-          <ThemeLogo width={180} height={60} priority />
-        </div>
 
-        <h1
-          className="font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl"
-        >
-          Customer feedback → triaged issues → product specs.
+        <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
+          AI Agents for
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            Automatically.
+            Customer Intelligence
           </span>
         </h1>
 
-        <p
-          className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl"
-        >
-          Hissuno watches your customer conversations, creates prioritized issues, and writes specs
-          linked to your codebase. No more spreadsheets. No more lost requests.
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
+          From support to specs to shipped code — let AI handle the noise while you build what matters.
         </p>
 
         {/* Integration logos row */}
@@ -95,32 +80,29 @@ export function HeroSection() {
                 className="flex h-8 w-8 items-center justify-center opacity-60 transition-opacity hover:opacity-100"
                 title={integration.name}
               >
-                {integration.isImage ? (
-                  <Image
-                    src={integration.logo}
-                    alt={integration.name}
-                    width={24}
-                    height={24}
-                    className="h-6 w-6 dark:invert"
-                  />
-                ) : (
-                  <integration.icon className="h-5 w-5 text-[var(--text-secondary)]" />
-                )}
+                <Image
+                  src={integration.logo}
+                  alt={integration.name}
+                  width={24}
+                  height={24}
+                  className={integration.name === 'Gmail' ? 'h-6 w-6' : 'h-6 w-6 dark:invert'}
+                />
               </div>
             ))}
           </div>
         </motion.div>
 
-        <div
-          className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
-        >
+        <div className="mt-10 flex flex-col items-center justify-center">
           <Button
             size="lg"
             onClick={handleCTAClick}
             className="w-full bg-[var(--accent-selected)] hover:opacity-90 sm:w-auto"
           >
-            Get Started
+            Join Waitlist
           </Button>
+          <p className="mt-2 text-sm text-[var(--text-tertiary)]">
+            Join now and get free credits
+          </p>
         </div>
       </motion.div>
     </section>

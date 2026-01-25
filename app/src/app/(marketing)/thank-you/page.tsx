@@ -9,13 +9,13 @@ function ThankYouContent() {
   const { showThankYou } = useCTA()
   const hasOpened = useRef(false)
 
-  const type = searchParams.get('type') as 'waitlist' | 'call' | null
+  const type = searchParams.get('type')
 
   useEffect(() => {
-    // Only open the modal once on mount
-    if (type && !hasOpened.current) {
+    // Only open the modal once on mount when type is 'waitlist'
+    if (type === 'waitlist' && !hasOpened.current) {
       hasOpened.current = true
-      showThankYou(type)
+      showThankYou()
     }
   }, [type, showThankYou])
 

@@ -16,6 +16,10 @@ export type TriggerAnalysisParams = {
   projectId: string
   userId: string
   supabase: SupabaseClient<Database>
+  /** Named package ID to associate the analysis with */
+  namedPackageId?: string
+  /** Specific source IDs to analyze (if not provided, uses all enabled sources) */
+  sourceIds?: string[]
 }
 
 export type TriggerAnalysisResult = {
@@ -50,7 +54,7 @@ export type TriggerAnalysisResult = {
 export async function triggerKnowledgeAnalysis(
   params: TriggerAnalysisParams
 ): Promise<TriggerAnalysisResult> {
-  const { projectId, userId, supabase } = params
+  const { projectId, userId, supabase, namedPackageId, sourceIds } = params
 
   // Fetch project
   const { data: project, error: projectError } = await supabase
@@ -84,11 +88,18 @@ export async function triggerKnowledgeAnalysis(
     }
   }
 
-  // Fetch all knowledge sources for the project (with source_code for codebase type)
-  const { data: sources, error: sourcesError } = await supabase
+  // Fetch knowledge sources for the project (with source_code for codebase type)
+  // If sourceIds provided, only fetch those specific sources
+  let sourcesQuery = supabase
     .from('knowledge_sources')
     .select('*, source_code:source_codes(*)')
     .eq('project_id', projectId)
+
+  if (sourceIds && sourceIds.length > 0) {
+    sourcesQuery = sourcesQuery.in('id', sourceIds)
+  }
+
+  const { data: sources, error: sourcesError } = await sourcesQuery
 
   if (sourcesError) {
     console.error('[analysis-service] failed to load sources', projectId, sourcesError)
@@ -97,8 +108,10 @@ export async function triggerKnowledgeAnalysis(
 
   const allSources = (sources ?? []) as Array<KnowledgeSourceRecord & { source_code: { id: string; kind: string; repository_url: string | null; repository_branch: string | null } | null }>
 
-  // Filter to only enabled sources
-  const enabledSources = allSources.filter((s) => s.enabled !== false)
+  // Filter to only enabled sources (when sourceIds not specified) or use all fetched (when sourceIds specified)
+  const enabledSources = sourceIds
+    ? allSources // When sourceIds specified, use all fetched sources regardless of enabled flag
+    : allSources.filter((s) => s.enabled !== false)
 
   // Find the codebase source (if any and enabled)
   const codebaseSource = enabledSources.find((s) => s.type === 'codebase')
@@ -151,6 +164,7 @@ export async function triggerKnowledgeAnalysis(
   // Note: Codebase is synced internally by prepare-codebase step
   const workflowInput = {
     projectId,
+    namedPackageId: namedPackageId ?? null,
     analysisId: '', // Will be set after record creation
     analysisScope,
     sources: enabledSources.map((s) => ({
@@ -177,6 +191,7 @@ export async function triggerKnowledgeAnalysis(
         hasCodebase,
         sourceIds: enabledSources.map((s) => s.id),
         branch: branch,
+        namedPackageId: namedPackageId ?? null,
         workflowInput: {
           ...workflowInput,
           analysisId: '', // Placeholder - will be updated below

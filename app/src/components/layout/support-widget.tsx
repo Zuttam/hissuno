@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { HissunoWidget } from '@hissuno/widget'
 import { useUser } from '@/components/providers/auth-provider'
+import { useSupportWidget } from '@/components/providers/support-widget-provider'
 import { HISSUNO_SUPPORT_PROJECT_ID } from '@/lib/consts'
 
 const WIDGET_TOKEN_KEY = 'hissuno_widget_token'
@@ -39,6 +40,7 @@ function cacheToken(userId: string, token: string): void {
 
 export function SupportWidget() {
   const { user, isLoading } = useUser()
+  const { isOpen, open, close, registerControls } = useSupportWidget()
   const [widgetToken, setWidgetToken] = useState<string | undefined>()
 
   // Fetch widget token for authenticated users (with localStorage caching)
@@ -81,6 +83,10 @@ export function SupportWidget() {
         email: user.email ?? '',
         ...(user.user_metadata?.full_name && { name: user.user_metadata.full_name }),
       } : undefined}
+      defaultOpen={isOpen}
+      onOpen={open}
+      onClose={close}
+      onControlsReady={registerControls}
     />
   )
 }

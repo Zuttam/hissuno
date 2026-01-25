@@ -65,7 +65,7 @@ export function Dialog({ open, onClose, title, children, className, size = 'md' 
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
           className={cn(
-            'w-full rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-xl',
+            'w-full max-h-[90vh] flex flex-col rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-xl',
             sizeClasses[size],
             className
           )}
@@ -74,7 +74,7 @@ export function Dialog({ open, onClose, title, children, className, size = 'md' 
           aria-labelledby="dialog-title"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b-2 border-[color:var(--border-subtle)] p-4">
+          <div className="flex-shrink-0 flex items-center justify-between border-b-2 border-[color:var(--border-subtle)] p-4">
             <h2
               id="dialog-title"
               className="font-mono text-lg font-bold uppercase tracking-tight text-[color:var(--foreground)]"
@@ -105,7 +105,7 @@ export function Dialog({ open, onClose, title, children, className, size = 'md' 
           </div>
 
           {/* Content */}
-          <div className="p-4">{children}</div>
+          <div className="flex-1 overflow-y-auto p-4">{children}</div>
         </div>
       </div>
     </>

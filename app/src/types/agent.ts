@@ -7,4 +7,6 @@ export type SupportAgentContext = {
   userId: string | null
   userMetadata: Record<string, string> | null
   sessionId: string
+  /** Named knowledge package ID to use for this session */
+  namedPackageId: string | null
 }

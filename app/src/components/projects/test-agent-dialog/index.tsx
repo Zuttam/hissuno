@@ -10,6 +10,7 @@ import { SessionListSidebar } from './session-list-sidebar'
 
 interface TestAgentDialogProps {
   project: ProjectRecord
+  packageId?: string
   onClose: () => void
 }
 
@@ -49,7 +50,7 @@ function LoadingIndicator() {
   )
 }
 
-export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
+export function TestAgentDialog({ project, packageId, onClose }: TestAgentDialogProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { user } = useUser()
 
@@ -84,6 +85,7 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
     initialMessage: 'Hi! How can I help you today?',
     userId: user?.id,
     sessionId: currentSessionId || undefined,
+    packageId,
     userMetadata: user
       ? {
           email: user.email ?? '',

@@ -65,6 +65,7 @@ export function HissunoWidget({
   defaultOpen = false,
   onOpen,
   onClose,
+  onControlsReady,
   className,
   headers = {},
 }: HissunoWidgetProps) {
@@ -140,6 +141,11 @@ export function HissunoWidget({
     userId,
     userMetadata,
   });
+
+  // Expose chat controls to parent components
+  useEffect(() => {
+    onControlsReady?.({ setInput });
+  }, [onControlsReady, setInput]);
 
   // History is only available if userId is provided
   const canShowHistory = !!userId;

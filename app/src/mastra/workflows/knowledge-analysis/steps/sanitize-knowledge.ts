@@ -55,7 +55,7 @@ export const sanitizeKnowledge = createStep({
 
     await writer?.write({ type: 'progress', message: 'Scanning for sensitive information...' })
 
-    const { business, product, technical, faq, how_to, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
+    const { projectId, namedPackageId, business, product, technical, faq, how_to, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
     const agent = mastra?.getAgent('securityScannerAgent')
 
     // Track redaction stats
@@ -73,6 +73,8 @@ export const sanitizeKnowledge = createStep({
       logger?.warn('[sanitize-knowledge] Security scanner agent not found, skipping sanitization')
       await writer?.write({ type: 'progress', message: 'Security scanner not configured, skipping...' })
       return {
+        projectId,
+        namedPackageId,
         business,
         product,
         technical,
@@ -177,6 +179,8 @@ Return the sanitized content maintaining the exact same structure and formatting
     }
 
     return {
+      projectId,
+      namedPackageId,
       business: sanitizedBusiness,
       product: sanitizedProduct,
       technical: sanitizedTechnical,

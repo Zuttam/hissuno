@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { createAdminClient, isServiceRoleConfigured } from '@/lib/supabase/server'
+import type { CTAEventData } from '@/lib/event_tracking/types'
 
 export const runtime = 'nodejs'
 
 // Strict email regex (RFC 5322 simplified)
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
+
+type WaitlistSource = CTAEventData['source']
 
 export async function POST(request: Request) {
   if (!isServiceRoleConfigured()) {
@@ -14,7 +17,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { email, website } = body as { email?: string; website?: string }
+    const { email, website, source } = body as { email?: string; website?: string; source?: WaitlistSource }
 
     // Honeypot check - if website field is filled, it's likely a bot
     if (website) {
@@ -50,6 +53,7 @@ export async function POST(request: Request) {
     const { error } = await supabase.from('waitlist').insert({
       email: sanitizedEmail,
       ip_address: ipAddress,
+      source: source || null,
     })
 
     // Handle duplicate email gracefully

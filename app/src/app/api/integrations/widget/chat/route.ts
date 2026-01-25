@@ -22,6 +22,8 @@ interface AgentRequestBody {
   pageTitle?: string
   sessionId?: string
   widgetToken?: string
+  /** Override the knowledge package used for this chat (for testing specific packages) */
+  packageId?: string
 }
 
 /**
@@ -126,6 +128,7 @@ export async function POST(request: NextRequest) {
       pageTitle,
       sessionId: clientSessionId,
       widgetToken,
+      packageId,
     } = body
 
     // Validate required fields
@@ -223,6 +226,7 @@ export async function POST(request: NextRequest) {
       messages,
       userId,
       userMetadata,
+      packageId,
       supabase,
     })
 

@@ -24,6 +24,7 @@ export type SourceInput = z.infer<typeof sourceInputSchema>
  */
 export const workflowInputSchema = z.object({
   projectId: z.string(),
+  namedPackageId: z.string().nullable().optional(),
   analysisScope: z.string().nullable().optional(),
   sources: z.array(sourceInputSchema),
 })
@@ -38,6 +39,8 @@ export const workflowContextWithCodebaseSchema = workflowInputSchema.extend({
   localCodePath: z.string().nullable(),
   codebaseLeaseId: z.string(),
   codebaseCommitSha: z.string().nullable(),
+  // Named package ID (passed through)
+  namedPackageId: z.string().nullable().optional(),
 })
 
 export type WorkflowContextWithCodebase = z.infer<typeof workflowContextWithCodebaseSchema>
@@ -48,6 +51,7 @@ export type WorkflowContextWithCodebase = z.infer<typeof workflowContextWithCode
 
 export const analyzeCodebaseOutputSchema = z.object({
   projectId: z.string(),
+  namedPackageId: z.string().nullable().optional(),
   sources: z.array(sourceInputSchema),
   codebaseAnalysis: z.string(),
   hasCodebase: z.boolean(),
@@ -69,6 +73,8 @@ export const analysisResultSchema = z.object({
 export type AnalysisResult = z.infer<typeof analysisResultSchema>
 
 export const analyzeSourcesOutputSchema = z.object({
+  projectId: z.string(),
+  namedPackageId: z.string().nullable().optional(),
   analysisResults: z.array(analysisResultSchema),
   codebaseAnalysis: z.string(),
   hasCodebase: z.boolean(),
@@ -81,6 +87,8 @@ export const analyzeSourcesOutputSchema = z.object({
 export type AnalyzeSourcesOutput = z.infer<typeof analyzeSourcesOutputSchema>
 
 export const compiledKnowledgeSchema = z.object({
+  projectId: z.string(),
+  namedPackageId: z.string().nullable().optional(),
   business: z.string(),
   product: z.string(),
   technical: z.string(),
@@ -109,6 +117,8 @@ export const redactionSummarySchema = z.object({
 export type RedactionSummary = z.infer<typeof redactionSummarySchema>
 
 export const sanitizedKnowledgeSchema = z.object({
+  projectId: z.string(),
+  namedPackageId: z.string().nullable().optional(),
   business: z.string(),
   product: z.string(),
   technical: z.string(),
@@ -132,6 +142,8 @@ export const knowledgePackageSchema = z.object({
 export type KnowledgePackage = z.infer<typeof knowledgePackageSchema>
 
 export const workflowOutputSchema = z.object({
+  projectId: z.string(),
+  namedPackageId: z.string().nullable().optional(),
   saved: z.boolean(),
   packages: z.array(knowledgePackageSchema),
   errors: z.array(z.string()),

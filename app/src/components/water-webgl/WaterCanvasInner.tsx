@@ -6,12 +6,20 @@ import { WaterPlane } from './WaterPlane'
 import { PostEffects } from './PostEffects'
 import { useWaterWebGL } from './WaterWebGLContext'
 
+const DESKTOP_BREAKPOINT = 768
+
 export function WaterCanvasInner() {
-  const { triggerRipple } = useWaterWebGL()
+  const { triggerRipple, clickRipplesEnabled } = useWaterWebGL()
   const lastRippleRef = useRef<number>(0)
 
-  // Global click handler for ripples
+  // Global click handler for ripples (desktop marketing pages only)
   useEffect(() => {
+    // Skip if click ripples are disabled
+    if (!clickRipplesEnabled) return
+
+    // Only enable on desktop
+    if (window.innerWidth <= DESKTOP_BREAKPOINT) return
+
     const RIPPLE_COOLDOWN = 100 // ms between ripples
 
     const handleClick = (e: MouseEvent) => {
@@ -31,32 +39,12 @@ export function WaterCanvasInner() {
       triggerRipple(e.clientX, e.clientY, 1.0)
     }
 
-    const handleTouchEnd = (e: TouchEvent) => {
-      const now = Date.now()
-      if (now - lastRippleRef.current < RIPPLE_COOLDOWN) return
-
-      const touch = e.changedTouches[0]
-      if (!touch) return
-      const target = e.target as Element
-      if (
-        target.closest(
-          'button, a, input, textarea, select, [role="button"], [data-no-ripple]'
-        )
-      ) {
-        return
-      }
-      lastRippleRef.current = now
-      triggerRipple(touch.clientX, touch.clientY, 0.8)
-    }
-
     document.addEventListener('click', handleClick)
-    document.addEventListener('touchend', handleTouchEnd, { passive: true })
 
     return () => {
       document.removeEventListener('click', handleClick)
-      document.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [triggerRipple])
+  }, [triggerRipple, clickRipplesEnabled])
 
   return (
     <Canvas

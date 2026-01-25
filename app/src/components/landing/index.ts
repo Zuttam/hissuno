@@ -3,7 +3,6 @@ export { UTMCapture } from './utm-capture'
 
 // CTA (unified context for all CTA flows)
 export { CTAProvider, useCTA } from './cta-context'
-export { CTAOptionsDialog } from './cta-options-dialog'
 export { WaitlistDialog } from './waitlist-dialog'
 export { ThankYouModal } from './thank-you-modal'
 
@@ -11,7 +10,7 @@ export { ThankYouModal } from './thank-you-modal'
 export { MarketingNav } from './marketing-nav'
 
 // Home page sections
-export { HeroSection, FeaturesSection, ValuePropsSection, QuotesSection, CommunitySection, CTASection, MistOverlay } from './home'
+export { HeroSection, AgentsShowcaseSection, FeaturesSection, ValuePropsSection, QuotesSection, CommunitySection, CTASection, MistOverlay } from './home'
 
 // Roadmap page
 export {
@@ -27,5 +26,23 @@ export {
   SupportHeroSection,
   SupportFeaturesSection,
   SupportHowItWorksSection,
+  SupportKnowledgeSection,
   SupportCTASection,
 } from './support-agent'
+
+// PM Co-Pilot landing page
+export {
+  PMHeroSection,
+  PMFeaturesSection,
+  PMValuePropsSection,
+  PMQuotesSection,
+  PMCTASection,
+} from './pm-copilot'
+
+// FDE (Forward Development Engineer) landing page
+export {
+  FDEHeroSection,
+  FDEFeaturesSection,
+  FDEValuePropsSection,
+  FDECTASection,
+} from './fde'

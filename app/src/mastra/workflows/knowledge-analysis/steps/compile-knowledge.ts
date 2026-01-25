@@ -26,7 +26,7 @@ export const compileKnowledge = createStep({
 
     await writer?.write({ type: 'progress', message: 'Compiling knowledge packages...' })
 
-    const { analysisResults, codebaseAnalysis, hasCodebase, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
+    const { projectId, namedPackageId, analysisResults, codebaseAnalysis, hasCodebase, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
     const agent = mastra?.getAgent('knowledgeCompilerAgent')
 
     // Combine all analysis content
@@ -44,6 +44,8 @@ export const compileKnowledge = createStep({
 
     if (allContent.length === 0) {
       return {
+        projectId,
+        namedPackageId,
         business: '# Business Knowledge Base\n\nNo content available for analysis.',
         product: '# Product Knowledge Base\n\nNo content available for analysis.',
         technical: '# Technical Knowledge Base\n\nNo content available for analysis.',
@@ -60,6 +62,8 @@ export const compileKnowledge = createStep({
     if (!agent) {
       // Fallback: simple categorization without agent
       return {
+        projectId,
+        namedPackageId,
         business: `# Business Knowledge Base\n\n${combinedContent}`,
         product: `# Product Knowledge Base\n\n${combinedContent}`,
         technical: `# Technical Knowledge Base\n\n${codebaseAnalysis || combinedContent}`,
@@ -106,7 +110,7 @@ For each category, provide a complete markdown document. Return the result as a 
 
       await writer?.write({ type: 'progress', message: 'Knowledge packages compiled successfully' })
 
-      const result = response.object ?? {
+      const defaultKnowledge = {
         business: '# Business Knowledge Base\n\nNo business knowledge extracted.',
         product: '# Product Knowledge Base\n\nNo product knowledge extracted.',
         technical: '# Technical Knowledge Base\n\nNo technical knowledge extracted.',
@@ -114,8 +118,17 @@ For each category, provide a complete markdown document. Return the result as a 
         how_to: '# How-To Guides\n\nNo how-to content extracted.',
       }
 
+      // Extract only the knowledge content fields from the result
+      const result = response.object ?? defaultKnowledge
+
       return {
-        ...result,
+        projectId,
+        namedPackageId,
+        business: result.business ?? defaultKnowledge.business,
+        product: result.product ?? defaultKnowledge.product,
+        technical: result.technical ?? defaultKnowledge.technical,
+        faq: result.faq ?? defaultKnowledge.faq,
+        how_to: result.how_to ?? defaultKnowledge.how_to,
         localCodePath,
         codebaseLeaseId,
         codebaseCommitSha,
@@ -124,6 +137,8 @@ For each category, provide a complete markdown document. Return the result as a 
       const message = error instanceof Error ? error.message : 'Unknown error'
       console.error('[compile-knowledge] Error:', message)
       return {
+        projectId,
+        namedPackageId,
         business: `# Business Knowledge Base\n\nCompilation error: ${message}`,
         product: `# Product Knowledge Base\n\nCompilation error: ${message}`,
         technical: `# Technical Knowledge Base\n\nCompilation error: ${message}`,

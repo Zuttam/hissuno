@@ -4,19 +4,16 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 import type { CTAEventData } from '@/lib/event_tracking/types'
 
 type CTASource = CTAEventData['source']
-type CTADialog = 'options' | 'waitlist' | 'thank-you' | null
-type ThankYouType = 'waitlist' | 'call'
+type CTADialog = 'waitlist' | 'thank-you' | null
 
 interface CTAContextValue {
   // Current active dialog
   activeDialog: CTADialog
   source: CTASource | null
-  thankYouType: ThankYouType | null
 
   // Actions
-  openCTAOptions: (source: CTASource) => void
-  openWaitlistDialog: () => void
-  showThankYou: (type: ThankYouType) => void
+  openWaitlist: (source: CTASource) => void
+  showThankYou: () => void
   closeDialog: () => void
 }
 
@@ -25,28 +22,18 @@ const CTAContext = createContext<CTAContextValue | null>(null)
 export function CTAProvider({ children }: { children: ReactNode }) {
   const [activeDialog, setActiveDialog] = useState<CTADialog>(null)
   const [source, setSource] = useState<CTASource | null>(null)
-  const [thankYouType, setThankYouType] = useState<ThankYouType | null>(null)
 
-  const openCTAOptions = useCallback((ctaSource: CTASource) => {
+  const openWaitlist = useCallback((ctaSource: CTASource) => {
     setSource(ctaSource)
-    setActiveDialog('options')
-  }, [])
-
-  const openWaitlistDialog = useCallback(() => {
     setActiveDialog('waitlist')
   }, [])
 
-  const showThankYou = useCallback((type: ThankYouType) => {
-    setThankYouType(type)
+  const showThankYou = useCallback(() => {
     setActiveDialog('thank-you')
   }, [])
 
   const closeDialog = useCallback(() => {
     setActiveDialog(null)
-    // Reset thank you type after animation completes
-    setTimeout(() => {
-      setThankYouType(null)
-    }, 300)
   }, [])
 
   return (
@@ -54,9 +41,7 @@ export function CTAProvider({ children }: { children: ReactNode }) {
       value={{
         activeDialog,
         source,
-        thankYouType,
-        openCTAOptions,
-        openWaitlistDialog,
+        openWaitlist,
         showThankYou,
         closeDialog,
       }}

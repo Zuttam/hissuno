@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react'
 import Image from 'next/image'
-import { MessageSquare, GitBranch, FileCode, LucideIcon, Mail, BookOpen } from 'lucide-react'
+import { MessageSquare, GitBranch, FileCode, LucideIcon, BookOpen } from 'lucide-react'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { WaterReveal } from '@/components/landing/water-reveal'
 
@@ -25,26 +25,26 @@ interface FloatingIntegration {
 
 const STEPS: Step[] = [
   {
-    id: 'conversations',
+    id: 'connect',
     step: 1,
-    title: 'Conversations flow in',
+    title: 'Connect your channels',
     description:
-      'Connect Slack, your website widget, or email. Every customer message lands in one place.',
+      'Slack, email, widget, Intercom — every customer touchpoint in one place.',
     icon: MessageSquare,
     flowDirection: 'in',
     integrations: [
       { name: 'Slack', logo: '/logos/slack.svg', delay: 0 },
       { name: 'Intercom', logo: '/logos/intercom.svg', delay: 0.1 },
       { name: 'Gong', logo: '/logos/gong.svg', delay: 0.2 },
-      { name: 'Email', icon: Mail, delay: 0.3 },
+      { name: 'Gmail', logo: '/logos/gmail.svg', delay: 0.3 },
     ],
   },
   {
-    id: 'triage',
+    id: 'ai-acts',
     step: 2,
-    title: 'AI triages and creates issues',
+    title: 'AI understands and acts',
     description:
-      'Grounded by your codebase and organizational knowledge. Generates issue classification, impact assessment, and effort estimation automatically.',
+      'Grounded in your codebase, AI answers questions, triages issues, and writes code.',
     icon: GitBranch,
     flowDirection: 'in',
     integrations: [
@@ -55,11 +55,11 @@ const STEPS: Step[] = [
     ],
   },
   {
-    id: 'specs',
+    id: 'control',
     step: 3,
-    title: 'Specs write themselves',
+    title: 'You stay in control',
     description:
-      'When an issue hits critical mass, Hissuno generates a product spec linked to your codebase — ready for your next sprint.',
+      'Review, approve, and ship. Nothing happens without your sign-off.',
     icon: FileCode,
     flowDirection: 'out',
     integrations: [
@@ -108,7 +108,7 @@ function FloatingIntegrationLogo({
             alt={integration.name}
             width={20}
             height={20}
-            className="h-5 w-5 dark:invert"
+            className={integration.name === 'Gmail' ? 'h-5 w-5' : 'h-5 w-5 dark:invert'}
           />
         ) : integration.icon ? (
           <integration.icon className="h-5 w-5 text-[var(--accent-teal)]" />
@@ -203,7 +203,7 @@ export function FeaturesSection() {
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            From conversation to shipped feature in three steps
+            From conversation to shipped code in three steps
           </p>
         </WaterReveal>
 

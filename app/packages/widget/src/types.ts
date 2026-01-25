@@ -183,6 +183,12 @@ export interface HissunoWidgetProps {
   onClose?: () => void;
 
   /**
+   * Callback that exposes chat controls for external manipulation
+   * Useful for programmatically setting input values
+   */
+  onControlsReady?: (controls: { setInput: (value: string) => void }) => void;
+
+  /**
    * Additional CSS class name for custom styling
    */
   className?: string;

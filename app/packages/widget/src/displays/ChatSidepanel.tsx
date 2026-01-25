@@ -68,7 +68,7 @@ export function ChatSidepanel({
   const inputBg = isDark ? '#2a2a2a' : '#f9fafb';
   const inputBorder = isDark ? '#444444' : '#d1d5db';
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -101,7 +101,7 @@ export function ChatSidepanel({
           position: 'fixed',
           top: 0,
           right: 0,
-          width: 400,
+          width: 480,
           height: '100vh',
           display: 'flex',
           flexDirection: 'column',
@@ -250,14 +250,14 @@ export function ChatSidepanel({
             borderTop: `1px solid ${borderColor}`,
           }}
         >
-          <input
-            type="text"
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={isLoading}
             aria-label="Type your message"
+            rows={1}
             style={{
               flex: 1,
               padding: '10px 14px',
@@ -268,6 +268,11 @@ export function ChatSidepanel({
               fontSize: 14,
               outline: 'none',
               fontFamily: 'system-ui, -apple-system, sans-serif',
+              resize: 'none',
+              minHeight: 40,
+              maxHeight: 120,
+              overflow: 'auto',
+              lineHeight: '20px',
             }}
           />
           {isStreaming && onCancelChat ? (
