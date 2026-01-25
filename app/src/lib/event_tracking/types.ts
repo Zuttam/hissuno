@@ -17,7 +17,7 @@ export interface OnboardingCompletedEventData {
 }
 
 export interface CTAEventData {
-  source: 'nav' | 'hero' | 'cta_section'
+  source: 'nav' | 'hero' | 'cta_section' | 'roadmap'
   option?: 'book_call' | 'join_waitlist'
   utm?: UTMParams
 }
@@ -30,6 +30,6 @@ export interface CallBookingEventData {
 
 export interface ThankYouEventData {
   type: 'waitlist' | 'call'
-  source?: 'nav' | 'hero' | 'cta_section'
+  source?: 'nav' | 'hero' | 'cta_section' | 'roadmap'
   utm?: UTMParams
 }

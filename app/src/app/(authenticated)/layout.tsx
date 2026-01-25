@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { connection } from 'next/server'
 import { AuthProvider } from '@/components/providers/auth-provider'
 import { ProjectProvider } from '@/components/providers/project-provider'
 import { SupportWidget } from '@/components/layout/support-widget'
@@ -11,6 +12,7 @@ export default async function AuthenticatedLayout({
 }: {
   children: ReactNode
 }) {
+  await connection()
   const user = await getSessionUser()
 
   return (

@@ -7,10 +7,19 @@ import { createAdminClient } from '@/lib/supabase/server'
 import {
   getSlackBotToken,
   getOrCreateSlackChannel,
-  getSlackChannel,
+  getSlackChannelWithMode,
+  getThreadSession,
+  updateThreadSessionResponder,
+  type SlackChannelWithMode,
 } from './index'
 import { SlackClient } from './client'
-import { processSlackMention, processSlackMessage } from './message-processor'
+import {
+  processSlackMention,
+  processSlackMessage,
+  processPassiveThreadCapture,
+  processSlackThreadResponse,
+} from './message-processor'
+import { decideIfShouldRespond } from './response-decision'
 
 export type SlackEventPayload = {
   teamId: string
@@ -130,13 +139,11 @@ async function handleAppMention(params: {
     return
   }
 
-  // Get or create channel record
-  const channelInfo = await slackClient.getChannelInfo(event.channel)
-  const channel = await getSlackChannel(supabase, teamId, event.channel)
+  // Get channel with mode info
+  let channel = await getSlackChannelWithMode(supabase, teamId, event.channel)
 
-  let channelDbId: string
   if (!channel) {
-    // Get workspace token ID first
+    // Get workspace token ID first and create channel record
     const { data: workspaceToken } = await (supabase as any)
       .from('slack_workspace_tokens')
       .select('id, workspace_domain')
@@ -148,6 +155,7 @@ async function handleAppMention(params: {
       return
     }
 
+    const channelInfo = await slackClient.getChannelInfo(event.channel)
     const newChannel = await getOrCreateSlackChannel(supabase, {
       workspaceTokenId: workspaceToken.id,
       channelId: event.channel,
@@ -160,17 +168,45 @@ async function handleAppMention(params: {
       console.error('[slack.event-handlers] Failed to create channel record')
       return
     }
-    channelDbId = newChannel.id
-  } else {
-    channelDbId = channel.id
+
+    // Re-fetch to get full channel info with mode
+    channel = await getSlackChannelWithMode(supabase, teamId, event.channel)
+    if (!channel) {
+      console.error('[slack.event-handlers] Failed to get channel after creation')
+      return
+    }
   }
 
-  // Process the mention
+  const threadTs = event.thread_ts || event.ts
+
+  // Check channel mode
+  if (channel.channelMode === 'passive') {
+    // Passive mode: capture thread but don't respond
+    console.log(`[slack.event-handlers] Passive mode - capturing mention without response`)
+
+    await processPassiveThreadCapture({
+      projectId,
+      channelId: event.channel,
+      channelDbId: channel.id,
+      threadTs,
+      messageTs: event.ts,
+      userId: event.user,
+      text: event.text || '',
+      slackClient,
+      supabase,
+      teamId,
+      workspacePrimaryDomain: channel.workspacePrimaryDomain,
+      captureMode: 'passive_mention',
+    })
+    return
+  }
+
+  // Interactive mode: process the mention and respond
   await processSlackMention({
     projectId,
     channelId: event.channel,
-    channelDbId,
-    threadTs: event.thread_ts || event.ts, // Use thread_ts if in thread, else message ts
+    channelDbId: channel.id,
+    threadTs,
     messageTs: event.ts,
     userId: event.user,
     text: event.text || '',
@@ -182,7 +218,7 @@ async function handleAppMention(params: {
 }
 
 /**
- * Handle message event (for monitoring external participants)
+ * Handle message event (for monitoring and intelligent response)
  */
 async function handleMessage(params: {
   event: SlackEvent
@@ -192,7 +228,7 @@ async function handleMessage(params: {
   supabase: ReturnType<typeof createAdminClient>
   teamId: string
 }): Promise<void> {
-  const { event, projectId, slackClient, supabase, teamId } = params
+  const { event, projectId, botUserId, slackClient, supabase, teamId } = params
 
   // Only monitor threaded messages for now
   if (!event.thread_ts) {
@@ -203,13 +239,71 @@ async function handleMessage(params: {
     return
   }
 
-  // Get channel record
-  const channel = await getSlackChannel(supabase, teamId, event.channel)
+  // Get channel with mode info
+  const channel = await getSlackChannelWithMode(supabase, teamId, event.channel)
   if (!channel) {
     return // Channel not tracked
   }
 
-  // Process message for external participant detection
+  // Handle based on channel mode
+  if (channel.channelMode === 'passive') {
+    // Passive mode: capture threads based on capture scope
+    await handlePassiveModeMessage({
+      event,
+      channel,
+      projectId,
+      botUserId,
+      slackClient,
+      supabase,
+      teamId,
+    })
+    return
+  }
+
+  // Interactive mode: check if this is a subscribed thread
+  const threadSession = await getThreadSession(supabase, channel.id, event.thread_ts)
+
+  if (threadSession) {
+    // This thread is subscribed - decide if we should respond
+    const decision = await decideIfShouldRespond({
+      text: event.text || '',
+      botUserId,
+      lastResponderType: threadSession.lastResponderType,
+    })
+
+    console.log(`[slack.event-handlers] Response decision for thread:`, {
+      channel: event.channel,
+      thread: event.thread_ts,
+      shouldRespond: decision.shouldRespond,
+      reason: decision.reason,
+      confidence: decision.confidence,
+      usedClassifier: decision.usedClassifier,
+    })
+
+    if (decision.shouldRespond) {
+      // Respond to the thread
+      await processSlackThreadResponse({
+        projectId,
+        channelId: event.channel,
+        channelDbId: channel.id,
+        threadTs: event.thread_ts,
+        messageTs: event.ts,
+        userId: event.user,
+        text: event.text || '',
+        botUserId,
+        slackClient,
+        supabase,
+        teamId,
+        threadSession,
+      })
+    } else {
+      // User responded, update tracking
+      await updateThreadSessionResponder(supabase, threadSession.id, 'user')
+    }
+    return
+  }
+
+  // Not a subscribed thread - check for external participant detection (existing behavior)
   await processSlackMessage({
     projectId,
     channelId: event.channel,
@@ -222,6 +316,75 @@ async function handleMessage(params: {
     supabase,
     teamId,
     workspacePrimaryDomain: channel.workspacePrimaryDomain,
+  })
+}
+
+/**
+ * Handle message in passive mode channel
+ */
+async function handlePassiveModeMessage(params: {
+  event: SlackEvent
+  channel: SlackChannelWithMode
+  projectId: string
+  botUserId: string
+  slackClient: SlackClient
+  supabase: ReturnType<typeof createAdminClient>
+  teamId: string
+}): Promise<void> {
+  const { event, channel, projectId, slackClient, supabase, teamId } = params
+
+  if (!event.thread_ts || !event.channel || !event.ts) {
+    return
+  }
+
+  if (channel.captureScope === 'all') {
+    // Capture all threaded messages
+    await processPassiveThreadCapture({
+      projectId,
+      channelId: event.channel,
+      channelDbId: channel.id,
+      threadTs: event.thread_ts,
+      messageTs: event.ts,
+      userId: event.user,
+      text: event.text || '',
+      slackClient,
+      supabase,
+      teamId,
+      workspacePrimaryDomain: channel.workspacePrimaryDomain,
+      captureMode: 'passive_all',
+    })
+    return
+  }
+
+  // capture_scope === 'external_only' - only capture if external participant
+  // Check if user is external before capturing
+  const userEmail = event.user ? await slackClient.getUserEmail(event.user) : null
+  if (!userEmail || !channel.workspacePrimaryDomain) {
+    return // Can't determine if external
+  }
+
+  const emailDomain = userEmail.split('@')[1]?.toLowerCase()
+  const primaryDomain = channel.workspacePrimaryDomain.toLowerCase()
+  const isExternal = emailDomain !== primaryDomain
+
+  if (!isExternal) {
+    return // Internal user, skip
+  }
+
+  // External user - capture the thread
+  await processPassiveThreadCapture({
+    projectId,
+    channelId: event.channel,
+    channelDbId: channel.id,
+    threadTs: event.thread_ts,
+    messageTs: event.ts,
+    userId: event.user,
+    text: event.text || '',
+    slackClient,
+    supabase,
+    teamId,
+    workspacePrimaryDomain: channel.workspacePrimaryDomain,
+    captureMode: 'passive_external',
   })
 }
 

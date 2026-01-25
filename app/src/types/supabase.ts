@@ -898,7 +898,9 @@ export type Database = {
       }
       slack_channels: {
         Row: {
+          capture_scope: string | null
           channel_id: string
+          channel_mode: string | null
           channel_name: string | null
           channel_type: string | null
           created_at: string | null
@@ -909,7 +911,9 @@ export type Database = {
           workspace_token_id: string
         }
         Insert: {
+          capture_scope?: string | null
           channel_id: string
+          channel_mode?: string | null
           channel_name?: string | null
           channel_type?: string | null
           created_at?: string | null
@@ -920,7 +924,9 @@ export type Database = {
           workspace_token_id: string
         }
         Update: {
+          capture_scope?: string | null
           channel_id?: string
+          channel_mode?: string | null
           channel_name?: string | null
           channel_type?: string | null
           created_at?: string | null
@@ -946,7 +952,9 @@ export type Database = {
           created_at: string | null
           has_external_participants: boolean | null
           id: string
+          last_bot_response_ts: string | null
           last_message_ts: string | null
+          last_responder_type: string | null
           session_id: string
           slack_channel_id: string
           thread_ts: string
@@ -956,7 +964,9 @@ export type Database = {
           created_at?: string | null
           has_external_participants?: boolean | null
           id?: string
+          last_bot_response_ts?: string | null
           last_message_ts?: string | null
+          last_responder_type?: string | null
           session_id: string
           slack_channel_id: string
           thread_ts: string
@@ -966,7 +976,9 @@ export type Database = {
           created_at?: string | null
           has_external_participants?: boolean | null
           id?: string
+          last_bot_response_ts?: string | null
           last_message_ts?: string | null
+          last_responder_type?: string | null
           session_id?: string
           slack_channel_id?: string
           thread_ts?: string

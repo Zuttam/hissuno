@@ -113,7 +113,7 @@ Important domain terms or patterns a support agent should know.
 - Keep the entire output under 1000 words if possible
 - Be efficient with tool calls - you have limited iterations
 `,
-  model: 'openai/gpt-4o',
+  model: 'openai/gpt-5.2',
   tools: {
     listCodebaseFiles: listCodebaseFilesTool,
     readCodebaseFile: readCodebaseFileTool,

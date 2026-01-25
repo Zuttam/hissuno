@@ -20,7 +20,7 @@ export const saveKnowledgePackages = createStep({
 
     await writer?.write({ type: 'progress', message: 'Saving knowledge packages...' })
 
-    const { business, product, technical, faq, how_to, redactionSummary } = inputData
+    const { business, product, technical, faq, how_to, redactionSummary, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
     const initData = getInitData?.() as { 
       projectId: string
       analysisId?: string
@@ -34,6 +34,9 @@ export const saveKnowledgePackages = createStep({
         saved: false,
         packages: [],
         errors: ['Project ID not found in workflow context'],
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
 
@@ -148,15 +151,18 @@ export const saveKnowledgePackages = createStep({
         }
       }
 
-      await writer?.write({ 
-        type: 'progress', 
-        message: `Analysis complete! Saved ${packages.length} knowledge packages.` 
+      await writer?.write({
+        type: 'progress',
+        message: `Analysis complete! Saved ${packages.length} knowledge packages.`
       })
 
       return {
         saved: packages.length > 0,
         packages,
         errors,
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -183,6 +189,9 @@ export const saveKnowledgePackages = createStep({
         saved: false,
         packages: [],
         errors: [`Failed to save packages: ${message}`],
+        localCodePath,
+        codebaseLeaseId,
+        codebaseCommitSha,
       }
     }
   },

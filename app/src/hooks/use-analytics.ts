@@ -106,9 +106,11 @@ export function useProjectAnalytics({
     setError(null)
     try {
       const params = new URLSearchParams()
+      params.set('type', 'project')
+      params.set('projectId', projectId)
       params.set('period', period)
 
-      const response = await fetch(`/api/projects/${projectId}/analytics?${params.toString()}`, {
+      const response = await fetch(`/api/analytics?${params.toString()}`, {
         cache: 'no-store',
       })
 

@@ -1,10 +1,13 @@
 /**
  * Knowledge Analysis Service
  * Shared logic for triggering and managing knowledge analysis workflows
+ *
+ * Note: Codebase sync is now handled internally by the workflow via
+ * prepare-codebase and cleanup-codebase steps. This service just validates
+ * and triggers the workflow.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { syncGitHubCodebase, getProjectCodebasePath, cleanupProjectCodebase } from '@/lib/codebase'
 import { mastra } from '@/mastra'
 import type { Database } from '@/types/supabase'
 import type { KnowledgeSourceRecord } from './types'
@@ -13,8 +16,6 @@ export type TriggerAnalysisParams = {
   projectId: string
   userId: string
   supabase: SupabaseClient<Database>
-  /** If true, skip GitHub sync (useful when sync was already done during project creation) */
-  skipGitHubSync?: boolean
 }
 
 export type TriggerAnalysisResult = {
@@ -23,10 +24,6 @@ export type TriggerAnalysisResult = {
   analysisId: string
   sourceCount: number
   hasCodebase: boolean
-  /** Local path to the cloned codebase (for cleanup after analysis) */
-  localCodePath?: string
-  /** Branch name (for cleanup after analysis) */
-  branch?: string
 } | {
   success: false
   error: string
@@ -44,17 +41,16 @@ export type TriggerAnalysisResult = {
  * It will:
  * 1. Check if analysis is already running
  * 2. Fetch all knowledge sources
- * 3. Clone/sync GitHub codebase to ephemeral local directory
- * 4. Create an analysis record
- * 5. The SSE stream route will execute the actual workflow
+ * 3. Create an analysis record
+ * 4. The SSE stream route will execute the actual workflow
  *
- * Note: Caller is responsible for cleaning up the local codebase after analysis
- * using cleanupAnalysisCodebase(projectId, branch)
+ * Note: Codebase sync is handled internally by the workflow via prepare-codebase
+ * and cleanup-codebase steps. No cleanup needed from caller.
  */
 export async function triggerKnowledgeAnalysis(
   params: TriggerAnalysisParams
 ): Promise<TriggerAnalysisResult> {
-  const { projectId, userId, supabase, skipGitHubSync = false } = params
+  const { projectId, userId, supabase } = params
 
   // Fetch project
   const { data: project, error: projectError } = await supabase
@@ -128,37 +124,8 @@ export async function triggerKnowledgeAnalysis(
     }
   }
 
-  // Clone/sync GitHub codebase to local directory
-  let localCodePath: string | null = null
   const branch = sourceCode?.repository_branch ?? null
   const analysisScope = codebaseSource?.analysis_scope ?? null
-
-  if (hasCodebase && sourceCode) {
-    if (!skipGitHubSync) {
-      console.log('[analysis-service] Cloning/syncing GitHub codebase before analysis')
-
-      const syncResult = await syncGitHubCodebase({
-        codebaseId: sourceCode.id,
-        userId,
-        projectId,
-      })
-
-      if (syncResult.status === 'error') {
-        console.error('[analysis-service] GitHub sync failed:', syncResult.error)
-        return {
-          success: false,
-          error: `Failed to clone GitHub repository: ${syncResult.error}`,
-          statusCode: 500,
-        }
-      }
-
-      localCodePath = syncResult.localPath ?? null
-      console.log('[analysis-service] GitHub sync completed:', syncResult.status, 'SHA:', syncResult.commitSha, 'Path:', localCodePath)
-    } else {
-      // If skipping sync, still get the local path (assumes already cloned)
-      localCodePath = branch ? getProjectCodebasePath(projectId, branch) : null
-    }
-  }
 
   // Update enabled sources to 'processing' status
   if (enabledSources.length > 0) {
@@ -174,10 +141,6 @@ export async function triggerKnowledgeAnalysis(
 
   if (!workflow) {
     console.error('[analysis-service] workflow not found')
-    // Cleanup on failure
-    if (localCodePath && branch) {
-      await cleanupAnalysisCodebase(projectId, branch)
-    }
     return { success: false, error: 'Analysis workflow not configured.', statusCode: 500 }
   }
 
@@ -185,10 +148,10 @@ export async function triggerKnowledgeAnalysis(
   const runId = `knowledge-${projectId}-${Date.now()}`
 
   // Prepare workflow input - only include enabled sources
+  // Note: Codebase is synced internally by prepare-codebase step
   const workflowInput = {
     projectId,
     analysisId: '', // Will be set after record creation
-    localCodePath,
     analysisScope,
     sources: enabledSources.map((s) => ({
       id: s.id,
@@ -225,10 +188,6 @@ export async function triggerKnowledgeAnalysis(
 
   if (insertError || !analysisRecord) {
     console.error('[analysis-service] Failed to create analysis record', insertError)
-    // Cleanup on failure
-    if (localCodePath && branch) {
-      await cleanupAnalysisCodebase(projectId, branch)
-    }
     return { success: false, error: 'Failed to start analysis.', statusCode: 500 }
   }
 
@@ -258,20 +217,5 @@ export async function triggerKnowledgeAnalysis(
     analysisId: analysisRecord.id,
     sourceCount: enabledSources.length,
     hasCodebase,
-    localCodePath: localCodePath ?? undefined,
-    branch: branch ?? undefined,
-  }
-}
-
-/**
- * Cleanup function to remove ephemeral codebase after analysis completes.
- * Should be called after workflow completes (success or failure).
- */
-export async function cleanupAnalysisCodebase(projectId: string, branch: string): Promise<void> {
-  try {
-    await cleanupProjectCodebase(projectId, branch)
-    console.log('[analysis-service] Cleaned up codebase for', projectId, branch)
-  } catch (error) {
-    console.warn('[analysis-service] Failed to cleanup codebase:', error)
   }
 }

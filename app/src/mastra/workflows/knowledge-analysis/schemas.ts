@@ -18,14 +18,29 @@ export const sourceInputSchema = z.object({
 
 export type SourceInput = z.infer<typeof sourceInputSchema>
 
+/**
+ * Workflow input schema - projectId and sources only.
+ * Codebase access is handled internally by prepare-codebase step.
+ */
 export const workflowInputSchema = z.object({
   projectId: z.string(),
-  localCodePath: z.string().nullable().optional(),
   analysisScope: z.string().nullable().optional(),
   sources: z.array(sourceInputSchema),
 })
 
 export type WorkflowInput = z.infer<typeof workflowInputSchema>
+
+/**
+ * Internal context after prepare-codebase step.
+ * Adds codebase lease fields for workflow-internal use.
+ */
+export const workflowContextWithCodebaseSchema = workflowInputSchema.extend({
+  localCodePath: z.string().nullable(),
+  codebaseLeaseId: z.string(),
+  codebaseCommitSha: z.string().nullable(),
+})
+
+export type WorkflowContextWithCodebase = z.infer<typeof workflowContextWithCodebaseSchema>
 
 // ============================================================================
 // STEP OUTPUT SCHEMAS
@@ -36,6 +51,10 @@ export const analyzeCodebaseOutputSchema = z.object({
   sources: z.array(sourceInputSchema),
   codebaseAnalysis: z.string(),
   hasCodebase: z.boolean(),
+  // Codebase lease fields (passed through from prepare-codebase)
+  localCodePath: z.string().nullable(),
+  codebaseLeaseId: z.string(),
+  codebaseCommitSha: z.string().nullable(),
 })
 
 export type AnalyzeCodebaseOutput = z.infer<typeof analyzeCodebaseOutputSchema>
@@ -53,6 +72,10 @@ export const analyzeSourcesOutputSchema = z.object({
   analysisResults: z.array(analysisResultSchema),
   codebaseAnalysis: z.string(),
   hasCodebase: z.boolean(),
+  // Codebase lease fields (passed through)
+  localCodePath: z.string().nullable(),
+  codebaseLeaseId: z.string(),
+  codebaseCommitSha: z.string().nullable(),
 })
 
 export type AnalyzeSourcesOutput = z.infer<typeof analyzeSourcesOutputSchema>
@@ -63,6 +86,10 @@ export const compiledKnowledgeSchema = z.object({
   technical: z.string(),
   faq: z.string(),
   how_to: z.string(),
+  // Codebase lease fields (passed through)
+  localCodePath: z.string().nullable().optional(),
+  codebaseLeaseId: z.string().optional(),
+  codebaseCommitSha: z.string().nullable().optional(),
 })
 
 export type CompiledKnowledge = z.infer<typeof compiledKnowledgeSchema>
@@ -88,6 +115,10 @@ export const sanitizedKnowledgeSchema = z.object({
   faq: z.string(),
   how_to: z.string(),
   redactionSummary: redactionSummarySchema,
+  // Codebase lease fields (passed through)
+  localCodePath: z.string().nullable().optional(),
+  codebaseLeaseId: z.string().optional(),
+  codebaseCommitSha: z.string().nullable().optional(),
 })
 
 export type SanitizedKnowledge = z.infer<typeof sanitizedKnowledgeSchema>
@@ -104,6 +135,10 @@ export const workflowOutputSchema = z.object({
   saved: z.boolean(),
   packages: z.array(knowledgePackageSchema),
   errors: z.array(z.string()),
+  // Codebase lease fields (passed through)
+  localCodePath: z.string().nullable().optional(),
+  codebaseLeaseId: z.string().optional(),
+  codebaseCommitSha: z.string().nullable().optional(),
 })
 
 export type WorkflowOutput = z.infer<typeof workflowOutputSchema>
@@ -125,6 +160,9 @@ export const workflowWithEmbeddingOutputSchema = z.object({
   packages: z.array(knowledgePackageSchema),
   errors: z.array(z.string()),
   embedding: embeddingResultSchema,
+  // Codebase cleanup status
+  codebaseLeaseId: z.string().optional(),
+  codebaseCleanedUp: z.boolean().optional(),
 })
 
 export type WorkflowWithEmbeddingOutput = z.infer<typeof workflowWithEmbeddingOutputSchema>

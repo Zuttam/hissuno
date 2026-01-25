@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { cleanupAnalysisCodebase } from '@/lib/knowledge/analysis-service'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
 import { mastra } from '@/mastra'
@@ -53,12 +52,14 @@ async function resolveUser() {
  */
 function getStepDisplayName(stepId: string): string {
   const stepNames: Record<string, string> = {
+    'prepare-codebase': 'Preparing codebase access',
     'analyze-codebase': 'Analyzing codebase',
     'analyze-sources': 'Analyzing knowledge sources',
     'compile-knowledge': 'Compiling knowledge packages',
     'sanitize-knowledge': 'Sanitizing sensitive information',
     'save-packages': 'Saving knowledge packages',
     'embed-knowledge': 'Generating semantic embeddings',
+    'cleanup-codebase': 'Cleaning up',
   }
   return stepNames[stepId] ?? stepId
 }
@@ -219,12 +220,6 @@ export async function GET(_request: Request, context: RouteContext) {
 
           console.log(`${LOG_PREFIX} Workflow stream completed, total events:`, eventCount)
 
-          // Cleanup local codebase directory after successful analysis
-          const branch = latestAnalysis.metadata?.branch as string | undefined
-          if (branch) {
-            await cleanupAnalysisCodebase(projectId, branch)
-          }
-
           // Stream ended - close the connection
           close()
         } catch (error) {
@@ -245,11 +240,6 @@ export async function GET(_request: Request, context: RouteContext) {
             console.error(`${LOG_PREFIX} Failed to update analysis record:`, dbError)
           }
 
-          // Cleanup local codebase directory on error
-          const branch = latestAnalysis.metadata?.branch as string | undefined
-          if (branch) {
-            await cleanupAnalysisCodebase(projectId, branch)
-          }
 
           // Send user-friendly error event
           emitEvent('error', {

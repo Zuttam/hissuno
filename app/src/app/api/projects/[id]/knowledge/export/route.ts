@@ -4,7 +4,6 @@ import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { downloadKnowledgePackage } from '@/lib/knowledge/storage'
-import type { KnowledgeCategory } from '@/lib/knowledge/types'
 
 export const runtime = 'nodejs'
 

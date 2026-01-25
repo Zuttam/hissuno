@@ -44,6 +44,18 @@ export const workflowInputSchema = z.object({
 
 export type WorkflowInput = z.infer<typeof workflowInputSchema>
 
+/**
+ * Internal context after prepare-codebase step.
+ * Adds codebase lease fields for workflow-internal use.
+ */
+export const workflowContextWithCodebaseSchema = workflowInputSchema.extend({
+  localCodePath: z.string().nullable(),
+  codebaseLeaseId: z.string(),
+  codebaseCommitSha: z.string().nullable(),
+})
+
+export type WorkflowContextWithCodebase = z.infer<typeof workflowContextWithCodebaseSchema>
+
 // ============================================================================
 // STEP OUTPUT SCHEMAS
 // ============================================================================
@@ -54,20 +66,13 @@ export const classifyOutputSchema = z.object({
   tags: z.array(sessionTagSchema),
   tagsApplied: z.boolean(),
   reasoning: z.string(),
+  // Codebase lease fields (passed through)
+  localCodePath: z.string().nullable(),
+  codebaseLeaseId: z.string(),
+  codebaseCommitSha: z.string().nullable(),
 })
 
 export type ClassifyOutput = z.infer<typeof classifyOutputSchema>
-
-export const pmReviewResultSchema = z.object({
-  action: z.enum(['created', 'upvoted', 'skipped']),
-  issueId: z.string().optional(),
-  issueTitle: z.string().optional(),
-  skipReason: z.string().optional(),
-  thresholdMet: z.boolean().optional(),
-  specGenerated: z.boolean().optional(),
-})
-
-export type PMReviewResultType = z.infer<typeof pmReviewResultSchema>
 
 // ============================================================================
 // MULTI-STEP PM REVIEW SCHEMAS
@@ -146,6 +151,10 @@ export const preparedPMContextSchema = z.object({
     issueSpecThreshold: z.number(),
     pmDedupIncludeClosed: z.boolean(),
   }),
+  // Codebase lease fields (passed through)
+  localCodePath: z.string().nullable(),
+  codebaseLeaseId: z.string(),
+  codebaseCommitSha: z.string().nullable(),
 })
 
 export type PreparedPMContextType = z.infer<typeof preparedPMContextSchema>
@@ -199,6 +208,10 @@ export const executeDecisionOutputSchema = z.object({
   specGenerated: z.boolean().optional(),
   impactScore: z.number().optional(),
   effortEstimate: z.string().optional(),
+  // Codebase lease fields (passed through)
+  localCodePath: z.string().nullable().optional(),
+  codebaseLeaseId: z.string().optional(),
+  codebaseCommitSha: z.string().nullable().optional(),
 })
 
 export type ExecuteDecisionOutputType = z.infer<typeof executeDecisionOutputSchema>
@@ -221,6 +234,9 @@ export const workflowOutputSchema = z.object({
   // Enriched fields
   impactScore: z.number().optional(),
   effortEstimate: z.string().optional(),
+  // Codebase cleanup status
+  codebaseLeaseId: z.string().optional(),
+  codebaseCleanedUp: z.boolean().optional(),
 })
 
 export type WorkflowOutput = z.infer<typeof workflowOutputSchema>

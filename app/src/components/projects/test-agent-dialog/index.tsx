@@ -101,7 +101,7 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
         // Load the most recent session
         const latestSession = sessions[0]
         try {
-          const response = await fetch(`/api/sessions/${latestSession.id}`)
+          const response = await fetch(`/api/projects/${project.id}/sessions/${latestSession.id}`)
           if (response.ok) {
             const { messages: sessionMessages } = await response.json()
             const formattedMessages: Message[] = sessionMessages.map((msg: { id: string; role: string; content: string; createdAt: string }) => ({
@@ -161,7 +161,7 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
 
     setIsLoadingSession(true)
     try {
-      const response = await fetch(`/api/sessions/${sessionId}`)
+      const response = await fetch(`/api/projects/${project.id}/sessions/${sessionId}`)
       if (!response.ok) {
         throw new Error('Failed to load session')
       }
@@ -187,7 +187,7 @@ export function TestAgentDialog({ project, onClose }: TestAgentDialogProps) {
     } finally {
       setIsLoadingSession(false)
     }
-  }, [currentSessionId, loadSession])
+  }, [project.id, currentSessionId, loadSession])
 
   // Show loading dots when waiting for response (isLoading but no streaming content yet)
   const lastMessage = messages[messages.length - 1]

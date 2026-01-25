@@ -11,7 +11,12 @@ import { triggerChatRun, updateChatRunStatus, type ChatMessage } from '@/lib/age
 import { mastra } from '@/mastra'
 import type { SupportAgentContext } from '@/types/agent'
 import { SlackClient, type SlackMessage } from './client'
-import { getOrCreateThreadSession, updateThreadSessionLastMessage } from './index'
+import {
+  getOrCreateThreadSession,
+  updateThreadSessionLastMessage,
+  updateThreadSessionResponder,
+  type ThreadSessionWithTracking,
+} from './index'
 
 const LOG_PREFIX = '[slack.message-processor]'
 
@@ -399,6 +404,264 @@ export async function processSlackMessage(params: ProcessMessageParams): Promise
       slackChannelId: channelId,
       threadTs,
       hasExternalParticipants: true,
+    })
+  }
+}
+
+type ProcessPassiveThreadCaptureParams = {
+  projectId: string
+  channelId: string
+  channelDbId: string
+  threadTs: string
+  messageTs: string
+  userId?: string
+  text: string
+  slackClient: SlackClient
+  supabase: ReturnType<typeof createAdminClient>
+  teamId: string
+  workspacePrimaryDomain?: string | null
+  captureMode: 'passive_mention' | 'passive_all' | 'passive_external'
+}
+
+/**
+ * Process passive thread capture - creates session without bot response
+ * Used in passive mode to capture threads silently
+ */
+export async function processPassiveThreadCapture(
+  params: ProcessPassiveThreadCaptureParams
+): Promise<void> {
+  const {
+    projectId,
+    channelId,
+    channelDbId,
+    threadTs,
+    messageTs,
+    userId,
+    text,
+    slackClient,
+    supabase,
+    teamId,
+    workspacePrimaryDomain,
+    captureMode,
+  } = params
+
+  console.log(`${LOG_PREFIX} Processing passive thread capture`, {
+    channelId,
+    threadTs,
+    userId,
+    captureMode,
+  })
+
+  // Generate session ID
+  const sessionId = generateSlackSessionId(teamId, channelId, threadTs)
+
+  // Check if thread session already exists
+  const { data: existingSession } = await (supabase as any)
+    .from('slack_thread_sessions')
+    .select('id, session_id')
+    .eq('channel_id', channelDbId)
+    .eq('thread_ts', threadTs)
+    .single()
+
+  if (existingSession) {
+    // Thread already being tracked, just update last message timestamp
+    await updateThreadSessionLastMessage(supabase, existingSession.id, messageTs)
+    return
+  }
+
+  // Get user info for metadata
+  let userEmail: string | null = null
+  let userName: string | null = null
+  let userDisplayName: string | null = null
+  let isExternal = false
+
+  if (userId) {
+    const userInfo = await slackClient.getUserInfo(userId)
+    if (userInfo) {
+      userEmail = userInfo.profile.email || userInfo.email || null
+      userName = userInfo.real_name || userInfo.name || null
+      userDisplayName = userInfo.profile.display_name || userInfo.display_name || null
+
+      // Check if external
+      if (userEmail && workspacePrimaryDomain) {
+        const emailDomain = userEmail.split('@')[1]?.toLowerCase()
+        isExternal = emailDomain !== workspacePrimaryDomain.toLowerCase()
+      }
+    }
+  }
+
+  // Build user metadata
+  const userMetadata: Record<string, string> = {
+    slack_user_id: userId || 'unknown',
+    slack_channel_id: channelId,
+    slack_workspace_id: teamId,
+    capture_mode: captureMode,
+  }
+  if (userEmail) userMetadata.email = userEmail
+  if (userName) userMetadata.name = userName
+  if (userDisplayName) userMetadata.display_name = userDisplayName
+  if (isExternal) userMetadata.is_external = 'true'
+
+  // Create session
+  await upsertSession({
+    id: sessionId,
+    projectId,
+    userId: userEmail || userId || null,
+    userMetadata,
+    pageUrl: null,
+    pageTitle: `Slack: #${channelId} (passive)`,
+    source: 'slack',
+  })
+
+  // Create thread session mapping
+  const threadSessionResult = await getOrCreateThreadSession(supabase, {
+    sessionId,
+    channelDbId,
+    slackChannelId: channelId,
+    threadTs,
+    hasExternalParticipants: isExternal,
+  })
+
+  // Update last message timestamp
+  if (threadSessionResult) {
+    await updateThreadSessionLastMessage(supabase, threadSessionResult.id, messageTs)
+  }
+}
+
+type ProcessSlackThreadResponseParams = {
+  projectId: string
+  channelId: string
+  channelDbId: string
+  threadTs: string
+  messageTs: string
+  userId?: string
+  text: string
+  botUserId: string
+  slackClient: SlackClient
+  supabase: ReturnType<typeof createAdminClient>
+  teamId: string
+  threadSession: ThreadSessionWithTracking
+}
+
+/**
+ * Process thread response - triggers agent response for subscribed threads
+ * Used in interactive mode when bot should respond to a thread message
+ */
+export async function processSlackThreadResponse(
+  params: ProcessSlackThreadResponseParams
+): Promise<void> {
+  const {
+    projectId,
+    channelId,
+    threadTs,
+    messageTs,
+    userId,
+    text,
+    botUserId,
+    slackClient,
+    supabase,
+    threadSession,
+  } = params
+
+  const sessionId = threadSession.sessionId
+
+  console.log(`${LOG_PREFIX} Processing thread response`, { channelId, threadTs, userId, sessionId })
+
+  // Get user info for metadata
+  let userEmail: string | null = null
+  let userName: string | null = null
+  let userDisplayName: string | null = null
+
+  if (userId) {
+    const userInfo = await slackClient.getUserInfo(userId)
+    if (userInfo) {
+      userEmail = userInfo.profile.email || userInfo.email || null
+      userName = userInfo.real_name || userInfo.name || null
+      userDisplayName = userInfo.profile.display_name || userInfo.display_name || null
+    }
+  }
+
+  // Build user metadata
+  const userMetadata: Record<string, string> = {
+    slack_user_id: userId || 'unknown',
+    slack_channel_id: channelId,
+  }
+  if (userEmail) userMetadata.email = userEmail
+  if (userName) userMetadata.name = userName
+  if (userDisplayName) userMetadata.display_name = userDisplayName
+
+  // Fetch thread history
+  const threadMessages = await slackClient.getThreadMessages(channelId, threadTs)
+
+  // Convert to chat messages
+  const chatMessages = convertSlackMessages(threadMessages, botUserId)
+
+  if (chatMessages.length === 0) {
+    chatMessages.push({
+      role: 'user',
+      content: removeBotMention(text, botUserId),
+    })
+  }
+
+  // Trigger chat run
+  const chatRunResult = await triggerChatRun({
+    projectId,
+    sessionId,
+    messages: chatMessages,
+    userId: userEmail || userId || null,
+    userMetadata,
+    supabase,
+  })
+
+  if (!chatRunResult.success) {
+    console.error(`${LOG_PREFIX} Failed to trigger chat run:`, chatRunResult.error)
+
+    if (chatRunResult.error?.includes('already in progress')) {
+      await slackClient.postMessage({
+        channel: channelId,
+        text: "I'm still working on a previous response. Please wait a moment!",
+        threadTs,
+      })
+    }
+    return
+  }
+
+  // Execute the agent synchronously
+  const response = await executeAgentSync({
+    projectId,
+    sessionId,
+    chatRunId: chatRunResult.chatRunId,
+    messages: chatMessages,
+    userId: userEmail || userId || null,
+    userMetadata,
+    supabase,
+  })
+
+  // Post response to Slack
+  if (response) {
+    const cleanResponse = response.replace(/\[SESSION_GOODBYE\]/g, '').trim()
+
+    const postResult = await slackClient.postMessage({
+      channel: channelId,
+      text: cleanResponse,
+      threadTs,
+    })
+
+    // Update session activity
+    await updateSessionActivity(sessionId)
+
+    // Update thread session tracking - mark bot as last responder
+    await updateThreadSessionResponder(
+      supabase,
+      threadSession.id,
+      'bot',
+      postResult?.ts || messageTs
+    )
+  } else {
+    await slackClient.postMessage({
+      channel: channelId,
+      text: "I'm sorry, I encountered an issue processing your request. Please try again.",
+      threadTs,
     })
   }
 }

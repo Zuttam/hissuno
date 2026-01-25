@@ -30,7 +30,7 @@ async function resolveUser() {
 /**
  * GET /api/projects/[id]/knowledge
  * Get all compiled knowledge packages for a project
- * 
+ *
  * Query params:
  * - category?: 'business' | 'product' | 'technical' - filter by category
  * - includeContent?: 'true' - include the markdown content in response
@@ -103,7 +103,7 @@ export async function GET(request: Request, context: RouteContext) {
 /**
  * PATCH /api/projects/[id]/knowledge
  * Update a knowledge package content (creates a new version)
- * 
+ *
  * Body:
  * - category: 'business' | 'product' | 'technical' - the category to update
  * - content: string - the new markdown content

@@ -85,7 +85,7 @@ export default function IntegrationsPage() {
 
     try {
       const [widgetRes, slackRes, githubRes] = await Promise.all([
-        fetch(`/api/sessions?projectId=${projectId}&stats=true`),
+        fetch(`/api/projects/${projectId}/sessions?stats=true`),
         fetch(`/api/integrations/slack?projectId=${projectId}`),
         fetch(`/api/integrations/github?projectId=${projectId}`),
       ])

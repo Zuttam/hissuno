@@ -1,4 +1,14 @@
+/**
+ * Issues Database Layer
+ *
+ * Pure database operations for issues. This layer handles Supabase queries
+ * and does NOT handle embeddings or business logic orchestration.
+ *
+ * For service-level operations (with embeddings), use lib/issues/issues-service.ts
+ */
+
 import { cache } from 'react'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
 import type {
@@ -6,9 +16,11 @@ import type {
   IssueWithProject,
   IssueWithSessions,
   IssueFilters,
-  CreateIssueInput,
   UpdateIssueInput,
   ProjectSettingsRecord,
+  IssuePriority,
+  IssueImpactAnalysis,
+  EffortEstimate,
 } from '@/types/issue'
 
 const selectIssueWithProject = '*, project:projects(id, name)'
@@ -19,6 +31,291 @@ const selectIssueWithSessions = `
     session:sessions(id, user_id, page_url, message_count, created_at, name, source)
   )
 `
+
+// ============================================================================
+// Pure DB Operations (accept Supabase client)
+// ============================================================================
+
+/**
+ * Input for creating an issue at DB level
+ */
+export interface InsertIssueData {
+  projectId: string
+  type: 'bug' | 'feature_request' | 'change_request'
+  title: string
+  description: string
+  priority: IssuePriority
+  priorityManualOverride?: boolean
+  upvoteCount?: number
+  status?: 'open' | 'ready' | 'in_progress' | 'resolved' | 'closed'
+  // Impact analysis fields
+  affectedAreas?: string[]
+  impactScore?: number | null
+  impactAnalysis?: IssueImpactAnalysis | null
+  // Effort estimation fields
+  effortEstimate?: EffortEstimate | null
+  effortReasoning?: string | null
+  affectedFiles?: string[]
+}
+
+/**
+ * Insert a new issue into the database
+ */
+export async function insertIssue(
+  supabase: SupabaseClient,
+  data: InsertIssueData
+): Promise<IssueRecord> {
+  const { data: issue, error } = await supabase
+    .from('issues')
+    .insert({
+      project_id: data.projectId,
+      type: data.type,
+      title: data.title,
+      description: data.description,
+      priority: data.priority,
+      priority_manual_override: data.priorityManualOverride ?? false,
+      upvote_count: data.upvoteCount ?? 1,
+      status: data.status ?? 'open',
+      is_archived: false,
+      // Impact analysis
+      affected_areas: data.affectedAreas ?? [],
+      impact_score: data.impactScore ?? null,
+      impact_analysis: data.impactAnalysis ?? null,
+      // Effort estimation
+      effort_estimate: data.effortEstimate ?? null,
+      effort_reasoning: data.effortReasoning ?? null,
+      affected_files: data.affectedFiles ?? [],
+    })
+    .select()
+    .single()
+
+  if (error || !issue) {
+    console.error('[supabase.issues.insertIssue] Failed', error)
+    throw new Error(`Failed to insert issue: ${error?.message ?? 'Unknown error'}`)
+  }
+
+  return issue as IssueRecord
+}
+
+/**
+ * Update an existing issue in the database
+ */
+export async function updateIssueById(
+  supabase: SupabaseClient,
+  issueId: string,
+  data: UpdateIssueInput
+): Promise<IssueRecord> {
+  const updates: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  }
+
+  if (data.title !== undefined) updates.title = data.title
+  if (data.description !== undefined) updates.description = data.description
+  if (data.type !== undefined) updates.type = data.type
+  if (data.status !== undefined) updates.status = data.status
+  if (data.priority !== undefined) {
+    updates.priority = data.priority
+    // If priority is being set manually, mark as override unless explicitly set
+    if (data.priority_manual_override === undefined) {
+      updates.priority_manual_override = true
+    }
+  }
+  if (data.priority_manual_override !== undefined) {
+    updates.priority_manual_override = data.priority_manual_override
+  }
+
+  const { data: issue, error } = await supabase
+    .from('issues')
+    .update(updates)
+    .eq('id', issueId)
+    .select()
+    .single()
+
+  if (error || !issue) {
+    console.error('[supabase.issues.updateIssueById] Failed', issueId, error)
+    throw new Error(`Failed to update issue: ${error?.message ?? 'Unknown error'}`)
+  }
+
+  return issue as IssueRecord
+}
+
+/**
+ * Delete an issue from the database
+ */
+export async function deleteIssueById(
+  supabase: SupabaseClient,
+  issueId: string
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('issues')
+    .delete()
+    .eq('id', issueId)
+
+  if (error) {
+    console.error('[supabase.issues.deleteIssueById] Failed', issueId, error)
+    throw new Error(`Failed to delete issue: ${error.message}`)
+  }
+
+  return true
+}
+
+/**
+ * Update upvote count and priority for an issue
+ */
+export async function updateIssueUpvote(
+  supabase: SupabaseClient,
+  issueId: string,
+  newUpvoteCount: number,
+  newPriority: IssuePriority
+): Promise<IssueRecord> {
+  const { data: issue, error } = await supabase
+    .from('issues')
+    .update({
+      upvote_count: newUpvoteCount,
+      priority: newPriority,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', issueId)
+    .select()
+    .single()
+
+  if (error || !issue) {
+    console.error('[supabase.issues.updateIssueUpvote] Failed', issueId, error)
+    throw new Error(`Failed to update issue upvote: ${error?.message ?? 'Unknown error'}`)
+  }
+
+  return issue as IssueRecord
+}
+
+/**
+ * Link a session to an issue
+ */
+export async function linkSessionToIssue(
+  supabase: SupabaseClient,
+  issueId: string,
+  sessionId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('issue_sessions')
+    .insert({ issue_id: issueId, session_id: sessionId })
+    .select()
+    .maybeSingle()
+
+  if (error && !error.message.includes('duplicate')) {
+    console.error('[supabase.issues.linkSessionToIssue] Failed', { issueId, sessionId }, error)
+    // Don't throw - this is non-critical
+  }
+}
+
+/**
+ * Mark a session as PM reviewed
+ */
+export async function markSessionPMReviewed(
+  supabase: SupabaseClient,
+  sessionId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('sessions')
+    .update({ pm_reviewed_at: new Date().toISOString() })
+    .eq('id', sessionId)
+
+  if (error) {
+    console.error('[supabase.issues.markSessionPMReviewed] Failed', sessionId, error)
+  }
+}
+
+/**
+ * Get an issue by ID with minimal fields (for upvote operations)
+ */
+export async function getIssueForUpvote(
+  supabase: SupabaseClient,
+  issueId: string
+): Promise<{
+  id: string
+  title: string
+  projectId: string
+  upvoteCount: number
+  priorityManualOverride: boolean
+  priority: IssuePriority
+  productSpec: string | null
+} | null> {
+  const { data, error } = await supabase
+    .from('issues')
+    .select('id, title, project_id, upvote_count, priority_manual_override, priority, product_spec')
+    .eq('id', issueId)
+    .single()
+
+  if (error || !data) {
+    if (error?.code !== 'PGRST116') {
+      console.error('[supabase.issues.getIssueForUpvote] Failed', issueId, error)
+    }
+    return null
+  }
+
+  return {
+    id: data.id,
+    title: data.title,
+    projectId: data.project_id,
+    upvoteCount: data.upvote_count ?? 1,
+    priorityManualOverride: data.priority_manual_override,
+    priority: data.priority as IssuePriority,
+    productSpec: data.product_spec,
+  }
+}
+
+/**
+ * Get issue with current title/description for embedding comparison
+ */
+export async function getIssueForEmbedding(
+  supabase: SupabaseClient,
+  issueId: string
+): Promise<{ projectId: string; title: string; description: string } | null> {
+  const { data, error } = await supabase
+    .from('issues')
+    .select('project_id, title, description')
+    .eq('id', issueId)
+    .single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return {
+    projectId: data.project_id,
+    title: data.title,
+    description: data.description,
+  }
+}
+
+/**
+ * Update issue archive status
+ */
+export async function updateIssueArchiveStatusById(
+  supabase: SupabaseClient,
+  issueId: string,
+  isArchived: boolean
+): Promise<IssueRecord> {
+  const { data, error } = await supabase
+    .from('issues')
+    .update({
+      is_archived: isArchived,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', issueId)
+    .select()
+    .single()
+
+  if (error || !data) {
+    console.error('[supabase.issues.updateIssueArchiveStatusById] Failed', issueId, error)
+    throw new Error(`Failed to update issue archive status: ${error?.message ?? 'Unknown error'}`)
+  }
+
+  return data as IssueRecord
+}
+
+// ============================================================================
+// Query Functions (use user-authenticated client, with caching)
+// ============================================================================
 
 /**
  * Lists issues with optional filters. Requires authenticated user context.
@@ -52,7 +349,7 @@ export const listIssues = cache(async (filters: IssueFilters = {}): Promise<Issu
       .eq('user_id', user.id)
 
     const projectIds = userProjects?.map(p => p.id) ?? []
-    
+
     if (projectIds.length === 0) {
       return []
     }
@@ -229,144 +526,6 @@ export const getProjectIssues = cache(async (projectId: string, limit = 20): Pro
 })
 
 /**
- * Updates an issue. Requires authenticated user context.
- */
-export async function updateIssue(issueId: string, input: UpdateIssueInput): Promise<IssueRecord | null> {
-  if (!isSupabaseConfigured()) {
-    throw new Error('Supabase must be configured.')
-  }
-
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    // Verify user owns the project this issue belongs to
-    const { data: issue } = await supabase
-      .from('issues')
-      .select('project_id')
-      .eq('id', issueId)
-      .single()
-
-    if (!issue) {
-      return null
-    }
-
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', issue.project_id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!project) {
-      throw new UnauthorizedError('You do not have permission to update this issue.')
-    }
-
-    // Build update object
-    const updates: Record<string, unknown> = {
-      updated_at: new Date().toISOString(),
-    }
-
-    if (input.title !== undefined) updates.title = input.title
-    if (input.description !== undefined) updates.description = input.description
-    if (input.type !== undefined) updates.type = input.type
-    if (input.status !== undefined) updates.status = input.status
-    if (input.priority !== undefined) {
-      updates.priority = input.priority
-      // If priority is being set manually, mark as override
-      if (input.priority_manual_override === undefined) {
-        updates.priority_manual_override = true
-      }
-    }
-    if (input.priority_manual_override !== undefined) {
-      updates.priority_manual_override = input.priority_manual_override
-    }
-
-    const { data, error } = await supabase
-      .from('issues')
-      .update(updates)
-      .eq('id', issueId)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('[supabase.issues] failed to update issue', issueId, error)
-      throw new Error('Unable to update issue.')
-    }
-
-    return data as IssueRecord
-  } catch (error) {
-    console.error('[supabase.issues] unexpected error updating issue', issueId, error)
-    throw error
-  }
-}
-
-/**
- * Deletes an issue. Requires authenticated user context.
- */
-export async function deleteIssue(issueId: string): Promise<boolean> {
-  if (!isSupabaseConfigured()) {
-    throw new Error('Supabase must be configured.')
-  }
-
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    // Verify user owns the project this issue belongs to
-    const { data: issue } = await supabase
-      .from('issues')
-      .select('project_id')
-      .eq('id', issueId)
-      .single()
-
-    if (!issue) {
-      return false
-    }
-
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', issue.project_id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!project) {
-      throw new UnauthorizedError('You do not have permission to delete this issue.')
-    }
-
-    const { error } = await supabase
-      .from('issues')
-      .delete()
-      .eq('id', issueId)
-
-    if (error) {
-      console.error('[supabase.issues] failed to delete issue', issueId, error)
-      throw new Error('Unable to delete issue.')
-    }
-
-    return true
-  } catch (error) {
-    console.error('[supabase.issues] unexpected error deleting issue', issueId, error)
-    throw error
-  }
-}
-
-/**
  * Gets project settings. Uses admin client.
  */
 export async function getProjectSettings(projectId: string): Promise<ProjectSettingsRecord | null> {
@@ -448,136 +607,40 @@ export const getProjectIssueStats = cache(async (projectId: string): Promise<{
   }
 })
 
+// ============================================================================
+// Auth helpers for service layer
+// ============================================================================
+
 /**
- * Creates a manual issue. Requires authenticated user context.
+ * Verify user owns a project. Returns project info if owned, null otherwise.
  */
-export async function createManualIssue(input: CreateIssueInput): Promise<IssueWithProject | null> {
-  if (!isSupabaseConfigured()) {
-    throw new Error('Supabase must be configured.')
-  }
+export async function verifyProjectOwnership(
+  supabase: SupabaseClient,
+  projectId: string,
+  userId: string
+): Promise<{ id: string; name: string } | null> {
+  const { data } = await supabase
+    .from('projects')
+    .select('id, name')
+    .eq('id', projectId)
+    .eq('user_id', userId)
+    .single()
 
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    // Verify user owns the project
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id, name')
-      .eq('id', input.project_id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!project) {
-      throw new UnauthorizedError('You do not have permission to create issues for this project.')
-    }
-
-    const { data, error } = await supabase
-      .from('issues')
-      .insert({
-        project_id: input.project_id,
-        type: input.type,
-        title: input.title,
-        description: input.description,
-        priority: input.priority || 'low',
-        priority_manual_override: true,
-        upvote_count: 1,
-        status: 'open',
-        is_archived: false,
-      })
-      .select(selectIssueWithProject)
-      .single()
-
-    if (error) {
-      console.error('[supabase.issues] failed to create manual issue', error)
-      throw new Error('Unable to create issue.')
-    }
-
-    // Link to sessions if provided
-    if (input.session_ids && input.session_ids.length > 0) {
-      const sessionLinks = input.session_ids.map((sessionId) => ({
-        issue_id: data.id,
-        session_id: sessionId,
-      }))
-      await supabase.from('issue_sessions').insert(sessionLinks)
-    }
-
-    return data as IssueWithProject
-  } catch (error) {
-    console.error('[supabase.issues] unexpected error creating manual issue', error)
-    throw error
-  }
+  return data ?? null
 }
 
 /**
- * Updates the archive status of an issue. Requires authenticated user context.
+ * Get project_id for an issue
  */
-export async function updateIssueArchiveStatus(
-  issueId: string,
-  isArchived: boolean
-): Promise<IssueRecord | null> {
-  if (!isSupabaseConfigured()) {
-    throw new Error('Supabase must be configured.')
-  }
+export async function getIssueProjectId(
+  supabase: SupabaseClient,
+  issueId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('issues')
+    .select('project_id')
+    .eq('id', issueId)
+    .single()
 
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    // Get issue and verify ownership
-    const { data: issue } = await supabase
-      .from('issues')
-      .select('project_id')
-      .eq('id', issueId)
-      .single()
-
-    if (!issue) {
-      return null
-    }
-
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', issue.project_id)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!project) {
-      throw new UnauthorizedError('You do not have permission to update this issue.')
-    }
-
-    const { data, error } = await supabase
-      .from('issues')
-      .update({
-        is_archived: isArchived,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', issueId)
-      .select()
-      .single()
-
-    if (error) {
-      console.error('[supabase.issues] failed to update issue archive status', issueId, error)
-      throw new Error('Unable to update issue.')
-    }
-
-    return data as IssueRecord
-  } catch (error) {
-    console.error('[supabase.issues] unexpected error updating issue archive status', issueId, error)
-    throw error
-  }
+  return data?.project_id ?? null
 }

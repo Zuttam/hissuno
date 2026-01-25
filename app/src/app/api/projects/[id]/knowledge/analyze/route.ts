@@ -51,11 +51,11 @@ export async function POST(_request: Request, context: RouteContext) {
 
     if (!result.success) {
       return NextResponse.json(
-        { 
+        {
           error: result.error,
           ...(result.runId && { runId: result.runId }),
           ...(result.analysisId && { analysisId: result.analysisId }),
-        }, 
+        },
         { status: result.statusCode }
       )
     }
@@ -126,7 +126,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
     // Determine overall status based on latest analysis and sources
     let overallStatus: 'idle' | 'processing' | 'completed' | 'failed' | 'partial' | 'cancelled'
-    
+
     if (isRunning || processing.length > 0) {
       overallStatus = 'processing'
     } else if (latestAnalysis?.status === 'cancelled') {

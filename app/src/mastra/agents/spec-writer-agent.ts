@@ -1,5 +1,5 @@
 import { Agent } from '@mastra/core/agent'
-import { generateProductSpecTool, saveProductSpecTool } from '../tools/issue-tools'
+import { gatherProductSpecInfoTool, saveProductSpecTool } from '../tools/spec-tools'
 import { searchKnowledgeTool, getKnowledgePackageTool } from '../tools/knowledge-tools'
 import {
   searchCodebaseFilesTool,
@@ -17,7 +17,7 @@ import { webSearchTool } from '../tools/web-search-tool'
  */
 
 const specWriterTools = [
-  generateProductSpecTool,
+  gatherProductSpecInfoTool,
   saveProductSpecTool,
   searchKnowledgeTool,
   getKnowledgePackageTool,
@@ -39,7 +39,7 @@ Generate detailed, actionable product specifications that bridge user needs with
 ## Your Process
 
 ### Step 1: Gather Context
-Use \`generate-product-spec\` to get:
+Use \`gather-product-spec-info\` to get:
 - Issue details (title, description, type, priority)
 - All linked support sessions with full message history
 - Project information
@@ -152,6 +152,6 @@ Use \`save-product-spec\` to store the completed specification.
 - Action-oriented
 - Evidence-based
 `,
-  model: 'openai/gpt-4o',
+  model: 'openai/gpt-5.2',
   tools: Object.fromEntries(specWriterTools.map((tool) => [tool.id, tool])),
 })

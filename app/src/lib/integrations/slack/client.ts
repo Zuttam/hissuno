@@ -247,6 +247,40 @@ export class SlackClient {
   }
 
   /**
+   * Leave a channel
+   */
+  async leaveChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
+    const result = await this.request<Record<string, never>>('conversations.leave', {
+      channel: channelId,
+    })
+
+    if (!result.ok) {
+      console.error('[SlackClient.leaveChannel] Error:', result.error)
+      return { ok: false, error: result.error }
+    }
+
+    return { ok: true }
+  }
+
+  /**
+   * List public channels the bot can access
+   */
+  async listPublicChannels(): Promise<SlackChannelInfo[]> {
+    const result = await this.request<{ channels: SlackChannelInfo[] }>('conversations.list', {
+      types: 'public_channel',
+      exclude_archived: 'true',
+      limit: 200,
+    })
+
+    if (!result.ok || !result.channels) {
+      console.error('[SlackClient.listPublicChannels] Error:', result.error)
+      return []
+    }
+
+    return result.channels
+  }
+
+  /**
    * Get team/workspace information
    */
   async getTeamInfo(): Promise<{
