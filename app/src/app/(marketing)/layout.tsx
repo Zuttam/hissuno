@@ -11,7 +11,7 @@ import { CookieConsentBanner } from '@/components/consent'
 
 
 export const metadata: Metadata = {
-  title: 'Hissuno - Turn Customer Conversations into Engineering Work',
+  title: 'Hissuno - Turn Customer Conversations into Shipped Features',
   description:
     'AI-powered customer intelligence platform that converts conversations into actionable issues, product specs, and code changes.',
 }

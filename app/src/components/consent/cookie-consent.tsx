@@ -22,13 +22,34 @@ export function useCookieConsent() {
   const accept = () => {
     localStorage.setItem(CONSENT_KEY, 'accepted')
     setConsent('accepted')
-    // Reload to trigger instrumentation-client.ts initialization
-    window.location.reload()
+
+    // Update Google Consent Mode v2
+    window.gtag?.('consent', 'update', {
+      ad_storage: 'granted',
+      ad_user_data: 'granted',
+      ad_personalization: 'granted',
+      analytics_storage: 'granted',
+    })
+
+    // Update Meta Pixel consent
+    window.fbq?.('consent', 'grant')
+    window.fbq?.('track', 'PageView')
   }
 
   const decline = () => {
     localStorage.setItem(CONSENT_KEY, 'declined')
     setConsent('declined')
+
+    // Explicitly deny consent (already default, but be explicit)
+    window.gtag?.('consent', 'update', {
+      ad_storage: 'denied',
+      ad_user_data: 'denied',
+      ad_personalization: 'denied',
+      analytics_storage: 'denied',
+    })
+
+    // Revoke Meta Pixel consent
+    window.fbq?.('consent', 'revoke')
   }
 
   return { consent, isLoaded, accept, decline }

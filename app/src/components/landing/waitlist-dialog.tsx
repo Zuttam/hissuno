@@ -4,6 +4,7 @@ import { useState, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dialog, Button } from '@/components/ui'
 import { useCTA } from './cta-context'
+import { trackWaitlistCompleted } from '@/lib/event_tracking/events'
 
 // Strict email regex (RFC 5322 simplified)
 const EMAIL_REGEX =
@@ -67,7 +68,8 @@ export function WaitlistDialog() {
         throw new Error(data.error || 'Failed to join waitlist.')
       }
 
-      // Success - navigate to thank you page
+      // Success - track conversion BEFORE navigation
+      trackWaitlistCompleted({})
       setEmail('')
       closeDialog()
       showThankYou('waitlist')

@@ -4,19 +4,7 @@ import type {
   OnboardingCompletedEventData,
   CTAEventData,
   CallBookingEventData,
-  ThankYouEventData,
 } from './types'
-
-declare global {
-  interface Window {
-    gtag?: (...args: unknown[]) => void
-    fbq?: (
-      command: 'track' | 'trackCustom' | 'init',
-      eventName: string,
-      parameters?: Record<string, unknown>
-    ) => void
-  }
-}
 
 /**
  * Track when a user starts the signup process
@@ -166,6 +154,39 @@ export function trackCTAOptionSelected(data: CTAEventData): void {
 }
 
 /**
+ * Track when waitlist signup is completed
+ */
+export function trackWaitlistCompleted(data: { email?: string; utm?: Record<string, string> }): void {
+  const properties = {
+    ...data.utm,
+  }
+
+  // PostHog
+  posthog.capture('waitlist_completed', properties)
+
+  // Google Ads - conversion (fire BEFORE navigation to ensure it's sent)
+  const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
+  const thankYouLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_LABEL_THANK_YOU || 'p6Z7CJ_ivewbEMjU0dRC'
+  if (googleAdsId && thankYouLabel) {
+    console.debug('Firing Google Ads waitlist conversion event')
+    
+    window.gtag?.('event', 'conversion', {
+      send_to: `${googleAdsId}/${thankYouLabel}`,
+      value: 5.0,
+      currency: 'USD',
+    })
+  }
+
+  // Meta Pixel - Lead event
+  window.fbq?.('track', 'Lead', {
+    content_name: 'Waitlist Signup',
+    content_category: 'Conversion',
+    value: 5.0,
+    currency: 'USD',
+  })
+}
+
+/**
  * Track when Calendly popup is opened
  */
 export function trackCallBookingStarted(data: CallBookingEventData): void {
@@ -198,37 +219,24 @@ export function trackCallBookingCompleted(data: CallBookingEventData): void {
 
   // PostHog
   posthog.capture('call_booking_completed', properties)
-}
 
-/**
- * Track when thank you page is viewed (key conversion event for optimization)
- */
-export function trackThankYouPageViewed(data: ThankYouEventData): void {
-  const properties = {
-    type: data.type,
-    source: data.source,
-    ...data.utm,
-  }
-
-  // PostHog
-  posthog.capture('thank_you_page_viewed', properties)
-
-  // Google Ads - conversion (key for optimization)
+  // Google Ads - conversion (fire BEFORE navigation to ensure it's sent)
   const googleAdsId = process.env.NEXT_PUBLIC_GOOGLE_ADS_ID
   const thankYouLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_LABEL_THANK_YOU || 'p6Z7CJ_ivewbEMjU0dRC'
   if (googleAdsId && thankYouLabel) {
     window.gtag?.('event', 'conversion', {
       send_to: `${googleAdsId}/${thankYouLabel}`,
-      value: data.type === 'call' ? 10.0 : 5.0,
+      value: 10.0,
       currency: 'USD',
     })
   }
 
   // Meta Pixel - Lead event
   window.fbq?.('track', 'Lead', {
-    content_name: data.type === 'call' ? 'Call Booked Thank You' : 'Waitlist Thank You',
+    content_name: 'Call Booked',
     content_category: 'Conversion',
-    value: data.type === 'call' ? 10.0 : 5.0,
+    value: 10.0,
     currency: 'USD',
   })
 }
+

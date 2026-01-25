@@ -30,7 +30,7 @@ export function WelcomeEmail({ fullName, dashboardUrl }: WelcomeEmailProps) {
 
           <Text style={text}>
             Thanks for signing up for Hissuno. We&apos;re excited to help you transform
-            customer conversations into actionable engineering work.
+            customer conversations intos shipped features.
           </Text>
 
           <Section style={buttonContainer}>

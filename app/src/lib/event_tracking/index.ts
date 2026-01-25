@@ -1,4 +1,4 @@
-export type { UTMParams, SignupEventData, OnboardingCompletedEventData, ThankYouEventData } from './types'
+export type { UTMParams, SignupEventData, OnboardingCompletedEventData } from './types'
 
 export {
   parseUTMFromURL,
@@ -18,5 +18,4 @@ export {
   trackSignupCompleted,
   trackOnboardingCompleted,
   trackPageView,
-  trackThankYouPageViewed,
 } from './events'

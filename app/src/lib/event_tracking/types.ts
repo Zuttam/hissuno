@@ -27,9 +27,3 @@ export interface CallBookingEventData {
   inviteeUri?: string
   utm?: UTMParams
 }
-
-export interface ThankYouEventData {
-  type: 'waitlist' | 'call'
-  source?: 'nav' | 'hero' | 'cta_section' | 'roadmap' | 'login'
-  utm?: UTMParams
-}

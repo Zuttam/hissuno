@@ -1,35 +1,14 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dialog, Button } from '@/components/ui'
 import { useCTA } from './cta-context'
-import { trackThankYouPageViewed } from '@/lib/event_tracking/events'
-import { getStoredUTM } from '@/lib/event_tracking/utm'
 
 export function ThankYouModal() {
   const router = useRouter()
-  const { activeDialog, thankYouType, source, closeDialog } = useCTA()
-  const hasTracked = useRef(false)
+  const { activeDialog, thankYouType, closeDialog } = useCTA()
 
   const isOpen = activeDialog === 'thank-you'
-
-  // Track thank you page view when modal opens
-  useEffect(() => {
-    if (isOpen && thankYouType && !hasTracked.current) {
-      hasTracked.current = true
-      trackThankYouPageViewed({
-        type: thankYouType,
-        source: source ?? undefined,
-        utm: getStoredUTM() ?? undefined,
-      })
-    }
-
-    // Reset tracking flag when modal closes
-    if (!isOpen) {
-      hasTracked.current = false
-    }
-  }, [isOpen, thankYouType, source])
 
   const handleClose = () => {
     closeDialog()

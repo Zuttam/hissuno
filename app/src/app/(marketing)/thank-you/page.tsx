@@ -1,21 +1,23 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useCTA } from '@/components/landing/cta-context'
 
 function ThankYouContent() {
   const searchParams = useSearchParams()
-  const { showThankYou, activeDialog } = useCTA()
+  const { showThankYou } = useCTA()
+  const hasOpened = useRef(false)
 
   const type = searchParams.get('type') as 'waitlist' | 'call' | null
 
   useEffect(() => {
-    // Only open the modal if it's not already open and we have a valid type
-    if (type && activeDialog !== 'thank-you') {
+    // Only open the modal once on mount
+    if (type && !hasOpened.current) {
+      hasOpened.current = true
       showThankYou(type)
     }
-  }, [type, showThankYou, activeDialog])
+  }, [type, showThankYou])
 
   // The modal is rendered by the layout, this page just triggers it
   return null
