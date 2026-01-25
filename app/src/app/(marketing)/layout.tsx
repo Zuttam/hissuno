@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { WaterWebGLProvider, WaterCanvas } from '@/components/water-webgl'
 import { CTAProvider } from '@/components/landing/cta-context'
@@ -63,7 +64,9 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         </div>
 
         {/* Dialogs */}
-        <CTAOptionsDialog />
+        <Suspense fallback={null}>
+          <CTAOptionsDialog />
+        </Suspense>
         <WaitlistDialog />
         <ThankYouModal />
         <CookieConsentBanner />
