@@ -11,21 +11,7 @@ export { ThankYouModal } from './thank-you-modal'
 export { MarketingNav } from './marketing-nav'
 
 // Home page sections
-export { HeroSection, FeaturesSection, ValuePropsSection, CommunitySection, CTASection, MistOverlay } from './home'
-
-// Tool-specific landing pages
-export {
-  ToolHeroSection,
-  ProblemSection,
-  SolutionSection,
-  BenefitsSection,
-  QuoteSection,
-  EarlyAccessCTASection,
-  getToolConfig,
-  getSupportedToolSlugs,
-  SUPPORTED_TOOLS,
-} from './tool-landing'
-export type { ToolConfig } from './tool-landing'
+export { HeroSection, FeaturesSection, ValuePropsSection, QuotesSection, CommunitySection, CTASection, MistOverlay } from './home'
 
 // Roadmap page
 export {
@@ -35,3 +21,11 @@ export {
   RoadmapItem,
   RoadmapCTASection,
 } from './roadmap'
+
+// Support Agent landing page
+export {
+  SupportHeroSection,
+  SupportFeaturesSection,
+  SupportHowItWorksSection,
+  SupportCTASection,
+} from './support-agent'

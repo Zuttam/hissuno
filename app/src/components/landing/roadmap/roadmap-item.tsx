@@ -1,8 +1,8 @@
 'use client'
 
 import { motion } from 'motion/react'
-import type { RoadmapItem as RoadmapItemType, RoadmapStatus } from '@/app/(marketing)/roadmap/roadmap-data'
-import { STATUS_CONFIG } from '@/app/(marketing)/roadmap/roadmap-data'
+import type { RoadmapItem as RoadmapItemType, RoadmapStatus } from '@/app/(marketing)/landing/roadmap/roadmap-data'
+import { STATUS_CONFIG } from '@/app/(marketing)/landing/roadmap/roadmap-data'
 
 interface RoadmapItemProps {
   item: RoadmapItemType

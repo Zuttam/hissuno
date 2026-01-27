@@ -1,60 +1,195 @@
 'use client'
 
-import Link from 'next/link'
+import { motion } from 'motion/react'
 import Image from 'next/image'
+import { MessageSquare, GitBranch, FileCode, LucideIcon, Mail, BookOpen } from 'lucide-react'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { WaterReveal } from '@/components/landing/water-reveal'
 
-const FEATURES = [
+interface Step {
+  id: string
+  step: number
+  title: string
+  description: string
+  icon: LucideIcon
+  integrations: FloatingIntegration[]
+  flowDirection: 'in' | 'out'
+}
+
+interface FloatingIntegration {
+  name: string
+  logo?: string
+  icon?: LucideIcon
+  delay: number
+}
+
+const STEPS: Step[] = [
   {
-    id: 'knowledge',
-    title: 'Agent-Ready Knowledge Base',
-    description: 'High-fidelity documentation that powers AI agents and responds to natural language queries.',
-    icon: '/file.svg',
-    color: 'var(--accent-teal)',
-    utmContent: 'knowledge',
-  },
-  {
-    id: 'support-agent',
-    title: 'AI Support Agent',
-    description: 'Deploy intelligent support embedded in your website or Slack channels.',
-    icon: '/logos/slack.svg',
-    color: 'var(--accent-warm)',
-    utmContent: 'support-agent',
+    id: 'conversations',
+    step: 1,
+    title: 'Conversations flow in',
+    description:
+      'Connect Slack, your website widget, or email. Every customer message lands in one place.',
+    icon: MessageSquare,
+    flowDirection: 'in',
+    integrations: [
+      { name: 'Slack', logo: '/logos/slack.svg', delay: 0 },
+      { name: 'Intercom', logo: '/logos/intercom.svg', delay: 0.1 },
+      { name: 'Gong', logo: '/logos/gong.svg', delay: 0.2 },
+      { name: 'Email', icon: Mail, delay: 0.3 },
+    ],
   },
   {
     id: 'triage',
-    title: 'Smart Conversation Triage',
-    description: 'Automatically classify, prioritize, and route customer conversations.',
-    icon: '/logos/linear.svg',
-    color: 'var(--accent-coral)',
-    utmContent: 'triage',
-  },
-  {
-    id: 'issues',
-    title: 'Issue & Action Tracking',
-    description: 'Convert conversations into product tickets with automatic prioritization and deduplication.',
-    icon: '/logos/jira.svg',
-    color: 'var(--accent-selected)',
-    utmContent: 'issues',
+    step: 2,
+    title: 'AI triages and creates issues',
+    description:
+      'Grounded by your codebase and organizational knowledge. Generates issue classification, impact assessment, and effort estimation automatically.',
+    icon: GitBranch,
+    flowDirection: 'in',
+    integrations: [
+      { name: 'GitHub', logo: '/logos/github.svg', delay: 0 },
+      { name: 'OpenAI', logo: '/logos/openai.svg', delay: 0.1 },
+      { name: 'Anthropic', logo: '/logos/anthropic.svg', delay: 0.2 },
+      { name: 'Knowledge', icon: BookOpen, delay: 0.3 },
+    ],
   },
   {
     id: 'specs',
-    title: 'Connected Product Specs',
-    description: 'Generate specs linked to customer conversations and your codebase.',
-    icon: '/window.svg',
-    color: 'var(--accent-teal)',
-    utmContent: 'specs',
-  },
-  {
-    id: 'coding-agent',
-    title: 'Bring Your Own Agent',
-    description: 'Use our native coding agent or integrate with Claude, Cursor, or your preferred tool.',
-    icon: '/logos/github.svg',
-    color: 'var(--accent-selected)',
-    utmContent: 'coding-agent',
+    step: 3,
+    title: 'Specs write themselves',
+    description:
+      'When an issue hits critical mass, Hissuno generates a product spec linked to your codebase — ready for your next sprint.',
+    icon: FileCode,
+    flowDirection: 'out',
+    integrations: [
+      { name: 'Linear', logo: '/logos/linear.svg', delay: 0 },
+      { name: 'Jira', logo: '/logos/jira.svg', delay: 0.1 },
+    ],
   },
 ]
+
+function FloatingIntegrationLogo({
+  integration,
+  index,
+}: {
+  integration: FloatingIntegration
+  index: number
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{
+        duration: 0.5,
+        delay: 0.3 + integration.delay,
+        ease: 'easeOut',
+      }}
+      className="flex flex-col items-center"
+    >
+      {/* Floating logo with bobbing animation */}
+      <motion.div
+        animate={{
+          y: [0, -4, 0],
+        }}
+        transition={{
+          duration: 2.5,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: index * 0.3,
+        }}
+        className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-subtle)]/50 bg-[var(--surface)]/80 shadow-sm backdrop-blur-sm"
+        title={integration.name}
+      >
+        {integration.logo ? (
+          <Image
+            src={integration.logo}
+            alt={integration.name}
+            width={20}
+            height={20}
+            className="h-5 w-5 dark:invert"
+          />
+        ) : integration.icon ? (
+          <integration.icon className="h-5 w-5 text-[var(--accent-teal)]" />
+        ) : null}
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function AnimatedArrow({ direction }: { direction: 'down' | 'up' }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.5, delay: 0.5 }}
+      className="relative h-6 w-full flex justify-center"
+    >
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        className={direction === 'up' ? 'rotate-180' : ''}
+      >
+        {/* Animated dashed line */}
+        <motion.path
+          d="M12 4 L12 16"
+          stroke="var(--accent-teal)"
+          strokeWidth="2"
+          strokeDasharray="4 2"
+          strokeLinecap="round"
+          initial={{ pathLength: 0 }}
+          whileInView={{ pathLength: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8, delay: 0.6 }}
+        />
+        {/* Arrow head */}
+        <motion.path
+          d="M8 12 L12 16 L16 12"
+          stroke="var(--accent-teal)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.3, delay: 1 }}
+        />
+      </svg>
+    </motion.div>
+  )
+}
+
+function FloatingIntegrationsRow({
+  integrations,
+  flowDirection,
+}: {
+  integrations: FloatingIntegration[]
+  flowDirection: 'in' | 'out'
+}) {
+  // For 'in' flow: icons above, arrow pointing down (into card)
+  // For 'out' flow: icons above, arrow pointing up (from card to icons)
+  const arrowDirection = flowDirection === 'in' ? 'down' : 'up'
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex items-center justify-center gap-4">
+        {integrations.map((integration, idx) => (
+          <FloatingIntegrationLogo
+            key={integration.name}
+            integration={integration}
+            index={idx}
+          />
+        ))}
+      </div>
+      <AnimatedArrow direction={arrowDirection} />
+    </div>
+  )
+}
 
 export function FeaturesSection() {
   return (
@@ -62,53 +197,63 @@ export function FeaturesSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Everything You Need, One Platform
+            How It Works
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            Six powerful capabilities that replace your entire customer intelligence stack
+            From conversation to shipped feature in three steps
           </p>
         </WaterReveal>
 
-        <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {FEATURES.map((feature, index) => (
+        {/* 3-step horizontal flow */}
+        <div className="mt-16 grid gap-8 md:grid-cols-3">
+          {STEPS.map((step, index) => (
             <WaterReveal
-              key={feature.id}
+              key={step.id}
               preset="card"
               staggerIndex={index}
-              stagger="organic"
+              stagger="normal"
             >
-              <Link
-                href={`/sign-up?utm_content=${feature.utmContent}`}
-                className="block h-full"
-              >
+              <div className="relative h-full flex flex-col">
+                {/* Connecting line (hidden on mobile, shown between cards on desktop) */}
+                {index < STEPS.length - 1 && (
+                  <div
+                    className="absolute right-0 top-1/2 hidden h-[2px] w-8 translate-x-full bg-gradient-to-r from-[var(--accent-teal)] to-transparent md:block"
+                    aria-hidden="true"
+                  />
+                )}
+
+                {/* Floating integrations above card (all steps) */}
+                <div className="mb-4 min-h-[72px] flex items-end justify-center">
+                  <FloatingIntegrationsRow
+                    integrations={step.integrations}
+                    flowDirection={step.flowDirection}
+                  />
+                </div>
+
                 <FloatingCard
                   floating="gentle"
                   variant="elevated"
                   respondToRipple
-                  className="h-full cursor-pointer p-6 transition-colors hover:border-[var(--accent-teal)]"
+                  className="flex-1 p-6"
                   style={{ '--float-delay': `${index * 0.2}s` } as React.CSSProperties}
                 >
+                  {/* Icon */}
                   <div
-                    className="inline-flex h-12 w-12 items-center justify-center rounded-lg"
-                    style={{ backgroundColor: `color-mix(in srgb, ${feature.color} 15%, transparent)` }}
+                    className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: 'color-mix(in srgb, var(--accent-teal) 15%, transparent)' }}
                   >
-                    <Image
-                      src={feature.icon}
-                      alt=""
-                      width={28}
-                      height={28}
-                      className="opacity-80"
-                    />
+                    <step.icon className="h-6 w-6 text-[var(--accent-teal)]" />
                   </div>
-                  <h3 className="mt-4 font-mono text-xl font-semibold text-[var(--foreground)]">
-                    {feature.title}
+
+                  <h3 className="font-mono text-xl font-semibold text-[var(--foreground)]">
+                    {step.title}
                   </h3>
-                  <p className="mt-2 text-[var(--text-secondary)]">{feature.description}</p>
+                  <p className="mt-3 text-[var(--text-secondary)]">{step.description}</p>
                 </FloatingCard>
-              </Link>
+              </div>
             </WaterReveal>
           ))}
         </div>

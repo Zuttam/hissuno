@@ -669,7 +669,7 @@ describe('Billing Enforcement Integration', () => {
         })
       )
 
-      let result = await enforceLimit({
+      const result = await enforceLimit({
         userId: 'user-123',
         dimension: 'projects',
       })

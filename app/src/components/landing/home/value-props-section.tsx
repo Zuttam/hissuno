@@ -1,23 +1,37 @@
 'use client'
 
+import { ClipboardList, Rocket, Code2, LucideIcon } from 'lucide-react'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { WaterReveal } from '@/components/landing/water-reveal'
 
-const VALUE_PROPS = [
+interface ValueProp {
+  id: string
+  title: string
+  description: string
+  icon: LucideIcon
+}
+
+const VALUE_PROPS: ValueProp[] = [
   {
-    id: 'consolidation',
-    title: 'Replace Multiple Tools',
-    description: 'Stop juggling Intercom, Linear, Notion, and custom scripts. One platform handles it all.',
+    id: 'pms',
+    title: 'For Product Managers',
+    description:
+      'Stop copy-pasting from Slack to Linear. Issues create themselves with context, priority, and vote counts.',
+    icon: ClipboardList,
   },
   {
-    id: 'speed',
-    title: 'Ship Features Faster',
-    description: 'From customer request to deployed code in hours, not weeks. AI handles the busywork.',
+    id: 'founders',
+    title: 'For Founders',
+    description:
+      'Ship fast without losing customer signal. Know what to build next without reading every message.',
+    icon: Rocket,
   },
   {
-    id: 'satisfaction',
-    title: 'Happier Customers',
-    description: 'Instant responses, accurate information, and faster resolution times customers notice.',
+    id: 'engineers',
+    title: 'For Product Engineers',
+    description:
+      'Specs come with code references. Know exactly where to make changes before you start.',
+    icon: Code2,
   },
 ]
 
@@ -27,13 +41,13 @@ export function ValuePropsSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Why Teams Choose Hissuno
+            Built for How You Work
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            Measurable impact from day one
+            Whether you're a PM, founder, or product engineer
           </p>
         </WaterReveal>
 
@@ -52,6 +66,14 @@ export function ValuePropsSection() {
                 className="h-full p-6"
                 style={{ '--float-delay': `${index * 0.2}s` } as React.CSSProperties}
               >
+                {/* Icon container with teal gradient background */}
+                <div
+                  className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: 'color-mix(in srgb, var(--accent-teal) 15%, transparent)' }}
+                >
+                  <prop.icon className="h-6 w-6 text-[var(--accent-teal)]" />
+                </div>
+
                 <h3 className="font-mono text-xl font-semibold text-[var(--foreground)]">
                   {prop.title}
                 </h3>

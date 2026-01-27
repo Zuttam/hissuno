@@ -1,10 +1,26 @@
 'use client'
 
 import { motion } from 'motion/react'
+import Image from 'next/image'
+import { Mail } from 'lucide-react'
 import { Button, ThemeLogo } from '@/components/ui'
 import { useWaterWebGLOptional } from '@/components/water-webgl/WaterWebGLContext'
 import { useCTA } from '@/components/landing/cta-context'
 import { WATER_EASINGS } from '@/components/landing/scroll-animation-config'
+
+type Integration =
+  | { name: string; logo: string; isImage: true }
+  | { name: string; icon: typeof Mail; isImage: false }
+
+const INTEGRATIONS: Integration[] = [
+  { name: 'Slack', logo: '/logos/slack.svg', isImage: true },
+  { name: 'Email', icon: Mail, isImage: false },
+  { name: 'Linear', logo: '/logos/linear.svg', isImage: true },
+  { name: 'GitHub', logo: '/logos/github.svg', isImage: true },
+  { name: 'Intercom', logo: '/logos/intercom.svg', isImage: true },
+  { name: 'Gong', logo: '/logos/gong.svg', isImage: true },
+  { name: 'Jira', logo: '/logos/jira.svg', isImage: true },
+]
 
 export function HeroSection() {
   const water = useWaterWebGLOptional()
@@ -36,13 +52,13 @@ export function HeroSection() {
         aria-hidden="true"
       />
 
-      <motion.div 
+      <motion.div
         {...heroAnimation}
         transition={{ duration: 1.2, ease: WATER_EASINGS.float, delay: 0.2 }}
         className="relative z-10 mx-auto max-w-4xl text-center">
         {/* Interactive logo that triggers ripples */}
         <div
-          className="mx-auto mb-8 w-fit cursor-pointer"          
+          className="mx-auto mb-8 w-fit cursor-pointer"
           onClick={handleLogoClick}
         >
           <ThemeLogo width={180} height={60} priority />
@@ -51,18 +67,49 @@ export function HeroSection() {
         <h1
           className="font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl"
         >
-          Turn Customer Conversations into
+          Customer feedback → triaged issues → product specs.
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            Shipped Features
+            Automatically.
           </span>
         </h1>
 
         <p
           className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl"
         >
-          Hissuno is an AI-powered customer intelligence platform that turns customer conversations
-          into actionable issues, product specs, and shipped code — without the tool sprawl.
+          Hissuno watches your customer conversations, creates prioritized issues, and writes specs
+          linked to your codebase. No more spreadsheets. No more lost requests.
         </p>
+
+        {/* Integration logos row */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: WATER_EASINGS.float, delay: 0.6 }}
+          className="mt-8 flex flex-wrap items-center justify-center gap-4"
+        >
+          <span className="text-sm text-[var(--text-tertiary)]">Integrates with</span>
+          <div className="flex items-center gap-4">
+            {INTEGRATIONS.map((integration) => (
+              <div
+                key={integration.name}
+                className="flex h-8 w-8 items-center justify-center opacity-60 transition-opacity hover:opacity-100"
+                title={integration.name}
+              >
+                {integration.isImage ? (
+                  <Image
+                    src={integration.logo}
+                    alt={integration.name}
+                    width={24}
+                    height={24}
+                    className="h-6 w-6 dark:invert"
+                  />
+                ) : (
+                  <integration.icon className="h-5 w-5 text-[var(--text-secondary)]" />
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.div>
 
         <div
           className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"

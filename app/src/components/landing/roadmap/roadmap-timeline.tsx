@@ -2,7 +2,7 @@
 
 import { WaterReveal } from '@/components/landing/water-reveal'
 import { RoadmapPhaseCard } from './roadmap-phase-card'
-import { ROADMAP_PHASES } from '@/app/(marketing)/roadmap/roadmap-data'
+import { ROADMAP_PHASES } from '@/app/(marketing)/landing/roadmap/roadmap-data'
 
 export function RoadmapTimeline() {
   return (

@@ -32,8 +32,8 @@ const TEST_TIMEOUT = 60000
 
 // Test data
 let testProjectId: string
-let testSessionIds: string[] = []
-let testIssueIds: string[] = []
+const testSessionIds: string[] = []
+const testIssueIds: string[] = []
 
 /**
  * Create test project and sessions in database

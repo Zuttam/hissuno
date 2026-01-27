@@ -65,7 +65,7 @@ function CustomNodeRenderer(props: any, onNodeClick?: (node: FlowGraphNode) => v
 }
 
 // Recharts Sankey tooltip payload - the structure varies
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 interface RichTooltipProps {
   active?: boolean
   payload?: Array<{
