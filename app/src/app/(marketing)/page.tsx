@@ -2,6 +2,7 @@ import {
   HeroSection,
   FeaturesSection,
   ValuePropsSection,
+  QuotesSection,
   CommunitySection,
   CTASection,
   UTMCapture,
@@ -26,6 +27,7 @@ export default async function MarketingPage({ searchParams }: MarketingPageProps
       <HeroSection />
       <FeaturesSection />
       <ValuePropsSection />
+      <QuotesSection />
       {/* <CommunitySection /> */}
       <CTASection />
     </>

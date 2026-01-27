@@ -3,8 +3,8 @@
 import { FloatingCard } from '@/components/ui/floating-card'
 import { WaterReveal } from '@/components/landing/water-reveal'
 import { RoadmapItem } from './roadmap-item'
-import type { RoadmapPhase as RoadmapPhaseType } from '@/app/(marketing)/roadmap/roadmap-data'
-import { STATUS_CONFIG } from '@/app/(marketing)/roadmap/roadmap-data'
+import type { RoadmapPhase as RoadmapPhaseType } from '@/app/(marketing)/landing/roadmap/roadmap-data'
+import { STATUS_CONFIG } from '@/app/(marketing)/landing/roadmap/roadmap-data'
 
 interface RoadmapPhaseCardProps {
   phase: RoadmapPhaseType

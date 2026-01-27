@@ -1,6 +1,7 @@
 export { HeroSection } from './hero-section'
 export { FeaturesSection } from './features-section'
 export { ValuePropsSection } from './value-props-section'
+export { QuotesSection } from './quotes-section'
 export { CommunitySection } from './community-section'
 export { CTASection } from './cta-section'
 export { MistOverlay } from './mist-overlay'

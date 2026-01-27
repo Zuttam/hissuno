@@ -17,7 +17,7 @@ export interface OnboardingCompletedEventData {
 }
 
 export interface CTAEventData {
-  source: 'nav' | 'hero' | 'cta_section' | 'roadmap' | 'login'
+  source: 'nav' | 'hero' | 'cta_section' | 'roadmap' | 'login' | 'support_hero' | 'support_cta_section'
   option?: 'book_call' | 'join_waitlist'
   utm?: UTMParams
 }

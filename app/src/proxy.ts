@@ -5,9 +5,11 @@ import { USER_EMAIL_HEADER, USER_ID_HEADER, USER_NAME_HEADER } from '@/lib/auth/
 const PUBLIC_PATH_PREFIXES = [
   '/login',
   '/sign-up',
+  
   '/legal',
   '/thank-you',
-  '/roadmap',
+  '/landing',
+
 
   '/auth/callback',
   '/api/cron',

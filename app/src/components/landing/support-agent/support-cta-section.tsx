@@ -5,13 +5,13 @@ import { useWaterWebGLOptional } from '@/components/water-webgl/WaterWebGLContex
 import { useCTA } from '@/components/landing/cta-context'
 import { WaterReveal } from '@/components/landing/water-reveal'
 
-export function CTASection() {
+export function SupportCTASection() {
   const water = useWaterWebGLOptional()
   const { openCTAOptions } = useCTA()
 
   const handleButtonClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
-    openCTAOptions('cta_section')
+    openCTAOptions('support_cta_section')
   }
 
   return (
@@ -28,13 +28,13 @@ export function CTASection() {
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         <WaterReveal preset="text" parallax parallaxDepth={0.1}>
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)] md:text-4xl">
-            Stop triaging manually
+            Stop answering the same questions
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            See how Hissuno turns your customer feedback into shipped features.
+            Let AI handle support while you build.
           </p>
         </WaterReveal>
 

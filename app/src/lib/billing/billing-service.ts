@@ -74,7 +74,7 @@ export async function getUsageMetrics(
   // Calculate period start (beginning of current billing period or month)
   const now = new Date()
   let periodStart: Date
-  let periodEnd: string | null = subscription?.current_period_end ?? null
+  const periodEnd: string | null = subscription?.current_period_end ?? null
 
   if (periodEnd) {
     // If we have a period end, calculate start based on monthly billing

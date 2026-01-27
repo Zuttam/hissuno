@@ -905,7 +905,7 @@ export const getImpactFlowAnalytics = cache(async (
   const sessionIds = sessionList.map(s => s.id)
 
   // Query participant types from session_messages
-  let participantsQuery = supabase
+  const participantsQuery = supabase
     .from('session_messages')
     .select('session_id, sender_type')
     .in('session_id', sessionIds)

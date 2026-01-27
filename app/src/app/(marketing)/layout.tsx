@@ -11,9 +11,9 @@ import { CookieConsentBanner } from '@/components/consent'
 
 
 export const metadata: Metadata = {
-  title: 'Hissuno - Turn Customer Conversations into Shipped Features',
+  title: 'Hissuno - Customer Feedback to Product Specs, Automatically',
   description:
-    'AI-powered customer intelligence platform that converts conversations into actionable issues, product specs, and code changes.',
+    'AI that triages customer conversations, creates prioritized issues, and writes product specs linked to your codebase.',
 }
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
@@ -40,7 +40,13 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                 </div>
                 <div className="flex items-center gap-4">
                   <Link
-                    href="/roadmap"
+                    href="/landing/support-agent"
+                    className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
+                  >
+                    AI Support
+                  </Link>
+                  <Link
+                    href="/landing/roadmap"
                     className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
                   >
                     Roadmap
