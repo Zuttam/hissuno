@@ -114,6 +114,7 @@
 ## Phase 8
 
 ### Marketing
+[] Run SDR agent
 [] Docs portal
 
 ### Issues

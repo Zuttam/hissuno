@@ -50,6 +50,14 @@ function BillingIcon({ className }: { className?: string }) {
   )
 }
 
+function GiftIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+    </svg>
+  )
+}
+
 export function SidebarAccountSection({ user, isCollapsed, onNavigate }: SidebarAccountSectionProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -57,6 +65,7 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
   const { theme, setThemePreference } = useThemePreference()
 
   const isSettingsActive = pathname.startsWith('/account/settings')
+  const isInvitesActive = pathname.startsWith('/account/promotions')
   const isBillingActive = pathname.startsWith('/account/billing')
 
   useEffect(() => {
@@ -105,6 +114,18 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
           title="Settings"
         >
           <SettingsIcon className="h-4 w-4" />
+        </Link>
+        <Link
+          href="/account/promotions"
+          onClick={onNavigate}
+          className={`flex h-8 w-8 items-center justify-center rounded-[4px] transition ${
+            isInvitesActive
+              ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
+              : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
+          }`}
+          title="Invites"
+        >
+          <GiftIcon className="h-4 w-4" />
         </Link>
         <Link
           href="/account/billing"
@@ -179,6 +200,18 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
       >
         <SettingsIcon className="h-4 w-4 flex-shrink-0" />
         <span>Settings</span>
+      </Link>
+      <Link
+        href="/account/promotions"
+        onClick={onNavigate}
+        className={`flex items-center gap-2 rounded-[4px] px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide transition ${
+          isInvitesActive
+            ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
+            : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
+        }`}
+      >
+        <GiftIcon className="h-4 w-4 flex-shrink-0" />
+        <span>Invites</span>
       </Link>
       <Link
         href="/account/billing"
