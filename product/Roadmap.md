@@ -91,7 +91,8 @@
 ## Phase 7
 
 ### Marketing
-[] Ad campaign for AI Support
+[x] Ads for AI Support
+[x] Ads for AI FDE
 
 ### Support
 [] Email agent
@@ -104,9 +105,7 @@
 ### Platform 
 [] Improve onboarding 
 [] Improve welcome email visualization
-[] Project multi-users access and RBAC
-[] Add invite link support 
-[] Alerts and weekly reports(email, slack)
+[] Add invite link and promotions support 
 
 ### Issues
 [] Calculate issue upvotes over time and alert or change priority if there's an anomaly
@@ -127,6 +126,8 @@
 
 ### Platform
 [] API Access (via secret key)
+[] Project multi-users access and RBAC
+[] Alerts and weekly reports(email, slack)
 [] MCP Access
 [] MCP Apps
 
@@ -137,3 +138,9 @@
 
 ### Sessions
 [] Facebook community channels
+
+### Platform
+[] Project multi-users access and RBAC
+[] Alerts and weekly reports(email, slack)
+[] MCP Access
+[] MCP Apps

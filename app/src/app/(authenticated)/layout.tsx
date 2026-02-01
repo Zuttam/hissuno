@@ -24,7 +24,7 @@ export default async function AuthenticatedLayout({
             <div className="flex h-screen overflow-hidden" suppressHydrationWarning>
               <WaterCanvas />
               <AppSidebar user={user} />
-              <main className="relative flex-1 min-w-0 flex flex-col overflow-hidden">
+              <main className="relative flex-1 min-w-0 flex flex-col overflow-y-auto">
                 {children}
               </main>
               <SupportWidget />
