@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Dialog, Button } from '@/components/ui'
 import { useCTA } from './cta-context'
 
@@ -22,7 +22,6 @@ function CTAParamHandler() {
 }
 
 export function ThankYouModal() {
-  const router = useRouter()
   const { activeDialog, closeDialog } = useCTA()
   const hasTracked = useRef(false)
 
@@ -37,7 +36,6 @@ export function ThankYouModal() {
 
   const handleThankYouClose = () => {
     closeDialog()
-    router.push('/')
   }
 
   return (

@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useCallback, FormEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import { Dialog, Button, Input } from '@/components/ui'
 import { useCTA } from './cta-context'
-import { trackCTAOptionSelected } from '@/lib/event_tracking/events'
+import { trackWaitlistCompleted } from '@/lib/event_tracking/events'
+
+// Email validation regex (RFC 5322 simplified)
+const EMAIL_REGEX =
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
 
 export function WaitlistDialog() {
-  const router = useRouter()
-  const { activeDialog, source, closeDialog } = useCTA()
+  const { activeDialog, source, closeDialog, showThankYou } = useCTA()
   const [email, setEmail] = useState('')
   const [website, setWebsite] = useState('') // Honeypot field
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -20,18 +22,25 @@ export function WaitlistDialog() {
     async (e: FormEvent) => {
       e.preventDefault()
       setError(null)
-      setIsSubmitting(true)
 
-      // Track analytics
-      if (source) {
-        trackCTAOptionSelected({ source, option: 'join_waitlist' })
+      // Client-side email validation
+      const trimmedEmail = email.trim()
+      if (!trimmedEmail) {
+        setError('Email is required.')
+        return
       }
+      if (!EMAIL_REGEX.test(trimmedEmail)) {
+        setError('Please enter a valid email address.')
+        return
+      }
+
+      setIsSubmitting(true)
 
       try {
         const response = await fetch('/api/waitlist', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, website, source }),
+          body: JSON.stringify({ email: trimmedEmail, website, source }),
         })
 
         const data = await response.json()
@@ -41,17 +50,20 @@ export function WaitlistDialog() {
           return
         }
 
-        // Success - close dialog and redirect to thank you page
+        // Track waitlist completion on success
+        trackWaitlistCompleted({ email: trimmedEmail })
+
+        // Success - close waitlist dialog and show thank you modal
         closeDialog()
         setEmail('')
-        router.push('/thank-you?type=waitlist')
+        showThankYou()
       } catch {
         setError('Something went wrong. Please try again.')
       } finally {
         setIsSubmitting(false)
       }
     },
-    [email, website, source, closeDialog, router]
+    [email, website, source, closeDialog, showThankYou]
   )
 
   const handleClose = useCallback(() => {
