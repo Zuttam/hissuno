@@ -1,0 +1,15 @@
+name: Intercom Sync Cron
+
+on:
+  schedule:
+    - cron: '15 * * * *' # Every hour at :15
+  workflow_dispatch: {} # Allow manual triggers
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Intercom sync
+        run: |
+          curl -sf -X GET "${{ secrets.CRON_URL }}/api/cron/intercom-sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

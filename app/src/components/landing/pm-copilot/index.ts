@@ -1,0 +1,5 @@
+export { PMHeroSection } from './pm-hero-section'
+export { PMFeaturesSection } from './pm-features-section'
+export { PMValuePropsSection } from './pm-value-props-section'
+export { PMQuotesSection } from './pm-quotes-section'
+export { PMCTASection } from './pm-cta-section'

@@ -109,6 +109,75 @@ export interface KnowledgePackageRecord {
   generated_at: string
   created_at: string
   updated_at: string
+  /** FK to named_knowledge_packages - links this category to a named package */
+  named_package_id: string | null
+}
+
+// ============================================================================
+// NAMED KNOWLEDGE PACKAGES
+// ============================================================================
+
+/**
+ * Database row type for named_knowledge_packages table
+ */
+export interface NamedKnowledgePackageRecord {
+  id: string
+  project_id: string
+  name: string
+  description: string | null
+  guidelines: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Insert type for named_knowledge_packages table
+ */
+export interface NamedKnowledgePackageInsert {
+  id?: string
+  project_id: string
+  name: string
+  description?: string | null
+  guidelines?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+/**
+ * Update type for named_knowledge_packages table
+ */
+export interface NamedKnowledgePackageUpdate {
+  id?: string
+  project_id?: string
+  name?: string
+  description?: string | null
+  guidelines?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+/**
+ * Database row type for named_package_sources junction table
+ */
+export interface NamedPackageSourceRecord {
+  id: string
+  package_id: string
+  source_id: string
+  created_at: string
+}
+
+/**
+ * Named package with related data for display
+ */
+export interface NamedPackageWithSources extends NamedKnowledgePackageRecord {
+  /** Knowledge sources linked to this package */
+  sources: KnowledgeSourceRecord[]
+  /** Generated category packages (business, product, technical, faq, how_to) */
+  categories: KnowledgePackageRecord[]
+  /** Count of linked sources */
+  sourceCount: number
+  /** Most recent analysis timestamp */
+  lastAnalyzedAt: string | null
 }
 
 /**
@@ -123,6 +192,8 @@ export interface KnowledgePackageInsert {
   generated_at?: string
   created_at?: string
   updated_at?: string
+  /** FK to named_knowledge_packages */
+  named_package_id?: string | null
 }
 
 /**
@@ -137,6 +208,8 @@ export interface KnowledgePackageUpdate {
   generated_at?: string
   created_at?: string
   updated_at?: string
+  /** FK to named_knowledge_packages */
+  named_package_id?: string | null
 }
 
 /**
@@ -174,6 +247,8 @@ export interface KnowledgePackageContent {
  */
 export interface KnowledgeAnalysisInput {
   projectId: string
+  /** Named package ID to associate generated knowledge with */
+  namedPackageId?: string
   /** @deprecated Use codebase source in sources array instead */
   sourceCodePath?: string
   sources: Array<{

@@ -7,11 +7,11 @@ import { WaterReveal } from '@/components/landing/water-reveal'
 
 export function RoadmapCTASection() {
   const water = useWaterWebGLOptional()
-  const { openCTAOptions } = useCTA()
+  const { openWaitlist } = useCTA()
 
   const handleButtonClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
-    openCTAOptions('roadmap')
+    openWaitlist('roadmap')
   }
 
   return (
@@ -33,8 +33,7 @@ export function RoadmapCTASection() {
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            Book a call to share your feedback or join the waitlist for early access to new
-            features.
+            Join the waitlist to share your feedback and help shape the roadmap.
           </p>
         </WaterReveal>
 
@@ -45,7 +44,7 @@ export function RoadmapCTASection() {
               onClick={handleButtonClick}
               className="bg-[var(--accent-selected)] hover:opacity-90"
             >
-              Get Started
+              Join Waitlist
             </Button>
           </div>
         </WaterReveal>

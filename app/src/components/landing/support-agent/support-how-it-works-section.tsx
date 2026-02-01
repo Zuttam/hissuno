@@ -9,21 +9,21 @@ const STEPS = [
     step: 1,
     title: 'Connect your codebase',
     description:
-      'Point Hissuno at your GitHub repo. It reads your code and docs to understand your product.',
+      'Point Hissuno at your GitHub repo. It reads your code to understand your product inside and out.',
   },
   {
-    id: 'embed',
+    id: 'knowledge',
     step: 2,
-    title: 'Embed or invite',
+    title: 'Add knowledge sources',
     description:
-      'Add the widget to your site, or invite the bot to Slack. One line of code or one click.',
+      'Connect docs, FAQs, Notion pages. Everything becomes searchable context for the AI.',
   },
   {
-    id: 'done',
+    id: 'deploy',
     step: 3,
-    title: "You're done",
+    title: 'Deploy anywhere',
     description:
-      'Hissuno answers questions immediately. You get notified only when a human is needed.',
+      'Widget, Slack, email, docs — pick your channels. Answers start flowing in minutes, not days.',
   },
 ]
 
@@ -33,7 +33,7 @@ export function SupportHowItWorksSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Setup in 5 Minutes
+            Zero Setup, Instant Answers
           </h2>
         </WaterReveal>
 

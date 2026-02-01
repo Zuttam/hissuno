@@ -93,7 +93,7 @@ export function ChatDialog({
     }
   }, [onClose]);
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -287,8 +287,7 @@ export function ChatDialog({
               borderTop: `1px solid ${borderColor}`,
             }}
           >
-            <input
-              type="text"
+            <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -296,6 +295,7 @@ export function ChatDialog({
               disabled={isLoading}
               autoFocus
               aria-label="Type your message"
+              rows={1}
               style={{
                 flex: 1,
                 padding: '12px 16px',
@@ -306,6 +306,11 @@ export function ChatDialog({
                 fontSize: 14,
                 outline: 'none',
                 fontFamily: 'system-ui, -apple-system, sans-serif',
+                resize: 'none',
+                minHeight: 44,
+                maxHeight: 120,
+                overflow: 'auto',
+                lineHeight: '20px',
               }}
             />
             {isStreaming && onCancelChat ? (

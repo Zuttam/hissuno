@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import ReactMarkdown from 'react-markdown'
-import rehypeHighlight from 'rehype-highlight'
 import { cn } from '@/lib/utils/class'
 import { Button, Textarea } from '@/components/ui'
+import { MarkdownContent } from '@/components/ui/markdown-content'
 
 interface KnowledgeViewerProps {
   content: string
@@ -29,10 +28,10 @@ export function KnowledgeViewer({
 }: KnowledgeViewerProps) {
   const [editedContent, setEditedContent] = useState(content)
 
-  // Sync edited content when content prop changes or entering edit mode
+  // Sync edited content when content prop changes
   useEffect(() => {
     setEditedContent(content)
-  }, [content, isEditing])
+  }, [content])
 
   if (!content && !isEditing) {
     return (
@@ -76,9 +75,10 @@ export function KnowledgeViewer({
   }
 
   return (
-    <div
+    <MarkdownContent
+      content={content}
       className={cn(
-        'prose prose-sm max-w-none dark:prose-invert',
+        'prose-sm',
         'max-h-[400px] overflow-y-auto',
         // Custom styling for knowledge documents
         'prose-headings:font-mono prose-headings:uppercase prose-headings:tracking-tight',
@@ -97,8 +97,6 @@ export function KnowledgeViewer({
         'prose-td:border prose-td:border-[color:var(--border-subtle)] prose-td:p-2',
         className
       )}
-    >
-      <ReactMarkdown rehypePlugins={[rehypeHighlight]}>{content}</ReactMarkdown>
-    </div>
+    />
   )
 }

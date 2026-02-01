@@ -73,61 +73,67 @@
 
 ## Phase 6
 
+### Knowledge
+[x] Seperate knowledge sources and knowledge package -> allow user to create multiple packages from various sources and connect the agents to relevant knowledge package
+
 ### Marketing
-[] Launch Ad campaigns for join and demo CTA (google and meta)
-[] Test pixel
+[x] Launch Ad campaigns for join and demo CTA (google and meta)
+[x] Test pixel
 
 ### Support
-
-[] Slack auto response (no need to tag in thread)
+[x] Slack auto response (no need to tag in thread)
 
 ### Sessions
-[] Slack as source only (read only sessions from channels)
-[] Intercom integration (API Key - https://developers.intercom.com/docs/references/rest-api/api.intercom.io)
-[] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
+[x] Slack as source only (read only sessions from channels)
+[x] Intercom integration (API Key - https://developers.intercom.com/docs/references/rest-api/api.intercom.io)
 
-### Issues 
-[] Jira Integration 
-
-### Platform
-[] Improve onboarding 
-[] Improve welcome email visualization
 
 ## Phase 7
 
 ### Marketing
-[] Docs portal
+[] Ad campaign for AI Support
 
 ### Support
 [] Email agent
 
 ### Sessions
-[] Improve participants identification
-  [] show additional details in a more clean way
-  [] Show additioanl participants (multi user conversations) 
-
+[] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
+[] Expend sessions type to different use cases: behavioral session (events), meeting (multi user conversation like gong -> show transcript), chat (intercom, widget) and show the contents accordingly
+[] Improve participants identification - show additional details in a cleaner way
 
 ### Platform 
+[] Improve onboarding 
+[] Improve welcome email visualization
 [] Project multi-users access and RBAC
 [] Add invite link support 
 [] Alerts and weekly reports(email, slack)
 
 ### Issues
-[] Draft response email to the user
-[] Support Actions items (not necessary code related)
 [] Calculate issue upvotes over time and alert or change priority if there's an anomaly
-[] Lieaner Integration
+[] Jira Integration 
 
 ## Phase 8
 
 ### Marketing
-[] Product Hunt
+[] Docs portal
 
-### Sessions
-[] Facebook community channels
+### Issues
+[] Draft response email to the user
+[] Support Actions items (not necessary code related)
+[] Lieaner Integration
 
 ### Code
 [] Create initial implementation 
 
 ### Platform
 [] API Access (via secret key)
+[] MCP Access
+[] MCP Apps
+
+## Phase 9
+
+### Marketing
+[] Ad Campaign for AI FDE 
+
+### Sessions
+[] Facebook community channels

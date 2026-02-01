@@ -1,22 +1,18 @@
 'use client'
 
 import { motion } from 'motion/react'
-import { Button, ThemeLogo } from '@/components/ui'
+import { Button } from '@/components/ui'
 import { useWaterWebGLOptional } from '@/components/water-webgl/WaterWebGLContext'
 import { useCTA } from '@/components/landing/cta-context'
 import { WATER_EASINGS } from '@/components/landing/scroll-animation-config'
 
 export function SupportHeroSection() {
   const water = useWaterWebGLOptional()
-  const { openCTAOptions } = useCTA()
-
-  const handleLogoClick = (e: React.MouseEvent) => {
-    water?.triggerRipple(e.clientX, e.clientY, 1.5)
-  }
+  const { openWaitlist } = useCTA()
 
   const handleCTAClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
-    openCTAOptions('support_hero')
+    openWaitlist('support_hero')
   }
 
   const heroAnimation = {
@@ -38,38 +34,30 @@ export function SupportHeroSection() {
       <motion.div
         {...heroAnimation}
         transition={{ duration: 1.2, ease: WATER_EASINGS.float, delay: 0.2 }}
-        className="relative z-10 mx-auto max-w-4xl text-center">
-        {/* Interactive logo that triggers ripples */}
-        <div
-          className="mx-auto mb-8 w-fit cursor-pointer"
-          onClick={handleLogoClick}
-        >
-          <ThemeLogo width={180} height={60} priority />
-        </div>
-
-        <h1
-          className="font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl"
-        >
-          AI Support Agents
+        className="relative z-10 mx-auto max-w-4xl text-center"
+      >
+        <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
+          Stop Answering the
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            That Know Your Product!
+            Same Questions
           </span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
-          Embed in your website or Slack. Answers customer questions using your codebase and docs — works out of the box.
+          AI support that reduces noise, gives instant answers, and works across every channel — no setup required.
         </p>
 
-        <div
-          className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
-        >
+        <div className="mt-10 flex flex-col items-center justify-center">
           <Button
             size="lg"
             onClick={handleCTAClick}
             className="w-full bg-[var(--accent-selected)] hover:opacity-90 sm:w-auto"
           >
-            Get Started
+            Join Waitlist
           </Button>
+          <p className="mt-2 text-sm text-[var(--text-tertiary)]">
+            Join now and get free credits
+          </p>
         </div>
       </motion.div>
     </section>

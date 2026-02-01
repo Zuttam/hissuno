@@ -7,11 +7,11 @@ import { WaterReveal } from '@/components/landing/water-reveal'
 
 export function SupportCTASection() {
   const water = useWaterWebGLOptional()
-  const { openCTAOptions } = useCTA()
+  const { openWaitlist } = useCTA()
 
   const handleButtonClick = (e: React.MouseEvent) => {
     water?.triggerRipple(e.clientX, e.clientY, 1.5)
-    openCTAOptions('support_cta_section')
+    openWaitlist('support_cta_section')
   }
 
   return (
@@ -28,25 +28,28 @@ export function SupportCTASection() {
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         <WaterReveal preset="text" parallax parallaxDepth={0.1}>
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)] md:text-4xl">
-            Stop answering the same questions
+            Let AI Handle the Noise
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            Let AI handle support while you build.
+            Instant answers backed by your codebase. No hallucinations.
           </p>
         </WaterReveal>
 
         <WaterReveal preset="card" delay={0.25}>
-          <div className="mt-8">
+          <div className="mt-8 flex flex-col items-center">
             <Button
               size="lg"
               onClick={handleButtonClick}
               className="bg-[var(--accent-selected)] hover:opacity-90"
             >
-              Get Started
+              Join Waitlist
             </Button>
+            <p className="mt-2 text-sm text-[var(--text-tertiary)]">
+              Join now and get free credits
+            </p>
           </div>
         </WaterReveal>
       </div>

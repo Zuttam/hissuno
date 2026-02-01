@@ -1,9 +1,8 @@
 import {
   HeroSection,
+  AgentsShowcaseSection,
   FeaturesSection,
-  ValuePropsSection,
   QuotesSection,
-  CommunitySection,
   CTASection,
   UTMCapture,
   MistOverlay,
@@ -25,10 +24,9 @@ export default async function MarketingPage({ searchParams }: MarketingPageProps
       <MistOverlay />
 
       <HeroSection />
+      <AgentsShowcaseSection />
       <FeaturesSection />
-      <ValuePropsSection />
       <QuotesSection />
-      {/* <CommunitySection /> */}
       <CTASection />
     </>
   )

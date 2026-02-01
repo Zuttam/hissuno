@@ -105,27 +105,14 @@
   animation: hissuno-fade-in-backdrop 0.2s ease-out;
 }
 
-/* Messages container */
+/* Messages container - hide scrollbar but keep scrolling */
 .hissuno-messages {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(155, 155, 155, 0.5) transparent;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 
 .hissuno-messages::-webkit-scrollbar {
-  width: 6px;
-}
-
-.hissuno-messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.hissuno-messages::-webkit-scrollbar-thumb {
-  background-color: rgba(155, 155, 155, 0.5);
-  border-radius: 3px;
-}
-
-.hissuno-messages::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(155, 155, 155, 0.7);
+  display: none; /* Chrome, Safari, Opera */
 }
 
 /* Loading dots animation */

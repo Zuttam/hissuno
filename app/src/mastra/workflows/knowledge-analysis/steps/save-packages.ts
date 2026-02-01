@@ -20,17 +20,22 @@ export const saveKnowledgePackages = createStep({
 
     await writer?.write({ type: 'progress', message: 'Saving knowledge packages...' })
 
-    const { business, product, technical, faq, how_to, redactionSummary, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
-    const initData = getInitData?.() as { 
+    const { projectId, namedPackageId, business, product, technical, faq, how_to, redactionSummary, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
+    const initData = getInitData?.() as {
       projectId: string
+      namedPackageId?: string
       analysisId?: string
-      sources: unknown[] 
+      sources: unknown[]
     } | undefined
-    const projectId = initData?.projectId
+    // Use projectId from inputData first, fall back to initData
+    const resolvedProjectId = projectId ?? initData?.projectId
+    const resolvedNamedPackageId = namedPackageId ?? initData?.namedPackageId ?? null
     const analysisId = initData?.analysisId
 
-    if (!projectId) {
+    if (!resolvedProjectId) {
       return {
+        projectId: '',
+        namedPackageId: resolvedNamedPackageId,
         saved: false,
         packages: [],
         errors: ['Project ID not found in workflow context'],
@@ -60,19 +65,26 @@ export const saveKnowledgePackages = createStep({
       for (const { key, content } of categories) {
         await writer?.write({ type: 'progress', message: `Saving ${key} knowledge package...` })
         try {
-          // Get current version
-          const { data: existing } = await supabase
+          // Get current version - filter by named_package_id if provided
+          let versionQuery = supabase
             .from('knowledge_packages')
             .select('version')
-            .eq('project_id', projectId)
+            .eq('project_id', resolvedProjectId)
             .eq('category', key)
-            .single()
+
+          if (resolvedNamedPackageId) {
+            versionQuery = versionQuery.eq('named_package_id', resolvedNamedPackageId)
+          }
+
+          const { data: existing } = await versionQuery.single()
 
           const newVersion = (existing?.version ?? 0) + 1
 
           // Upload to storage using the helper (uses admin client internally)
+          // Include named package ID in path for organization
+          const storageSuffix = resolvedNamedPackageId ? `/${resolvedNamedPackageId}` : ''
           const { path: storagePath, error: uploadError } = await uploadKnowledgePackage(
-            projectId,
+            `${resolvedProjectId}${storageSuffix}`,
             key,
             content,
             newVersion
@@ -83,19 +95,37 @@ export const saveKnowledgePackages = createStep({
             continue
           }
 
-          // Upsert database record
-          const { error: dbError } = await supabase.from('knowledge_packages').upsert(
-            {
-              project_id: projectId,
-              category: key,
-              storage_path: storagePath,
-              version: newVersion,
-              generated_at: new Date().toISOString(),
-            },
-            {
+          // Upsert database record with named_package_id
+          const packageRecord: Record<string, unknown> = {
+            project_id: resolvedProjectId,
+            category: key,
+            storage_path: storagePath,
+            version: newVersion,
+            generated_at: new Date().toISOString(),
+            named_package_id: resolvedNamedPackageId,
+          }
+
+          // For upsert, we need to handle the conflict differently based on whether we have a named package
+          // If we have a named_package_id, we need to match on project_id + category + named_package_id
+          // If not, we match on project_id + category (legacy behavior)
+          let upsertQuery
+          if (resolvedNamedPackageId) {
+            // Delete existing and insert new (since we can't use composite unique on nullable column easily)
+            await supabase
+              .from('knowledge_packages')
+              .delete()
+              .eq('project_id', resolvedProjectId)
+              .eq('category', key)
+              .eq('named_package_id', resolvedNamedPackageId)
+
+            upsertQuery = supabase.from('knowledge_packages').insert(packageRecord)
+          } else {
+            upsertQuery = supabase.from('knowledge_packages').upsert(packageRecord, {
               onConflict: 'project_id,category',
-            }
-          )
+            })
+          }
+
+          const { error: dbError } = await upsertQuery
 
           if (dbError) {
             errors.push(`Failed to save ${key} record: ${dbError.message}`)
@@ -157,6 +187,8 @@ export const saveKnowledgePackages = createStep({
       })
 
       return {
+        projectId: resolvedProjectId,
+        namedPackageId: resolvedNamedPackageId,
         saved: packages.length > 0,
         packages,
         errors,
@@ -166,7 +198,7 @@ export const saveKnowledgePackages = createStep({
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
-      
+
       // Mark analysis as failed if we have an analysisId
       if (analysisId) {
         try {
@@ -184,8 +216,10 @@ export const saveKnowledgePackages = createStep({
           console.error('[save-packages] Failed to mark analysis as failed:', updateError)
         }
       }
-      
+
       return {
+        projectId: resolvedProjectId ?? '',
+        namedPackageId: resolvedNamedPackageId,
         saved: false,
         packages: [],
         errors: [`Failed to save packages: ${message}`],

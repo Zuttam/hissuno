@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect } from 'react'
-import { KnowledgeViewer } from '@/components/projects/knowledge/knowledge-viewer'
+import { MarkdownContent } from '@/components/ui/markdown-content'
 import type { ChatMessage } from '@/types/session'
 
 interface SessionChatProps {
@@ -105,7 +105,7 @@ function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : (
-            <KnowledgeViewer content={message.content} />
+            <MarkdownContent content={message.content} />
           )}
         </div>
 

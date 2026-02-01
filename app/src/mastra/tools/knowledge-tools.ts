@@ -9,8 +9,8 @@
  * - faq: Frequently asked questions and answers
  * - how_to: Step-by-step guides and tutorials
  *
- * NOTE: These tools expect `projectId` to be available in the RuntimeContext.
- * The API route sets this automatically when handling widget requests.
+ * NOTE: These tools expect `projectId` and optionally `namedPackageId` to be available
+ * in the RuntimeContext. The API route sets these automatically when handling widget requests.
  */
 
 import { createTool } from '@mastra/core/tools'
@@ -21,19 +21,28 @@ import type { KnowledgeCategory } from '@/lib/knowledge/types'
 
 const KNOWLEDGE_CATEGORIES: KnowledgeCategory[] = ['business', 'product', 'technical', 'faq', 'how_to']
 
+interface KnowledgeContext {
+  projectId: string | null
+  namedPackageId: string | null
+}
+
 /**
- * Helper to get projectId from runtimeContext with validation
+ * Helper to get projectId and namedPackageId from runtimeContext with validation
  */
-function getProjectIdFromContext(runtimeContext: unknown): string | null {
+function getContextFromRuntime(runtimeContext: unknown): KnowledgeContext {
   if (!runtimeContext || typeof runtimeContext !== 'object') {
-    return null
+    return { projectId: null, namedPackageId: null }
   }
   const ctx = runtimeContext as { get?: (key: string) => unknown }
   if (typeof ctx.get !== 'function') {
-    return null
+    return { projectId: null, namedPackageId: null }
   }
   const projectId = ctx.get('projectId')
-  return typeof projectId === 'string' ? projectId : null
+  const namedPackageId = ctx.get('namedPackageId')
+  return {
+    projectId: typeof projectId === 'string' ? projectId : null,
+    namedPackageId: typeof namedPackageId === 'string' ? namedPackageId : null,
+  }
 }
 
 /**
@@ -59,7 +68,7 @@ Note: The project is automatically determined from the conversation context.`,
     error: z.string().optional(),
   }),
   execute: async ({ runtimeContext }) => {
-    const projectId = getProjectIdFromContext(runtimeContext)
+    const { projectId, namedPackageId } = getContextFromRuntime(runtimeContext)
 
     if (!projectId) {
       return {
@@ -72,11 +81,17 @@ Note: The project is automatically determined from the conversation context.`,
     try {
       const supabase = createAdminClient()
 
-      const { data: packages, error } = await supabase
+      let query = supabase
         .from('knowledge_packages')
         .select('category, version, generated_at, storage_path')
         .eq('project_id', projectId)
-        .order('category', { ascending: true })
+
+      // Filter by named package if specified
+      if (namedPackageId) {
+        query = query.eq('named_package_id', namedPackageId)
+      }
+
+      const { data: packages, error } = await query.order('category', { ascending: true })
 
       if (error) {
         return {
@@ -141,7 +156,7 @@ Note: The project is automatically determined from the conversation context.`,
   }),
   execute: async ({ context, runtimeContext }) => {
     const { category } = context
-    const projectId = getProjectIdFromContext(runtimeContext)
+    const { projectId, namedPackageId } = getContextFromRuntime(runtimeContext)
 
     if (!projectId) {
       return {
@@ -158,12 +173,18 @@ Note: The project is automatically determined from the conversation context.`,
       const supabase = createAdminClient()
 
       // Get package metadata from database
-      const { data: pkg, error: dbError } = await supabase
+      let query = supabase
         .from('knowledge_packages')
         .select('*')
         .eq('project_id', projectId)
         .eq('category', category)
-        .single()
+
+      // Filter by named package if specified
+      if (namedPackageId) {
+        query = query.eq('named_package_id', namedPackageId)
+      }
+
+      const { data: pkg, error: dbError } = await query.single()
 
       if (dbError || !pkg) {
         return {
@@ -245,7 +266,7 @@ Note: The project is automatically determined from the conversation context.`,
   }),
   execute: async ({ context, runtimeContext }) => {
     const { query, categories } = context
-    const projectId = getProjectIdFromContext(runtimeContext)
+    const { projectId, namedPackageId } = getContextFromRuntime(runtimeContext)
     const categoriesToSearch = categories ?? KNOWLEDGE_CATEGORIES
 
     if (!projectId) {
@@ -261,11 +282,18 @@ Note: The project is automatically determined from the conversation context.`,
       const supabase = createAdminClient()
 
       // Get all relevant packages
-      const { data: packages, error: dbError } = await supabase
+      let packagesQuery = supabase
         .from('knowledge_packages')
         .select('*')
         .eq('project_id', projectId)
         .in('category', categoriesToSearch)
+
+      // Filter by named package if specified
+      if (namedPackageId) {
+        packagesQuery = packagesQuery.eq('named_package_id', namedPackageId)
+      }
+
+      const { data: packages, error: dbError } = await packagesQuery
 
       if (dbError) {
         return {
@@ -398,7 +426,7 @@ Note: The project is automatically determined from the conversation context.`,
   }),
   execute: async ({ context, runtimeContext }) => {
     const { query, categories, limit = 5 } = context
-    const projectId = getProjectIdFromContext(runtimeContext)
+    const { projectId, namedPackageId } = getContextFromRuntime(runtimeContext)
 
     if (!projectId) {
       return {
@@ -413,6 +441,7 @@ Note: The project is automatically determined from the conversation context.`,
       const { searchKnowledgeEmbeddings } = await import('@/lib/knowledge/embedding-service')
 
       const searchResults = await searchKnowledgeEmbeddings(projectId, query, {
+        namedPackageId: namedPackageId ?? undefined,
         categories: categories as KnowledgeCategory[] | undefined,
         limit,
         similarityThreshold: 0.65,

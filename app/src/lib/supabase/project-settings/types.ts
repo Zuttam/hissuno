@@ -39,6 +39,13 @@ export interface IssueSettings {
 }
 
 /**
+ * Support agent settings subset of ProjectSettingsRecord
+ */
+export interface SupportAgentSettings {
+  support_agent_package_id: string | null
+}
+
+/**
  * Input for updating widget settings
  */
 export type WidgetSettingsInput = Partial<WidgetSettings>
@@ -52,6 +59,11 @@ export type SessionSettingsInput = Partial<SessionSettings>
  * Input for updating issue settings
  */
 export type IssueSettingsInput = Partial<IssueSettings>
+
+/**
+ * Input for updating support agent settings
+ */
+export type SupportAgentSettingsInput = Partial<SupportAgentSettings>
 
 /**
  * Default widget settings
@@ -89,4 +101,11 @@ export const DEFAULT_ISSUE_SETTINGS: IssueSettings = {
   issue_spec_threshold: 3,
   spec_guidelines: null,
   pm_dedup_include_closed: false,
+}
+
+/**
+ * Default support agent settings
+ */
+export const DEFAULT_SUPPORT_AGENT_SETTINGS: SupportAgentSettings = {
+  support_agent_package_id: null,
 }

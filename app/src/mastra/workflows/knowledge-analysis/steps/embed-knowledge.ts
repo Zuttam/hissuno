@@ -42,8 +42,9 @@ export const embedKnowledge = createStep({
       message: 'Generating semantic embeddings for knowledge search...',
     })
 
-    const initData = getInitData?.() as { projectId: string } | undefined
-    const projectId = initData?.projectId
+    const initData = getInitData?.() as { projectId: string; namedPackageId?: string } | undefined
+    const projectId = inputData.projectId ?? initData?.projectId
+    const namedPackageId = inputData.namedPackageId ?? initData?.namedPackageId
 
     if (!projectId) {
       return {
@@ -60,7 +61,7 @@ export const embedKnowledge = createStep({
       // Dynamic import to avoid issues in workflow context
       const { embedProjectKnowledge } = await import('@/lib/knowledge/embedding-service')
 
-      const result = await embedProjectKnowledge(projectId)
+      const result = await embedProjectKnowledge(projectId, { namedPackageId: namedPackageId ?? undefined })
 
       await writer?.write({
         type: 'progress',

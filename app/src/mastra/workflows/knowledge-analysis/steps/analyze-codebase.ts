@@ -20,7 +20,7 @@ export const analyzeCodebase = createStep({
       throw new Error('Input data not found')
     }
 
-    const { projectId, sources, localCodePath, analysisScope, codebaseLeaseId, codebaseCommitSha } = inputData
+    const { projectId, namedPackageId, sources, localCodePath, analysisScope, codebaseLeaseId, codebaseCommitSha } = inputData
     logger?.info('[analyze-codebase] Starting', { projectId, localCodePath, analysisScope })
 
     // Emit progress event
@@ -32,6 +32,7 @@ export const analyzeCodebase = createStep({
       await writer?.write({ type: 'progress', message: 'No codebase configured, skipping...' })
       return {
         projectId,
+        namedPackageId,
         sources,
         codebaseAnalysis: '',
         hasCodebase: false,
@@ -47,6 +48,7 @@ export const analyzeCodebase = createStep({
       await writer?.write({ type: 'progress', message: 'Codebase analyzer not configured' })
       return {
         projectId,
+        namedPackageId,
         sources,
         codebaseAnalysis: '[Codebase analysis skipped: Agent not configured]',
         hasCodebase: true,
@@ -115,6 +117,7 @@ Be efficient with your tool usage - you don't need to read every file. Focus on 
 
       return {
         projectId,
+        namedPackageId,
         sources,
         codebaseAnalysis: analysis,
         hasCodebase: true,
@@ -127,6 +130,7 @@ Be efficient with your tool usage - you don't need to read every file. Focus on 
       logger?.error('[analyze-codebase] Error', { error: message })
       return {
         projectId,
+        namedPackageId,
         sources,
         codebaseAnalysis: `[Codebase analysis error: ${message}]`,
         hasCodebase: true,

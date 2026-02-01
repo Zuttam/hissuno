@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { updateSessionActivity } from '@/lib/supabase/sessions'
 import { saveSessionMessage } from '@/lib/supabase/session-messages'
 import { getRunningChatRun, updateChatRunStatus } from '@/lib/agent/chat-run-service'
+import { getSupportAgentSettingsAdmin } from '@/lib/supabase/project-settings/support-agent'
 import {
   type BaseSSEEvent,
   createSSEStreamWithExecutor,
@@ -137,12 +138,20 @@ export async function GET(request: NextRequest) {
         console.log(`${LOG_PREFIX} Sending connected event...`)
         emitEvent('connected', { message: 'Connected to chat stream' })
 
+        // Get the knowledge package ID - use override from metadata if provided, otherwise fetch from settings
+        let namedPackageId: string | null = chatRun.metadata?.packageId || null
+        if (!namedPackageId) {
+          const agentSettings = await getSupportAgentSettingsAdmin(projectId)
+          namedPackageId = agentSettings.support_agent_package_id
+        }
+
         // Build runtime context
         const runtimeContext = new RuntimeContext<SupportAgentContext>()
         runtimeContext.set('projectId', projectId)
         runtimeContext.set('userId', chatRun.metadata?.userId || null)
         runtimeContext.set('userMetadata', chatRun.metadata?.userMetadata || null)
         runtimeContext.set('sessionId', sessionId)
+        runtimeContext.set('namedPackageId', namedPackageId)
 
         // Convert messages to ModelMessage format
         const mastraMessages: ModelMessage[] = messages.map((msg) => ({

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { Spinner } from '@/components/ui'
+import { CheckIcon, WarningIcon } from '@/components/ui/icons'
 
 /**
  * SSE event types from the analysis stream
@@ -76,7 +77,8 @@ export function AnalysisProgressBar({ events, isProcessing }: AnalysisProgressBa
 
   // Count completed steps
   const completedSteps = events.filter((e) => e.type === 'step-finish').length
-  const totalSteps = 6 // analyze-codebase, analyze-sources, compile-knowledge, sanitize-knowledge, save-packages, embed-knowledge
+  // Total workflow steps: analyze-codebase, analyze-sources, compile-knowledge, sanitize-knowledge, save-packages, embed-knowledge
+  const totalSteps = 6
 
   // If we're processing but have no detailed events, show generic progress
   const hasDetailedEvents = events.some((e) => e.type === 'step-start' || e.type === 'step-finish')
@@ -97,30 +99,10 @@ export function AnalysisProgressBar({ events, isProcessing }: AnalysisProgressBa
         <div className="flex items-center gap-3">
           {isProcessing && <Spinner size="sm" />}
           {!isProcessing && !hasError && (
-            <svg
-              className="h-5 w-5 text-[color:var(--accent-success)]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
+            <CheckIcon className="h-5 w-5 text-[color:var(--accent-success)]" />
           )}
           {hasError && (
-            <svg
-              className="h-5 w-5 text-[color:var(--accent-warning)]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
+            <WarningIcon className="h-5 w-5 text-[color:var(--accent-warning)]" />
           )}
           <div>
             <p className="font-mono text-sm font-semibold text-[color:var(--foreground)]">

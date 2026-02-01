@@ -24,7 +24,7 @@ export const analyzeSources = createStep({
       throw new Error('Input data not found')
     }
 
-    const { sources, codebaseAnalysis, hasCodebase, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
+    const { projectId, namedPackageId, sources, codebaseAnalysis, hasCodebase, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
     const results: AnalysisResult[] = []
 
     await writer?.write({ type: 'progress', message: `Analyzing ${sources.length} knowledge source(s)...` })
@@ -224,6 +224,8 @@ Please extract and organize:
     })
 
     return {
+      projectId,
+      namedPackageId,
       analysisResults: results,
       codebaseAnalysis,
       hasCodebase,

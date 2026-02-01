@@ -6,11 +6,15 @@ import { useCTA } from './cta-context'
 import { useRouter } from 'next/navigation'
 
 export function MarketingNav() {
-  const { openCTAOptions } = useCTA()
+  const { openWaitlist } = useCTA()
   const router = useRouter()
 
   const handleSignInClick = () => {
     router.push('/login')
+  }
+
+  const handleJoinWaitlist = () => {
+    openWaitlist('nav')
   }
 
   return (
@@ -34,10 +38,10 @@ export function MarketingNav() {
           </Button>
           <Button
             size="sm"
-            onClick={() => openCTAOptions('nav')}
+            onClick={handleJoinWaitlist}
             className="bg-[var(--accent-selected)] hover:opacity-90 py-2"
           >
-            Get Started
+            Join Waitlist
           </Button>
         </div>
       </nav>

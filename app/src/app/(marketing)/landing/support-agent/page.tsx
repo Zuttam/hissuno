@@ -3,6 +3,8 @@ import {
   SupportHeroSection,
   SupportFeaturesSection,
   SupportHowItWorksSection,
+  SupportKnowledgeSection,
+  SupportQuotesSection,
   SupportCTASection,
 } from '@/components/landing/support-agent'
 import { UTMCapture, MistOverlay } from '@/components/landing'
@@ -10,7 +12,7 @@ import { UTMCapture, MistOverlay } from '@/components/landing'
 export const metadata: Metadata = {
   title: 'Hissuno - AI Support Agent for Your Product',
   description:
-    'AI support that answers customer questions using your codebase. Embed in your website or Slack. No training required.',
+    'AI support that reduces noise, gives instant answers, and works across every channel. Answers backed by your codebase — no hallucinations.',
 }
 
 interface SupportAgentPageProps {
@@ -31,6 +33,8 @@ export default async function SupportAgentPage({ searchParams }: SupportAgentPag
       <SupportHeroSection />
       <SupportFeaturesSection />
       <SupportHowItWorksSection />
+      <SupportKnowledgeSection />
+      <SupportQuotesSection />
       <SupportCTASection />
     </>
   )
