@@ -55,6 +55,41 @@ export interface IntercomContact {
   name?: string | null
   phone?: string | null
   role: 'user' | 'lead'
+  avatar?: string | null
+  owner_id?: number | null
+  location?: {
+    country?: string | null
+    country_code?: string | null
+    region?: string | null
+    city?: string | null
+  } | null
+  companies?: {
+    companies: Array<{
+      id: string
+      name?: string | null
+      company_id?: string | null
+    }>
+  } | null
+  tags?: {
+    tags: Array<{
+      id: string
+      name: string
+    }>
+  } | null
+  social_profiles?: {
+    data: Array<{
+      type: string
+      name: string
+      url: string
+    }>
+  } | null
+  custom_attributes?: Record<string, unknown> | null
+  created_at?: number | null
+  last_seen_at?: number | null
+  signed_up_at?: number | null
+  browser?: string | null
+  browser_language?: string | null
+  os?: string | null
 }
 
 /**
@@ -244,12 +279,25 @@ export class IntercomClient {
     perPage?: number
     startingAfter?: string
   } = {}): Promise<IntercomListResponse<IntercomConversationListItem>> {
-    return this.request<IntercomListResponse<IntercomConversationListItem>>('GET', '/conversations', {
+    // Intercom API returns conversations under a `conversations` key, not `data`
+    const response = await this.request<{
+      type: string
+      conversations: IntercomConversationListItem[]
+      pages: IntercomListResponse<IntercomConversationListItem>['pages']
+      total_count: number
+    }>('GET', '/conversations', {
       params: {
         per_page: options.perPage || 20,
         starting_after: options.startingAfter,
       },
     })
+
+    return {
+      type: response.type,
+      data: response.conversations ?? [],
+      pages: response.pages,
+      total_count: response.total_count,
+    }
   }
 
   /**

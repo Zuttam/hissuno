@@ -3,13 +3,15 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getStoredUTM } from '@/lib/event_tracking'
+import { getStoredInviteCode } from '@/lib/invites/session-storage'
 
 interface GoogleSignInButtonProps {
   redirectTo?: string
   onClick?: () => void
+  disabled?: boolean
 }
 
-export function GoogleSignInButton({ redirectTo = '/projects', onClick }: GoogleSignInButtonProps) {
+export function GoogleSignInButton({ redirectTo = '/projects', onClick, disabled }: GoogleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,6 +35,12 @@ export function GoogleSignInButton({ redirectTo = '/projects', onClick }: Google
         Object.entries(storedUTM).forEach(([key, value]) => {
           if (value) callbackUrl.searchParams.set(key, value)
         })
+      }
+
+      // Include stored invite code in callback URL
+      const storedInvite = getStoredInviteCode()
+      if (storedInvite) {
+        callbackUrl.searchParams.set('invite', storedInvite)
       }
 
       const { error } = await supabase.auth.signInWithOAuth({
@@ -59,7 +67,7 @@ export function GoogleSignInButton({ redirectTo = '/projects', onClick }: Google
       <button
         type="button"
         onClick={handleGoogleSignIn}
-        disabled={isLoading}
+        disabled={isLoading || disabled}
         className="flex w-full items-center justify-center gap-3 rounded-[4px] border-2 border-[--border-subtle] bg-[--background] px-4 py-3 font-mono text-sm font-semibold text-[--foreground] transition hover:border-[--border-default] hover:bg-[--surface-raised] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--accent-primary] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isLoading ? (

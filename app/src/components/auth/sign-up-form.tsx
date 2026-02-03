@@ -1,13 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
+import { useSearchParams } from 'next/navigation'
 import { signUpAction, type AuthActionState } from '@/lib/auth/actions'
 import { GoogleSignInButton } from './google-sign-in-button'
 import { trackSignupStarted, getStoredUTM, storePreselectedUseCase } from '@/lib/event_tracking'
 import { Divider } from '@/components/ui/divider'
+import { storeInviteCode } from '@/lib/invites/session-storage'
 
 const initialState: AuthActionState = {}
 
@@ -31,6 +33,13 @@ interface SignUpFormProps {
 
 export function SignUpForm({ preSelectedUseCase }: SignUpFormProps) {
   const [state, formAction] = useActionState(signUpAction, initialState)
+  const searchParams = useSearchParams()
+  const inviteFromUrl = searchParams.get('invite') ?? ''
+
+  const [inviteCode, setInviteCode] = useState(inviteFromUrl)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [isValidatingInvite, setIsValidatingInvite] = useState(false)
+  const [inviteValidated, setInviteValidated] = useState(false)
 
   // Store pre-selected use case for onboarding when component mounts
   useEffect(() => {
@@ -39,8 +48,53 @@ export function SignUpForm({ preSelectedUseCase }: SignUpFormProps) {
     }
   }, [preSelectedUseCase])
 
+  // Validate invite code from URL on mount
+  useEffect(() => {
+    if (inviteFromUrl) {
+      void validateInvite(inviteFromUrl)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const validateInvite = useCallback(async (code: string) => {
+    if (!code.trim()) {
+      setInviteError(null)
+      setInviteValidated(false)
+      return
+    }
+
+    setIsValidatingInvite(true)
+    setInviteError(null)
+
+    try {
+      const response = await fetch(`/api/invites/validate?code=${encodeURIComponent(code.trim())}`)
+      const result = await response.json()
+
+      if (result.valid) {
+        setInviteValidated(true)
+        setInviteError(null)
+      } else {
+        setInviteValidated(false)
+        setInviteError(result.error ?? 'Invalid invite code.')
+      }
+    } catch {
+      setInviteError('Failed to validate invite code.')
+      setInviteValidated(false)
+    } finally {
+      setIsValidatingInvite(false)
+    }
+  }, [])
+
+  const handleInviteBlur = useCallback(() => {
+    void validateInvite(inviteCode)
+  }, [inviteCode, validateInvite])
+
   const handleGoogleClick = () => {
     trackSignupStarted({ method: 'google', utm: getStoredUTM() ?? undefined })
+    // Store invite code for retrieval after OAuth callback
+    if (inviteCode.trim()) {
+      storeInviteCode(inviteCode.trim())
+    }
   }
 
   const handleFormSubmit = () => {
@@ -49,8 +103,57 @@ export function SignUpForm({ preSelectedUseCase }: SignUpFormProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Invite Code */}
+      <div className="flex flex-col gap-2">
+        <label className="block font-mono text-sm font-semibold uppercase tracking-wide text-[--foreground]" htmlFor="inviteCode">
+          Invite Code
+        </label>
+        <div className="relative">
+          <input
+            id="inviteCode"
+            name="inviteCode"
+            type="text"
+            value={inviteCode}
+            onChange={(e) => {
+              setInviteCode(e.target.value.toUpperCase())
+              setInviteValidated(false)
+              setInviteError(null)
+            }}
+            onBlur={handleInviteBlur}
+            placeholder="ABCD1234"
+            required
+            maxLength={8}
+            className={`w-full rounded-[4px] border-2 bg-[--background] px-3 py-2 font-mono text-sm uppercase text-[--foreground] outline-none transition focus:ring-0 ${
+              inviteError
+                ? 'border-[--accent-danger] focus:border-[--accent-danger]'
+                : inviteValidated
+                  ? 'border-[--accent-success] focus:border-[--accent-success]'
+                  : 'border-[--border-subtle] focus:border-[--accent-primary]'
+            }`}
+          />
+          {isValidatingInvite && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[--text-tertiary] border-t-transparent" />
+            </div>
+          )}
+          {!isValidatingInvite && inviteValidated && (
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[--accent-success]">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          )}
+        </div>
+        {inviteError && (
+          <p className="font-mono text-xs text-[--accent-danger]">{inviteError}</p>
+        )}
+        <p className="font-mono text-xs text-[--text-tertiary]">
+          An invite code is required to sign up. Ask a friend for one!
+        </p>
+      </div>
+
       {/* Google Sign-In */}
-      <GoogleSignInButton redirectTo="/onboarding" onClick={handleGoogleClick} />
+      <GoogleSignInButton redirectTo="/onboarding" onClick={handleGoogleClick} disabled={!inviteValidated} />
 
       {/* Divider */}
       <Divider />
@@ -70,6 +173,9 @@ export function SignUpForm({ preSelectedUseCase }: SignUpFormProps) {
             className="w-full rounded-[4px] border-2 border-[--border-subtle] bg-[--background] px-3 py-2 font-mono text-sm text-[--foreground] outline-none transition focus:border-[--accent-primary] focus:ring-0"
           />
         </div>
+
+        {/* Hidden field to pass invite code to form action */}
+        <input type="hidden" name="inviteCode" value={inviteCode} />
 
         <div className="space-y-1">
           <label className="block font-mono text-sm font-semibold uppercase tracking-wide text-[--foreground]" htmlFor="password">

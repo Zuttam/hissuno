@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getSessionUser } from '@/lib/auth/server'
 import { sendWelcomeNotificationIfNeeded } from '@/lib/notifications/welcome-notifications'
+import { validateInviteCode, claimInvite } from '@/lib/invites/invite-service'
 
 export type AuthActionState = {
   error?: string
@@ -67,6 +68,17 @@ export async function signUpAction(
   const email = formData.get('email')?.toString().trim().toLowerCase() ?? ''
   const password = formData.get('password')?.toString() ?? ''
   const confirmPassword = formData.get('confirmPassword')?.toString() ?? ''
+  const inviteCode = formData.get('inviteCode')?.toString().trim() ?? ''
+
+  // Validate invite code first
+  if (!inviteCode) {
+    return { error: 'An invite code is required to sign up.' }
+  }
+
+  const inviteValidation = await validateInviteCode(inviteCode)
+  if (!inviteValidation.valid) {
+    return { error: inviteValidation.error ?? 'Invalid invite code.' }
+  }
 
   if (!email || !password || !confirmPassword) {
     return { error: 'Fill in email, password, and confirmation.' }
@@ -77,13 +89,23 @@ export async function signUpAction(
   }
 
   const supabase = await createClient()
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
   })
 
   if (error) {
     return { error: error.message }
+  }
+
+  // Claim the invite after successful signup
+  if (data.user && inviteValidation.code) {
+    try {
+      await claimInvite(inviteValidation.code, data.user.id)
+    } catch (claimError) {
+      // Log but don't fail signup - user is already created
+      console.error('[auth.signUp] Failed to claim invite:', claimError)
+    }
   }
 
   await refreshAuthDependentPaths()

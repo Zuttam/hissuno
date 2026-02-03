@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendWelcomeNotificationIfNeeded } from '@/lib/notifications/welcome-notifications'
 import { getSafeRedirectPath } from '@/lib/auth/server'
+import { validateInviteCode, claimInvite } from '@/lib/invites/invite-service'
 
 export const runtime = 'nodejs'
 
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
   const next = searchParams.get('next')
   const error = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
+  const inviteCode = searchParams.get('invite')
 
   // Handle OAuth errors
   if (error) {
@@ -82,6 +84,20 @@ export async function GET(request: Request) {
 
       if (isNewUser) {
         redirectUrl.searchParams.set('signup_completed', 'true')
+
+        // For new OAuth users, claim the invite if provided
+        if (inviteCode) {
+          try {
+            const validation = await validateInviteCode(inviteCode)
+            if (validation.valid && validation.code) {
+              await claimInvite(validation.code, user.id)
+              console.log(`[auth.callback] Claimed invite ${validation.code} for new OAuth user ${user.id}`)
+            }
+          } catch (claimError) {
+            // Log but don't block the user
+            console.error('[auth.callback] Failed to claim invite for OAuth user:', claimError)
+          }
+        }
       }
     }
 

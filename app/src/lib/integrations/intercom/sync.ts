@@ -7,6 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/supabase'
 import {
   IntercomClient,
+  type IntercomContact,
   type IntercomConversation,
   type IntercomConversationListItem,
   IntercomApiError,
@@ -87,23 +88,52 @@ function generateSessionId(conversationId: string): string {
 }
 
 /**
- * Extract contact info from conversation
+ * Build enriched user metadata from a full Intercom contact
  */
-function extractContactInfo(conversation: IntercomConversation): {
-  userId: string | null
-  name: string | null
-  email: string | null
-} {
-  const contact = conversation.contacts?.contacts?.[0]
-  if (!contact) {
-    return { userId: null, name: null, email: null }
+function buildUserMetadata(
+  conversationId: string,
+  contact: IntercomContact | null
+): Record<string, unknown> {
+  const metadata: Record<string, unknown> = {
+    intercom_conversation_id: conversationId,
+  }
+  if (!contact) return metadata
+
+  if (contact.name) metadata.name = contact.name
+  if (contact.email) metadata.email = contact.email
+  if (contact.phone) metadata.phone = contact.phone
+  if (contact.role) metadata.role = contact.role
+  if (contact.location?.city) metadata.city = contact.location.city
+  if (contact.location?.region) metadata.region = contact.location.region
+  if (contact.location?.country) metadata.country = contact.location.country
+  if (contact.companies?.companies?.[0]?.name) {
+    metadata.company = contact.companies.companies[0].name
+  }
+  if (contact.browser) metadata.browser = contact.browser
+  if (contact.os) metadata.os = contact.os
+  if (contact.last_seen_at) {
+    metadata.last_seen_at = new Date(contact.last_seen_at * 1000).toISOString()
+  }
+  if (contact.signed_up_at) {
+    metadata.signed_up_at = new Date(contact.signed_up_at * 1000).toISOString()
+  }
+  if (contact.tags?.tags?.length) {
+    metadata.tags = contact.tags.tags.map((t) => t.name).join(', ')
+  }
+  if (contact.social_profiles?.data?.length) {
+    for (const profile of contact.social_profiles.data) {
+      metadata[`social_${profile.name.toLowerCase()}`] = profile.url
+    }
+  }
+  if (contact.custom_attributes) {
+    for (const [key, value] of Object.entries(contact.custom_attributes)) {
+      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        metadata[`custom_${key}`] = String(value)
+      }
+    }
   }
 
-  return {
-    userId: contact.external_id || contact.id,
-    name: contact.name || null,
-    email: contact.email || null,
-  }
+  return metadata
 }
 
 /**
@@ -133,19 +163,27 @@ function generateSessionName(conversation: IntercomConversation): string {
  */
 async function createSessionFromConversation(
   supabase: AnySupabase,
+  intercom: IntercomClient,
   projectId: string,
   connectionId: string,
   conversation: IntercomConversation
 ): Promise<{ sessionId: string; messageCount: number } | null> {
   const sessionId = generateSessionId(conversation.id)
-  const contactInfo = extractContactInfo(conversation)
 
-  // Build user metadata
-  const userMetadata: Record<string, unknown> = {
-    intercom_conversation_id: conversation.id,
+  // Fetch full contact data (the conversation only has minimal contact refs)
+  const embeddedContact = conversation.contacts?.contacts?.[0]
+  let fullContact: IntercomContact | null = null
+  if (embeddedContact?.id) {
+    try {
+      fullContact = await intercom.getContact(embeddedContact.id)
+    } catch (err) {
+      console.warn('[intercom.sync] Failed to fetch contact details:', err)
+      fullContact = embeddedContact
+    }
   }
-  if (contactInfo.name) userMetadata.name = contactInfo.name
-  if (contactInfo.email) userMetadata.email = contactInfo.email
+
+  const userId = fullContact?.external_id || fullContact?.id || null
+  const userMetadata = buildUserMetadata(conversation.id, fullContact)
 
   // Create session
   const { error: sessionError } = await supabase.from('sessions').insert({
@@ -154,7 +192,7 @@ async function createSessionFromConversation(
     source: 'intercom',
     status: 'closed', // Historical data is always closed
     name: generateSessionName(conversation),
-    user_id: contactInfo.userId,
+    user_id: userId,
     user_metadata: userMetadata,
     first_message_at: new Date(conversation.created_at * 1000).toISOString(),
     last_activity_at: new Date(conversation.updated_at * 1000).toISOString(),
@@ -332,6 +370,7 @@ export async function syncIntercomConversations(
         // Create session and messages
         const result = await createSessionFromConversation(
           client,
+          intercom,
           projectId,
           credentials.connectionId,
           fullConversation
