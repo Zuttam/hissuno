@@ -187,7 +187,7 @@ export default function IntegrationsPage() {
     const fetchStatuses = async () => {
       try {
         const [widgetRes, slackRes, githubRes, intercomRes] = await Promise.all([
-          fetch(`/api/sessions?projectId=${projectId}&stats=true`),
+          fetch(`/api/projects/${projectId}/sessions?stats=true`),
           fetch(`/api/integrations/slack?projectId=${projectId}`),
           fetch(`/api/integrations/github?projectId=${projectId}`),
           fetch(`/api/integrations/intercom?projectId=${projectId}`),

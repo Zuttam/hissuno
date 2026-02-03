@@ -13,6 +13,7 @@ const PUBLIC_PATH_PREFIXES = [
 
   '/auth/callback',
   '/api/cron',
+  '/api/invites/validate',
   '/api/integrations/github/callback',
   '/api/integrations/slack/callback',
   '/api/integrations/widget',

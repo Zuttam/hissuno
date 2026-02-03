@@ -53,16 +53,25 @@ export function isOriginAllowed(
       return true
     }
 
-    // Wildcard matching: *.example.com
+    // Wildcard matching: *.example.com or https://*.example.com
+    // Extract wildcard domain, handling both with and without protocol prefix
+    let wildcardDomain: string | null = null
     if (normalizedAllowed.startsWith('*.')) {
-      const domain = normalizedAllowed.slice(2) // Remove "*."
-      // Check if origin ends with the domain (after the protocol)
+      wildcardDomain = normalizedAllowed.slice(2) // Remove "*."
+    } else {
+      const wildcardMatch = normalizedAllowed.match(/^https?:\/\/\*\.(.+)$/)
+      if (wildcardMatch) {
+        wildcardDomain = wildcardMatch[1]
+      }
+    }
+
+    if (wildcardDomain) {
       try {
         const originUrl = new URL(normalizedOrigin)
         const originHost = originUrl.host
 
         // Match exact domain or any subdomain
-        if (originHost === domain || originHost.endsWith('.' + domain)) {
+        if (originHost === wildcardDomain || originHost.endsWith('.' + wildcardDomain)) {
           return true
         }
       } catch {

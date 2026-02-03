@@ -162,21 +162,21 @@ describe('Manual Creation and Archive Feature', () => {
 
   describe('Archive URL Parameter Building', () => {
     it('should build URL with showArchived=true', () => {
-      const baseUrl = '/api/sessions'
+      const baseUrl = '/api/projects/project-123/sessions'
       const params = new URLSearchParams()
       params.set('showArchived', 'true')
 
       const url = `${baseUrl}?${params.toString()}`
-      expect(url).toBe('/api/sessions?showArchived=true')
+      expect(url).toBe('/api/projects/project-123/sessions?showArchived=true')
     })
 
     it('should not include showArchived when false/undefined', () => {
-      const baseUrl = '/api/sessions'
+      const baseUrl = '/api/projects/project-123/sessions'
       const params = new URLSearchParams()
       // Not setting showArchived
 
       const url = params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl
-      expect(url).toBe('/api/sessions')
+      expect(url).toBe('/api/projects/project-123/sessions')
     })
 
     it('should combine showArchived with other filters', () => {

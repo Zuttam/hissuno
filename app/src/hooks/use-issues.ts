@@ -270,7 +270,7 @@ interface UsePMReviewState {
   isReviewing: boolean
   result: PMReviewResult | null
   error: string | null
-  triggerReview: (sessionId: string) => Promise<PMReviewResult | null>
+  triggerReview: (projectId: string, sessionId: string) => Promise<PMReviewResult | null>
 }
 
 export function usePMReview(): UsePMReviewState {
@@ -278,13 +278,13 @@ export function usePMReview(): UsePMReviewState {
   const [result, setResult] = useState<PMReviewResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const triggerReview = useCallback(async (sessionId: string): Promise<PMReviewResult | null> => {
+  const triggerReview = useCallback(async (projectId: string, sessionId: string): Promise<PMReviewResult | null> => {
     setIsReviewing(true)
     setError(null)
     setResult(null)
 
     try {
-      const response = await fetch(`/api/sessions/${sessionId}/pm-review`, {
+      const response = await fetch(`/api/projects/${projectId}/sessions/${sessionId}/review`, {
         method: 'POST',
       })
 
