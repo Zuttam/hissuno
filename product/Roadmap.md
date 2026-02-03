@@ -95,12 +95,14 @@
 [x] Ads for AI FDE
 
 ### Support
-[x] alert and interact in slack for open sessions -  support sessions go to a centeralize channel in slack, the user can answer in the relevant thread in slack which replies in the session to the user
+[] alert and interact in slack for open sessions -  support sessions go to a centeralize channel in slack, the user can answer in the relevant thread in slack which replies in the session to the user
+[] Fix automatic close session cron in prod
+[] Add waiting for human status
 
 ### Sessions
 [] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
 [] Expend sessions type to different use cases: behavioral session (events), meeting (multi user conversation like gong -> show transcript), chat (intercom, widget) and show the contents accordingly
-[] Improve participants identification - show additional details in a cleaner way
+
 
 ### Platform 
 [x] Improve onboarding 
@@ -143,6 +145,7 @@
 [] Ad Campaign for AI FDE 
 
 ### Sessions
+[] Improve participants identification - show additional details in a cleaner way
 [] Facebook community channels
 
 ### Platform
