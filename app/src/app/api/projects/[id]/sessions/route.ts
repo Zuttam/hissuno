@@ -67,6 +67,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       dateFrom: searchParams.get('dateFrom') || undefined,
       dateTo: searchParams.get('dateTo') || undefined,
       showArchived: searchParams.get('showArchived') === 'true',
+      isHumanTakeover: searchParams.get('isHumanTakeover') === 'true' || undefined,
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 50,
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined,
     }

@@ -98,7 +98,7 @@ export function PackageListItem({
                       className="text-[color:var(--accent-selected)] hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      Support Agent
+                      Support Specialist
                     </Link>
                   </>
                 )}

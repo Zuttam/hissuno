@@ -100,6 +100,7 @@ export async function GET(request: NextRequest) {
       let isClosed = false
       let lastMessageId: string | null = null
       let lastStatus: string | null = null
+      let lastHumanTakeover: boolean | null = null
 
       const safeEnqueue = (data: Uint8Array) => {
         if (!isClosed) {
@@ -188,24 +189,36 @@ export async function GET(request: NextRequest) {
             }
           }
 
-          // Check for session status changes
+          // Check for session status changes and human takeover flag
           const { data: session } = await supabase
             .from('sessions')
-            .select('status')
+            .select('status, is_human_takeover')
             .eq('id', sessionId)
             .single()
 
-          if (session && session.status !== lastStatus) {
-            if (lastStatus !== null) {
-              // Only emit if status actually changed (not on first poll)
-              emitEvent('status-change', { status: session.status })
+          if (session) {
+            // Emit human takeover changes
+            if (lastHumanTakeover !== null && session.is_human_takeover !== lastHumanTakeover) {
+              if (session.is_human_takeover) {
+                emitEvent('status-change', { status: 'human_takeover' })
+              } else {
+                emitEvent('status-change', { status: session.status })
+              }
             }
-            lastStatus = session.status
+            lastHumanTakeover = session.is_human_takeover
 
-            // Close stream if session is closed
-            if (session.status === 'closed') {
-              safeClose()
-              return
+            // Emit session status changes
+            if (session.status !== lastStatus) {
+              if (lastStatus !== null) {
+                emitEvent('status-change', { status: session.status })
+              }
+              lastStatus = session.status
+
+              // Close stream if session is closed
+              if (session.status === 'closed') {
+                safeClose()
+                return
+              }
             }
           }
 

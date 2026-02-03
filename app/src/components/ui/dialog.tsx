@@ -56,13 +56,13 @@ export function Dialog({ open, onClose, title, children, className, size = 'md' 
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/20"
+        className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Dialog */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-[70] flex items-center justify-center p-4">
         <div
           className={cn(
             'w-full max-h-[90vh] flex flex-col rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-xl',

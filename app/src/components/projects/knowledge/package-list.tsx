@@ -13,9 +13,10 @@ interface PackageListProps {
   activePackageId: string | null
   onPackagesChange?: () => void
   hasResources?: boolean
+  initialExpandedPackageId?: string | null
 }
 
-export function PackageList({ projectId, activePackageId, onPackagesChange, hasResources = true }: PackageListProps) {
+export function PackageList({ projectId, activePackageId, onPackagesChange, hasResources = true, initialExpandedPackageId }: PackageListProps) {
   const [packages, setPackages] = useState<NamedPackageWithSources[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +24,7 @@ export function PackageList({ projectId, activePackageId, onPackagesChange, hasR
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
   // Inline expansion state
-  const [expandedPackageId, setExpandedPackageId] = useState<string | null>(null)
+  const [expandedPackageId, setExpandedPackageId] = useState<string | null>(initialExpandedPackageId ?? null)
   const [categoryContents, setCategoryContents] = useState<
     Record<string, Record<KnowledgeCategory, CategoryContent>>
   >({})
@@ -118,6 +119,13 @@ export function PackageList({ projectId, activePackageId, onPackagesChange, hasR
     },
     [projectId]
   )
+
+  // Sync expandedPackageId when initialExpandedPackageId changes (e.g., dialog re-opens)
+  useEffect(() => {
+    if (initialExpandedPackageId) {
+      setExpandedPackageId(initialExpandedPackageId)
+    }
+  }, [initialExpandedPackageId])
 
   useEffect(() => {
     const init = async () => {
@@ -354,11 +362,11 @@ export function PackageList({ projectId, activePackageId, onPackagesChange, hasR
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Heading as="h3" size="subsection">
-          Knowledge Packages
+          Available Packages
         </Heading>
         <Button
           variant="secondary"
-          size="sm"
+          size="md"
           onClick={() => setShowCreateDialog(true)}
           disabled={!hasResources}
         >

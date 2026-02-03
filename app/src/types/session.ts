@@ -80,6 +80,11 @@ export interface SessionRecord {
   idle_prompt_sent_at: string | null
   scheduled_close_at: string | null
   is_archived: boolean
+  is_human_takeover: boolean
+  human_takeover_at: string | null
+  human_takeover_user_id: string | null
+  human_takeover_slack_channel_id: string | null
+  human_takeover_slack_thread_ts: string | null
   created_at: string
   updated_at: string
 }
@@ -154,6 +159,7 @@ export interface SessionFilters {
   dateFrom?: string
   dateTo?: string
   showArchived?: boolean
+  isHumanTakeover?: boolean
   limit?: number
   offset?: number
 }
@@ -187,6 +193,7 @@ export interface UpdateSessionInput {
   status?: SessionStatus
   user_id?: string | null
   user_metadata?: Record<string, string> | null
+  is_human_takeover?: boolean
 }
 
 /**

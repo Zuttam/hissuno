@@ -219,7 +219,7 @@ function EmptyState() {
           No issues yet
         </h2>
         <p className="text-sm text-[color:var(--text-secondary)]">
-          Issues will appear here when the PM Agent identifies actionable feedback 
+          Issues will appear here when The Captain identifies actionable feedback 
           from user sessions. You can also trigger a PM Review manually on any session.
         </p>
       </div>

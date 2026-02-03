@@ -98,6 +98,8 @@ export function createMockSession(
     idle_prompt_sent_at: null,
     scheduled_close_at: null,
     is_archived: false,
+    is_human_takeover: false,
+    human_takeover_at: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }

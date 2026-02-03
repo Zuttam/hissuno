@@ -1,9 +1,9 @@
 import { ChangePasswordForm } from '@/components/account/change-password-form'
+import { NotificationPreferencesSection } from '@/components/account/notification-preferences-section'
 import { ProfileSection } from '@/components/account/profile-section'
 import { Heading, PageHeader } from '@/components/ui'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { getSessionUser } from '@/lib/auth/server'
-import { Page } from 'openai/pagination.mjs'
 
 export default async function AccountSettingsPage() {
   const user = await getSessionUser()
@@ -16,6 +16,7 @@ export default async function AccountSettingsPage() {
 
       <div className="flex flex-col gap-8">
         <ProfileSection email={user?.email} />
+        <NotificationPreferencesSection />
         <FloatingCard
           floating="gentle"
           variant="elevated"

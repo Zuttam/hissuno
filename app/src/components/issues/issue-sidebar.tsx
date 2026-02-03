@@ -4,8 +4,10 @@ import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Spinner, Select, MarkdownContent, Badge } from '@/components/ui'
 import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType } from '@/types/issue'
+import type { JiraIssueSyncStatus } from '@/types/jira'
 import { useIssueDetail } from '@/hooks/use-issues'
 import { useSpecGeneration } from '@/hooks/use-spec-generation'
+import { useJiraSyncStatus } from '@/hooks/use-jira-sync'
 import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
 
@@ -28,6 +30,7 @@ export function IssueSidebar({
     updateIssue,
     refresh: refreshIssue,
   } = useIssueDetail({ projectId, issueId })
+  const { status: jiraStatus, isRetrying: isJiraRetrying, retrySync: retryJiraSync } = useJiraSyncStatus(projectId, issueId)
   const [isArchiving, setIsArchiving] = useState(false)
 
   const handleArchiveToggle = useCallback(async () => {
@@ -185,6 +188,17 @@ export function IssueSidebar({
                 onTypeChange={handleTypeChange}
               />
             </div>
+
+            {/* Jira Sync Status */}
+            {jiraStatus.synced && (
+              <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+                <JiraSyncBadge
+                  status={jiraStatus}
+                  isRetrying={isJiraRetrying}
+                  onRetry={retryJiraSync}
+                />
+              </div>
+            )}
 
             {/* Description */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
@@ -404,6 +418,81 @@ function formatRelativeDate(dateString: string): string {
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
   return `${Math.floor(diffDays / 30)}mo ago`
 }
+
+// ============================================================================
+// Jira Sync Badge
+// ============================================================================
+
+interface JiraSyncBadgeProps {
+  status: JiraIssueSyncStatus
+  isRetrying: boolean
+  onRetry: () => void
+}
+
+function JiraSyncBadge({ status, isRetrying, onRetry }: JiraSyncBadgeProps) {
+  const syncStatusLabel =
+    status.lastSyncStatus === 'success'
+      ? 'Synced'
+      : status.lastSyncStatus === 'failed'
+        ? 'Sync Failed'
+        : 'Pending'
+
+  const syncStatusVariant: 'success' | 'danger' | 'warning' =
+    status.lastSyncStatus === 'success'
+      ? 'success'
+      : status.lastSyncStatus === 'failed'
+        ? 'danger'
+        : 'warning'
+
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        {/* Jira icon */}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M11.53 2c0 4.97 3.86 9 8.47 9H22v1.67C22 17.73 17.73 22 12.67 22H12c-5.52 0-10-4.48-10-10v-.67C2 6.27 6.27 2 11.33 2h.2z"
+            fill="currentColor"
+            className="text-[color:var(--text-secondary)]"
+          />
+        </svg>
+
+        {status.jiraIssueUrl ? (
+          <a
+            href={status.jiraIssueUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-sm font-medium text-[color:var(--accent-selected)] hover:underline"
+          >
+            {status.jiraIssueKey}
+          </a>
+        ) : (
+          <span className="font-mono text-sm text-[color:var(--text-secondary)]">
+            {status.jiraIssueKey || 'Jira'}
+          </span>
+        )}
+
+        <Badge variant={syncStatusVariant}>
+          {syncStatusLabel}
+        </Badge>
+      </div>
+
+      {status.lastSyncStatus === 'failed' && (
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={isRetrying}
+          className="rounded-[4px] border border-[color:var(--border)] px-2 py-1 font-mono text-xs text-[color:var(--text-secondary)] transition hover:border-[color:var(--accent-primary)] hover:text-[color:var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isRetrying ? 'Retrying...' : 'Retry Sync'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// Linked Session Card
+// ============================================================================
 
 const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
   widget: 'info',

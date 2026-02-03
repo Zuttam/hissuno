@@ -11,7 +11,9 @@ import {
   recordNotification,
   hasNotificationBeenSent,
   getUserProfile,
+  shouldSendNotification,
 } from '@/lib/notifications/notification-service'
+import { sendSlackNotification } from '@/lib/notifications/slack-notifications'
 import { getBillingInfo } from '@/lib/billing/billing-service'
 import type { EnforcementResult, LimitDimension } from '@/lib/billing/enforcement-types'
 
@@ -64,8 +66,9 @@ export async function sendLimitNotificationIfNeeded(
       return
     }
 
-    // Send email if Resend is configured
-    if (isResendConfigured()) {
+    // Check email preference and send if allowed
+    const shouldEmail = await shouldSendNotification(userId, 'limit_reached', 'email')
+    if (shouldEmail && isResendConfigured()) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.hissuno.com'
       const upgradeUrl = `${appUrl}/account/billing`
 
@@ -97,23 +100,51 @@ export async function sendLimitNotificationIfNeeded(
         console.error(`${LOG_PREFIX} Failed to send email:`, emailError)
         // Continue to record notification even if email fails
       }
+
+      // Record the email notification (prevents duplicates)
+      await recordNotification({
+        userId,
+        type: 'limit_reached',
+        channel: 'email',
+        metadata: {
+          dimension: result.dimension,
+          current: result.current,
+          limit: result.limit,
+          periodStart,
+        },
+        dedupKey,
+      })
+    } else if (!shouldEmail) {
+      console.log(`${LOG_PREFIX} Email notification disabled by user preferences`)
     } else {
       console.warn(`${LOG_PREFIX} Resend not configured, skipping email`)
     }
 
-    // Record the notification (prevents duplicates)
-    await recordNotification({
-      userId,
-      type: 'limit_reached',
-      channel: 'email',
-      metadata: {
-        dimension: result.dimension,
-        current: result.current,
-        limit: result.limit,
-        periodStart,
-      },
-      dedupKey,
-    })
+    // Check Slack preference and send if allowed
+    const shouldSlack = await shouldSendNotification(userId, 'limit_reached', 'slack')
+    if (shouldSlack) {
+      try {
+        const slackText = `You've reached your ${result.dimension} limit on Hissuno (${result.current}/${result.limit}). Upgrade your plan to continue: ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.hissuno.com'}/account/billing`
+        const slackResult = await sendSlackNotification({ userId, text: slackText })
+
+        if (slackResult.ok) {
+          await recordNotification({
+            userId,
+            type: 'limit_reached',
+            channel: 'slack',
+            metadata: {
+              dimension: result.dimension,
+              current: result.current,
+              limit: result.limit,
+              periodStart,
+            },
+            dedupKey: `${dedupKey}:slack`,
+          })
+        }
+      } catch (slackError) {
+        console.error(`${LOG_PREFIX} Failed to send Slack notification:`, slackError)
+      }
+    }
   } catch (error) {
     console.error(`${LOG_PREFIX} Error sending limit notification:`, error)
     // Don't throw - this is a best-effort notification

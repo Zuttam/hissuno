@@ -520,6 +520,69 @@ export async function updateThreadSessionResponder(
 }
 
 /**
+ * Check if a DM channel is linked to a session via human takeover notification
+ */
+export async function getNotificationThreadSession(
+  supabase: SupabaseClient<Database> | AnySupabase,
+  slackChannelId: string,
+  threadTs?: string
+): Promise<{ sessionId: string; projectId: string; userId: string } | null> {
+  const client = supabase as AnySupabase
+
+  // Look up session by human_takeover_slack_channel_id
+  let query = client
+    .from('sessions')
+    .select('id, project_id, human_takeover_user_id')
+    .eq('human_takeover_slack_channel_id', slackChannelId)
+    .eq('is_human_takeover', true)
+
+  // If threadTs is provided, match it; otherwise match null (top-level DM)
+  if (threadTs) {
+    query = query.eq('human_takeover_slack_thread_ts', threadTs)
+  }
+
+  const { data, error } = await query.single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return {
+    sessionId: data.id,
+    projectId: data.project_id,
+    userId: data.human_takeover_user_id,
+  }
+}
+
+/**
+ * Record human takeover notification info on a session
+ */
+export async function setSessionHumanTakeoverNotification(
+  supabase: SupabaseClient<Database> | AnySupabase,
+  params: {
+    sessionId: string
+    slackChannelId: string
+    slackThreadTs?: string
+    userId: string
+  }
+): Promise<void> {
+  const client = supabase as AnySupabase
+
+  const { error } = await client
+    .from('sessions')
+    .update({
+      human_takeover_slack_channel_id: params.slackChannelId,
+      human_takeover_slack_thread_ts: params.slackThreadTs ?? null,
+      human_takeover_user_id: params.userId,
+    })
+    .eq('id', params.sessionId)
+
+  if (error) {
+    console.error('[slack.setSessionHumanTakeoverNotification] Failed:', error)
+  }
+}
+
+/**
  * Update channel mode
  */
 export async function updateSlackChannelMode(

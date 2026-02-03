@@ -9,6 +9,8 @@ import { WidgetConfigDialog } from '@/components/projects/edit-dialogs/widget-co
 import { SlackConfigDialog } from '@/components/projects/edit-dialogs/slack-config-dialog'
 import { GitHubConfigDialog } from '@/components/projects/edit-dialogs/github-config-dialog'
 import { IntercomConfigDialog } from '@/components/projects/edit-dialogs/intercom-config-dialog'
+import { GongConfigDialog } from '@/components/projects/edit-dialogs/gong-config-dialog'
+import { JiraConfigDialog } from '@/components/projects/edit-dialogs/jira-config-dialog'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { Badge, Button, Spinner, PageHeader } from '@/components/ui'
 
@@ -85,23 +87,29 @@ export default function IntegrationsPage() {
   const [showSlackDialog, setShowSlackDialog] = useState(false)
   const [showGithubDialog, setShowGithubDialog] = useState(false)
   const [showIntercomDialog, setShowIntercomDialog] = useState(false)
+  const [showGongDialog, setShowGongDialog] = useState(false)
+  const [showJiraDialog, setShowJiraDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [widgetStats, setWidgetStats] = useState<{ isActive: boolean } | null>(null)
   const [slackConnected, setSlackConnected] = useState(false)
   const [githubConnected, setGithubConnected] = useState(false)
   const [intercomConnected, setIntercomConnected] = useState(false)
+  const [gongConnected, setGongConnected] = useState(false)
+  const [jiraConnected, setJiraConnected] = useState(false)
 
   // Refresh integration statuses - defined early so it can be used in useEffect
   const refreshStatuses = useCallback(async () => {
     if (!projectId) return
 
     try {
-      const [widgetRes, slackRes, githubRes, intercomRes] = await Promise.all([
+      const [widgetRes, slackRes, githubRes, intercomRes, gongRes, jiraRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/sessions?stats=true`),
         fetch(`/api/integrations/slack?projectId=${projectId}`),
         fetch(`/api/integrations/github?projectId=${projectId}`),
         fetch(`/api/integrations/intercom?projectId=${projectId}`),
+        fetch(`/api/integrations/gong?projectId=${projectId}`),
+        fetch(`/api/integrations/jira?projectId=${projectId}`),
       ])
 
       if (widgetRes.ok) {
@@ -123,6 +131,16 @@ export default function IntegrationsPage() {
         const data = await intercomRes.json()
         setIntercomConnected(data.connected)
       }
+
+      if (gongRes.ok) {
+        const data = await gongRes.json()
+        setGongConnected(data.connected)
+      }
+
+      if (jiraRes.ok) {
+        const data = await jiraRes.json()
+        setJiraConnected(data.connected)
+      }
     } catch (err) {
       console.error('[integrations] Failed to refresh statuses:', err)
     }
@@ -142,10 +160,15 @@ export default function IntegrationsPage() {
       setShowGithubDialog(true)
     } else if (dialog === 'intercom') {
       setShowIntercomDialog(true)
+    } else if (dialog === 'gong') {
+      setShowGongDialog(true)
+    } else if (dialog === 'jira') {
+      setShowJiraDialog(true)
     }
 
     // Handle OAuth return - clean up URL and refresh status
-    if ((githubJustConnected || slackJustConnected) && projectId) {
+    const jiraJustConnected = searchParams.get('jira') === 'connected'
+    if ((githubJustConnected || slackJustConnected || jiraJustConnected) && projectId) {
       void refreshStatuses()
       router.replace(`/projects/${projectId}/integrations`)
     }
@@ -180,17 +203,33 @@ export default function IntegrationsPage() {
     }
   }
 
+  const handleCloseGongDialog = () => {
+    setShowGongDialog(false)
+    if (searchParams.get('dialog')) {
+      router.replace(`/projects/${projectId}/integrations`)
+    }
+  }
+
+  const handleCloseJiraDialog = () => {
+    setShowJiraDialog(false)
+    if (searchParams.get('dialog')) {
+      router.replace(`/projects/${projectId}/integrations`)
+    }
+  }
+
   // Fetch integration statuses
   useEffect(() => {
     if (!projectId) return
 
     const fetchStatuses = async () => {
       try {
-        const [widgetRes, slackRes, githubRes, intercomRes] = await Promise.all([
+        const [widgetRes, slackRes, githubRes, intercomRes, gongRes, jiraRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/sessions?stats=true`),
           fetch(`/api/integrations/slack?projectId=${projectId}`),
           fetch(`/api/integrations/github?projectId=${projectId}`),
           fetch(`/api/integrations/intercom?projectId=${projectId}`),
+          fetch(`/api/integrations/gong?projectId=${projectId}`),
+          fetch(`/api/integrations/jira?projectId=${projectId}`),
         ])
 
         if (widgetRes.ok) {
@@ -211,6 +250,16 @@ export default function IntegrationsPage() {
         if (intercomRes.ok) {
           const data = await intercomRes.json()
           setIntercomConnected(data.connected)
+        }
+
+        if (gongRes.ok) {
+          const data = await gongRes.json()
+          setGongConnected(data.connected)
+        }
+
+        if (jiraRes.ok) {
+          const data = await jiraRes.json()
+          setJiraConnected(data.connected)
         }
       } catch (err) {
         console.error('[integrations] Failed to fetch statuses:', err)
@@ -245,10 +294,9 @@ export default function IntegrationsPage() {
         id: 'gong',
         name: 'Gong',
         description: 'Import call recordings and transcripts from Gong',
-        status: 'not_connected',
+        status: gongConnected ? 'active' : 'not_connected',
         icon: <GongIcon />,
         category: 'sessions',
-        comingSoon: true,
       },
       {
         id: 'intercom',
@@ -270,10 +318,9 @@ export default function IntegrationsPage() {
         id: 'jira',
         name: 'Jira',
         description: 'Sync issues to Jira for project management',
-        status: 'not_connected',
+        status: jiraConnected ? 'active' : 'not_connected',
         icon: <JiraIcon />,
         category: 'issues',
-        comingSoon: true,
       },
       {
         id: 'linear',
@@ -303,7 +350,7 @@ export default function IntegrationsPage() {
         comingSoon: true,
       },
     ])
-  }, [widgetStats, slackConnected, githubConnected, intercomConnected])
+  }, [widgetStats, slackConnected, githubConnected, intercomConnected, gongConnected, jiraConnected])
 
   const sessionIntegrations = integrations.filter(i => i.category === 'sessions')
   const issueIntegrations = integrations.filter(i => i.category === 'issues')
@@ -312,7 +359,7 @@ export default function IntegrationsPage() {
 
   // Handler for opening integration dialogs - updates URL for consistent tracking
   const handleConfigureIntegration = (integrationId: string) => {
-    if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github' || integrationId === 'intercom') {
+    if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github' || integrationId === 'intercom' || integrationId === 'gong' || integrationId === 'jira') {
       router.push(`/projects/${projectId}/integrations?dialog=${integrationId}`)
     }
   }
@@ -438,6 +485,20 @@ export default function IntegrationsPage() {
       <IntercomConfigDialog
         open={showIntercomDialog}
         onClose={handleCloseIntercomDialog}
+        projectId={projectId}
+        onStatusChanged={refreshStatuses}
+      />
+
+      <GongConfigDialog
+        open={showGongDialog}
+        onClose={handleCloseGongDialog}
+        projectId={projectId}
+        onStatusChanged={refreshStatuses}
+      />
+
+      <JiraConfigDialog
+        open={showJiraDialog}
+        onClose={handleCloseJiraDialog}
         projectId={projectId}
         onStatusChanged={refreshStatuses}
       />

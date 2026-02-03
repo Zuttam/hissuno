@@ -75,8 +75,8 @@ export async function GET(request: NextRequest) {
         }
         finalRedirectUrl = url.toString()
       } else {
-        // Fallback to knowledge page if nextUrl doesn't match project
-        finalRedirectUrl = `${appUrl}/projects/${projectId}/knowledge?github=connected`
+        // Fallback to agents page if nextUrl doesn't match project
+        finalRedirectUrl = `${appUrl}/projects/${projectId}/agents?github=connected`
       }
     } else {
       // Legacy behavior for backward compatibility (wizard flows)

@@ -7,7 +7,11 @@
 import { render } from '@react-email/components'
 import { getResendClient, getFromAddress, isResendConfigured } from '@/lib/email/resend'
 import { WelcomeEmail } from '@/lib/email/templates/welcome'
-import { recordNotification, hasNotificationBeenSent } from '@/lib/notifications/notification-service'
+import {
+  recordNotification,
+  hasNotificationBeenSent,
+  shouldSendNotification,
+} from '@/lib/notifications/notification-service'
 import type { SendEmailResult } from '@/lib/email/types'
 
 const LOG_PREFIX = '[welcome-notifications]'
@@ -35,6 +39,13 @@ export async function sendWelcomeNotificationIfNeeded(
     if (alreadySent) {
       console.log(`${LOG_PREFIX} Welcome notification already sent for user ${userId}`)
       return { success: true, error: 'Already sent' }
+    }
+
+    // Check email preference
+    const shouldEmail = await shouldSendNotification(userId, 'welcome', 'email')
+    if (!shouldEmail) {
+      console.log(`${LOG_PREFIX} Email notification disabled by user preferences`)
+      return { success: true, error: 'Disabled by preferences' }
     }
 
     // Send email if Resend is configured

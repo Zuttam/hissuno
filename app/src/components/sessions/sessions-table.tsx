@@ -145,6 +145,7 @@ function SessionRow({
       </td>
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'status', columns)}>
         <span className="inline-flex items-center gap-1">
+          {session.is_human_takeover && <Badge variant="warning">Needs Human</Badge>}
           <Badge variant={session.status === 'active' ? 'success' : 'default'}>
             {session.status}
           </Badge>

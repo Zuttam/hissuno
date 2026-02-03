@@ -3,6 +3,7 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
 import { saveSessionMessage } from './session-messages'
 import { ensureSessionName, generateDefaultName } from '@/lib/sessions/name-generator'
+import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-notifications'
 import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, CreateSessionInput, UpdateSessionInput } from '@/types/session'
 
 const selectSessionWithProject = '*, project:projects(id, name)'
@@ -180,6 +181,9 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     }
     if (filters.source) {
       query = query.eq('source', filters.source)
+    }
+    if (filters.isHumanTakeover) {
+      query = query.eq('is_human_takeover', true)
     }
     if (filters.tags && filters.tags.length > 0) {
       query = query.overlaps('tags', filters.tags)
@@ -655,6 +659,10 @@ export async function updateSession(
     if (input.status !== undefined) updates.status = input.status
     if (input.user_id !== undefined) updates.user_id = input.user_id
     if (input.user_metadata !== undefined) updates.user_metadata = input.user_metadata
+    if (input.is_human_takeover !== undefined) {
+      updates.is_human_takeover = input.is_human_takeover
+      updates.human_takeover_at = input.is_human_takeover ? new Date().toISOString() : null
+    }
 
     const { data, error } = await supabase
       .from('sessions')
@@ -672,5 +680,85 @@ export async function updateSession(
   } catch (error) {
     console.error('[supabase.sessions] unexpected error updating session', sessionId, error)
     throw error
+  }
+}
+
+/**
+ * Sets the human takeover flag on a session. Uses admin client for agent/integration use.
+ * When enabling takeover, sends a notification to the project owner.
+ */
+export async function setSessionHumanTakeover(
+  sessionId: string,
+  enabled: boolean
+): Promise<void> {
+  if (!isServiceRoleConfigured()) {
+    console.warn('[supabase.sessions] Service role not configured, skipping human takeover update')
+    return
+  }
+
+  try {
+    const supabase = createAdminClient()
+
+    const { error } = await supabase
+      .from('sessions')
+      .update({
+        is_human_takeover: enabled,
+        human_takeover_at: enabled ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', sessionId)
+
+    if (error) {
+      console.error('[supabase.sessions] failed to set human takeover', sessionId, error)
+      return
+    }
+
+    // Send notification when enabling human takeover (fire-and-forget)
+    if (enabled) {
+      const { data: session } = await supabase
+        .from('sessions')
+        .select('project_id, name')
+        .eq('id', sessionId)
+        .single()
+
+      if (session) {
+        void sendHumanNeededNotification({
+          sessionId,
+          projectId: session.project_id,
+          sessionName: session.name,
+        }).catch((err) => {
+          console.error('[supabase.sessions] failed to send human needed notification', err)
+        })
+      }
+    }
+  } catch (error) {
+    console.error('[supabase.sessions] unexpected error setting human takeover', sessionId, error)
+  }
+}
+
+/**
+ * Checks if a session is in human takeover mode. Uses admin client for widget route use.
+ */
+export async function isSessionInHumanTakeover(sessionId: string): Promise<boolean> {
+  if (!isServiceRoleConfigured()) {
+    return false
+  }
+
+  try {
+    const supabase = createAdminClient()
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('is_human_takeover')
+      .eq('id', sessionId)
+      .single()
+
+    if (error || !data) {
+      return false
+    }
+
+    return data.is_human_takeover === true
+  } catch {
+    return false
   }
 }
