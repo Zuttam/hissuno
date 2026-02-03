@@ -17,7 +17,7 @@ export default function OnboardingLayout({
         src="https://assets.lemonsqueezy.com/lemon.js"
         strategy="lazyOnload"
       />
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="px-4 py-8">
         {children}
       </main>
     </>

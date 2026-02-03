@@ -12,14 +12,14 @@ import { storeInviteCode } from '@/lib/invites/session-storage'
 
 const initialState: AuthActionState = {}
 
-function SubmitButton() {
+function SubmitButton({ disabled }: { disabled?: boolean }) {
   const { pending } = useFormStatus()
 
   return (
     <button
       type="submit"
       className="mt-6 w-full rounded-[4px] border-2 border-[--accent-primary] bg-[--accent-primary] px-4 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-white transition hover:bg-[--accent-primary-hover] hover:border-[--accent-primary-hover] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[--accent-primary] disabled:cursor-not-allowed disabled:opacity-50"
-      disabled={pending}
+      disabled={disabled || pending}
     >
       {pending ? 'Creating account...' : 'Create account'}
     </button>
@@ -145,16 +145,25 @@ export function SignUpForm({ invite, preSelectedUseCase }: SignUpFormProps) {
         {inviteError && (
           <p className="font-mono text-xs text-[--accent-danger]">{inviteError}</p>
         )}
-        <p className="font-mono text-xs text-[--text-tertiary]">
-          An invite code is required to sign up. Ask a friend for one!
+        <p className={`font-mono text-xs ${inviteValidated ? 'text-[--accent-success]' : 'text-[--text-tertiary]'}`}>
+          {inviteValidated
+            ? 'You can now join the party \u{1F973}'
+            : 'An invite code is required to sign up. Ask a friend for one!'}
         </p>
       </div>
+
+      {/* Divider */}
+      <Divider />
 
       {/* Google Sign-In */}
       <GoogleSignInButton redirectTo="/onboarding" onClick={handleGoogleClick} disabled={!inviteValidated} />
 
-      {/* Divider */}
-      <Divider />
+      {/* Or Divider */}
+      <div className="my-4 flex items-center gap-3">
+        <div className="h-px flex-1 bg-[--border-subtle]" />
+        <span className="font-mono text-xs uppercase text-[--text-tertiary]">or</span>
+        <div className="h-px flex-1 bg-[--border-subtle]" />
+      </div>
 
       {/* Email/Password Form */}
       <form className="flex flex-col gap-4" action={formAction} onSubmit={handleFormSubmit}>
@@ -204,12 +213,12 @@ export function SignUpForm({ invite, preSelectedUseCase }: SignUpFormProps) {
         </div>
 
         {state?.error && (
-          <div className="rounded-[4px] border-2 border-[--accent-danger] bg-transparent px-3 py-2 font-mono text-sm text-[--foreground]">
+          <div className="rounded-[4px] border-2 border-[--accent-danger] bg-transparent px-3 py-2 font-mono text-sm text-[--accent-danger]">
             {state.error}
           </div>
         )}
 
-        <SubmitButton />
+        <SubmitButton disabled={!inviteValidated} />
 
         <p className="text-center text-sm text-[--text-secondary]">
           Already have an account?{' '}

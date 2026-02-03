@@ -5,6 +5,7 @@ import { USER_EMAIL_HEADER, USER_ID_HEADER, USER_NAME_HEADER } from '@/lib/auth/
 const PUBLIC_PATH_PREFIXES = [
   '/login',
   '/sign-up',
+  '/unauthorized',
 
   '/legal',
   '/landing',
@@ -76,8 +77,8 @@ export async function proxy(request: NextRequest) {
     })
   }
 
-  // Fetch user profile for name and onboarding status (used in multiple places below)
-  let userProfile: { full_name: string | null; onboarding_completed: boolean } | null = null
+  // Fetch user profile for name, activation, and onboarding status (used in multiple places below)
+  let userProfile: { full_name: string | null; is_activated: boolean; onboarding_completed: boolean } | null = null
 
   if (user?.id) {
     requestHeaders.set(USER_ID_HEADER, user.id)
@@ -93,7 +94,7 @@ export async function proxy(request: NextRequest) {
 
     const { data } = await supabase
       .from('user_profiles')
-      .select('full_name, onboarding_completed')
+      .select('full_name, is_activated, onboarding_completed')
       .eq('user_id', user.id)
       .single()
     userProfile = data
@@ -171,11 +172,20 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // Check if authenticated user has completed onboarding (using profile fetched earlier)
-  // Skip this check for the onboarding page itself to avoid redirect loops
+  // Check if authenticated user is activated and has completed onboarding
+  // Non-activated users go to /unauthorized; activated but non-onboarded users go to /onboarding
   const isOnboardingPath = pathname === '/onboarding' || pathname.startsWith('/onboarding/')
-  if (user && !isPublicPath(pathname) && !isApiRoute && !isOnboardingPath) {
-    if (!userProfile || !userProfile.onboarding_completed) {
+  if (user && !isPublicPath(pathname) && !isApiRoute) {
+    // Non-activated users always go to /unauthorized
+    if (!userProfile || !userProfile.is_activated) {
+      const unauthorizedUrl = new URL('/unauthorized', request.url)
+      const redirectResponse = NextResponse.redirect(unauthorizedUrl)
+      forwardCookies(redirectResponse)
+      return redirectResponse
+    }
+
+    // Activated but non-onboarded users go to /onboarding (skip if already there)
+    if (!isOnboardingPath && !userProfile.onboarding_completed) {
       const onboardingUrl = new URL('/onboarding', request.url)
       const redirectResponse = NextResponse.redirect(onboardingUrl)
       forwardCookies(redirectResponse)
