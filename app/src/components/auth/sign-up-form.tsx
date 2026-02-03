@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useEffect, useState, useCallback } from 'react'
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
-import { useSearchParams } from 'next/navigation'
 import { signUpAction, type AuthActionState } from '@/lib/auth/actions'
 import { GoogleSignInButton } from './google-sign-in-button'
 import { trackSignupStarted, getStoredUTM, storePreselectedUseCase } from '@/lib/event_tracking'
@@ -28,15 +27,14 @@ function SubmitButton() {
 }
 
 interface SignUpFormProps {
+  invite?: string
   preSelectedUseCase?: string
 }
 
-export function SignUpForm({ preSelectedUseCase }: SignUpFormProps) {
+export function SignUpForm({ invite, preSelectedUseCase }: SignUpFormProps) {
   const [state, formAction] = useActionState(signUpAction, initialState)
-  const searchParams = useSearchParams()
-  const inviteFromUrl = searchParams.get('invite') ?? ''
 
-  const [inviteCode, setInviteCode] = useState(inviteFromUrl)
+  const [inviteCode, setInviteCode] = useState(invite ?? '')
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [isValidatingInvite, setIsValidatingInvite] = useState(false)
   const [inviteValidated, setInviteValidated] = useState(false)
@@ -50,8 +48,8 @@ export function SignUpForm({ preSelectedUseCase }: SignUpFormProps) {
 
   // Validate invite code from URL on mount
   useEffect(() => {
-    if (inviteFromUrl) {
-      void validateInvite(inviteFromUrl)
+    if (invite) {
+      void validateInvite(invite)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
