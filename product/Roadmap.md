@@ -95,7 +95,7 @@
 [x] Ads for AI FDE
 
 ### Support
-[] Email agent
+[x] alert and interact in slack for open sessions -  support sessions go to a centeralize channel in slack, the user can answer in the relevant thread in slack which replies in the session to the user
 
 ### Sessions
 [] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
@@ -103,15 +103,18 @@
 [] Improve participants identification - show additional details in a cleaner way
 
 ### Platform 
-[] Improve onboarding 
-[] Improve welcome email visualization
-[] Add invite link and promotions support 
+[x] Improve onboarding 
+[x] Add invite link support
+[] Move knowledge into agents screen
+[] Implement basic alert system
 
 ### Issues
 [] Calculate issue upvotes over time and alert or change priority if there's an anomaly
-[] Jira Integration 
 
 ## Phase 8
+
+### Suport
+[] Email agent
 
 ### Marketing
 [] Run SDR agent
@@ -121,12 +124,14 @@
 [] Draft response email to the user
 [] Support Actions items (not necessary code related)
 [] Lieaner Integration
+[] Jira Integration 
 
 ### Code
 [] Create initial implementation 
 
 ### Platform
 [] API Access (via secret key)
+[] Improve welcome email visualization
 [] Project multi-users access and RBAC
 [] Alerts and weekly reports(email, slack)
 [] MCP Access
