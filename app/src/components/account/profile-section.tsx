@@ -128,11 +128,22 @@ export function ProfileSection({ email }: ProfileSectionProps) {
       variant="elevated"
       className="space-y-6 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
     >
-      <div>
-        <Heading as="h2" size="section">Profile</Heading>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Manage how Hissuno recognizes you across projects.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Heading as="h2" size="section">Profile</Heading>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Manage how Hissuno recognizes you across projects.
+          </p>
+        </div>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => void handleSave()}
+          disabled={isSaving}
+          className="shrink-0"
+        >
+          {isSaving ? 'Saving...' : 'Save Profile'}
+        </Button>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -197,15 +208,6 @@ export function ProfileSection({ email }: ProfileSectionProps) {
           {successMessage}
         </div>
       )}
-
-      <Button
-        variant="primary"
-        size="md"
-        onClick={() => void handleSave()}
-        disabled={isSaving}
-      >
-        {isSaving ? 'Saving...' : 'Save Profile'}
-      </Button>
     </FloatingCard>
   )
 }

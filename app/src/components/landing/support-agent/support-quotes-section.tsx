@@ -10,29 +10,29 @@ interface QuoteItem {
   role: string
 }
 
-// Support-focused quotes: Knowledge/Efficiency pain points
+// Support-focused quotes: Business impact of slow/bad support
 const SUPPORT_QUOTES: QuoteItem[] = [
   {
     id: 'sup1',
-    text: "I answer the same 10 questions every single day. Our docs exist, customers just don't read them.",
+    text: "A trial user cancelled because they waited 6 hours for an answer that was in our docs. That's $2,400/year we lost to response time.",
     author: 'Support Lead',
     role: 'B2B SaaS',
   },
   {
     id: 'sup2',
-    text: "New support hires take 3 months to learn the product well enough to help customers.",
+    text: "We doubled our support team to handle volume. Turns out 60% of tickets were repeat questions we could have deflected.",
     author: 'Head of Support',
     role: 'Enterprise Software',
   },
   {
     id: 'sup3',
-    text: "Our best support rep quit. She took half our product knowledge with her.",
+    text: "Our NPS dropped 20 points after a bad support experience went viral. One wrong answer cost us our reputation.",
     author: 'Customer Success Manager',
     role: 'Startup',
   },
   {
     id: 'sup4',
-    text: "Customers wait 4 hours for answers that are already in our help center.",
+    text: "We lost an enterprise deal because our support couldn't answer technical questions fast enough during the trial.",
     author: 'Support Engineer',
     role: 'Dev Tools',
   },
@@ -82,10 +82,10 @@ export function SupportQuotesSection() {
           className="text-center"
         >
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)]">
-            Sound Familiar?
+            The Real Cost of Slow Support
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-[var(--text-secondary)]">
-            Support teams struggle with the same knowledge gap
+            Every slow response is a retention risk. Every wrong answer erodes trust.
           </p>
         </motion.div>
       </div>

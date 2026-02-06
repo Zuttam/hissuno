@@ -8,15 +8,15 @@ import { WaterReveal } from '@/components/landing/water-reveal'
 const KNOWLEDGE_POINTS = [
   {
     id: 'accurate',
-    text: 'Every answer cites specific files and docs',
+    text: 'Citable answers build customer trust and reduce repeat questions',
   },
   {
     id: 'grounded',
-    text: 'No hallucinations — grounded in your actual code',
+    text: 'No hallucinations means no churn from bad support experiences',
   },
   {
     id: 'updated',
-    text: 'Stays current as your codebase evolves',
+    text: 'Stays current automatically — no manual knowledge base maintenance',
   },
 ]
 
@@ -26,13 +26,13 @@ export function SupportKnowledgeSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Answers Backed by Your Codebase
+            Every Answer Earns Customer Trust
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            Every response is grounded in your actual product knowledge
+            Accurate, citable answers mean customers trust self-service and your team handles fewer escalations
           </p>
         </WaterReveal>
 
@@ -98,10 +98,10 @@ export function SupportKnowledgeSection() {
               className="h-full p-8"
             >
               <h3 className="font-mono text-xl font-semibold text-[var(--foreground)]">
-                Knowledge-Grounded AI
+                Evidence-Grounded Support
               </h3>
               <p className="mt-2 text-[var(--text-secondary)]">
-                Unlike generic chatbots, Hissuno reads your codebase and documentation to give specific, accurate answers.
+                Unlike generic chatbots, Hissuno reads your codebase and documentation. Accurate answers mean happy customers who stay.
               </p>
 
               <ul className="mt-6 space-y-4">

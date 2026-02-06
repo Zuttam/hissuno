@@ -14,10 +14,11 @@ interface Integration {
 
 const INTEGRATIONS: Integration[] = [
   { name: 'Slack', logo: '/logos/slack.svg' },
-  { name: 'Linear', logo: '/logos/linear.svg' },
-  { name: 'GitHub', logo: '/logos/github.svg' },
-  { name: 'Intercom', logo: '/logos/intercom.svg' },
   { name: 'Jira', logo: '/logos/jira.svg' },
+  { name: 'Gong', logo: '/logos/gong.svg' },
+  { name: 'Linear', logo: '/logos/linear.svg' },
+  { name: 'Intercom', logo: '/logos/intercom.svg' },
+  { name: 'GitHub', logo: '/logos/github.svg' },
 ]
 
 export function PMHeroSection() {
@@ -51,14 +52,14 @@ export function PMHeroSection() {
         className="relative z-10 mx-auto max-w-4xl text-center"
       >
         <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
-          Your AI Product Manager
+          Evidence-Backed Product Decisions,
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            Co-Pilot
+            On Autopilot
           </span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
-          An AI agent that watches customer conversations, triages feedback, and writes specs — so you can focus on what to build next.
+          Your AI Product Intelligence Agent connects every customer touchpoint to business outcomes. Know what drives revenue, stop guessing what to build.
         </p>
 
         {/* Integration logos row */}

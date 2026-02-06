@@ -10,29 +10,29 @@ interface QuoteItem {
   role: string
 }
 
-// FDE-focused quotes: Engineering/Speed pain points
+// FDE-focused quotes: Business impact of slow delivery
 const FDE_QUOTES: QuoteItem[] = [
   {
     id: 'fde1',
-    text: "Customer reported a bug Monday. PR merged Friday. By then, three more users churned.",
+    text: "Customer reported a critical bug Monday. PR merged Friday. By then, they'd already started evaluating competitors.",
     author: 'Engineering Lead',
     role: 'Series B Startup',
   },
   {
     id: 'fde2',
-    text: "Our backlog has 200 items. Half are duplicates. Nobody has time to clean it up.",
+    text: "We lost a $150k deal because we couldn't ship the feature fast enough. Our competitor delivered it in 2 weeks.",
     author: 'Senior Engineer',
     role: 'SaaS Platform',
   },
   {
     id: 'fde3',
-    text: "We spend more time in triage meetings than actually building features.",
+    text: "Our time-to-value is 6 weeks. Customers churn in 4. We're losing the race before we even start.",
     author: 'Tech Lead',
     role: 'Dev Tools Company',
   },
   {
     id: 'fde4',
-    text: "Every feature request goes through 5 people before an engineer sees it. By then the context is gone.",
+    text: "Three enterprise customers asked for the same feature. It took us 4 months to ship. One of them didn't renew.",
     author: 'CTO',
     role: 'Early-Stage Startup',
   },
@@ -82,10 +82,10 @@ export function FDEQuotesSection() {
           className="text-center"
         >
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)]">
-            Sound Familiar?
+            When Engineering Bottlenecks Cost Customers
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-[var(--text-secondary)]">
-            Engineering teams are drowning in customer feedback
+            Delayed features and slow response times compound into lost revenue
           </p>
         </motion.div>
       </div>

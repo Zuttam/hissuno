@@ -55,14 +55,14 @@ export function HeroSection() {
         className="relative z-10 mx-auto max-w-4xl text-center">
 
         <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
-          AI Agents for
+          AI Agents That Drive
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            Customer Intelligence
+            Product Impact
           </span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
-          From support to specs to shipped code — let AI handle the noise while you build what matters.
+          Reduce churn, ship faster, and never miss a revenue signal — with AI agents grounded in your codebase and customer data.
         </p>
 
         {/* Integration logos row */}
@@ -89,6 +89,29 @@ export function HeroSection() {
                 />
               </div>
             ))}
+          </div>
+        </motion.div>
+
+        {/* Metrics banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: WATER_EASINGS.float, delay: 0.8 }}
+          className="mx-auto mt-8 flex max-w-2xl flex-wrap items-center justify-center gap-6 rounded-xl border border-[var(--border)] bg-[var(--background)]/50 px-6 py-4 backdrop-blur-sm md:gap-10"
+        >
+          <div className="flex flex-col items-center">
+            <span className="font-mono text-2xl font-bold text-[var(--accent-teal)]">10+</span>
+            <span className="text-xs text-[var(--text-tertiary)]">hours/week saved</span>
+          </div>
+          <div className="h-8 w-px bg-[var(--border)]" />
+          <div className="flex flex-col items-center">
+            <span className="font-mono text-2xl font-bold text-[var(--accent-teal)]">3x</span>
+            <span className="text-xs text-[var(--text-tertiary)]">faster resolution</span>
+          </div>
+          <div className="h-8 w-px bg-[var(--border)]" />
+          <div className="flex flex-col items-center">
+            <span className="font-mono text-2xl font-bold text-[var(--accent-teal)]">Zero</span>
+            <span className="text-xs text-[var(--text-tertiary)]">signals lost</span>
           </div>
         </motion.div>
 

@@ -13,49 +13,49 @@ interface QuoteItem {
 const QUOTES: QuoteItem[] = [
   {
     id: 'q1',
-    text: "We had 500 feature requests in a spreadsheet. Nobody knew which ones mattered.",
-    author: 'Engineering Lead',
+    text: "We lost a $200k deal because we shipped the wrong features. The signals were there — we just couldn't see them.",
+    author: 'VP of Product',
     role: 'Series B Startup',
   },
   {
     id: 'q2',
-    text: "Our support team knew exactly what customers needed. That knowledge never reached product.",
-    author: 'Head of Support',
+    text: "Three enterprise customers churned in Q3. Every single pain point was buried in support tickets we never read.",
+    author: 'Head of Customer Success',
     role: 'SaaS Company',
   },
   {
     id: 'q3',
-    text: "We shipped features nobody asked for while ignoring bugs customers screamed about.",
-    author: 'Product Manager',
+    text: "We spent 6 months building a feature our competitor launched in 2 weeks. Our customers had been asking for it the whole time.",
+    author: 'Engineering Lead',
     role: 'B2B Platform',
   },
   {
     id: 'q4',
-    text: "Every customer call was valuable. None of them were actionable.",
+    text: "Our sales team promised features to close deals. Product never saw those commitments until the customer threatened to cancel.",
     author: 'Founder',
     role: 'Early-stage Startup',
   },
   {
     id: 'q5',
-    text: "I spent 4 hours a week just triaging Slack messages from customer success.",
-    author: 'Senior PM',
+    text: "We hired 3 support reps to handle volume. Turns out 60% of tickets were about the same 5 issues nobody fixed.",
+    author: 'Director of Support',
     role: 'Enterprise Software',
   },
   {
     id: 'q6',
-    text: "We built a roadmap based on who yelled loudest, not what mattered most.",
-    author: 'VP of Product',
+    text: "Our biggest customer told us exactly what they needed in a Gong call. That feedback sat in a spreadsheet for 8 months.",
+    author: 'Account Executive',
     role: 'Growth Company',
   },
   {
     id: 'q7',
-    text: "Three different customers reported the same bug. We created three different tickets.",
-    author: 'QA Lead',
+    text: "We built our roadmap from gut feel. 40% of what we shipped got zero adoption.",
+    author: 'Product Manager',
     role: 'Dev Tools Company',
   },
   {
     id: 'q8',
-    text: "Our best product insights were buried in support tickets nobody read.",
+    text: "Our NPS dropped 15 points before we realized there was a pattern in the complaints. By then, the damage was done.",
     author: 'CTO',
     role: 'Fintech Startup',
   },
@@ -105,10 +105,10 @@ export function QuotesSection() {
           className="text-center"
         >
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)]">
-            Sound Familiar?
+            The Cost of Flying Blind
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-[var(--text-secondary)]">
-            Every product team struggles with the same problem
+            When customer intelligence is broken, revenue pays the price
           </p>
         </motion.div>
       </div>

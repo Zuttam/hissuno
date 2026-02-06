@@ -37,14 +37,14 @@ export function SupportHeroSection() {
         className="relative z-10 mx-auto max-w-4xl text-center"
       >
         <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
-          Stop Answering the
+          Resolve Instantly,
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            Same Questions
+            Retain Forever
           </span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
-          AI support that reduces noise, gives instant answers, and works across every channel — no setup required.
+          AI support grounded in your codebase that cuts resolution time, reduces support costs, and turns every interaction into a retention opportunity.
         </p>
 
         <div className="mt-10 flex flex-col items-center justify-center">

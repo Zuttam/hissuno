@@ -28,13 +28,13 @@ export function FDECTASection() {
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         <WaterReveal preset="text" parallax parallaxDepth={0.1}>
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)] md:text-4xl">
-            Ship Customer Requests Faster
+            Turn Customer Needs into Shipped Features
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            Let your AI engineer turn customer feedback into pull requests.
+            Your AI development agent bridges the gap between what customers need and what your team ships.
           </p>
         </WaterReveal>
 

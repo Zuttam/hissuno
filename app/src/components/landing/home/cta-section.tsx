@@ -28,13 +28,13 @@ export function CTASection() {
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         <WaterReveal preset="text" parallax parallaxDepth={0.1}>
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)] md:text-4xl">
-            Ready to Let AI Handle the Noise?
+            Ready to Turn Customer Signals into Revenue?
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            See how Hissuno can help your team ship faster.
+            Join teams using AI agents to reduce churn, ship faster, and build what actually matters.
           </p>
         </WaterReveal>
 

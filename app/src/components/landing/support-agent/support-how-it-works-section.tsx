@@ -9,21 +9,21 @@ const STEPS = [
     step: 1,
     title: 'Connect your codebase',
     description:
-      'Point Hissuno at your GitHub repo. It reads your code to understand your product inside and out.',
+      'Point Hissuno at your GitHub repo. Your AI support agent learns your product deeply — reducing incorrect answers and escalations.',
   },
   {
     id: 'knowledge',
     step: 2,
     title: 'Add knowledge sources',
     description:
-      'Connect docs, FAQs, Notion pages. Everything becomes searchable context for the AI.',
+      'Connect docs, FAQs, Notion pages. The more context, the fewer escalations and the higher your deflection rate.',
   },
   {
     id: 'deploy',
     step: 3,
-    title: 'Deploy anywhere',
+    title: 'Deploy and see results',
     description:
-      'Widget, Slack, email, docs — pick your channels. Answers start flowing in minutes, not days.',
+      'Widget, Slack, email — pick your channels. Start reducing support costs and improving CSAT from day one.',
   },
 ]
 
@@ -33,13 +33,13 @@ export function SupportHowItWorksSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Zero Setup, Instant Answers
+            From Setup to ROI in Minutes
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            No training. No configuration. Just connect and go.
+            No training period. No manual configuration. Start reducing support costs on day one.
           </p>
         </WaterReveal>
 

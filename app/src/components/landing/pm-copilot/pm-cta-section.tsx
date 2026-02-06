@@ -28,13 +28,13 @@ export function PMCTASection() {
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         <WaterReveal preset="text" parallax parallaxDepth={0.1}>
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)] md:text-4xl">
-            Stop Triaging Manually
+            Build the Roadmap That Drives Revenue
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            Let your AI co-pilot handle the busywork while you focus on strategy.
+            Let your AI Product Intelligence Agent connect every customer signal to business impact.
           </p>
         </WaterReveal>
 

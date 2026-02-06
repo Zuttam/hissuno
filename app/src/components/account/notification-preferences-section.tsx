@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { Checkbox, Badge, Divider, Heading, Button } from '@/components/ui'
+import { Checkbox, Badge, Divider, Heading, Button, Select, FormField } from '@/components/ui'
 import { FloatingCard } from '@/components/ui/floating-card'
 import {
   NOTIFICATION_TYPE_INFO,
@@ -9,16 +9,30 @@ import {
   type NotificationPreferences,
 } from '@/types/notification-preferences'
 
+interface SlackChannel {
+  id: string
+  name: string
+}
+
+const NOTIFICATION_TIPS = [
+  'When you receive a "human needed" notification, you can reply within the Slack thread to respond to the end user directly.',
+]
+
 export function NotificationPreferencesSection() {
   const [preferences, setPreferences] = useState<NotificationPreferences>(() =>
     resolvePreferences(null)
   )
   const [silenced, setSilenced] = useState(false)
   const [slackAvailable, setSlackAvailable] = useState(false)
+  const [slackNotificationChannel, setSlackNotificationChannel] = useState<string | null>(null)
+  const [availableSlackChannels, setAvailableSlackChannels] = useState<SlackChannel[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Random tip on mount
+  const [currentTipIndex] = useState(() => Math.floor(Math.random() * NOTIFICATION_TIPS.length))
 
   useEffect(() => {
     async function fetchPreferences() {
@@ -33,6 +47,12 @@ export function NotificationPreferencesSection() {
         }
         if (data.slackAvailable !== undefined) {
           setSlackAvailable(data.slackAvailable)
+        }
+        if (data.slackNotificationChannel !== undefined) {
+          setSlackNotificationChannel(data.slackNotificationChannel)
+        }
+        if (data.availableSlackChannels) {
+          setAvailableSlackChannels(data.availableSlackChannels)
         }
       } catch (err) {
         console.error('Failed to fetch notification preferences:', err)
@@ -64,6 +84,13 @@ export function NotificationPreferencesSection() {
     setSuccessMessage(null)
   }, [])
 
+  const handleChannelChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value
+    setSlackNotificationChannel(value === '' ? null : value)
+    setError(null)
+    setSuccessMessage(null)
+  }, [])
+
   const handleSave = useCallback(async () => {
     setIsSaving(true)
     setError(null)
@@ -73,7 +100,7 @@ export function NotificationPreferencesSection() {
       const response = await fetch('/api/user/notification-preferences', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ preferences, silenced }),
+        body: JSON.stringify({ preferences, silenced, slackNotificationChannel }),
       })
 
       if (!response.ok) {
@@ -87,7 +114,7 @@ export function NotificationPreferencesSection() {
     } finally {
       setIsSaving(false)
     }
-  }, [preferences, silenced])
+  }, [preferences, silenced, slackNotificationChannel])
 
   if (isLoading) {
     return (
@@ -112,12 +139,44 @@ export function NotificationPreferencesSection() {
       variant="elevated"
       className="space-y-6 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
     >
-      <div>
-        <Heading as="h2" size="section">Notification Preferences</Heading>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Control how and when you receive notifications from Hissuno.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <Heading as="h2" size="section">Notification Preferences</Heading>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Control how and when you receive notifications from Hissuno.
+          </p>
+        </div>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => void handleSave()}
+          disabled={isSaving || silenced === undefined}
+          className="shrink-0"
+        >
+          {isSaving ? 'Saving...' : 'Save Preferences'}
+        </Button>
       </div>
+
+      {/* Slack Channel Selector */}
+      <FormField label="Slack Notification Channel">
+        <Select
+          value={slackNotificationChannel ?? ''}
+          onChange={handleChannelChange}
+          disabled={!slackAvailable}
+        >
+          <option value="">DM to you (default)</option>
+          {availableSlackChannels.map((channel) => (
+            <option key={channel.id} value={channel.id}>
+              #{channel.name}
+            </option>
+          ))}
+        </Select>
+        {!slackAvailable && (
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Connect Slack to a project first to enable channel selection
+          </p>
+        )}
+      </FormField>
 
       <Checkbox
         checked={silenced}
@@ -207,6 +266,14 @@ export function NotificationPreferencesSection() {
         </div>
       </div>
 
+      {/* Tips footer */}
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800/50">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          <span className="mr-2">💡</span>
+          {NOTIFICATION_TIPS[currentTipIndex]}
+        </p>
+      </div>
+
       {error && (
         <div className="rounded-[4px] border-2 border-[--accent-danger] bg-transparent px-3 py-2 text-sm font-mono text-[--foreground]">
           {error}
@@ -218,15 +285,6 @@ export function NotificationPreferencesSection() {
           {successMessage}
         </div>
       )}
-
-      <Button
-        variant="primary"
-        size="md"
-        onClick={() => void handleSave()}
-        disabled={isSaving || silenced === undefined}
-      >
-        {isSaving ? 'Saving...' : 'Save Preferences'}
-      </Button>
     </FloatingCard>
   )
 }

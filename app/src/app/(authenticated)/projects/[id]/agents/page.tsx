@@ -222,10 +222,10 @@ export default function AgentsPage() {
           }}
         />
 
-        {/* The Captain (PM Agent) */}
+        {/* Product Specialist (PM Agent) */}
         <AgentCard
           avatar="🧭"
-          title="The Captain"
+          title="Product Specialist"
           description="Reviews sessions, creates issues, and generates specs"
           channels={buildPmSources(integrationStatuses)}
           destinations={buildPmDestinations(integrationStatuses)}

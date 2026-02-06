@@ -69,7 +69,7 @@ export function PmAgentDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="The Captain" size="lg">
+    <Dialog open={open} onClose={onClose} title="Product Specialist" size="lg">
       <div className="flex flex-col gap-6">
         {error && <Alert variant="warning">{error}</Alert>}
 

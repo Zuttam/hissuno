@@ -29,7 +29,7 @@ const STEPS: Step[] = [
     step: 1,
     title: 'Connect your channels',
     description:
-      'Slack, email, widget, Intercom — every customer touchpoint in one place.',
+      'Slack, email, widget, Intercom — capture every customer signal so nothing falls through the cracks.',
     icon: MessageSquare,
     flowDirection: 'in',
     integrations: [
@@ -42,9 +42,9 @@ const STEPS: Step[] = [
   {
     id: 'ai-acts',
     step: 2,
-    title: 'AI understands and acts',
+    title: 'AI analyzes and prioritizes',
     description:
-      'Grounded in your codebase, AI answers questions, triages issues, and writes code.',
+      'Grounded in your codebase, AI triages by revenue impact, resolves support instantly, and generates implementation-ready specs.',
     icon: GitBranch,
     flowDirection: 'in',
     integrations: [
@@ -59,7 +59,7 @@ const STEPS: Step[] = [
     step: 3,
     title: 'You stay in control',
     description:
-      'Review, approve, and ship. Nothing happens without your sign-off.',
+      'Review, approve, and ship with confidence. Every action tied to customer evidence and business impact.',
     icon: FileCode,
     flowDirection: 'out',
     integrations: [
@@ -203,7 +203,7 @@ export function FeaturesSection() {
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            From conversation to shipped code in three steps
+            From customer signal to shipped value in three steps
           </p>
         </WaterReveal>
 

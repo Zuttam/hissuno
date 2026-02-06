@@ -17,25 +17,25 @@ const AGENTS: AgentCard[] = [
   {
     id: 'support-agent',
     icon: MessageSquare,
-    headline: 'Stop Answering the Same Questions',
+    headline: 'Cut Support Costs, Boost Retention',
     description:
-      'Instant answers backed by your codebase. Web widget, Slack, email.',
+      'Resolve tickets instantly with codebase-grounded answers. Reduce support load, improve CSAT, and keep customers before they churn.',
     href: '/landing/support-agent',
   },
   {
     id: 'pm-copilot',
     icon: ClipboardList,
-    headline: 'Your AI Product Manager',
+    headline: 'Build What Drives Revenue',
     description:
-      'Triage feedback, create issues, write specs. Focus on strategy, not busywork.',
+      'Auto-triage by revenue impact and customer urgency. Every product decision backed by real customer evidence.',
     href: '/landing/pm-copilot',
   },
   {
     id: 'fde',
     icon: Code,
-    headline: 'From Request to Pull Request',
+    headline: 'Ship Customer Value in Hours',
     description:
-      'Customer requests become code changes in hours, not weeks.',
+      'Turn validated customer needs into reviewed code changes. Reduce time-to-value from weeks to hours.',
     href: '/landing/fde',
   },
 ]
@@ -46,13 +46,13 @@ export function AgentsShowcaseSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Three Agents. One Platform.
+            Three Agents. Real Business Impact.
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            Choose the agent that fits your workflow, or use them all together.
+            Each agent delivers measurable outcomes across support, product, and engineering.
           </p>
         </WaterReveal>
 

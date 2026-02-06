@@ -9,21 +9,21 @@ const FEATURES = [
     id: 'widget',
     title: 'Web Widget',
     description:
-      'Embed in 2 minutes. No training required. Customers get instant, accurate answers 24/7.',
+      'Instant self-service that reduces ticket volume by up to 40%. Customers get answers before they get frustrated.',
     icon: '/window.svg',
   },
   {
     id: 'slack',
     title: 'Slack Integration',
     description:
-      'Works in your community and support channels. Responds in threads, keeps conversations organized.',
+      'Faster response times in community channels. Turn support threads into retention moments, not escalation points.',
     icon: '/logos/slack.svg',
   },
   {
     id: 'email',
     title: 'Email Support',
     description:
-      'Connect Gmail or Outlook. AI responds to support emails while you supervise and approve.',
+      'Reduce average response time from hours to minutes. Every quick, accurate reply builds customer trust.',
     icon: '/logos/gmail.svg',
   },
 ]
@@ -34,13 +34,13 @@ export function SupportFeaturesSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Multi-Channel Support
+            Every Channel, Instant Resolution
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            Meet customers where they are — web, Slack, or email
+            Faster answers on every channel means higher CSAT and lower support costs
           </p>
         </WaterReveal>
 
