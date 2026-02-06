@@ -104,6 +104,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.status !== undefined) input.status = body.status
     if (body.user_id !== undefined) input.user_id = body.user_id
     if (body.user_metadata !== undefined) input.user_metadata = body.user_metadata
+    if (body.is_human_takeover !== undefined) input.is_human_takeover = body.is_human_takeover
 
     // Check if there's anything to update
     if (Object.keys(input).length === 0) {

@@ -63,7 +63,7 @@ export function ProjectPageLayout({ children }: ProjectPageLayoutProps) {
       />  
 
       {/* Page content */}
-      <div className="flex-1 flex flex-col gap-6 overflow-y-auto mx-4 md:mx-6 pb-6">
+      <div className="flex-1 flex flex-col gap-6 overflow-y-auto overflow-x-hidden mx-4 md:mx-6 pb-6">
         {children}
       </div>
     </div>

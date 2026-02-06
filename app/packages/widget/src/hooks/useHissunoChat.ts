@@ -522,6 +522,24 @@ export function useHissunoChat({
             }
           }
 
+          if (data.type === 'status-change' && data.status === 'human_takeover') {
+            // Human takeover activated - inject system message
+            const takeoverId = `system_takeover_${Date.now()}`;
+            if (!seenMessageIds.current.has(takeoverId)) {
+              seenMessageIds.current.add(takeoverId);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: takeoverId,
+                  role: 'assistant' as const,
+                  content: 'A human agent will be with you shortly.',
+                  createdAt: new Date(),
+                  senderType: 'system',
+                },
+              ]);
+            }
+          }
+
           if (data.type === 'status-change' && data.status === 'closed') {
             // Session was closed, cleanup
             sessionClosedRef.current = true;
@@ -835,6 +853,14 @@ export function useHissunoChat({
             return;
           }
           throw new Error(data.error ?? 'Failed to send message');
+        }
+
+        const result = await response.json();
+
+        // If human takeover is active, skip AI stream
+        if (result.status === 'human_takeover') {
+          setIsLoading(false);
+          return;
         }
 
         // Connect to SSE stream

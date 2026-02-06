@@ -6,7 +6,7 @@
 /**
  * Onboarding step identifiers
  */
-export type OnboardingStepId = 'profile' | 'use-case' | 'billing'
+export type OnboardingStepId = 'profile' | 'use-case' | 'billing' | 'project'
 
 // ============================================
 // Validation
@@ -49,6 +49,15 @@ export interface BillingFormData {
 }
 
 /**
+ * Project form data for onboarding
+ */
+export interface ProjectFormData {
+  name: string
+  description: string
+  skipped: boolean
+}
+
+/**
  * Use case options for onboarding
  */
 export type UseCaseOption = 'knowledge' | 'slack' | 'triage' | 'specs'
@@ -81,6 +90,7 @@ export interface OnboardingFormData {
   profile: ProfileFormData
   useCase: UseCaseFormData
   billing: BillingFormData
+  project: ProjectFormData
 }
 
 // ============================================
@@ -105,6 +115,7 @@ export interface OnboardingWizardContext {
 export interface StepProps {
   context: OnboardingWizardContext
   onValidationChange?: (isValid: boolean) => void
+  onCheckoutComplete?: () => void
   title: string
   description?: React.ReactNode
 }
@@ -182,10 +193,20 @@ export const DEFAULT_USE_CASE_DATA: UseCaseFormData = {
 }
 
 /**
+ * Default project form data
+ */
+export const DEFAULT_PROJECT_DATA: ProjectFormData = {
+  name: '',
+  description: '',
+  skipped: false,
+}
+
+/**
  * Default form data for onboarding flow
  */
 export const DEFAULT_ONBOARDING_DATA: OnboardingFormData = {
   profile: DEFAULT_PROFILE_DATA,
   useCase: DEFAULT_USE_CASE_DATA,
   billing: DEFAULT_BILLING_DATA,
+  project: DEFAULT_PROJECT_DATA,
 }

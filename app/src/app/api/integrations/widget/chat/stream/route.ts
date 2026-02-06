@@ -3,7 +3,7 @@ import type { ModelMessage } from 'ai'
 import { RuntimeContext } from '@mastra/core/runtime-context'
 import { getProjectById } from '@/lib/projects/keys'
 import { createAdminClient } from '@/lib/supabase/server'
-import { updateSessionActivity } from '@/lib/supabase/sessions'
+import { updateSessionActivity, setSessionHumanTakeover } from '@/lib/supabase/sessions'
 import { saveSessionMessage } from '@/lib/supabase/session-messages'
 import { getRunningChatRun, updateChatRunStatus } from '@/lib/agent/chat-run-service'
 import { getSupportAgentSettingsAdmin } from '@/lib/supabase/project-settings/support-agent'
@@ -221,6 +221,14 @@ export async function GET(request: NextRequest) {
         // Do post-completion DB updates in background (don't block the client)
         const postCompletionTasks = async () => {
           try {
+            // Check for human takeover marker and strip it before saving
+            const HUMAN_TAKEOVER_MARKER = '[HUMAN_TAKEOVER]'
+            if (fullContent.includes(HUMAN_TAKEOVER_MARKER)) {
+              console.log(`${LOG_PREFIX} Human takeover marker detected, setting flag`)
+              fullContent = fullContent.replace(HUMAN_TAKEOVER_MARKER, '').trim()
+              await setSessionHumanTakeover(sessionId, true)
+            }
+
             // Save AI response to session_messages
             await saveSessionMessage({
               sessionId,

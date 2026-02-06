@@ -28,13 +28,13 @@ export function SupportCTASection() {
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         <WaterReveal preset="text" parallax parallaxDepth={0.1}>
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)] md:text-4xl">
-            Let AI Handle the Noise
+            Turn Support into a Retention Engine
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            Instant answers backed by your codebase. No hallucinations.
+            Instant, accurate answers that keep customers happy and reduce your support burden.
           </p>
         </WaterReveal>
 

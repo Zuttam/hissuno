@@ -2,10 +2,18 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useProject } from '@/components/providers/project-provider'
+import { useIntegrationStatuses } from '@/hooks/use-integration-statuses'
 import { TestAgentDialog } from '@/components/projects/test-agent-dialog'
+import { KnowledgeSourcesList } from '@/components/projects/knowledge/knowledge-sources-list'
+import { KnowledgeSourcesDialog } from '@/components/projects/edit-dialogs/knowledge-sources-dialog'
+import { AgentCard, buildSupportChannels, buildPmSources, buildPmDestinations } from '@/components/projects/agents/agent-card'
+import { SupportAgentDialog } from '@/components/projects/agents/support-agent-dialog'
+import { PmAgentDialog } from '@/components/projects/agents/pm-agent-dialog'
+import { KnowledgeDetailDialog } from '@/components/projects/agents/knowledge-detail-dialog'
 import { FloatingCard } from '@/components/ui/floating-card'
-import { Button, Heading, Alert, Spinner, Input, Select, PageHeader, FormField } from '@/components/ui'
-import { PackageSelector } from '@/components/projects/knowledge/package-selector'
+import { Button, Heading, Spinner, PageHeader, Badge } from '@/components/ui'
+import { formatRelativeTime } from '@/lib/utils/format-time'
+import type { KnowledgeSourceRecord, NamedPackageWithSources } from '@/lib/knowledge/types'
 
 interface AgentSettings {
   supportAgent: {
@@ -20,123 +28,148 @@ interface AgentSettings {
   }
 }
 
+const DEFAULT_SETTINGS: AgentSettings = {
+  supportAgent: {
+    toneOfVoice: 'professional',
+    brandGuidelines: '',
+    packageId: null,
+  },
+  pmAgent: {
+    classificationGuidelines: '',
+    specGuidelines: '',
+    autoSpecThreshold: 3,
+  },
+}
+
 export default function AgentsPage() {
   const { project, projectId, isLoading: isLoadingProject } = useProject()
+  const { statuses: integrationStatuses } = useIntegrationStatuses(projectId)
+
+  // Dialog visibility
+  const [showSupportDialog, setShowSupportDialog] = useState(false)
+  const [showPmDialog, setShowPmDialog] = useState(false)
   const [showTestAgent, setShowTestAgent] = useState(false)
-  const [settings, setSettings] = useState<AgentSettings>({
-    supportAgent: {
-      toneOfVoice: 'professional',
-      brandGuidelines: '',
-      packageId: null,
-    },
-    pmAgent: {
-      classificationGuidelines: '',
-      specGuidelines: '',
-      autoSpecThreshold: 3,
-    },
-  })
+  const [showSourcesDialog, setShowSourcesDialog] = useState(false)
+  const [showKnowledgeDetail, setShowKnowledgeDetail] = useState(false)
+
+  // Data
+  const [settings, setSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [sources, setSources] = useState<KnowledgeSourceRecord[]>([])
+  const [isLoadingSources, setIsLoadingSources] = useState(true)
+  const [packages, setPackages] = useState<NamedPackageWithSources[]>([])
 
-  // Fetch project settings on mount
-  useEffect(() => {
+  // Fetch settings
+  const fetchSettings = useCallback(async () => {
     if (!projectId) return
-
-    const fetchSettings = async () => {
-      try {
-        // Fetch both general settings and support agent settings
-        const [settingsRes, supportAgentRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}/settings`),
-          fetch(`/api/projects/${projectId}/settings/support-agent`),
-        ])
-
-        if (settingsRes.ok) {
-          const data = await settingsRes.json()
-          if (data.settings) {
-            setSettings((prev) => ({
-              ...prev,
-              supportAgent: {
-                ...prev.supportAgent,
-                toneOfVoice: data.settings.support_agent_tone ?? 'professional',
-                brandGuidelines: data.settings.brand_guidelines ?? '',
-              },
-              pmAgent: {
-                classificationGuidelines: data.settings.classification_guidelines ?? '',
-                specGuidelines: data.settings.spec_guidelines ?? '',
-                autoSpecThreshold: data.settings.auto_spec_threshold ?? 3,
-              },
-            }))
-          }
-        }
-
-        if (supportAgentRes.ok) {
-          const data = await supportAgentRes.json()
-          if (data.settings) {
-            setSettings((prev) => ({
-              ...prev,
-              supportAgent: {
-                ...prev.supportAgent,
-                packageId: data.settings.support_agent_package_id ?? null,
-              },
-            }))
-          }
-        }
-      } catch (err) {
-        console.error('[agents] Failed to fetch settings:', err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    void fetchSettings()
-  }, [projectId])
-
-  const handleSave = useCallback(async () => {
-    if (!projectId) return
-
-    setIsSaving(true)
-    setError(null)
-    setSuccessMessage(null)
 
     try {
-      // Save both general settings and support agent package setting
       const [settingsRes, supportAgentRes] = await Promise.all([
-        fetch(`/api/projects/${projectId}/settings`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            support_agent_tone: settings.supportAgent.toneOfVoice,
-            brand_guidelines: settings.supportAgent.brandGuidelines,
-            classification_guidelines: settings.pmAgent.classificationGuidelines,
-            spec_guidelines: settings.pmAgent.specGuidelines,
-            auto_spec_threshold: settings.pmAgent.autoSpecThreshold,
-          }),
-        }),
-        fetch(`/api/projects/${projectId}/settings/support-agent`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            support_agent_package_id: settings.supportAgent.packageId,
-          }),
-        }),
+        fetch(`/api/projects/${projectId}/settings`),
+        fetch(`/api/projects/${projectId}/settings/support-agent`),
       ])
 
-      if (!settingsRes.ok || !supportAgentRes.ok) {
-        throw new Error('Failed to save settings')
+      if (settingsRes.ok) {
+        const data = await settingsRes.json()
+        if (data.settings) {
+          setSettings((prev) => ({
+            ...prev,
+            supportAgent: {
+              ...prev.supportAgent,
+              toneOfVoice: data.settings.support_agent_tone ?? 'professional',
+              brandGuidelines: data.settings.brand_guidelines ?? '',
+            },
+            pmAgent: {
+              classificationGuidelines: data.settings.classification_guidelines ?? '',
+              specGuidelines: data.settings.spec_guidelines ?? '',
+              autoSpecThreshold: data.settings.auto_spec_threshold ?? 3,
+            },
+          }))
+        }
       }
 
-      setSuccessMessage('Settings saved successfully')
-      setTimeout(() => setSuccessMessage(null), 3000)
-    } catch {
-      setError('Failed to save settings. Please try again.')
+      if (supportAgentRes.ok) {
+        const data = await supportAgentRes.json()
+        if (data.settings) {
+          setSettings((prev) => ({
+            ...prev,
+            supportAgent: {
+              ...prev.supportAgent,
+              packageId: data.settings.support_agent_package_id ?? null,
+            },
+          }))
+        }
+      }
+    } catch (err) {
+      console.error('[agents] Failed to fetch settings:', err)
     } finally {
-      setIsSaving(false)
+      setIsLoading(false)
     }
-  }, [projectId, settings])
+  }, [projectId])
 
-  // Show loading state
+  // Fetch knowledge sources
+  const fetchSources = useCallback(async () => {
+    if (!projectId) return
+    setIsLoadingSources(true)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/settings/knowledge-sources`)
+      if (response.ok) {
+        const data = await response.json()
+        setSources(data.sources ?? [])
+      }
+    } catch (err) {
+      console.error('[agents] Failed to fetch sources:', err)
+    } finally {
+      setIsLoadingSources(false)
+    }
+  }, [projectId])
+
+  // Fetch packages
+  const fetchPackages = useCallback(async () => {
+    if (!projectId) return
+    try {
+      const response = await fetch(`/api/projects/${projectId}/knowledge/packages`)
+      if (response.ok) {
+        const data = await response.json()
+        setPackages(data.packages ?? [])
+      }
+    } catch (err) {
+      console.error('[agents] Failed to fetch packages:', err)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    void fetchSettings()
+    void fetchSources()
+    void fetchPackages()
+  }, [fetchSettings, fetchSources, fetchPackages])
+
+  // Resolve active package name for card display
+  const activePackage = packages.find((p) => p.id === settings.supportAgent.packageId)
+
+  const handleSettingsSaved = () => {
+    void fetchSettings()
+    void fetchPackages()
+  }
+
+  const handleSourcesSaved = () => {
+    void fetchSources()
+  }
+
+  const handlePackagesChange = () => {
+    void fetchPackages()
+    void fetchSettings()
+  }
+
+  // Build knowledge row meta text
+  const knowledgeRowMeta = activePackage
+    ? [
+        `${activePackage.sourceCount} source${activePackage.sourceCount !== 1 ? 's' : ''}`,
+        activePackage.lastAnalyzedAt ? `analyzed ${formatRelativeTime(activePackage.lastAnalyzedAt)}` : null,
+      ].filter(Boolean).join(' · ')
+    : ''
+
+  // Loading state
   if (isLoadingProject || !project || !projectId || isLoading) {
     return (
       <>
@@ -150,180 +183,97 @@ export default function AgentsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Agents"
-        actions={
-          <>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handleSave}
-              loading={isSaving}
-              disabled={isSaving}
-            >
-              Save Changes
-            </Button>
-          </>
-        }
+      <PageHeader title="Agents" />
+
+      {/* Connected Resources */}
+      <FloatingCard floating="gentle">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Heading as="h3" size="subsection">Connected Knowledge Resources</Heading>
+            {sources.length > 0 && <Badge variant="default">{sources.length}</Badge>}
+          </div>
+          <Button variant="ghost" size="md" onClick={() => setShowSourcesDialog(true)}>
+            Configure
+          </Button>
+        </div>
+        <KnowledgeSourcesList
+          sources={sources}
+          isLoading={isLoadingSources}
+          onConfigure={() => setShowSourcesDialog(true)}
+        />
+      </FloatingCard>
+
+      {/* Agent Cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Support Specialist */}
+        <AgentCard
+          avatar="🎧"
+          title="Support Specialist"
+          description="Powers customer conversations with product knowledge"
+          channels={buildSupportChannels(integrationStatuses)}
+          onClick={() => setShowSupportDialog(true)}
+          knowledgeRow={{
+            label: activePackage ? activePackage.name : 'Not assigned',
+            meta: knowledgeRowMeta,
+            onClick: (e) => {
+              e.stopPropagation()
+              setShowKnowledgeDetail(true)
+            },
+          }}
+        />
+
+        {/* Product Specialist (PM Agent) */}
+        <AgentCard
+          avatar="🧭"
+          title="Product Specialist"
+          description="Reviews sessions, creates issues, and generates specs"
+          channels={buildPmSources(integrationStatuses)}
+          destinations={buildPmDestinations(integrationStatuses)}
+          onClick={() => setShowPmDialog(true)}
+        />
+      </div>
+
+      {/* Dialogs */}
+      <SupportAgentDialog
+        open={showSupportDialog}
+        onClose={() => setShowSupportDialog(false)}
+        project={project}
+        projectId={projectId}
+        initialSettings={settings.supportAgent}
+        packages={packages}
+        onSaved={handleSettingsSaved}
+        onOpenTestAgent={() => setShowTestAgent(true)}
+        onOpenKnowledgeDetail={() => setShowKnowledgeDetail(true)}
       />
 
-      {error && (
-        <Alert variant="warning">{error}</Alert>
-      )}
+      <PmAgentDialog
+        open={showPmDialog}
+        onClose={() => setShowPmDialog(false)}
+        projectId={projectId}
+        initialSettings={settings.pmAgent}
+        onSaved={handleSettingsSaved}
+      />
 
-      {successMessage && (
-        <Alert variant="success">{successMessage}</Alert>
-      )}
+      <KnowledgeDetailDialog
+        open={showKnowledgeDetail}
+        onClose={() => setShowKnowledgeDetail(false)}
+        projectId={projectId}
+        activePackageId={settings.supportAgent.packageId}
+        onPackagesChange={handlePackagesChange}
+        hasResources={sources.length > 0}
+      />
 
-      {/* Support Agent Configuration */}
-      <FloatingCard floating="gentle">
-          <div className="space-y-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <Heading as="h2" size="section">Support Agent</Heading>
-                <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                  Configure how the support agent responds to customer inquiries
-                </p>
-              </div>
-              <Button
-                variant="secondary"
-                onClick={() => setShowTestAgent(true)}
-              >
-                Test Agent
-              </Button>
-            </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <FormField
-                label="Knowledge Package"
-                description="Select which knowledge package the agent uses for responses"
-              >
-                <PackageSelector
-                  projectId={projectId}
-                  value={settings.supportAgent.packageId}
-                  onChange={(packageId) => setSettings({
-                    ...settings,
-                    supportAgent: { ...settings.supportAgent, packageId }
-                  })}
-                />
-              </FormField>
-
-              <FormField
-                label="Tone of Voice"
-                description="The overall tone the agent uses in responses"
-              >
-                <Select
-                  value={settings.supportAgent.toneOfVoice}
-                  onChange={(e) => setSettings({
-                    ...settings,
-                    supportAgent: { ...settings.supportAgent, toneOfVoice: e.target.value }
-                  })}
-                >
-                  <option value="professional">Professional</option>
-                  <option value="friendly">Friendly</option>
-                  <option value="technical">Technical</option>
-                  <option value="casual">Casual</option>
-                </Select>
-              </FormField>
-            </div>
-
-            <div>
-              <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
-                Brand Guidelines
-              </label>
-              <textarea
-                value={settings.supportAgent.brandGuidelines}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  supportAgent: { ...settings.supportAgent, brandGuidelines: e.target.value }
-                })}
-                placeholder="Enter any brand-specific guidelines, terminology, or style instructions for the support agent..."
-                rows={4}
-                className="w-full rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-3 py-2 font-mono text-sm text-[color:var(--foreground)] placeholder:text-[color:var(--text-tertiary)] focus:border-[color:var(--accent-selected)] focus:outline-none"
-              />
-              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                Custom instructions to align agent responses with your brand voice
-              </p>
-            </div>
-          </div>
-        </FloatingCard>
-
-        {/* PM Agent Configuration */}
-        <FloatingCard floating="gentle">
-          <div className="space-y-6">
-            <div>
-              <Heading as="h2" size="section">PM Agent</Heading>
-              <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                Configure how sessions are reviewed and specs are generated
-              </p>
-            </div>
-
-            <div>
-              <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
-                Session Classification Guidelines
-              </label>
-              <textarea
-                value={settings.pmAgent.classificationGuidelines}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  pmAgent: { ...settings.pmAgent, classificationGuidelines: e.target.value }
-                })}
-                placeholder="Enter guidelines for how sessions should be categorized and tagged (e.g., what constitutes a bug vs. feature request)..."
-                rows={4}
-                className="w-full rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-3 py-2 font-mono text-sm text-[color:var(--foreground)] placeholder:text-[color:var(--text-tertiary)] focus:border-[color:var(--accent-selected)] focus:outline-none"
-              />
-              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                Instructions for how the PM agent should classify and tag customer sessions
-              </p>
-            </div>
-
-            <div>
-              <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
-                Spec Generation Guidelines
-              </label>
-              <textarea
-                value={settings.pmAgent.specGuidelines}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  pmAgent: { ...settings.pmAgent, specGuidelines: e.target.value }
-                })}
-                placeholder="Enter guidelines for how product specs should be written (e.g., required sections, level of detail, technical depth)..."
-                rows={4}
-                className="w-full rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-3 py-2 font-mono text-sm text-[color:var(--foreground)] placeholder:text-[color:var(--text-tertiary)] focus:border-[color:var(--accent-selected)] focus:outline-none"
-              />
-              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                Instructions for how product specifications should be formatted and what to include
-              </p>
-            </div>
-
-            <div className="max-w-xs">
-              <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
-                Auto-Spec Threshold
-              </label>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={settings.pmAgent.autoSpecThreshold}
-                  onChange={(e) => setSettings({
-                    ...settings,
-                    pmAgent: { ...settings.pmAgent, autoSpecThreshold: parseInt(e.target.value) || 3 }
-                  })}
-                  className="w-20"
-                />
-                <span className="text-sm text-[color:var(--text-secondary)]">upvotes</span>
-              </div>
-              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                Number of upvotes an issue needs before a spec is automatically generated
-              </p>
-            </div>
-          </div>
-      </FloatingCard>
+      <KnowledgeSourcesDialog
+        open={showSourcesDialog}
+        onClose={() => setShowSourcesDialog(false)}
+        projectId={projectId}
+        onSaved={handleSourcesSaved}
+      />
 
       {showTestAgent && (
         <TestAgentDialog
           project={project}
+          packageId={settings.supportAgent.packageId ?? undefined}
           onClose={() => setShowTestAgent(false)}
         />
       )}

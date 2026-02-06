@@ -1,7 +1,7 @@
 import { forwardRef, ButtonHTMLAttributes, ReactNode } from 'react'
 import { cn } from '@/lib/utils/class'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,6 +21,8 @@ const variantClasses: Record<ButtonVariant, string> = {
     'border-1 border-(--border-subtle) bg-(--surface) text-(--foreground) hover:border-(--border) hover:bg-(--surface-hover) dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-100 dark:hover:border-zinc-600 dark:hover:bg-zinc-700/70',
   danger:
     'border-1 border-(--accent-danger) bg-transparent text-(--accent-danger) hover:bg-(--accent-danger) hover:text-white dark:border-red-500 dark:text-red-400 dark:hover:bg-red-500 dark:hover:text-white',
+  link:
+    'border-0 bg-transparent text-(--accent-selected) hover:underline p-0 dark:text-blue-400',
 }
 
 const selectedClasses: Record<ButtonVariant, string> = {
@@ -32,12 +34,19 @@ const selectedClasses: Record<ButtonVariant, string> = {
     '!bg-(--accent-selected) !border-(--accent-selected) !text-white hover:shadow-[0_0_0_4px_rgba(37,99,235,0.35)] dark:hover:shadow-[0_0_0_4px_rgba(59,130,246,0.35)]',
   danger:
     '!bg-(--accent-danger) !border-(--accent-danger) !text-white hover:shadow-[0_0_0_4px_rgba(239,68,68,0.4)] dark:hover:shadow-[0_0_0_4px_rgba(255,85,85,0.4)]',
+  link: '',
 }
 
-const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1 text-xs',
-  md: 'px-4 py-2.5 text-sm',
-  lg: 'px-6 py-3 text-sm',
+const textSizeClasses: Record<ButtonSize, string> = {
+  sm: 'text-xs',
+  md: 'text-sm',
+  lg: 'text-sm',
+}
+
+const paddingClasses: Record<ButtonSize, string> = {
+  sm: 'px-3 py-1',
+  md: 'px-4 py-2.5',
+  lg: 'px-6 py-3',
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -52,7 +61,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(
           'inline-flex items-center justify-center gap-2 rounded-[4px] font-mono font-semibold uppercase tracking-wide cursor-pointer transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50',
           variantClasses[variant],
-          sizeClasses[size],
+          textSizeClasses[size],
+          variant !== 'link' && paddingClasses[size],
           selected && selectedClasses[variant],
           className
         )}

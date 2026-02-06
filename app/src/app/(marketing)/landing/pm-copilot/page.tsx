@@ -9,9 +9,9 @@ import {
 import { UTMCapture, MistOverlay } from '@/components/landing'
 
 export const metadata: Metadata = {
-  title: 'Hissuno - AI PM Co-Pilot',
+  title: 'Hissuno - AI Product Intelligence Agent',
   description:
-    'An AI agent that watches customer conversations, triages feedback, and writes specs — so you can focus on what to build next.',
+    'AI Product Intelligence Agent that connects customer signals to business outcomes. Auto-triage by revenue impact, evidence-backed specs, and roadmap blind spot detection.',
 }
 
 interface PMCopilotPageProps {

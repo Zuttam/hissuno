@@ -10,9 +10,9 @@ import {
 import { UTMCapture, MistOverlay } from '@/components/landing'
 
 export const metadata: Metadata = {
-  title: 'Hissuno - AI Support Agent for Your Product',
+  title: 'Hissuno - AI Support Agent That Drives Retention',
   description:
-    'AI support that reduces noise, gives instant answers, and works across every channel. Answers backed by your codebase — no hallucinations.',
+    'AI support grounded in your codebase that cuts resolution time, reduces support costs, and turns every interaction into a retention opportunity.',
 }
 
 interface SupportAgentPageProps {

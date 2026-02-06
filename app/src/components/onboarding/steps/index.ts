@@ -9,6 +9,7 @@ export type {
   ProfileFormData,
   BillingFormData,
   UseCaseFormData,
+  ProjectFormData,
   CompanySize,
   UseCaseOption,
   UseCaseOptionInfo,
@@ -19,6 +20,7 @@ export {
   DEFAULT_PROFILE_DATA,
   DEFAULT_BILLING_DATA,
   DEFAULT_USE_CASE_DATA,
+  DEFAULT_PROJECT_DATA,
   USE_CASE_OPTIONS,
 } from './types'
 
@@ -37,3 +39,4 @@ export {
 export { ProfileStep } from './profile-step'
 export { UseCaseStep } from './use-case-step'
 export { BillingStep } from './billing-step'
+export { ProjectStep } from './project-step'

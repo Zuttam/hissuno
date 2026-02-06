@@ -10,6 +10,7 @@ import {
   getSlackChannelWithMode,
   getThreadSession,
   updateThreadSessionResponder,
+  getNotificationThreadSession,
   type SlackChannelWithMode,
 } from './index'
 import { SlackClient } from './client'
@@ -18,8 +19,10 @@ import {
   processSlackMessage,
   processPassiveThreadCapture,
   processSlackThreadResponse,
+  handleHumanAgentReply,
 } from './message-processor'
 import { decideIfShouldRespond } from './response-decision'
+import { setSessionHumanTakeover } from '@/lib/supabase/sessions'
 
 export type SlackEventPayload = {
   teamId: string
@@ -230,12 +233,33 @@ async function handleMessage(params: {
 }): Promise<void> {
   const { event, projectId, botUserId, slackClient, supabase, teamId } = params
 
-  // Only monitor threaded messages for now
-  if (!event.thread_ts) {
+  if (!event.channel || !event.ts) {
     return
   }
 
-  if (!event.channel || !event.ts) {
+  // Check if this is a DM reply to a notification thread
+  if (event.channel_type === 'im') {
+    const dmSession = await getNotificationThreadSession(
+      supabase,
+      event.channel,
+      event.thread_ts
+    )
+
+    if (dmSession) {
+      await handleHumanAgentReply({
+        sessionId: dmSession.sessionId,
+        projectId: dmSession.projectId,
+        text: event.text || '',
+        slackClient,
+        channelId: event.channel,
+        threadTs: event.thread_ts || event.ts,
+      })
+      return
+    }
+  }
+
+  // Only monitor threaded messages for now (non-DM case)
+  if (!event.thread_ts) {
     return
   }
 
@@ -269,6 +293,7 @@ async function handleMessage(params: {
       text: event.text || '',
       botUserId,
       lastResponderType: threadSession.lastResponderType,
+      sessionId: threadSession.sessionId,
     })
 
     console.log(`[slack.event-handlers] Response decision for thread:`, {
@@ -299,6 +324,11 @@ async function handleMessage(params: {
     } else {
       // User responded, update tracking
       await updateThreadSessionResponder(supabase, threadSession.id, 'user')
+
+      // Bridge human takeover phrase to session-level flag
+      if (decision.reason === 'Human takeover phrase detected' && threadSession.sessionId) {
+        void setSessionHumanTakeover(threadSession.sessionId, true)
+      }
     }
     return
   }

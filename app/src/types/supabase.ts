@@ -178,6 +178,193 @@ export type Database = {
           },
         ]
       }
+      intercom_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          filter_config: Json | null
+          id: string
+          last_sync_at: string | null
+          last_sync_conversations_count: number | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          next_sync_at: string | null
+          project_id: string
+          sync_enabled: boolean
+          sync_frequency: string
+          updated_at: string
+          workspace_id: string
+          workspace_name: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          filter_config?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_conversations_count?: number | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          next_sync_at?: string | null
+          project_id: string
+          sync_enabled?: boolean
+          sync_frequency?: string
+          updated_at?: string
+          workspace_id: string
+          workspace_name?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          filter_config?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_conversations_count?: number | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          next_sync_at?: string | null
+          project_id?: string
+          sync_enabled?: boolean
+          sync_frequency?: string
+          updated_at?: string
+          workspace_id?: string
+          workspace_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intercom_connections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intercom_sync_runs: {
+        Row: {
+          completed_at: string | null
+          connection_id: string
+          conversations_found: number | null
+          conversations_skipped: number | null
+          conversations_synced: number | null
+          error_message: string | null
+          id: string
+          started_at: string
+          status: string
+          triggered_by: string
+        }
+        Insert: {
+          completed_at?: string | null
+          connection_id: string
+          conversations_found?: number | null
+          conversations_skipped?: number | null
+          conversations_synced?: number | null
+          error_message?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          triggered_by: string
+        }
+        Update: {
+          completed_at?: string | null
+          connection_id?: string
+          conversations_found?: number | null
+          conversations_skipped?: number | null
+          conversations_synced?: number | null
+          error_message?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intercom_sync_runs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "intercom_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      intercom_synced_conversations: {
+        Row: {
+          connection_id: string
+          conversation_created_at: string | null
+          conversation_updated_at: string | null
+          id: string
+          intercom_conversation_id: string
+          parts_count: number | null
+          session_id: string
+          synced_at: string
+        }
+        Insert: {
+          connection_id: string
+          conversation_created_at?: string | null
+          conversation_updated_at?: string | null
+          id?: string
+          intercom_conversation_id: string
+          parts_count?: number | null
+          session_id: string
+          synced_at?: string
+        }
+        Update: {
+          connection_id?: string
+          conversation_created_at?: string | null
+          conversation_updated_at?: string | null
+          id?: string
+          intercom_conversation_id?: string
+          parts_count?: number | null
+          session_id?: string
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "intercom_synced_conversations_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "intercom_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "intercom_synced_conversations_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invites: {
+        Row: {
+          claimed_at: string | null
+          claimed_by_user_id: string | null
+          code: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          owner_user_id: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          code: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          owner_user_id: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by_user_id?: string | null
+          code?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          owner_user_id?: string
+        }
+        Relationships: []
+      }
       issue_embeddings: {
         Row: {
           created_at: string
@@ -387,6 +574,143 @@ export type Database = {
           },
         ]
       }
+      jira_connections: {
+        Row: {
+          access_token: string
+          cloud_id: string
+          created_at: string
+          id: string
+          installed_by_email: string | null
+          installed_by_user_id: string | null
+          is_enabled: boolean
+          issue_type_id: string | null
+          issue_type_name: string | null
+          jira_project_id: string | null
+          jira_project_key: string | null
+          project_id: string
+          refresh_token: string
+          site_url: string
+          token_expires_at: string
+          updated_at: string
+          webhook_id: string | null
+          webhook_secret: string | null
+        }
+        Insert: {
+          access_token: string
+          cloud_id: string
+          created_at?: string
+          id?: string
+          installed_by_email?: string | null
+          installed_by_user_id?: string | null
+          is_enabled?: boolean
+          issue_type_id?: string | null
+          issue_type_name?: string | null
+          jira_project_id?: string | null
+          jira_project_key?: string | null
+          project_id: string
+          refresh_token: string
+          site_url: string
+          token_expires_at: string
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_secret?: string | null
+        }
+        Update: {
+          access_token?: string
+          cloud_id?: string
+          created_at?: string
+          id?: string
+          installed_by_email?: string | null
+          installed_by_user_id?: string | null
+          is_enabled?: boolean
+          issue_type_id?: string | null
+          issue_type_name?: string | null
+          jira_project_id?: string | null
+          jira_project_key?: string | null
+          project_id?: string
+          refresh_token?: string
+          site_url?: string
+          token_expires_at?: string
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_secret?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jira_connections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jira_issue_syncs: {
+        Row: {
+          connection_id: string
+          created_at: string
+          id: string
+          issue_id: string
+          jira_issue_id: string | null
+          jira_issue_key: string | null
+          jira_issue_url: string | null
+          last_jira_status: string | null
+          last_sync_action: string | null
+          last_sync_error: string | null
+          last_sync_status: string
+          last_synced_at: string | null
+          last_webhook_received_at: string | null
+          retry_count: number
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          id?: string
+          issue_id: string
+          jira_issue_id?: string | null
+          jira_issue_key?: string | null
+          jira_issue_url?: string | null
+          last_jira_status?: string | null
+          last_sync_action?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string
+          last_synced_at?: string | null
+          last_webhook_received_at?: string | null
+          retry_count?: number
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          id?: string
+          issue_id?: string
+          jira_issue_id?: string | null
+          jira_issue_key?: string | null
+          jira_issue_url?: string | null
+          last_jira_status?: string | null
+          last_sync_action?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string
+          last_synced_at?: string | null
+          last_webhook_received_at?: string | null
+          retry_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jira_issue_syncs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "jira_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jira_issue_syncs_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: true
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_embeddings: {
         Row: {
           category: string
@@ -397,6 +721,7 @@ export type Database = {
           created_at: string
           embedding: string
           id: string
+          named_package_id: string | null
           package_id: string
           parent_headings: string[] | null
           project_id: string
@@ -413,6 +738,7 @@ export type Database = {
           created_at?: string
           embedding: string
           id?: string
+          named_package_id?: string | null
           package_id: string
           parent_headings?: string[] | null
           project_id: string
@@ -429,6 +755,7 @@ export type Database = {
           created_at?: string
           embedding?: string
           id?: string
+          named_package_id?: string | null
           package_id?: string
           parent_headings?: string[] | null
           project_id?: string
@@ -437,6 +764,13 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "knowledge_embeddings_named_package_id_fkey"
+            columns: ["named_package_id"]
+            isOneToOne: false
+            referencedRelation: "named_knowledge_packages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "knowledge_embeddings_package_id_fkey"
             columns: ["package_id"]
@@ -459,6 +793,7 @@ export type Database = {
           created_at: string
           generated_at: string
           id: string
+          named_package_id: string | null
           project_id: string
           storage_path: string
           updated_at: string
@@ -469,6 +804,7 @@ export type Database = {
           created_at?: string
           generated_at?: string
           id?: string
+          named_package_id?: string | null
           project_id: string
           storage_path: string
           updated_at?: string
@@ -479,12 +815,20 @@ export type Database = {
           created_at?: string
           generated_at?: string
           id?: string
+          named_package_id?: string | null
           project_id?: string
           storage_path?: string
           updated_at?: string
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "knowledge_packages_named_package_id_fkey"
+            columns: ["named_package_id"]
+            isOneToOne: false
+            referencedRelation: "named_knowledge_packages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "knowledge_packages_project_id_fkey"
             columns: ["project_id"]
@@ -560,6 +904,80 @@ export type Database = {
           },
         ]
       }
+      named_knowledge_packages: {
+        Row: {
+          created_at: string
+          description: string | null
+          guidelines: string | null
+          id: string
+          name: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          guidelines?: string | null
+          id?: string
+          name: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          guidelines?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "named_knowledge_packages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      named_package_sources: {
+        Row: {
+          created_at: string
+          id: string
+          package_id: string
+          source_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          package_id: string
+          source_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          package_id?: string
+          source_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "named_package_sources_package_id_fkey"
+            columns: ["package_id"]
+            isOneToOne: false
+            referencedRelation: "named_knowledge_packages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "named_package_sources_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_analyses: {
         Row: {
           completed_at: string | null
@@ -616,6 +1034,7 @@ export type Database = {
           session_idle_response_timeout_seconds: number | null
           session_idle_timeout_minutes: number | null
           spec_guidelines: string | null
+          support_agent_package_id: string | null
           updated_at: string
           widget_display_type: string | null
           widget_drawer_badge_label: string | null
@@ -639,6 +1058,7 @@ export type Database = {
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
           spec_guidelines?: string | null
+          support_agent_package_id?: string | null
           updated_at?: string
           widget_display_type?: string | null
           widget_drawer_badge_label?: string | null
@@ -662,6 +1082,7 @@ export type Database = {
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
           spec_guidelines?: string | null
+          support_agent_package_id?: string | null
           updated_at?: string
           widget_display_type?: string | null
           widget_drawer_badge_label?: string | null
@@ -680,6 +1101,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: true
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_settings_support_agent_package_id_fkey"
+            columns: ["support_agent_package_id"]
+            isOneToOne: false
+            referencedRelation: "named_knowledge_packages"
             referencedColumns: ["id"]
           },
         ]
@@ -713,6 +1141,53 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      promotions: {
+        Row: {
+          claimed_at: string | null
+          created_at: string
+          eligible_at: string | null
+          expires_at: string | null
+          id: string
+          invite_id: string
+          status: string
+          type: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          claimed_at?: string | null
+          created_at?: string
+          eligible_at?: string | null
+          expires_at?: string | null
+          id?: string
+          invite_id: string
+          status?: string
+          type: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          claimed_at?: string | null
+          created_at?: string
+          eligible_at?: string | null
+          expires_at?: string | null
+          id?: string
+          invite_id?: string
+          status?: string
+          type?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotions_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       session_messages: {
         Row: {
@@ -821,9 +1296,14 @@ export type Database = {
           created_at: string
           first_message_at: string | null
           goodbye_detected_at: string | null
+          human_takeover_at: string | null
+          human_takeover_slack_channel_id: string | null
+          human_takeover_slack_thread_ts: string | null
+          human_takeover_user_id: string | null
           id: string
           idle_prompt_sent_at: string | null
           is_archived: boolean
+          is_human_takeover: boolean
           last_activity_at: string | null
           message_count: number | null
           name: string | null
@@ -844,9 +1324,14 @@ export type Database = {
           created_at?: string
           first_message_at?: string | null
           goodbye_detected_at?: string | null
+          human_takeover_at?: string | null
+          human_takeover_slack_channel_id?: string | null
+          human_takeover_slack_thread_ts?: string | null
+          human_takeover_user_id?: string | null
           id: string
           idle_prompt_sent_at?: string | null
           is_archived?: boolean
+          is_human_takeover?: boolean
           last_activity_at?: string | null
           message_count?: number | null
           name?: string | null
@@ -867,9 +1352,14 @@ export type Database = {
           created_at?: string
           first_message_at?: string | null
           goodbye_detected_at?: string | null
+          human_takeover_at?: string | null
+          human_takeover_slack_channel_id?: string | null
+          human_takeover_slack_thread_ts?: string | null
+          human_takeover_user_id?: string | null
           id?: string
           idle_prompt_sent_at?: string | null
           is_archived?: boolean
+          is_human_takeover?: boolean
           last_activity_at?: string | null
           message_count?: number | null
           name?: string | null
@@ -1172,10 +1662,15 @@ export type Database = {
           full_name: string | null
           id: string
           is_activated: boolean
+          notification_preferences: Json | null
+          notifications_silenced: boolean
           onboarding_completed: boolean
           onboarding_completed_at: string | null
+          onboarding_current_step: string | null
           role: string | null
           selected_use_cases: string[] | null
+          slack_notification_channel: string | null
+          slack_user_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1186,10 +1681,15 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_activated?: boolean
+          notification_preferences?: Json | null
+          notifications_silenced?: boolean
           onboarding_completed?: boolean
           onboarding_completed_at?: string | null
+          onboarding_current_step?: string | null
           role?: string | null
           selected_use_cases?: string[] | null
+          slack_notification_channel?: string | null
+          slack_user_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1200,10 +1700,15 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_activated?: boolean
+          notification_preferences?: Json | null
+          notifications_silenced?: boolean
           onboarding_completed?: boolean
           onboarding_completed_at?: string | null
+          onboarding_current_step?: string | null
           role?: string | null
           selected_use_cases?: string[] | null
+          slack_notification_channel?: string | null
+          slack_user_id?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1215,18 +1720,21 @@ export type Database = {
           email: string
           id: string
           ip_address: string | null
+          source: string | null
         }
         Insert: {
           created_at?: string | null
           email: string
           id?: string
           ip_address?: string | null
+          source?: string | null
         }
         Update: {
           created_at?: string | null
           email?: string
           id?: string
           ip_address?: string | null
+          source?: string | null
         }
         Relationships: []
       }
@@ -1247,6 +1755,7 @@ export type Database = {
         Args: {
           p_categories?: string[]
           p_limit?: number
+          p_named_package_id?: string
           p_project_id: string
           p_query_embedding: string
           p_similarity_threshold?: number

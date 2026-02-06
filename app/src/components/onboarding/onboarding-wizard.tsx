@@ -10,6 +10,7 @@ import {
 import {
   DEFAULT_ONBOARDING_DATA,
   type OnboardingFormData,
+  type OnboardingStepId,
   type StepDefinition,
   type OnboardingWizardContext,
   type CompanySize,
@@ -95,6 +96,24 @@ export function OnboardingWizard() {
               selectedUseCases: mergedUseCases,
             },
           }))
+
+          // Restore saved step (only if not returning from checkout)
+          const savedStepId = data.profile.onboarding_current_step as OnboardingStepId | null
+          const isCheckoutReturn = searchParams.get('checkout') === 'success'
+          if (savedStepId && !isCheckoutReturn) {
+            const stepsForFlow = getStepsForFlow()
+            const savedIndex = stepsForFlow.findIndex((s) => s.id === savedStepId)
+            if (savedIndex >= 0) {
+              setCurrentStepIndex(savedIndex)
+            }
+          } else if (isCheckoutReturn) {
+            // Go to billing step on checkout return
+            const stepsForFlow = getStepsForFlow()
+            const billingIndex = stepsForFlow.findIndex((s) => s.id === 'billing')
+            if (billingIndex >= 0) {
+              setCurrentStepIndex(billingIndex)
+            }
+          }
         } else if (preselectedUseCase) {
           // No existing profile, but we have a pre-selected use case
           setFormData((prev) => ({
@@ -124,7 +143,7 @@ export function OnboardingWizard() {
   )
 
   // Save profile data (called on navigation)
-  const saveProfile = useCallback(async () => {
+  const saveProfile = useCallback(async (nextStepId?: string) => {
     try {
       await fetch('/api/user/profile', {
         method: 'POST',
@@ -135,13 +154,14 @@ export function OnboardingWizard() {
           role: formData.profile.role,
           companySize: formData.profile.companySize || null,
           selectedUseCases: formData.useCase?.selectedUseCases ?? [],
+          onboardingCurrentStep: nextStepId ?? steps[currentStepIndex]?.id ?? null,
           // Don't mark as completed - that happens on final submit
         }),
       })
     } catch (err) {
       console.error('[onboarding] Failed to save profile:', err)
     }
-  }, [formData.profile, formData.useCase?.selectedUseCases])
+  }, [formData.profile, formData.useCase?.selectedUseCases, steps, currentStepIndex])
 
   // Navigation handlers
   const handleNext = useCallback(async () => {
@@ -155,11 +175,12 @@ export function OnboardingWizard() {
 
     setError(null)
 
-    // Save profile data on each step transition
-    void saveProfile()
-
     if (currentStepIndex < steps.length - 1) {
-      setCurrentStepIndex(currentStepIndex + 1)
+      const nextIndex = currentStepIndex + 1
+      const nextStepId = steps[nextIndex]?.id
+      // Save profile data on each step transition, persisting the next step
+      void saveProfile(nextStepId)
+      setCurrentStepIndex(nextIndex)
     }
   }, [currentStepIndex, steps, formData, saveProfile])
 
@@ -195,7 +216,7 @@ export function OnboardingWizard() {
     setError(null)
 
     try {
-      // 1. Save profile with use cases
+      // 1. Save profile with use cases, clear current step
       const profileResponse = await fetch('/api/user/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -206,6 +227,7 @@ export function OnboardingWizard() {
           companySize: formData.profile.companySize || null,
           selectedUseCases: formData.useCase?.selectedUseCases ?? [],
           onboardingCompleted: true,
+          onboardingCurrentStep: null,
         }),
       })
 
@@ -224,9 +246,37 @@ export function OnboardingWizard() {
       clearStoredUTM()
       clearPreselectedUseCase()
 
-      // 4. Redirect to project
+      // 4. Create project if name was provided
+      const projectName = formData.project?.name?.trim()
+      if (projectName) {
+        setPhase('project')
+        try {
+          const projectFormData = new FormData()
+          projectFormData.append('name', projectName)
+          if (formData.project.description?.trim()) {
+            projectFormData.append('description', formData.project.description.trim())
+          }
+
+          const projectResponse = await fetch('/api/projects', {
+            method: 'POST',
+            body: projectFormData,
+          })
+
+          if (projectResponse.ok) {
+            const projectData = await projectResponse.json()
+            setPhase('redirecting')
+            router.push(`/projects/${projectData.project.id}/dashboard`)
+            return
+          }
+        } catch (err) {
+          console.error('[onboarding] Failed to create project:', err)
+          // Fall through to /projects/new
+        }
+      }
+
+      // 5. Redirect to project creation if no project was created
       setPhase('redirecting')
-      router.push(`/projects/new`)
+      router.push('/projects/new')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to complete onboarding'
       setError(message)
@@ -295,6 +345,7 @@ export function OnboardingWizard() {
               context={context}
               title={step.title}
               description={step.description}
+              {...(step.id === 'billing' ? { onCheckoutComplete: handleNext } : {})}
             />
           </WizardStep>
         ))}

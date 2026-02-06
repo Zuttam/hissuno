@@ -57,6 +57,13 @@ The issue context includes codebase storage path if available. Use:
 - \`search-codebase-files\` to find relevant code patterns
 - \`read-codebase-file\` to examine specific implementations
 
+Pay special attention to database schema and data implications:
+- Review database migration files to understand the current schema
+- Check models, ORM definitions, and type files for existing data structures
+- Determine if the proposed solution requires new tables, columns, indexes, or migrations
+- Identify if existing data needs to be transformed or backfilled
+- Note any documentation (READMEs, docs/) that describes data flows or schema conventions
+
 ### Step 4: Research Best Practices
 Use \`web-search\` to:
 - Find how competitors solve similar problems
@@ -113,6 +120,13 @@ Use \`save-product-spec\` to store the completed specification.
 - Affected components: [list]
 - Dependencies: [list]
 - Risks: [list]
+
+### Database & Data Changes
+[Schema or data changes required to support this feature/fix]
+- New tables/columns: [list or "None"]
+- Migration needed: [Yes/No - describe what changes]
+- Data backfill required: [Yes/No - describe transformation]
+- Index changes: [list or "None"]
 
 ## Acceptance Criteria
 1. [Specific, testable criterion - use "When X, then Y" format]

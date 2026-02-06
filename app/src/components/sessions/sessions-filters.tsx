@@ -89,6 +89,11 @@ export function SessionsFilters({
     onFilterChange({ ...filters, showArchived: !filters.showArchived || undefined })
   }, [filters, onFilterChange])
 
+  // Human takeover handler
+  const handleHumanTakeoverToggle = useCallback(() => {
+    onFilterChange({ ...filters, isHumanTakeover: !filters.isHumanTakeover || undefined })
+  }, [filters, onFilterChange])
+
   // Project handler
   const handleProjectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -149,6 +154,7 @@ export function SessionsFilters({
     if (filters.dateFrom) count++
     if (filters.dateTo) count++
     if (filters.showArchived) count++
+    if (filters.isHumanTakeover) count++
     if (filters.tags && filters.tags.length > 0) count++
     return count
   }, [filters])
@@ -168,6 +174,7 @@ export function SessionsFilters({
       <FilterLabel>Status:</FilterLabel>
       <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
       <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
+      <FilterChip label="Needs Human" active={filters.isHumanTakeover ?? false} onClick={handleHumanTakeoverToggle} />
       <span className="ml-2" />
       <FilterLabel>Type:</FilterLabel>
       {SESSION_TAGS.map((tag) => (
@@ -189,6 +196,7 @@ export function SessionsFilters({
         <FilterLabel>Status:</FilterLabel>
         <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
         <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
+        <FilterChip label="Needs Human" active={filters.isHumanTakeover ?? false} onClick={handleHumanTakeoverToggle} />
         <span className="ml-2" />
         <FilterLabel>Type:</FilterLabel>
         {SESSION_TAGS.map((tag) => (

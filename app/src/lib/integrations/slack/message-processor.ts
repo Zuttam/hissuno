@@ -7,6 +7,7 @@ import type { CoreMessage } from 'ai'
 import { RuntimeContext } from '@mastra/core/runtime-context'
 import { createAdminClient } from '@/lib/supabase/server'
 import { upsertSession, updateSessionActivity } from '@/lib/supabase/sessions'
+import { saveSessionMessage } from '@/lib/supabase/session-messages'
 import { triggerChatRun, updateChatRunStatus, type ChatMessage } from '@/lib/agent/chat-run-service'
 import { mastra } from '@/mastra'
 import type { SupportAgentContext } from '@/types/agent'
@@ -664,4 +665,55 @@ export async function processSlackThreadResponse(
       threadTs,
     })
   }
+}
+
+type HandleHumanAgentReplyParams = {
+  sessionId: string
+  projectId: string
+  text: string
+  slackClient: SlackClient
+  channelId: string
+  threadTs: string
+}
+
+/**
+ * Process a human agent's Slack DM reply and save to session.
+ * The message will be saved as a human_agent message and delivered to the customer widget.
+ */
+export async function handleHumanAgentReply(
+  params: HandleHumanAgentReplyParams
+): Promise<void> {
+  const { sessionId, projectId, text, slackClient, channelId, threadTs } = params
+
+  console.log(`${LOG_PREFIX} Processing human agent reply`, { sessionId, projectId })
+
+  // Save to session_messages as human_agent
+  const savedMessage = await saveSessionMessage({
+    sessionId,
+    projectId,
+    senderType: 'human_agent',
+    content: text,
+  })
+
+  if (!savedMessage) {
+    console.error(`${LOG_PREFIX} Failed to save human agent message`)
+    await slackClient.postMessage({
+      channel: channelId,
+      threadTs,
+      text: 'Failed to send message to customer. Please try again.',
+    })
+    return
+  }
+
+  // Update session activity
+  await updateSessionActivity(sessionId)
+
+  // Confirm in Slack thread
+  await slackClient.postMessage({
+    channel: channelId,
+    threadTs,
+    text: '\u2713 Message sent to customer',
+  })
+
+  console.log(`${LOG_PREFIX} Human agent reply saved and confirmed`, { sessionId })
 }

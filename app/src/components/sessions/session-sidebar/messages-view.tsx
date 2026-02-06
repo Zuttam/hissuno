@@ -63,6 +63,13 @@ export function MessagesView({ session, messages, onMessageSent }: MessagesViewP
 
   return (
     <>
+      {/* Human Takeover Banner */}
+      {session.is_human_takeover && isSessionActive && (
+        <div className="border-b border-[color:var(--border-subtle)] bg-[color:var(--accent-warning)]/10 px-4 py-2 text-center text-sm font-medium text-[color:var(--accent-warning)]">
+          AI is paused &mdash; Human takeover is active
+        </div>
+      )}
+
       {/* Chat Content */}
       <div className="flex-1 overflow-hidden">
         <SessionChat messages={messages} />

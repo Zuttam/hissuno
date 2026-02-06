@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect, type ChangeEvent } from 'react'
+import { useState, useCallback, useEffect, useRef, type ChangeEvent } from 'react'
+import Image from 'next/image'
 import { EditDialog } from './edit-dialog'
 import { FormField, Input, Select, Button, Textarea, Alert } from '@/components/ui'
 import type { KnowledgeSourceType } from '@/lib/knowledge/types'
@@ -37,11 +38,18 @@ interface KnowledgeSourcesDialogProps {
   onSaved?: () => void
 }
 
-const SOURCE_TYPE_CONFIG: Record<Exclude<KnowledgeSourceType, 'codebase'>, { icon: string; name: string; placeholder: string }> = {
-  website: { icon: '🌐', name: 'Website', placeholder: 'https://example.com' },
-  docs_portal: { icon: '📚', name: 'Documentation', placeholder: 'https://docs.example.com' },
-  uploaded_doc: { icon: '📄', name: 'Documents', placeholder: '' },
-  raw_text: { icon: '📝', name: 'Custom Text', placeholder: 'Enter custom content...' },
+type AddableSourceType = KnowledgeSourceType
+
+const SOURCE_TYPE_CONFIG: Record<AddableSourceType, { icon: React.ReactNode; name: string; placeholder: string }> = {
+  codebase: {
+    icon: <Image src="/logos/github.svg" alt="GitHub" width={16} height={16} />,
+    name: 'Codebase',
+    placeholder: '',
+  },
+  website: { icon: <span>🌐</span>, name: 'Website', placeholder: 'https://example.com' },
+  docs_portal: { icon: <span>📚</span>, name: 'Documentation', placeholder: 'https://docs.example.com' },
+  uploaded_doc: { icon: <span>📄</span>, name: 'Documents', placeholder: '' },
+  raw_text: { icon: <span>📝</span>, name: 'Custom Text', placeholder: 'Enter custom content...' },
 }
 
 export function KnowledgeSourcesDialog({
@@ -62,15 +70,23 @@ export function KnowledgeSourcesDialog({
   const [isLoadingRepos, setIsLoadingRepos] = useState(false)
   const [isLoadingBranches, setIsLoadingBranches] = useState(false)
 
-  // Codebase config
+  // Codebase config (shared for add + edit codebase)
   const [selectedRepo, setSelectedRepo] = useState<string>('')
   const [selectedBranch, setSelectedBranch] = useState<string>('')
   const [analysisScope, setAnalysisScope] = useState<string>('')
 
-  // New source input
-  const [addingType, setAddingType] = useState<Exclude<KnowledgeSourceType, 'codebase'> | null>(null)
+  // New source input (add mode)
+  const [addingType, setAddingType] = useState<AddableSourceType | null>(null)
   const [newSourceInput, setNewSourceInput] = useState('')
   const [newSourceFile, setNewSourceFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Edit mode for existing sources
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null)
+  const [editUrl, setEditUrl] = useState('')
+  const [editContent, setEditContent] = useState('')
+
+  const hasCodebaseSource = sources.some(s => s.type === 'codebase')
 
   // Fetch knowledge sources and GitHub status
   useEffect(() => {
@@ -88,18 +104,6 @@ export function KnowledgeSourcesDialog({
         if (sourcesRes.ok) {
           const data = await sourcesRes.json()
           setSources(data.sources || [])
-
-          // Set codebase config from existing source
-          const codebaseSource = data.sources?.find((s: KnowledgeSource) => s.type === 'codebase')
-          if (codebaseSource?.source_code) {
-            const url = codebaseSource.source_code.repository_url
-            const match = url.match(/github\.com\/([^/]+\/[^/]+)/)
-            if (match) {
-              setSelectedRepo(match[1])
-            }
-            setSelectedBranch(codebaseSource.source_code.repository_branch || '')
-            setAnalysisScope(codebaseSource.analysis_scope || '')
-          }
         }
 
         if (githubRes.ok) {
@@ -118,6 +122,14 @@ export function KnowledgeSourcesDialog({
 
     void fetchData()
   }, [open, projectId])
+
+  // Reset editing state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setEditingSourceId(null)
+      setAddingType(null)
+    }
+  }, [open])
 
   // Fetch repos when GitHub is connected
   useEffect(() => {
@@ -177,6 +189,8 @@ export function KnowledgeSourcesDialog({
     setSelectedBranch(e.target.value)
   }, [])
 
+  // --- Add source ---
+
   const handleAddSource = useCallback(async () => {
     if (!addingType) return
 
@@ -184,6 +198,31 @@ export function KnowledgeSourcesDialog({
     setError(null)
 
     try {
+      if (addingType === 'codebase') {
+        if (!selectedRepo || !selectedBranch) return
+
+        const res = await fetch(`/api/projects/${projectId}/settings/knowledge-sources`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'codebase',
+            repositoryUrl: `https://github.com/${selectedRepo}`,
+            repositoryBranch: selectedBranch,
+            analysis_scope: analysisScope || null,
+          }),
+        })
+
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Failed to add codebase')
+        }
+
+        const data = await res.json()
+        setSources(prev => [...prev.filter(s => s.type !== 'codebase'), data.source])
+        cancelAdding()
+        return
+      }
+
       let body: FormData | string
       const headers: Record<string, string> = {}
 
@@ -214,61 +253,62 @@ export function KnowledgeSourcesDialog({
 
       const data = await res.json()
       setSources(prev => [...prev, data.source])
-      setAddingType(null)
-      setNewSourceInput('')
-      setNewSourceFile(null)
+      cancelAdding()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add source')
     } finally {
       setIsSaving(false)
     }
-  }, [addingType, newSourceInput, newSourceFile, projectId])
+  }, [addingType, newSourceInput, newSourceFile, projectId, selectedRepo, selectedBranch, analysisScope])
 
-  const handleRemoveSource = useCallback(async (sourceId: string) => {
-    if (!confirm('Are you sure you want to remove this source?')) return
+  // --- Edit source ---
 
-    setIsSaving(true)
-    setError(null)
+  const openEditSource = useCallback((source: KnowledgeSource) => {
+    // Close add mode if open
+    setAddingType(null)
+    setNewSourceInput('')
+    setNewSourceFile(null)
 
-    try {
-      const res = await fetch(`/api/projects/${projectId}/settings/knowledge-sources?sourceId=${sourceId}`, {
-        method: 'DELETE',
-      })
+    setEditingSourceId(source.id)
 
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to remove source')
-      }
-
-      setSources(prev => prev.filter(s => s.id !== sourceId))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove source')
-    } finally {
-      setIsSaving(false)
+    if (source.type === 'codebase' && source.source_code) {
+      const url = source.source_code.repository_url
+      const match = url.match(/github\.com\/([^/]+\/[^/]+)/)
+      setSelectedRepo(match ? match[1] : '')
+      setSelectedBranch(source.source_code.repository_branch || '')
+      setAnalysisScope(source.analysis_scope || '')
+    } else if (source.type === 'website' || source.type === 'docs_portal') {
+      setEditUrl(source.url || '')
+    } else if (source.type === 'raw_text') {
+      setEditContent(source.content || '')
     }
-  }, [projectId])
+  }, [])
 
-  const handleSave = async () => {
+  const cancelEditing = useCallback(() => {
+    setEditingSourceId(null)
+    setEditUrl('')
+    setEditContent('')
+    setSelectedRepo('')
+    setSelectedBranch('')
+    setAnalysisScope('')
+  }, [])
+
+  const handleSaveEdit = useCallback(async (source: KnowledgeSource) => {
     setIsSaving(true)
     setError(null)
 
     try {
-      // Save codebase if configured
-      if (selectedRepo && selectedBranch) {
-        const existingCodebase = sources.find(s => s.type === 'codebase')
+      if (source.type === 'codebase') {
+        if (!selectedRepo || !selectedBranch) return
 
-        // Check if codebase config changed
-        const currentRepoUrl = existingCodebase?.source_code?.repository_url
-        const currentBranch = existingCodebase?.source_code?.repository_branch
-        const currentScope = existingCodebase?.analysis_scope
-
+        const existingUrl = source.source_code?.repository_url
+        const existingBranch = source.source_code?.repository_branch
         const newRepoUrl = `https://github.com/${selectedRepo}`
-        const repoChanged = currentRepoUrl !== newRepoUrl
-        const branchChanged = currentBranch !== selectedBranch
-        const scopeChanged = currentScope !== (analysisScope || null)
+        const repoChanged = existingUrl !== newRepoUrl
+        const branchChanged = existingBranch !== selectedBranch
+        const scopeChanged = source.analysis_scope !== (analysisScope || null)
 
-        if (repoChanged || branchChanged || !existingCodebase) {
-          // Create or replace codebase
+        if (repoChanged || branchChanged) {
           const res = await fetch(`/api/projects/${projectId}/settings/knowledge-sources`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -284,9 +324,11 @@ export function KnowledgeSourcesDialog({
             const data = await res.json()
             throw new Error(data.error || 'Failed to save codebase')
           }
-        } else if (scopeChanged && existingCodebase) {
-          // Just update analysis_scope
-          const res = await fetch(`/api/projects/${projectId}/settings/knowledge-sources?sourceId=${existingCodebase.id}`, {
+
+          const data = await res.json()
+          setSources(prev => prev.map(s => s.id === source.id ? data.source : s.type === 'codebase' ? data.source : s))
+        } else if (scopeChanged) {
+          const res = await fetch(`/api/projects/${projectId}/settings/knowledge-sources?sourceId=${source.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ analysis_scope: analysisScope || null }),
@@ -296,24 +338,252 @@ export function KnowledgeSourcesDialog({
             const data = await res.json()
             throw new Error(data.error || 'Failed to update codebase')
           }
+
+          setSources(prev => prev.map(s => s.id === source.id ? { ...s, analysis_scope: analysisScope || null } : s))
+        }
+      } else if (source.type === 'website' || source.type === 'docs_portal') {
+        if (editUrl !== source.url) {
+          const res = await fetch(`/api/projects/${projectId}/settings/knowledge-sources?sourceId=${source.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: editUrl }),
+          })
+
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.error || 'Failed to update source')
+          }
+
+          setSources(prev => prev.map(s => s.id === source.id ? { ...s, url: editUrl } : s))
+        }
+      } else if (source.type === 'raw_text') {
+        if (editContent !== source.content) {
+          const res = await fetch(`/api/projects/${projectId}/settings/knowledge-sources?sourceId=${source.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: editContent }),
+          })
+
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.error || 'Failed to update source')
+          }
+
+          setSources(prev => prev.map(s => s.id === source.id ? { ...s, content: editContent } : s))
         }
       }
 
-      onSaved?.()
+      cancelEditing()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save')
+      setError(err instanceof Error ? err.message : 'Failed to save changes')
     } finally {
       setIsSaving(false)
     }
+  }, [projectId, selectedRepo, selectedBranch, analysisScope, editUrl, editContent, cancelEditing])
+
+  // --- Remove / Disconnect ---
+
+  const handleRemoveSource = useCallback(async (source: KnowledgeSource) => {
+    const label = source.type === 'codebase' ? 'disconnect this codebase' : 'remove this source'
+    if (!confirm(`Are you sure you want to ${label}?`)) return
+
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      const res = await fetch(`/api/projects/${projectId}/settings/knowledge-sources?sourceId=${source.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to remove source')
+      }
+
+      setSources(prev => prev.filter(s => s.id !== source.id))
+      if (editingSourceId === source.id) {
+        cancelEditing()
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove source')
+    } finally {
+      setIsSaving(false)
+    }
+  }, [projectId, editingSourceId, cancelEditing])
+
+  const handleSave = async () => {
+    onSaved?.()
   }
 
   const getSourceDisplay = (source: KnowledgeSource) => {
+    if (source.type === 'codebase' && source.source_code) {
+      const url = source.source_code.repository_url
+      const match = url.match(/github\.com\/([^/]+\/[^/]+)/)
+      const repoName = match ? match[1] : url
+      const branch = source.source_code.repository_branch || 'main'
+      return `${repoName} (${branch})`
+    }
     if (source.url) return source.url
     if (source.content) return source.content.slice(0, 60) + (source.content.length > 60 ? '...' : '')
+    if (source.type === 'uploaded_doc') return 'Uploaded document'
     return 'Unknown'
   }
 
-  const nonCodebaseSources = sources.filter(s => s.type !== 'codebase')
+  const getSourceIcon = (source: KnowledgeSource) => {
+    const config = SOURCE_TYPE_CONFIG[source.type]
+    return config?.icon ?? <span>📦</span>
+  }
+
+  const cancelAdding = () => {
+    setAddingType(null)
+    setNewSourceInput('')
+    setNewSourceFile(null)
+    setSelectedRepo('')
+    setSelectedBranch('')
+    setAnalysisScope('')
+  }
+
+  const startAdding = (type: AddableSourceType) => {
+    // Close edit mode if open
+    cancelEditing()
+    setAddingType(type)
+  }
+
+  const isAddDisabled = () => {
+    if (!addingType) return true
+    if (addingType === 'codebase') return !selectedRepo || !selectedBranch
+    if (addingType === 'uploaded_doc') return !newSourceFile
+    return !newSourceInput.trim()
+  }
+
+  const isEditSaveDisabled = (source: KnowledgeSource) => {
+    if (source.type === 'codebase') return !selectedRepo || !selectedBranch
+    if (source.type === 'website' || source.type === 'docs_portal') return !editUrl.trim()
+    if (source.type === 'raw_text') return !editContent.trim()
+    return false
+  }
+
+  // --- Render helpers ---
+
+  const renderEditForm = (source: KnowledgeSource) => {
+    const isCodebase = source.type === 'codebase'
+    const removeLabel = isCodebase ? 'Disconnect' : 'Remove'
+
+    return (
+      <div
+        key={source.id}
+        className="p-4 border border-[color:var(--border-subtle)] rounded-[4px] bg-[color:var(--surface)] space-y-3"
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium flex items-center gap-1.5">
+            {getSourceIcon(source)} {SOURCE_TYPE_CONFIG[source.type]?.name ?? source.type}
+          </span>
+          <Button variant="ghost" size="sm" onClick={cancelEditing}>
+            Cancel
+          </Button>
+        </div>
+
+        {isCodebase ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Repository">
+                <Select
+                  value={selectedRepo}
+                  onChange={handleRepoChange}
+                  disabled={isLoadingRepos}
+                >
+                  <option value="">
+                    {isLoadingRepos ? 'Loading...' : 'Select repository'}
+                  </option>
+                  {repos.map(repo => (
+                    <option key={repo.id} value={repo.fullName}>
+                      {repo.fullName}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Branch">
+                <Select
+                  value={selectedBranch}
+                  onChange={handleBranchChange}
+                  disabled={isLoadingBranches || !selectedRepo}
+                >
+                  <option value="">
+                    {isLoadingBranches ? 'Loading...' : 'Select branch'}
+                  </option>
+                  {branches.map(branch => (
+                    <option key={branch} value={branch}>
+                      {branch}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
+
+            {selectedRepo && (
+              <FormField
+                label="Analysis Scope (optional)"
+                description="For monorepos, specify a subdirectory path"
+              >
+                <Input
+                  value={analysisScope}
+                  onChange={(e) => setAnalysisScope(e.target.value)}
+                  placeholder="e.g., packages/core"
+                />
+              </FormField>
+            )}
+          </div>
+        ) : source.type === 'website' || source.type === 'docs_portal' ? (
+          <FormField label="URL">
+            <Input
+              value={editUrl}
+              onChange={(e) => setEditUrl(e.target.value)}
+              placeholder={SOURCE_TYPE_CONFIG[source.type].placeholder}
+            />
+          </FormField>
+        ) : source.type === 'raw_text' ? (
+          <Textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            placeholder={SOURCE_TYPE_CONFIG[source.type].placeholder}
+            rows={3}
+          />
+        ) : (
+          <p className="text-sm text-[color:var(--text-secondary)]">
+            {getSourceDisplay(source)}
+          </p>
+        )}
+
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-[color:var(--accent-danger)] hover:text-[color:var(--accent-danger)]"
+            onClick={() => handleRemoveSource(source)}
+            disabled={isSaving}
+          >
+            {removeLabel}
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={cancelEditing}>
+              Cancel
+            </Button>
+            {source.type !== 'uploaded_doc' && (
+              <Button
+                size="sm"
+                onClick={() => handleSaveEdit(source)}
+                disabled={isSaving || isEditSaveDisabled(source)}
+                loading={isSaving}
+              >
+                Save
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <EditDialog
@@ -330,166 +600,192 @@ export function KnowledgeSourcesDialog({
           <span className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--foreground)] border-t-transparent" />
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
-          {/* GitHub Codebase Section */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-              Codebase
-            </h4>
-
-            {!githubStatus.connected ? (
-              <Alert variant="info">
-                Connect GitHub to add your codebase as a knowledge source.
+        <div className="flex flex-col gap-4">
+          {/* Add buttons */}
+          {!addingType && !editingSourceId && (
+            <div className="flex flex-wrap gap-2">
+              {githubStatus.connected && !hasCodebaseSource && (
                 <Button
-                  variant="primary"
+                  variant="ghost"
                   size="sm"
-                  className="ml-4"
-                  onClick={() => {
-                    const nextUrl = `/projects/${projectId}/knowledge`
-                    window.open(`/api/integrations/github/connect?projectId=${projectId}&nextUrl=${encodeURIComponent(nextUrl)}`, '_blank')
-                  }}
+                  onClick={() => startAdding('codebase')}
                 >
-                  Connect GitHub
-                </Button>
-              </Alert>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField label="Repository">
-                    <Select
-                      value={selectedRepo}
-                      onChange={handleRepoChange}
-                      disabled={isLoadingRepos}
-                    >
-                      <option value="">
-                        {isLoadingRepos ? 'Loading...' : 'Select repository'}
-                      </option>
-                      {repos.map(repo => (
-                        <option key={repo.id} value={repo.fullName}>
-                          {repo.fullName}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-
-                  <FormField label="Branch">
-                    <Select
-                      value={selectedBranch}
-                      onChange={handleBranchChange}
-                      disabled={isLoadingBranches || !selectedRepo}
-                    >
-                      <option value="">
-                        {isLoadingBranches ? 'Loading...' : 'Select branch'}
-                      </option>
-                      {branches.map(branch => (
-                        <option key={branch} value={branch}>
-                          {branch}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormField>
-                </div>
-
-                {selectedRepo && (
-                  <FormField
-                    label="Analysis Scope (optional)"
-                    description="For monorepos, specify a subdirectory path"
-                  >
-                    <Input
-                      value={analysisScope}
-                      onChange={(e) => setAnalysisScope(e.target.value)}
-                      placeholder="e.g., packages/core"
-                    />
-                  </FormField>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Other Sources Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-                Additional Sources
-              </h4>
-              {!addingType && (
-                <div className="flex gap-2">
-                  {(Object.keys(SOURCE_TYPE_CONFIG) as Exclude<KnowledgeSourceType, 'codebase'>[]).map(type => (
-                    <Button
-                      key={type}
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setAddingType(type)}
-                    >
-                      {SOURCE_TYPE_CONFIG[type].icon} Add {SOURCE_TYPE_CONFIG[type].name}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Add new source form */}
-            {addingType && (
-              <div className="p-4 border border-[color:var(--border-subtle)] rounded-[4px] bg-[color:var(--surface)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {SOURCE_TYPE_CONFIG[addingType].icon} Add {SOURCE_TYPE_CONFIG[addingType].name}
+                  <span className="flex items-center gap-1.5">
+                    {SOURCE_TYPE_CONFIG.codebase.icon} Add Codebase
                   </span>
-                  <Button variant="ghost" size="sm" onClick={() => {
-                    setAddingType(null)
-                    setNewSourceInput('')
-                    setNewSourceFile(null)
-                  }}>
-                    Cancel
+                </Button>
+              )}
+              {(Object.keys(SOURCE_TYPE_CONFIG) as AddableSourceType[])
+                .filter(type => type !== 'codebase')
+                .map(type => (
+                  <Button
+                    key={type}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => startAdding(type)}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {SOURCE_TYPE_CONFIG[type].icon} Add {SOURCE_TYPE_CONFIG[type].name}
+                    </span>
                   </Button>
-                </div>
+                ))}
+            </div>
+          )}
 
-                {addingType === 'uploaded_doc' ? (
+          {/* Add new source form */}
+          {addingType && (
+            <div className="p-4 border border-[color:var(--border-subtle)] rounded-[4px] bg-[color:var(--surface)] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium flex items-center gap-1.5">
+                  {SOURCE_TYPE_CONFIG[addingType].icon} Add {SOURCE_TYPE_CONFIG[addingType].name}
+                </span>
+                <Button variant="ghost" size="sm" onClick={cancelAdding}>
+                  Cancel
+                </Button>
+              </div>
+
+              {addingType === 'codebase' ? (
+                !githubStatus.connected ? (
+                  <Alert variant="info">
+                    Connect GitHub to add your codebase as a knowledge source.
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="ml-4"
+                      onClick={() => {
+                        const nextUrl = `/projects/${projectId}/agents`
+                        window.open(`/api/integrations/github/connect?projectId=${projectId}&nextUrl=${encodeURIComponent(nextUrl)}`, '_blank')
+                      }}
+                    >
+                      Connect GitHub
+                    </Button>
+                  </Alert>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField label="Repository">
+                        <Select
+                          value={selectedRepo}
+                          onChange={handleRepoChange}
+                          disabled={isLoadingRepos}
+                        >
+                          <option value="">
+                            {isLoadingRepos ? 'Loading...' : 'Select repository'}
+                          </option>
+                          {repos.map(repo => (
+                            <option key={repo.id} value={repo.fullName}>
+                              {repo.fullName}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+
+                      <FormField label="Branch">
+                        <Select
+                          value={selectedBranch}
+                          onChange={handleBranchChange}
+                          disabled={isLoadingBranches || !selectedRepo}
+                        >
+                          <option value="">
+                            {isLoadingBranches ? 'Loading...' : 'Select branch'}
+                          </option>
+                          {branches.map(branch => (
+                            <option key={branch} value={branch}>
+                              {branch}
+                            </option>
+                          ))}
+                        </Select>
+                      </FormField>
+                    </div>
+
+                    {selectedRepo && (
+                      <FormField
+                        label="Analysis Scope (optional)"
+                        description="For monorepos, specify a subdirectory path"
+                      >
+                        <Input
+                          value={analysisScope}
+                          onChange={(e) => setAnalysisScope(e.target.value)}
+                          placeholder="e.g., packages/core"
+                        />
+                      </FormField>
+                    )}
+                  </div>
+                )
+              ) : addingType === 'uploaded_doc' ? (
+                <>
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".pdf,.txt,.md,.doc,.docx"
                     onChange={(e) => setNewSourceFile(e.target.files?.[0] || null)}
-                    className="text-sm"
+                    className="hidden"
                   />
-                ) : addingType === 'raw_text' ? (
-                  <Textarea
-                    value={newSourceInput}
-                    onChange={(e) => setNewSourceInput(e.target.value)}
-                    placeholder={SOURCE_TYPE_CONFIG[addingType].placeholder}
-                    rows={3}
-                  />
-                ) : (
-                  <Input
-                    value={newSourceInput}
-                    onChange={(e) => setNewSourceInput(e.target.value)}
-                    placeholder={SOURCE_TYPE_CONFIG[addingType].placeholder}
-                  />
-                )}
+                  <div
+                    className="flex items-center gap-3 rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] px-4 py-3 cursor-pointer hover:border-[color:var(--accent-selected)] transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        fileInputRef.current?.click()
+                      }}
+                    >
+                      Choose file
+                    </Button>
+                    <span className="text-sm text-[color:var(--text-secondary)] truncate">
+                      {newSourceFile ? newSourceFile.name : 'No file selected'}
+                    </span>
+                  </div>
+                </>
+              ) : addingType === 'raw_text' ? (
+                <Textarea
+                  value={newSourceInput}
+                  onChange={(e) => setNewSourceInput(e.target.value)}
+                  placeholder={SOURCE_TYPE_CONFIG[addingType].placeholder}
+                  rows={3}
+                />
+              ) : (
+                <Input
+                  value={newSourceInput}
+                  onChange={(e) => setNewSourceInput(e.target.value)}
+                  placeholder={SOURCE_TYPE_CONFIG[addingType].placeholder}
+                />
+              )}
 
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={cancelAdding}>
+                  Cancel
+                </Button>
                 <Button
                   size="sm"
                   onClick={handleAddSource}
-                  disabled={
-                    isSaving ||
-                    (addingType === 'uploaded_doc' ? !newSourceFile : !newSourceInput.trim())
-                  }
+                  disabled={isSaving || isAddDisabled()}
                   loading={isSaving}
                 >
                   Add
                 </Button>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Existing sources list */}
-            {nonCodebaseSources.length > 0 ? (
-              <div className="space-y-2">
-                {nonCodebaseSources.map(source => (
+          {/* Source list */}
+          {sources.length > 0 ? (
+            <div className="space-y-2">
+              {sources.map(source =>
+                editingSourceId === source.id ? (
+                  renderEditForm(source)
+                ) : (
                   <div
                     key={source.id}
-                    className="flex items-center justify-between p-3 border border-[color:var(--border-subtle)] rounded-[4px] bg-[color:var(--surface)]"
+                    className="flex items-center justify-between p-3 border border-[color:var(--border-subtle)] rounded-[4px] bg-[color:var(--surface)] cursor-pointer hover:border-[color:var(--accent-selected)] transition-colors"
+                    onClick={() => openEditSource(source)}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span>{SOURCE_TYPE_CONFIG[source.type as Exclude<KnowledgeSourceType, 'codebase'>]?.icon || '📦'}</span>
+                      <span className="flex items-center shrink-0">{getSourceIcon(source)}</span>
                       <span className="text-sm text-[color:var(--foreground)] truncate">
                         {getSourceDisplay(source)}
                       </span>
@@ -497,20 +793,40 @@ export function KnowledgeSourcesDialog({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleRemoveSource(source.id)}
-                      disabled={isSaving}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEditSource(source)
+                      }}
                     >
-                      Remove
+                      Configure
                     </Button>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-[color:var(--text-tertiary)]">
-                No additional sources configured. Add websites, documentation, or custom text to enhance your agent.
-              </p>
-            )}
-          </div>
+                )
+              )}
+            </div>
+          ) : !addingType ? (
+            <p className="text-sm text-[color:var(--text-tertiary)] py-4 text-center">
+              No sources configured. Add a codebase, website, documentation, or custom text to enhance your agent.
+            </p>
+          ) : null}
+
+          {/* Connect GitHub prompt (if not connected and no codebase) */}
+          {!githubStatus.connected && !hasCodebaseSource && !addingType && !editingSourceId && (
+            <Alert variant="info">
+              Connect GitHub to add your codebase as a knowledge source.
+              <Button
+                variant="primary"
+                size="sm"
+                className="ml-4"
+                onClick={() => {
+                  const nextUrl = `/projects/${projectId}/agents`
+                  window.open(`/api/integrations/github/connect?projectId=${projectId}&nextUrl=${encodeURIComponent(nextUrl)}`, '_blank')
+                }}
+              >
+                Connect GitHub
+              </Button>
+            </Alert>
+          )}
         </div>
       )}
     </EditDialog>

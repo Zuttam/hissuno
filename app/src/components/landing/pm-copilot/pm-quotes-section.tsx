@@ -10,29 +10,29 @@ interface QuoteItem {
   role: string
 }
 
-// PM-focused subset of quotes from homepage
+// PM-focused quotes emphasizing business impact of bad prioritization
 const PM_QUOTES: QuoteItem[] = [
   {
     id: 'q1',
-    text: "We had 500 feature requests in a spreadsheet. Nobody knew which ones mattered.",
-    author: 'Engineering Lead',
+    text: "We prioritized by gut feel for two quarters. 40% of what we shipped had zero adoption. That's months of engineering time wasted.",
+    author: 'VP of Product',
     role: 'Series B Startup',
   },
   {
     id: 'q2',
-    text: "Our support team knew exactly what customers needed. That knowledge never reached product.",
-    author: 'Head of Support',
+    text: "Our biggest customer told us what they needed in 3 separate Gong calls. We built something else. They churned.",
+    author: 'Head of Product',
     role: 'SaaS Company',
   },
   {
     id: 'q3',
-    text: "We shipped features nobody asked for while ignoring bugs customers screamed about.",
+    text: "Sales promised features to close deals. Product never saw those commitments until customers threatened to cancel.",
     author: 'Product Manager',
     role: 'B2B Platform',
   },
   {
-    id: 'q5',
-    text: "I spent 4 hours a week just triaging Slack messages from customer success.",
+    id: 'q4',
+    text: "We built our roadmap from anecdotes, not evidence. Lost three enterprise deals because we missed what they actually needed.",
     author: 'Senior PM',
     role: 'Enterprise Software',
   },
@@ -82,10 +82,10 @@ export function PMQuotesSection() {
           className="text-center"
         >
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)]">
-            Sound Familiar?
+            The Hidden Cost of Bad Prioritization
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-[var(--text-secondary)]">
-            Every product team struggles with the same problem
+            Wrong priorities compound into lost revenue and churned customers
           </p>
         </motion.div>
       </div>

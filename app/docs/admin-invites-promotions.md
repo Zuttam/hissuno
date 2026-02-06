@@ -244,7 +244,76 @@ WHERE owner_user_id = 'USER_UUID_HERE'
 
 ---
 
-## 5. Quick Reference
+## 5. Creating Users Manually
+
+### Create a Verified User (email + password)
+
+Run this in the Supabase SQL Editor or via `psql`:
+
+```sql
+-- Create a new user with email/password, already verified
+INSERT INTO auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  created_at,
+  updated_at,
+  confirmation_token,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  is_super_admin
+)
+VALUES (
+  '00000000-0000-0000-0000-000000000000',
+  gen_random_uuid(),
+  'authenticated',
+  'authenticated',
+  'user@example.com',                              -- change this
+  crypt('their-password-here', gen_salt('bf')),    -- change this
+  NOW(),                                            -- marks email as verified
+  NOW(),
+  NOW(),
+  '',
+  '{"provider": "email", "providers": ["email"]}',
+  '{}',
+  false
+);
+```
+
+You also need to create the corresponding identity row, otherwise Supabase auth won't recognize the user for login:
+
+```sql
+-- Create identity (required for login to work)
+INSERT INTO auth.identities (
+  id,
+  user_id,
+  identity_data,
+  provider,
+  provider_id,
+  created_at,
+  updated_at,
+  last_sign_in_at
+)
+SELECT
+  id,
+  id,
+  jsonb_build_object('sub', id::text, 'email', email),
+  'email',
+  id::text,
+  NOW(),
+  NOW(),
+  NOW()
+FROM auth.users
+WHERE email = 'user@example.com';  -- must match the email above
+```
+
+---
+
+## 6. Quick Reference
 
 ### Find User ID by Email
 

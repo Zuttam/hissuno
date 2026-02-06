@@ -5,6 +5,7 @@
  */
 
 import { mastra } from '@/mastra'
+import { createAdminClient } from '@/lib/supabase/server'
 import type { SlackMessage } from './client'
 
 const LOG_PREFIX = '[slack.response-decision]'
@@ -47,6 +48,7 @@ export type DecideIfShouldRespondParams = {
   botUserId: string
   lastResponderType: 'bot' | 'user' | null
   threadHistory?: SlackMessage[]
+  sessionId?: string
 }
 
 /**
@@ -125,16 +127,36 @@ Respond with only "RESPOND" or "SKIP" followed by a brief reason.`
  * Decide if the bot should respond to a message in a subscribed thread
  *
  * Decision flow:
+ * 0. Session in human takeover mode → SKIP
  * 1. Bot directly mentioned → RESPOND
  * 2. Another user mentioned → SKIP
- * 3. Bot was last responder → RESPOND (continuation of conversation)
- * 4. Human takeover phrase detected → SKIP
+ * 3. Human takeover phrase detected → SKIP
+ * 4. Bot was last responder → RESPOND (continuation of conversation)
  * 5. Uncertain → Call classifier agent
  */
 export async function decideIfShouldRespond(
   params: DecideIfShouldRespondParams
 ): Promise<ResponseDecision> {
-  const { text, botUserId, lastResponderType, threadHistory } = params
+  const { text, botUserId, lastResponderType, threadHistory, sessionId } = params
+
+  // 0. Session in human takeover mode - never respond
+  if (sessionId) {
+    const supabase = createAdminClient()
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('is_human_takeover')
+      .eq('id', sessionId)
+      .single()
+
+    if (session?.is_human_takeover) {
+      return {
+        shouldRespond: false,
+        confidence: 'high',
+        reason: 'Session is in human takeover mode',
+        usedClassifier: false,
+      }
+    }
+  }
 
   // 1. Bot directly mentioned - always respond
   if (containsMention(text, botUserId)) {

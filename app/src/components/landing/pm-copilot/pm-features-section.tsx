@@ -5,25 +5,25 @@ import { WaterReveal } from '@/components/landing/water-reveal'
 
 const STEPS = [
   {
-    id: 'signals',
+    id: 'triage',
     step: 1,
-    title: 'Customer signals flow in',
+    title: 'Auto-triage by revenue impact',
     description:
-      'Connect Slack, email, and your support widget. Every customer conversation is automatically captured and processed.',
+      'Feedback is classified by urgency, revenue at risk, and pain signal strength. High-value accounts and critical issues surface first.',
   },
   {
-    id: 'triage',
+    id: 'evidence',
     step: 2,
-    title: 'Your co-pilot triages',
+    title: 'Evidence from every touchpoint',
     description:
-      'AI classifies feedback as bugs, features, or change requests. Duplicates are merged. Priority is assigned based on customer impact.',
+      'Slack, Gong, support, Intercom — AI extracts insights from every conversation and connects them to existing issues automatically.',
   },
   {
     id: 'specs',
     step: 3,
-    title: 'Specs write themselves',
+    title: 'Specs tied to business outcomes',
     description:
-      'When issues hit a vote threshold, your co-pilot generates product specs with codebase references. Ready for engineering review.',
+      'When evidence hits critical mass, AI generates specs with revenue context, affected accounts, and codebase references.',
   },
 ]
 
@@ -33,13 +33,13 @@ export function PMFeaturesSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            How Your Co-Pilot Works
+            Product Intelligence That Pays for Itself
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            From customer signal to actionable spec in three steps
+            Every capability designed to connect product decisions to business impact
           </p>
         </WaterReveal>
 

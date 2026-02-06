@@ -51,14 +51,14 @@ export function FDEHeroSection() {
         className="relative z-10 mx-auto max-w-4xl text-center"
       >
         <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
-          From Customer Request to
+          Ship What Customers Need,
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            Pull Request
+            In Record Time
           </span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
-          An AI engineer that listens to customers, opens tickets, and ships code changes — in record time.
+          An AI development agent that turns validated customer needs into production-ready code. Reduce time-to-value and ship the features that drive retention.
         </p>
 
         {/* Integration logos row */}

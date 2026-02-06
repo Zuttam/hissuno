@@ -207,6 +207,33 @@ body {
   animation: ripple-ring 1.8s ease-out 0.3s both;
 }
 
+/* Auto-hide scrollbars - show only when scrolling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--text-tertiary) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+}
+
 /* Slider thumb styling */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;

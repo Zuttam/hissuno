@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProjectById } from '@/lib/projects/keys'
-import { upsertSession } from '@/lib/supabase/sessions'
+import { upsertSession, isSessionInHumanTakeover } from '@/lib/supabase/sessions'
 import { triggerChatRun, getChatRunStatus } from '@/lib/agent/chat-run-service'
 import { createAdminClient } from '@/lib/supabase/server'
 import { saveSessionMessage } from '@/lib/supabase/session-messages'
@@ -215,6 +215,34 @@ export async function POST(request: NextRequest) {
     }).catch((error) => {
       console.error('[widget/chat.post] failed to upsert session', error)
     })
+
+    // Check if session is in human takeover mode (only for existing sessions)
+    if (clientSessionId) {
+      const humanTakeover = await isSessionInHumanTakeover(sessionId)
+      if (humanTakeover) {
+        // Save user message but skip AI response
+        const lastUserMessage = messages[messages.length - 1]
+        if (lastUserMessage?.role === 'user') {
+          saveSessionMessage({
+            sessionId,
+            projectId,
+            senderType: 'user',
+            content: lastUserMessage.content,
+          }).catch((error) => {
+            console.error('[widget/chat.post] failed to save user message (human takeover)', error)
+          })
+        }
+
+        return addCorsHeaders(
+          NextResponse.json({
+            message: 'Human takeover active.',
+            status: 'human_takeover',
+            sessionId,
+          }),
+          origin
+        )
+      }
+    }
 
     // Use admin client since this is public-facing (no user auth)
     const supabase = createAdminClient()

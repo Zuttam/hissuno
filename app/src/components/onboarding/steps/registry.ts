@@ -1,6 +1,7 @@
 import { ProfileStep } from './profile-step'
 import { UseCaseStep } from './use-case-step'
 import { BillingStep } from './billing-step'
+import { ProjectStep } from './project-step'
 import type { OnboardingStepId, OnboardingFormData, StepDefinition } from './types'
 
 /**
@@ -45,12 +46,22 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
       return { isValid: true }
     },
   },
+
+  project: {
+    id: 'project',
+    title: 'Create your first project',
+    shortTitle: 'Project',
+    description: 'Set up a project to start collecting customer conversations. You can skip this and create one later.',
+    component: ProjectStep,
+    validate: () => ({ isValid: true }),
+    isOptional: true,
+  },
 }
 
 /**
  * Default step ordering for onboarding flow
  */
-export const ONBOARDING_FLOW_ORDER: OnboardingStepId[] = ['profile', 'use-case', 'billing']
+export const ONBOARDING_FLOW_ORDER: OnboardingStepId[] = ['profile', 'use-case', 'billing', 'project']
 
 /**
  * Get step definitions for onboarding flow

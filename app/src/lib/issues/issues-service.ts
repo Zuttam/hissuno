@@ -31,6 +31,7 @@ import {
   type InsertIssueData,
 } from '@/lib/supabase/issues'
 import { upsertIssueEmbedding } from './embedding-service'
+import { triggerJiraSyncForIssue } from '@/lib/integrations/jira/sync'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -155,6 +156,9 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
     input.description,
     'issues-service.createIssue'
   )
+
+  // Trigger Jira sync (fire-and-forget)
+  triggerJiraSyncForIssue(issue.id, input.project_id, 'create')
 
   return {
     ...issue,
@@ -365,6 +369,9 @@ export async function createIssueAdmin(
     input.description,
     'issues-service.createIssueAdmin'
   )
+
+  // Trigger Jira sync (fire-and-forget)
+  triggerJiraSyncForIssue(issue.id, input.projectId, 'create')
 
   return { issue, embeddingCreated }
 }

@@ -14,19 +14,19 @@ const VALUE_PROPS: ValueProp[] = [
     id: 'pms',
     title: 'For Product Managers',
     description:
-      'Stop copy-pasting from Slack to Linear. Issues create themselves with context, priority, and vote counts.',
+      'Every product decision backed by customer evidence. Prioritize by revenue impact, not who yells loudest. Defend roadmap choices with data.',
   },
   {
     id: 'founders',
     title: 'For Founders',
     description:
-      'Ship fast without losing customer signal. Know what to build next without reading every message.',
+      'Know which customer problems drive retention and expansion. Catch churn risks before they escalate. Build the roadmap that grows revenue.',
   },
   {
     id: 'engineers',
     title: 'For Product Engineers',
     description:
-      'Specs come with code references. Know exactly where to make changes before you start.',
+      'Specs come with affected accounts, revenue context, and codebase references. Build with confidence that what you ship actually matters.',
   },
 ]
 
@@ -36,13 +36,13 @@ export function PMValuePropsSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Built for Product Teams
+            Outcomes That Matter to Your Role
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            Whether you&apos;re a PM, founder, or product engineer
+            Measurable impact across product, leadership, and engineering
           </p>
         </WaterReveal>
 

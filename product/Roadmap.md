@@ -96,22 +96,20 @@
 
 ### Support
 [] alert and interact in slack for open sessions -  support sessions go to a centeralize channel in slack, the user can answer in the relevant thread in slack which replies in the session to the user
-[] Fix automatic close session cron in prod
-[] Add waiting for human status
+[x] Fix automatic close session cron in prod
+[x] Improve human takeover mechanism (e.g Add waiting for human status)
 
 ### Sessions
 [] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
+
 [] Expend sessions type to different use cases: behavioral session (events), meeting (multi user conversation like gong -> show transcript), chat (intercom, widget) and show the contents accordingly
 
 
 ### Platform 
 [x] Improve onboarding 
 [x] Add invite link support
-[] Move knowledge into agents screen
-[] Implement basic alert system
-
-### Issues
-[] Calculate issue upvotes over time and alert or change priority if there's an anomaly
+[x] Move knowledge into agents screen
+[x] Implement basic alert/notification system
 
 ## Phase 8
 
@@ -120,11 +118,11 @@
 
 ### Marketing
 [] Run SDR agent
+[] Change theme to Samurai Pirate
 [] Docs portal
 
 ### Issues
-[] Draft response email to the user
-[] Support Actions items (not necessary code related)
+[] Calculate issue upvotes over time and alert or change priority if there's an anomaly
 [] Lieaner Integration
 [] Jira Integration 
 
@@ -132,7 +130,7 @@
 [] Create initial implementation 
 
 ### Platform
-[] API Access (via secret key)
+[] API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] Improve welcome email visualization
 [] Project multi-users access and RBAC
 [] Alerts and weekly reports(email, slack)
@@ -143,6 +141,7 @@
 
 ### Marketing
 [] Ad Campaign for AI FDE 
+[] Support promotions
 
 ### Sessions
 [] Improve participants identification - show additional details in a cleaner way
@@ -153,3 +152,7 @@
 [] Alerts and weekly reports(email, slack)
 [] MCP Access
 [] MCP Apps
+
+### Issues
+[] Support Actions items (not necessary code related)
+[] Draft response email to the user

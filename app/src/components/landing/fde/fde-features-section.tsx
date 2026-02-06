@@ -7,30 +7,30 @@ const STEPS = [
   {
     id: 'requests',
     step: 1,
-    title: 'Customer requests flow in',
+    title: 'Validated needs surface',
     description:
-      'Connect Slack, email, and your support widget. Every customer request is captured and categorized automatically.',
+      'Customer requests with evidence and revenue context flow in automatically. Know which features actually drive business outcomes.',
   },
   {
     id: 'triage',
     step: 2,
-    title: 'AI triages and creates issues',
+    title: 'Priority by impact',
     description:
-      'Requests are classified by type, assigned priority based on customer impact, and linked to related issues.',
+      'Requests ranked by revenue at risk, customer urgency, and strategic alignment. No more guessing what to build first.',
   },
   {
     id: 'specs',
     step: 3,
-    title: 'Specs write themselves',
+    title: 'Implementation-ready specs',
     description:
-      'When issues reach a threshold, detailed specifications are generated with codebase references and implementation notes.',
+      'Detailed specs with affected customers, business context, and codebase references. Engineers build with confidence.',
   },
   {
     id: 'pr',
     step: 4,
-    title: 'PR-Ready Code',
+    title: 'Ship value fast',
     description:
-      'AI generates implementation based on the spec, following your codebase patterns. Ready for your review and merge.',
+      'AI generates production-ready code following your patterns. Review, merge, and deliver customer value in hours, not weeks.',
   },
 ]
 
@@ -42,15 +42,15 @@ export function FDEFeaturesSection() {
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
             How Your
             <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-              AI Forward Development Engineer
+              AI Development Agent
             </span>
-            Works
+            Delivers Value
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            From customer request to pull request in four steps
+            From validated need to shipped value in four steps
           </p>
         </WaterReveal>
 

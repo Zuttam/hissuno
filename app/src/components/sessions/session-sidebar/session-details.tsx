@@ -215,6 +215,37 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
         )}
       </div>
 
+      {/* Human Takeover Toggle */}
+      {onUpdateSession && (
+        <div className="flex items-center justify-between rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-3 py-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-[color:var(--foreground)]">Human Takeover</span>
+            {session.is_human_takeover && (
+              <Badge variant="warning">Active</Badge>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => onUpdateSession({ is_human_takeover: !session.is_human_takeover })}
+            disabled={isSaving}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out disabled:opacity-50 ${
+              session.is_human_takeover
+                ? 'bg-[color:var(--accent-warning)]'
+                : 'bg-[color:var(--border-subtle)]'
+            }`}
+            role="switch"
+            aria-checked={session.is_human_takeover}
+            aria-label="Toggle human takeover"
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ease-in-out ${
+                session.is_human_takeover ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </div>
+      )}
+
       {/* Source, Archived, and Project */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

@@ -52,6 +52,7 @@ export async function POST(request: Request) {
       companySize,
       selectedUseCases,
       onboardingCompleted,
+      onboardingCurrentStep,
     } = body
 
     // Fetch existing profile to preserve fields not being updated
@@ -82,6 +83,11 @@ export async function POST(request: Request) {
     }
     if (selectedUseCases !== undefined) {
       updateData.selected_use_cases = selectedUseCases ?? []
+    }
+
+    // Onboarding step tracking
+    if (onboardingCurrentStep !== undefined) {
+      updateData.onboarding_current_step = onboardingCurrentStep
     }
 
     // Onboarding flags - only update if explicitly provided

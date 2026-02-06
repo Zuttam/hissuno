@@ -6,6 +6,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/server'
+import { resolvePreferences, type NotificationType } from '@/types/notification-preferences'
 
 const LOG_PREFIX = '[notification-service]'
 
@@ -113,6 +114,42 @@ export async function recordNotification(
 
   console.log(`${LOG_PREFIX} Recorded notification: type=${type}, channel=${channel}, id=${data.id}`)
   return { success: true, notificationId: data.id }
+}
+
+/**
+ * Check if a notification should be sent based on user preferences.
+ * Returns false if notifications are silenced or the specific type/channel is disabled.
+ */
+export async function shouldSendNotification(
+  userId: string,
+  type: NotificationType,
+  channel: 'email' | 'slack'
+): Promise<boolean> {
+  const supabase = createAdminClient()
+
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('notifications_silenced, notification_preferences')
+    .eq('user_id', userId)
+    .single()
+
+  if (error || !data) {
+    // If we can't read preferences, default to allowing email, blocking slack
+    console.warn(`${LOG_PREFIX} Could not read notification preferences for user ${userId}`)
+    return channel === 'email'
+  }
+
+  if (data.notifications_silenced) {
+    return false
+  }
+
+  const preferences = resolvePreferences(data.notification_preferences)
+  const pref = preferences[type]
+  if (!pref) {
+    return channel === 'email'
+  }
+
+  return pref[channel] ?? false
 }
 
 /**
