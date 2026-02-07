@@ -9,6 +9,35 @@ export type SessionStatus = 'active' | 'closing_soon' | 'awaiting_idle_response'
 export type SessionSource = 'widget' | 'slack' | 'intercom' | 'gong' | 'api' | 'manual'
 
 /**
+ * Session content type (determines how content is rendered)
+ */
+export type SessionType = 'chat' | 'meeting' | 'behavioral'
+
+/**
+ * Session type display information for UI
+ */
+export const SESSION_TYPE_INFO: Record<
+  SessionType,
+  { label: string; description: string; contentLabel: string; variant: 'info' | 'success' | 'warning' | 'default' }
+> = {
+  chat: { label: 'Chat', description: 'Conversational support session', contentLabel: 'Messages', variant: 'info' },
+  meeting: { label: 'Meeting', description: 'Call or meeting transcript', contentLabel: 'Transcript', variant: 'success' },
+  behavioral: { label: 'Behavioral', description: 'User behavior events', contentLabel: 'Events', variant: 'warning' },
+}
+
+/**
+ * Get the default session type for a given source
+ */
+export function getDefaultSessionType(source: SessionSource): SessionType {
+  switch (source) {
+    case 'gong':
+      return 'meeting'
+    default:
+      return 'chat'
+  }
+}
+
+/**
  * Source display information for UI
  */
 export const SESSION_SOURCE_INFO: Record<
@@ -69,6 +98,7 @@ export interface SessionRecord {
   page_title: string | null
   name: string | null
   source: SessionSource
+  session_type: SessionType
   message_count: number
   status: SessionStatus
   tags: SessionTag[]
@@ -155,6 +185,7 @@ export interface SessionFilters {
   name?: string
   status?: SessionStatus
   source?: SessionSource
+  sessionType?: SessionType
   tags?: string[]
   dateFrom?: string
   dateTo?: string

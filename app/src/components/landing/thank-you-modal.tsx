@@ -58,9 +58,9 @@ export function ThankYouModal() {
             </svg>
           </div>
           <div className="space-y-2">
-            <p className="text-lg font-medium text-[var(--foreground)]">You&apos;re on the list!</p>
+            <p className="text-lg font-medium text-[var(--foreground)]">You&apos;re in!</p>
             <p className="text-sm text-[var(--text-secondary)]">
-              We&apos;ll reach out soon with early access. Looking forward to having you!
+              We will share an invite with you in the upcoming days.
             </p>
           </div>
           <Button onClick={handleThankYouClose} variant="secondary" className="mt-4">

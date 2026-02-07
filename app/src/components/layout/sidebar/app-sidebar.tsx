@@ -106,11 +106,14 @@ export function AppSidebar({ user }: AppSidebarProps) {
       <>
         {/* Logo and collapse button */}
         <div className={`flex h-16 items-center border-b border-[color:var(--border-subtle)] ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
-          <Link href="/projects" className="flex items-center gap-2" onClick={closeMobile}>
+          <Link href="/projects" className="flex items-end gap-1.5" onClick={closeMobile}>
             {collapsed ? (
               <ThemeLogo width={24} height={24} priority />
             ) : (
-              <ThemeLogo width={56} height={16} priority />
+              <>
+                <ThemeLogo width={56} height={16} priority />
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-red-500 leading-none">beta</span>
+              </>
             )}
           </Link>
           {!collapsed && !forMobile && (

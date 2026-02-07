@@ -3,7 +3,6 @@
  */
 
 export const NOTIFICATION_TYPES = [
-  'welcome',
   'limit_reached',
   'human_needed',
   'new_issue_created',
@@ -32,13 +31,6 @@ export type NotificationTypeInfo = {
 }
 
 export const NOTIFICATION_TYPE_INFO: NotificationTypeInfo[] = [
-  {
-    type: 'welcome',
-    label: 'Welcome',
-    description: 'Welcome email when you sign up',
-    active: true,
-    supportedChannels: ['email'],
-  },
   {
     type: 'limit_reached',
     label: 'Limit Reached',

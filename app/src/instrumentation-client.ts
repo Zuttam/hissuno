@@ -15,7 +15,7 @@ const posthogHost =
 if (posthogKey) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
-    person_profiles: 'identified_only', // No person profiles until identify()
+    // person_profiles: 'identified_only', // No person profiles until identify()
     capture_pageview: true,
     capture_pageleave: true,
     persistence: consent === 'accepted' ? 'localStorage+cookie' : 'memory',

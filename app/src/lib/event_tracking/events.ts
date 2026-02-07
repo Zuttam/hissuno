@@ -187,6 +187,13 @@ export function trackWaitlistCompleted(data: { email?: string; utm?: Record<stri
 }
 
 /**
+ * Track when a user requests access to a gated feature
+ */
+export function trackFeatureAccessRequested(data: { feature: string }): void {
+  posthog.capture('feature_access_requested', { feature: data.feature })
+}
+
+/**
  * Track when Calendly popup is opened
  */
 export function trackCallBookingStarted(data: CallBookingEventData): void {

@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Button, Heading } from '@/components/ui'
+import { Button, Heading, Dialog, Input } from '@/components/ui'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { useInvites } from '@/hooks/use-invites'
-import { usePromotions } from '@/hooks/use-promotions'
-import type { InviteWithClaimInfo, PromotionRecord } from '@/types/invites'
+import type { InviteWithClaimInfo } from '@/types/invites'
 
 function CopyIcon({ className }: { className?: string }) {
   return (
@@ -23,11 +22,107 @@ function CheckIcon({ className }: { className?: string }) {
   )
 }
 
-function GiftIcon({ className }: { className?: string }) {
+function MailIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M21 11.25v8.25a1.5 1.5 0 0 1-1.5 1.5H5.25a1.5 1.5 0 0 1-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 1 0 9.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1 1 14.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
     </svg>
+  )
+}
+
+interface SendInviteDialogProps {
+  invite: InviteWithClaimInfo
+  open: boolean
+  onClose: () => void
+}
+
+function SendInviteDialog({ invite, open, onClose }: SendInviteDialogProps) {
+  const [email, setEmail] = useState(invite.target_email ?? '')
+  const [isSending, setIsSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sent, setSent] = useState(false)
+
+  const handleSend = useCallback(async () => {
+    const trimmed = email.trim()
+    if (!trimmed) return
+
+    setIsSending(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/user/invites/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inviteId: invite.id, recipientEmail: trimmed }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to send invite.')
+        return
+      }
+
+      setSent(true)
+      setTimeout(() => {
+        onClose()
+        setSent(false)
+        setEmail('')
+      }, 1500)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setIsSending(false)
+    }
+  }, [email, invite.id, onClose])
+
+  const handleClose = useCallback(() => {
+    setError(null)
+    setSent(false)
+    onClose()
+  }, [onClose])
+
+  return (
+    <Dialog open={open} onClose={handleClose} title="Send Invite">
+      <div className="space-y-4">
+        {sent ? (
+          <div className="flex items-center gap-2 text-[--accent-success]">
+            <CheckIcon className="h-5 w-5" />
+            <span className="text-sm font-medium">Invite sent!</span>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-[var(--text-secondary)]">
+              Send invite code <strong>{invite.code}</strong> via email.
+            </p>
+            <Input
+              type="email"
+              placeholder="recipient@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isSending}
+              autoFocus
+            />
+            {error && (
+              <p className="text-sm text-[var(--accent-danger)]">{error}</p>
+            )}
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={handleClose} disabled={isSending}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={isSending || !email.trim()}
+                className="bg-[var(--accent-selected)] hover:opacity-90"
+              >
+                {isSending ? 'Sending...' : 'Send Invite'}
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </Dialog>
   )
 }
 
@@ -37,7 +132,7 @@ interface InviteRowProps {
 
 function InviteRow({ invite }: InviteRowProps) {
   const [copiedLink, setCopiedLink] = useState(false)
-  const [copiedCode, setCopiedCode] = useState(false)
+  const [showSendDialog, setShowSendDialog] = useState(false)
 
   const inviteLink = typeof window !== 'undefined'
     ? `${window.location.origin}/signup?invite=${invite.code}`
@@ -52,16 +147,6 @@ function InviteRow({ invite }: InviteRowProps) {
       console.error('Failed to copy link')
     }
   }, [inviteLink])
-
-  const handleCopyCode = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(invite.code)
-      setCopiedCode(true)
-      setTimeout(() => setCopiedCode(false), 2000)
-    } catch {
-      console.error('Failed to copy code')
-    }
-  }, [invite.code])
 
   const isClaimed = !!invite.claimed_by_user_id
 
@@ -82,100 +167,43 @@ function InviteRow({ invite }: InviteRowProps) {
   }
 
   return (
-    <div className="flex items-center justify-between rounded-[4px] border-2 border-[--border-subtle] bg-[--surface] px-3 py-2">
-      <span className="font-mono text-sm font-semibold text-[--foreground]">{invite.code}</span>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => void handleCopyLink()}
-          className="flex items-center gap-1"
-        >
-          {copiedLink ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
-          <span className="text-xs">{copiedLink ? 'Copied!' : 'Copy Link'}</span>
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => void handleCopyCode()}
-          className="flex items-center gap-1"
-        >
-          {copiedCode ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
-          <span className="text-xs">{copiedCode ? 'Copied!' : 'Copy Code'}</span>
-        </Button>
+    <>
+      <div className="flex items-center justify-between rounded-[4px] border-2 border-[--border-subtle] bg-[--surface] px-3 py-2">
+        <span className="font-mono text-sm font-semibold text-[--foreground]">{invite.code}</span>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => void handleCopyLink()}
+            className="flex items-center gap-1"
+          >
+            {copiedLink ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
+            <span className="text-xs">{copiedLink ? 'Copied!' : 'Copy Link'}</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowSendDialog(true)}
+            className="flex items-center gap-1"
+          >
+            <MailIcon className="h-3.5 w-3.5" />
+            <span className="text-xs">Send Invite</span>
+          </Button>
+        </div>
       </div>
-    </div>
-  )
-}
-
-function formatPromotionValue(promotion: PromotionRecord): string {
-  switch (promotion.type) {
-    case 'referral_credit':
-      return `$${(promotion.value / 100).toFixed(2)} credit`
-    case 'discount_percent':
-      return `${promotion.value}% discount`
-    case 'free_month':
-      return `${promotion.value} free month${promotion.value > 1 ? 's' : ''}`
-    default:
-      return 'Reward'
-  }
-}
-
-function formatPromotionStatus(status: PromotionRecord['status']): string {
-  switch (status) {
-    case 'pending':
-      return 'Pending'
-    case 'eligible':
-      return 'Eligible'
-    case 'claimed':
-      return 'Claimed'
-    case 'expired':
-      return 'Expired'
-    default:
-      return status
-  }
-}
-
-function getStatusColor(status: PromotionRecord['status']): string {
-  switch (status) {
-    case 'pending':
-      return 'text-[--text-secondary]'
-    case 'eligible':
-      return 'text-[--accent-success]'
-    case 'claimed':
-      return 'text-[--accent-info]'
-    case 'expired':
-      return 'text-[--text-tertiary]'
-    default:
-      return 'text-[--text-secondary]'
-  }
-}
-
-interface PromotionRowProps {
-  promotion: PromotionRecord
-}
-
-function PromotionRow({ promotion }: PromotionRowProps) {
-  return (
-    <div className="flex items-center justify-between rounded-[4px] border-2 border-[--border-subtle] bg-[--surface] px-3 py-2">
-      <div className="flex items-center gap-3">
-        <GiftIcon className="h-4 w-4 text-[--text-secondary]" />
-        <span className="text-sm text-[--foreground]">{formatPromotionValue(promotion)}</span>
-      </div>
-      <span className={`text-xs font-medium ${getStatusColor(promotion.status)}`}>
-        {formatPromotionStatus(promotion.status)}
-      </span>
-    </div>
+      <SendInviteDialog
+        invite={invite}
+        open={showSendDialog}
+        onClose={() => setShowSendDialog(false)}
+      />
+    </>
   )
 }
 
 export function PromotionsSection() {
-  const { invites, isLoading: invitesLoading } = useInvites()
-  const { promotions, isLoading: promotionsLoading } = usePromotions()
-
-  const isLoading = invitesLoading || promotionsLoading
+  const { invites, isLoading } = useInvites()
 
   const availableInvites = invites.filter((inv) => !inv.claimed_by_user_id)
   const claimedInvites = invites.filter((inv) => !!inv.claimed_by_user_id)
@@ -206,7 +234,7 @@ export function PromotionsSection() {
       <div>
         <Heading as="h2" size="section">Invites</Heading>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Share your invite link to help friends join and earn rewards.
+          Share your invite link to help friends join Hissuno.
         </p>
       </div>
 
@@ -240,19 +268,6 @@ export function PromotionsSection() {
         </div>
       )}
 
-      {/* Earned Rewards */}
-      {promotions.length > 0 && (
-        <div className="space-y-3">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[--text-tertiary]">
-            Earned Rewards
-          </p>
-          <div className="space-y-2">
-            {promotions.map((promotion) => (
-              <PromotionRow key={promotion.id} promotion={promotion} />
-            ))}
-          </div>
-        </div>
-      )}
     </FloatingCard>
   )
 }

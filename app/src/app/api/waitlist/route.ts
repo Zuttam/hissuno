@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { headers } from 'next/headers'
 import { createAdminClient, isServiceRoleConfigured } from '@/lib/supabase/server'
+import { createInviteForEmail } from '@/lib/invites/invite-service'
 import type { CTAEventData } from '@/lib/event_tracking/types'
 
 export const runtime = 'nodejs'
@@ -9,6 +10,7 @@ export const runtime = 'nodejs'
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/
 
 type WaitlistSource = CTAEventData['source']
+type WaitlistType = 'platform_access' | 'feature_access'
 
 export async function POST(request: Request) {
   if (!isServiceRoleConfigured()) {
@@ -17,7 +19,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { email, website, source } = body as { email?: string; website?: string; source?: WaitlistSource }
+    const { email, website, source, type } = body as { email?: string; website?: string; source?: WaitlistSource; type?: WaitlistType }
 
     // Honeypot check - if website field is filled, it's likely a bot
     if (website) {
@@ -54,6 +56,7 @@ export async function POST(request: Request) {
       email: sanitizedEmail,
       ip_address: ipAddress,
       source: source || null,
+      type: type || 'platform_access',
     })
 
     // Handle duplicate email gracefully
@@ -64,6 +67,20 @@ export async function POST(request: Request) {
       }
       console.error('[api/waitlist.POST] insert error', error)
       return NextResponse.json({ error: 'Failed to join waitlist.' }, { status: 500 })
+    }
+
+    // Auto-create an invite code only for platform_access waitlist entries
+    const waitlistType = type || 'platform_access'
+    const adminUserId = process.env.ADMIN_USER_ID
+    if (adminUserId && waitlistType === 'platform_access') {
+      try {
+        await createInviteForEmail(adminUserId, sanitizedEmail)
+      } catch (inviteError) {
+        // Log but don't fail the waitlist response
+        console.error('[api/waitlist.POST] failed to auto-create invite', inviteError)
+      }
+    } else {
+      console.warn('[api/waitlist.POST] ADMIN_USER_ID not set, skipping auto-invite creation')
     }
 
     return NextResponse.json({ success: true })

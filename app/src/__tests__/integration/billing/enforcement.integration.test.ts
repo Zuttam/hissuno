@@ -71,6 +71,7 @@ vi.mock('@/lib/notifications/notification-service', () => ({
     mockDb.notifications.set(userId, userNotifications)
     return { success: true, notificationId: `notif-${Date.now()}` }
   }),
+  shouldSendNotification: vi.fn(async () => true),
   getUserProfile: vi.fn(async (userId: string) => {
     const user = mockDb.users.get(userId)
     return { email: user?.email ?? null, fullName: user?.fullName ?? null }
@@ -95,6 +96,21 @@ vi.mock('@/lib/email/resend', () => ({
     },
   })),
   getFromAddress: vi.fn(() => 'noreply@hissuno.com'),
+}))
+
+// Mock react-email render
+vi.mock('@react-email/components', () => ({
+  render: vi.fn(async () => '<html>mock email</html>'),
+}))
+
+// Mock email template
+vi.mock('@/lib/email/templates/limit-reached', () => ({
+  LimitReachedEmail: vi.fn(() => null),
+}))
+
+// Mock Slack notifications
+vi.mock('@/lib/notifications/slack-notifications', () => ({
+  sendSlackNotification: vi.fn(async () => ({ ok: false })),
 }))
 
 // Import after mocks

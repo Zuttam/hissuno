@@ -73,10 +73,10 @@ export function WaitlistDialog() {
   }, [closeDialog])
 
   return (
-    <Dialog open={isOpen} onClose={handleClose} title="Join the Waitlist">
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <Dialog open={isOpen} onClose={handleClose} title="Join the Beta">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <p className="text-sm text-[var(--text-secondary)]">
-          Be the first to know when we launch. We&apos;ll reach out soon.
+          Thanks for your interest in Hissuno!<br /> We&apos;re gradually onboarding new users and will send you an invite when it&apos;s your turn to blast off. 🚀⚡
         </p>
 
         <Input
@@ -119,7 +119,7 @@ export function WaitlistDialog() {
             disabled={isSubmitting || !email}
             className="bg-[var(--accent-selected)] hover:opacity-90"
           >
-            {isSubmitting ? 'Joining...' : 'Join Waitlist'}
+            {isSubmitting ? 'Joining...' : 'Join the Beta'}
           </Button>
         </div>
       </form>

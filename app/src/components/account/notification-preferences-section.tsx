@@ -182,7 +182,6 @@ export function NotificationPreferencesSection() {
         checked={silenced}
         onChange={handleSilenceToggle}
         label="Silence all notifications"
-        description="Temporarily stop all notifications across every channel"
       />
 
       <Divider />

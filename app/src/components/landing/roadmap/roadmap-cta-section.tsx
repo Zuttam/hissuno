@@ -33,7 +33,7 @@ export function RoadmapCTASection() {
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            Join the waitlist to share your feedback and help shape the roadmap.
+            Join the beta to share your feedback and help shape the roadmap.
           </p>
         </WaterReveal>
 
@@ -44,7 +44,7 @@ export function RoadmapCTASection() {
               onClick={handleButtonClick}
               className="bg-[var(--accent-selected)] hover:opacity-90"
             >
-              Join Waitlist
+              Join the Beta
             </Button>
           </div>
         </WaterReveal>

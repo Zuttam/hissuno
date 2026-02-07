@@ -41,7 +41,7 @@ export function MarketingNav() {
             onClick={handleJoinWaitlist}
             className="bg-[var(--accent-selected)] hover:opacity-90 py-2"
           >
-            Join Waitlist
+            Join the Beta
           </Button>
         </div>
       </nav>

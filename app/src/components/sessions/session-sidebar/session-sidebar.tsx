@@ -3,10 +3,11 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Spinner } from '@/components/ui'
 import { LimitReachedDialog } from '@/components/billing'
-import type { SessionWithProject, ChatMessage, UpdateSessionInput } from '@/types/session'
+import type { SessionWithProject, ChatMessage, UpdateSessionInput, SessionType } from '@/types/session'
+import { SESSION_TYPE_INFO } from '@/types/session'
 import { useSessionReview } from '@/hooks/use-session-review'
 import { SessionDetails } from './session-details'
-import { MessagesView } from './messages-view'
+import { SessionContentView } from './session-content-view'
 import { SessionTagEditor } from '../session-tags'
 import { SessionReviewSection } from '../session-review'
 
@@ -97,6 +98,8 @@ export function SessionSidebar({
   }, [onSessionUpdated])
 
   const isSessionActive = session?.status !== 'closed'
+  const sessionType: SessionType = session?.session_type ?? 'chat'
+  const typeInfo = SESSION_TYPE_INFO[sessionType]
 
   return (
     <>
@@ -113,9 +116,9 @@ export function SessionSidebar({
         <div className="flex items-center justify-between border-b-2 border-[color:var(--border-subtle)] p-4">
           <div className="flex items-center gap-3">
             <h2 className="font-mono text-lg font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-              {view === 'messages' ? 'Conversation' : 'Session Details'}
+              {view === 'messages' ? typeInfo.contentLabel : 'Session Details'}
             </h2>
-            {view === 'messages' && isSessionActive && (
+            {view === 'messages' && isSessionActive && sessionType === 'chat' && (
               <span className="rounded-full bg-green-500/20 px-2 py-0.5 text-xs font-medium text-green-600">
                 Live
               </span>
@@ -128,7 +131,7 @@ export function SessionSidebar({
               onClick={() => onViewChange(view === 'messages' ? 'details' : 'messages')}
               className="rounded-[4px] px-3 py-1.5 text-sm text-[color:var(--accent-primary)] transition hover:bg-[color:var(--surface-hover)]"
             >
-              {view === 'messages' ? 'View Details →' : '← Messages'}
+              {view === 'messages' ? 'View Details →' : `← ${typeInfo.contentLabel}`}
             </button>
             {session && (
               <button
@@ -205,7 +208,7 @@ export function SessionSidebar({
           </div>
         ) : session ? (
           view === 'messages' ? (
-            <MessagesView
+            <SessionContentView
               session={session}
               messages={messages}
               onMessageSent={onSessionUpdated}

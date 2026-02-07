@@ -4,7 +4,8 @@ import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleCon
 import { saveSessionMessage } from './session-messages'
 import { ensureSessionName, generateDefaultName } from '@/lib/sessions/name-generator'
 import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-notifications'
-import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, CreateSessionInput, UpdateSessionInput } from '@/types/session'
+import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, SessionType, CreateSessionInput, UpdateSessionInput } from '@/types/session'
+import { getDefaultSessionType } from '@/types/session'
 
 const selectSessionWithProject = '*, project:projects(id, name)'
 const selectSessionWithLinkedIssues = `
@@ -29,6 +30,7 @@ export async function upsertSession(params: {
   pageUrl?: string | null
   pageTitle?: string | null
   source?: SessionSource | null
+  sessionType?: SessionType | null
 }): Promise<void> {
   if (!isServiceRoleConfigured()) {
     console.warn('[supabase.sessions] Service role not configured, skipping session upsert')
@@ -49,6 +51,7 @@ export async function upsertSession(params: {
           page_url: params.pageUrl || null,
           page_title: params.pageTitle || null,
           source: params.source || 'widget',
+          session_type: params.sessionType || getDefaultSessionType(params.source || 'widget'),
           last_activity_at: new Date().toISOString(),
         },
         {
@@ -181,6 +184,9 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     }
     if (filters.source) {
       query = query.eq('source', filters.source)
+    }
+    if (filters.sessionType) {
+      query = query.eq('session_type', filters.sessionType)
     }
     if (filters.isHumanTakeover) {
       query = query.eq('is_human_takeover', true)

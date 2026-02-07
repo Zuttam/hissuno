@@ -15,6 +15,29 @@ export function generateInviteCode(): string {
 }
 
 /**
+ * Creates an invite code for a specific email address.
+ * Used to auto-generate invites when someone joins the waitlist.
+ */
+export async function createInviteForEmail(ownerUserId: string, targetEmail: string): Promise<string> {
+  const supabase = createAdminClient()
+  const code = generateInviteCode()
+
+  const { error } = await supabase.from('invites').insert({
+    code,
+    owner_user_id: ownerUserId,
+    target_email: targetEmail,
+  })
+
+  if (error) {
+    console.error('[invite-service.createInviteForEmail] Failed to create invite:', error)
+    throw new Error('Failed to create invite.')
+  }
+
+  console.log(`[invite-service.createInviteForEmail] Created invite ${code} for ${targetEmail}`)
+  return code
+}
+
+/**
  * Validates an invite code for signup.
  * Checks if the code exists, is not already claimed, and is not expired.
  */

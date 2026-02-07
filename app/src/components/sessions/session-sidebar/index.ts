@@ -1,3 +1,6 @@
 export { SessionSidebar } from './session-sidebar'
 export { SessionDetails } from './session-details'
 export { MessagesView } from './messages-view'
+export { TranscriptView } from './transcript-view'
+export { EventTimelineView } from './event-timeline-view'
+export { SessionContentView } from './session-content-view'

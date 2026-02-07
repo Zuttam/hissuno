@@ -6,11 +6,14 @@ import {
   Heading,
   Hr,
   Html,
+  Img,
   Link,
   Preview,
   Section,
   Text,
 } from '@react-email/components'
+
+const LOGO_URL = 'https://app.hissuno.com/logos/hissuno/light-mode-transparant.png'
 
 interface WelcomeEmailProps {
   fullName?: string | null
@@ -18,7 +21,7 @@ interface WelcomeEmailProps {
 }
 
 export function WelcomeEmail({ fullName, dashboardUrl }: WelcomeEmailProps) {
-  const greeting = fullName ? `Hi ${fullName}` : 'Welcome'
+  const greeting = fullName ? `Hi ${fullName}!` : 'Welcome!'
 
   return (
     <Html>
@@ -26,32 +29,51 @@ export function WelcomeEmail({ fullName, dashboardUrl }: WelcomeEmailProps) {
       <Preview>Welcome to Hissuno - Your customer intelligence platform</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>{greeting}!</Heading>
+          <Section style={logoContainer}>
+            <Img src={LOGO_URL} alt="Hissuno" width={140} height={46} style={logo} />
+          </Section>
+
+          <Heading style={h1}>{greeting}</Heading>
 
           <Text style={text}>
-            Thanks for signing up for Hissuno. We&apos;re excited to help you transform
-            customer conversations intos shipped features.
+            Thanks for joining Hissuno! We&apos;re thrilled to have you on board.
+          </Text>
+
+          <Text style={text}>
+            You&apos;re all set to start turning customer conversations into shipped features
+            &mdash; let&apos;s make every conversation count.
           </Text>
 
           <Section style={buttonContainer}>
             <Button style={button} href={dashboardUrl}>
-              Go to Dashboard
+              Get Started
             </Button>
           </Section>
 
-          <Text style={text}>With Hissuno, you can:</Text>
-          <ul style={list}>
-            <li>Deploy an AI support agent powered by your product knowledge</li>
-            <li>Automatically create and triage issues from customer feedback</li>
-            <li>Get actionable insights from every conversation</li>
-          </ul>
+          <Text style={subheading}>Here&apos;s what you can do:</Text>
+          <table style={featureTable} cellPadding={0} cellSpacing={0}>
+            <tr>
+              <td style={featureIcon}>&#127919;</td>
+              <td style={featureText}>Deploy an AI support agent powered by your product knowledge</td>
+            </tr>
+            <tr>
+              <td style={featureIcon}>&#9889;</td>
+              <td style={featureText}>Automatically create and triage issues from customer feedback</td>
+            </tr>
+            <tr>
+              <td style={featureIcon}>&#128161;</td>
+              <td style={featureText}>Get actionable insights from every conversation</td>
+            </tr>
+          </table>
 
           <Hr style={hr} />
 
-          <Text style={footer}>If you have any questions, just reply to this email.</Text>
+          <Text style={footer}>
+            Questions? Just reply to this email &mdash; we&apos;d love to hear from you.
+          </Text>
 
           <Link href={dashboardUrl} style={footerLink}>
-            Hissuno
+            hissuno.com
           </Link>
         </Container>
       </Body>
@@ -67,50 +89,81 @@ const main = {
 const container = {
   backgroundColor: '#ffffff',
   margin: '0 auto',
-  padding: '40px 20px',
+  padding: '40px 24px',
   maxWidth: '560px',
+  borderRadius: '8px',
+}
+
+const logoContainer = {
+  textAlign: 'center' as const,
+  margin: '0 0 32px',
+}
+
+const logo = {
+  margin: '0 auto',
 }
 
 const h1 = {
   color: '#1a1a1a',
-  fontSize: '24px',
-  fontWeight: '600',
-  lineHeight: '32px',
-  margin: '0 0 20px',
+  fontSize: '26px',
+  fontWeight: '700',
+  lineHeight: '34px',
+  margin: '0 0 16px',
 }
 
 const text = {
   color: '#525f7f',
   fontSize: '16px',
-  lineHeight: '24px',
+  lineHeight: '26px',
   margin: '0 0 16px',
 }
 
+const subheading = {
+  color: '#1a1a1a',
+  fontSize: '16px',
+  fontWeight: '600',
+  lineHeight: '24px',
+  margin: '0 0 12px',
+}
+
 const buttonContainer = {
-  margin: '24px 0',
+  margin: '28px 0',
 }
 
 const button = {
-  backgroundColor: '#1a1a1a',
-  borderRadius: '6px',
+  backgroundColor: '#2563eb',
+  borderRadius: '8px',
   color: '#fff',
   fontSize: '16px',
   fontWeight: '600',
   textDecoration: 'none',
   textAlign: 'center' as const,
-  padding: '12px 24px',
+  padding: '14px 28px',
 }
 
-const list = {
+const featureTable = {
+  width: '100%',
+  margin: '0 0 8px',
+}
+
+const featureIcon = {
+  fontSize: '18px',
+  width: '32px',
+  verticalAlign: 'top' as const,
+  paddingTop: '2px',
+  paddingBottom: '10px',
+}
+
+const featureText = {
   color: '#525f7f',
-  fontSize: '16px',
-  lineHeight: '24px',
-  paddingLeft: '20px',
+  fontSize: '15px',
+  lineHeight: '22px',
+  paddingBottom: '10px',
 }
 
 const hr = {
   borderColor: '#e6ebf1',
-  margin: '32px 0',
+  margin: '28px 0',
 }
 
 const footer = {

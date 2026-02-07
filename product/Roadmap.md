@@ -95,13 +95,12 @@
 [x] Ads for AI FDE
 
 ### Support
-[] alert and interact in slack for open sessions -  support sessions go to a centeralize channel in slack, the user can answer in the relevant thread in slack which replies in the session to the user
+[x] alert and interact in slack for open sessions -  support sessions go to a centeralize channel in slack, the user can answer in the relevant thread in slack which replies in the session to the user
 [x] Fix automatic close session cron in prod
 [x] Improve human takeover mechanism (e.g Add waiting for human status)
 
 ### Sessions
-[] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
-
+[x] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
 [] Expend sessions type to different use cases: behavioral session (events), meeting (multi user conversation like gong -> show transcript), chat (intercom, widget) and show the contents accordingly
 
 
@@ -112,6 +111,7 @@
 [x] Implement basic alert/notification system
 
 ## Phase 8
+
 
 ### Suport
 [] Email agent

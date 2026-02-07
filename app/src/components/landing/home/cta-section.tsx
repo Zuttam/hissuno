@@ -45,10 +45,10 @@ export function CTASection() {
               onClick={handleButtonClick}
               className="bg-[var(--accent-selected)] hover:opacity-90"
             >
-              Join Waitlist
+              Join the Beta
             </Button>
             <p className="mt-2 text-sm text-[var(--text-tertiary)]">
-              Join now and get free credits
+              Get early access
             </p>
           </div>
         </WaterReveal>

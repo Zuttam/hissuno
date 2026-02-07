@@ -5,6 +5,7 @@ export interface InviteRecord {
   claimed_by_user_id: string | null
   claimed_at: string | null
   expires_at: string | null
+  target_email: string | null
   created_at: string
 }
 

@@ -157,6 +157,7 @@ async function createSessionFromGongCall(
     id: sessionId,
     project_id: projectId,
     source: 'gong',
+    session_type: 'meeting',
     status: 'closed', // Historical data is always closed
     name: generateSessionName(call),
     user_id: userId,

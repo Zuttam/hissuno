@@ -344,6 +344,7 @@ export type Database = {
           expires_at: string | null
           id: string
           owner_user_id: string
+          target_email: string | null
         }
         Insert: {
           claimed_at?: string | null
@@ -353,6 +354,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           owner_user_id: string
+          target_email?: string | null
         }
         Update: {
           claimed_at?: string | null
@@ -362,6 +364,7 @@ export type Database = {
           expires_at?: string | null
           id?: string
           owner_user_id?: string
+          target_email?: string | null
         }
         Relationships: []
       }
@@ -1297,9 +1300,6 @@ export type Database = {
           first_message_at: string | null
           goodbye_detected_at: string | null
           human_takeover_at: string | null
-          human_takeover_slack_channel_id: string | null
-          human_takeover_slack_thread_ts: string | null
-          human_takeover_user_id: string | null
           id: string
           idle_prompt_sent_at: string | null
           is_archived: boolean
@@ -1312,6 +1312,7 @@ export type Database = {
           pm_reviewed_at: string | null
           project_id: string
           scheduled_close_at: string | null
+          session_type: string
           source: string | null
           status: string | null
           tags: string[] | null
@@ -1325,9 +1326,6 @@ export type Database = {
           first_message_at?: string | null
           goodbye_detected_at?: string | null
           human_takeover_at?: string | null
-          human_takeover_slack_channel_id?: string | null
-          human_takeover_slack_thread_ts?: string | null
-          human_takeover_user_id?: string | null
           id: string
           idle_prompt_sent_at?: string | null
           is_archived?: boolean
@@ -1340,6 +1338,7 @@ export type Database = {
           pm_reviewed_at?: string | null
           project_id: string
           scheduled_close_at?: string | null
+          session_type?: string
           source?: string | null
           status?: string | null
           tags?: string[] | null
@@ -1353,9 +1352,6 @@ export type Database = {
           first_message_at?: string | null
           goodbye_detected_at?: string | null
           human_takeover_at?: string | null
-          human_takeover_slack_channel_id?: string | null
-          human_takeover_slack_thread_ts?: string | null
-          human_takeover_user_id?: string | null
           id?: string
           idle_prompt_sent_at?: string | null
           is_archived?: boolean
@@ -1368,6 +1364,7 @@ export type Database = {
           pm_reviewed_at?: string | null
           project_id?: string
           scheduled_close_at?: string | null
+          session_type?: string
           source?: string | null
           status?: string | null
           tags?: string[] | null
@@ -1721,6 +1718,7 @@ export type Database = {
           id: string
           ip_address: string | null
           source: string | null
+          type: string
         }
         Insert: {
           created_at?: string | null
@@ -1728,6 +1726,7 @@ export type Database = {
           id?: string
           ip_address?: string | null
           source?: string | null
+          type?: string
         }
         Update: {
           created_at?: string | null
@@ -1735,6 +1734,7 @@ export type Database = {
           id?: string
           ip_address?: string | null
           source?: string | null
+          type?: string
         }
         Relationships: []
       }

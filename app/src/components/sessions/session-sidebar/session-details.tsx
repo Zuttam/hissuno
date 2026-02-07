@@ -3,8 +3,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { Badge, Select } from '@/components/ui'
-import type { SessionWithProject, SessionStatus, SessionSource, UpdateSessionInput } from '@/types/session'
-import { SESSION_SOURCE_INFO } from '@/types/session'
+import type { SessionWithProject, SessionStatus, SessionSource, SessionType, UpdateSessionInput } from '@/types/session'
+import { SESSION_SOURCE_INFO, SESSION_TYPE_INFO } from '@/types/session'
 
 function formatDateTime(dateString: string): string {
   const date = new Date(dateString)
@@ -246,11 +246,14 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
         </div>
       )}
 
-      {/* Source, Archived, and Project */}
+      {/* Source, Type, Archived, and Project */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Badge variant={sourceInfo.variant}>
             {sourceInfo.label}
+          </Badge>
+          <Badge variant={SESSION_TYPE_INFO[session.session_type as SessionType]?.variant ?? 'default'}>
+            {SESSION_TYPE_INFO[session.session_type as SessionType]?.label ?? session.session_type}
           </Badge>
           {session.is_archived && (
             <Badge variant="default">Archived</Badge>

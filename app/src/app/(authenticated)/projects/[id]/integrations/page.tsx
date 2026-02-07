@@ -4,7 +4,10 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { useProject } from '@/components/providers/project-provider'
+import { useUser } from '@/components/providers/auth-provider'
 import { useSupportWidget } from '@/components/providers/support-widget-provider'
+import { useFeatureFlag } from '@/hooks/use-feature-flag'
+import { trackFeatureAccessRequested } from '@/lib/event_tracking/events'
 import { WidgetConfigDialog } from '@/components/projects/edit-dialogs/widget-config-dialog'
 import { SlackConfigDialog } from '@/components/projects/edit-dialogs/slack-config-dialog'
 import { GitHubConfigDialog } from '@/components/projects/edit-dialogs/github-config-dialog'
@@ -24,6 +27,7 @@ interface Integration {
   icon: React.ReactNode
   category: 'sessions' | 'issues' | 'development' | 'analytics'
   comingSoon?: boolean
+  requestAccess?: boolean
 }
 
 function StatusBadge({ status }: { status: IntegrationStatus }) {
@@ -82,7 +86,13 @@ export default function IntegrationsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { project, projectId, isLoading: isLoadingProject } = useProject()
+  const { user } = useUser()
   const { openWithPrompt } = useSupportWidget()
+  
+  const [gongAccessRequested, setGongAccessRequested] = useState(false)
+  const [isRequestingGongAccess, setIsRequestingGongAccess] = useState(false)
+  const [jiraAccessRequested, setJiraAccessRequested] = useState(false)
+  const [isRequestingJiraAccess, setIsRequestingJiraAccess] = useState(false)
   const [showWidgetDialog, setShowWidgetDialog] = useState(false)
   const [showSlackDialog, setShowSlackDialog] = useState(false)
   const [showGithubDialog, setShowGithubDialog] = useState(false)
@@ -97,6 +107,33 @@ export default function IntegrationsPage() {
   const [intercomConnected, setIntercomConnected] = useState(false)
   const [gongConnected, setGongConnected] = useState(false)
   const [jiraConnected, setJiraConnected] = useState(false)
+  const {enabled: gongEnabled, isLoading: isGongLoading}  = useFeatureFlag('gong_integration')
+  const {enabled: jiraEnabled, isLoading: isJiraLoading}  = useFeatureFlag('jira_integration')
+
+  const handleRequestAccess = async (feature: string, setRequested: (v: boolean) => void, setRequesting: (v: boolean) => void) => {
+    if (!user?.email) return
+    setRequesting(true)
+    try {
+      await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          source: feature,
+          type: 'feature_access',
+        }),
+      })
+      setRequested(true)
+      trackFeatureAccessRequested({ feature })
+    } catch (err) {
+      console.error(`[integrations] Failed to request ${feature} access:`, err)
+    } finally {
+      setRequesting(false)
+    }
+  }
+
+  const handleRequestGongAccess = () => void handleRequestAccess('gong_integration', setGongAccessRequested, setIsRequestingGongAccess)
+  const handleRequestJiraAccess = () => void handleRequestAccess('jira_integration', setJiraAccessRequested, setIsRequestingJiraAccess)
 
   // Refresh integration statuses - defined early so it can be used in useEffect
   const refreshStatuses = useCallback(async () => {
@@ -160,9 +197,9 @@ export default function IntegrationsPage() {
       setShowGithubDialog(true)
     } else if (dialog === 'intercom') {
       setShowIntercomDialog(true)
-    } else if (dialog === 'gong') {
+    } else if (dialog === 'gong' && gongEnabled) {
       setShowGongDialog(true)
-    } else if (dialog === 'jira') {
+    } else if (dialog === 'jira' && jiraEnabled) {
       setShowJiraDialog(true)
     }
 
@@ -172,7 +209,7 @@ export default function IntegrationsPage() {
       void refreshStatuses()
       router.replace(`/projects/${projectId}/integrations`)
     }
-  }, [searchParams, projectId, router, refreshStatuses])
+  }, [searchParams, projectId, router, refreshStatuses, gongEnabled, jiraEnabled])
 
   // Clear URL param when dialog closes
   const handleCloseWidgetDialog = () => {
@@ -297,6 +334,7 @@ export default function IntegrationsPage() {
         status: gongConnected ? 'active' : 'not_connected',
         icon: <GongIcon />,
         category: 'sessions',
+        requestAccess: !gongEnabled,
       },
       {
         id: 'intercom',
@@ -321,6 +359,7 @@ export default function IntegrationsPage() {
         status: jiraConnected ? 'active' : 'not_connected',
         icon: <JiraIcon />,
         category: 'issues',
+        requestAccess: !jiraEnabled,
       },
       {
         id: 'linear',
@@ -350,7 +389,7 @@ export default function IntegrationsPage() {
         comingSoon: true,
       },
     ])
-  }, [widgetStats, slackConnected, githubConnected, intercomConnected, gongConnected, jiraConnected])
+  }, [widgetStats, slackConnected, githubConnected, intercomConnected, gongConnected, jiraConnected, gongEnabled, jiraEnabled])
 
   const sessionIntegrations = integrations.filter(i => i.category === 'sessions')
   const issueIntegrations = integrations.filter(i => i.category === 'issues')
@@ -359,6 +398,8 @@ export default function IntegrationsPage() {
 
   // Handler for opening integration dialogs - updates URL for consistent tracking
   const handleConfigureIntegration = (integrationId: string) => {
+    if (integrationId === 'gong' && !gongEnabled) return
+    if (integrationId === 'jira' && !jiraEnabled) return
     if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github' || integrationId === 'intercom' || integrationId === 'gong' || integrationId === 'jira') {
       router.push(`/projects/${projectId}/integrations?dialog=${integrationId}`)
     }
@@ -406,6 +447,9 @@ export default function IntegrationsPage() {
               key={integration.id}
               integration={integration}
               onConfigure={() => handleConfigureIntegration(integration.id)}
+              onRequestAccess={integration.id === 'gong' ? handleRequestGongAccess : undefined}
+              accessRequested={integration.id === 'gong' ? gongAccessRequested : undefined}
+              isRequestingAccess={integration.id === 'gong' ? isRequestingGongAccess : undefined}
             />
           ))}
         </div>
@@ -438,6 +482,9 @@ export default function IntegrationsPage() {
               key={integration.id}
               integration={integration}
               onConfigure={() => handleConfigureIntegration(integration.id)}
+              onRequestAccess={integration.id === 'jira' ? handleRequestJiraAccess : undefined}
+              accessRequested={integration.id === 'jira' ? jiraAccessRequested : undefined}
+              isRequestingAccess={integration.id === 'jira' ? isRequestingJiraAccess : undefined}
             />
           ))}
         </div>
@@ -509,9 +556,12 @@ export default function IntegrationsPage() {
 interface IntegrationCardProps {
   integration: Integration
   onConfigure?: () => void
+  onRequestAccess?: () => void
+  accessRequested?: boolean
+  isRequestingAccess?: boolean
 }
 
-function IntegrationCard({ integration, onConfigure }: IntegrationCardProps) {
+function IntegrationCard({ integration, onConfigure, onRequestAccess, accessRequested, isRequestingAccess }: IntegrationCardProps) {
   return (
     <FloatingCard floating="gentle" className="p-0">
       <div className="p-4">
@@ -526,6 +576,8 @@ function IntegrationCard({ integration, onConfigure }: IntegrationCardProps) {
               </h4>
               {integration.comingSoon ? (
                 <Badge variant="default">Coming Soon</Badge>
+              ) : integration.requestAccess ? (
+                <Badge variant="info">Early Access</Badge>
               ) : (
                 <StatusBadge status={integration.status} />
               )}
@@ -534,7 +586,16 @@ function IntegrationCard({ integration, onConfigure }: IntegrationCardProps) {
               {integration.description}
             </p>
           </div>
-          {!integration.comingSoon && (
+          {integration.comingSoon ? null : integration.requestAccess ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={accessRequested ? undefined : onRequestAccess}
+              disabled={isRequestingAccess || accessRequested}
+            >
+              {isRequestingAccess ? 'Requesting...' : accessRequested ? 'Requested' : 'Request Access'}
+            </Button>
+          ) : (
             <Button
               variant="secondary"
               size="sm"

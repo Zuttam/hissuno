@@ -10,7 +10,6 @@ import { WelcomeEmail } from '@/lib/email/templates/welcome'
 import {
   recordNotification,
   hasNotificationBeenSent,
-  shouldSendNotification,
 } from '@/lib/notifications/notification-service'
 import type { SendEmailResult } from '@/lib/email/types'
 
@@ -41,14 +40,6 @@ export async function sendWelcomeNotificationIfNeeded(
       return { success: true, error: 'Already sent' }
     }
 
-    // Check email preference
-    const shouldEmail = await shouldSendNotification(userId, 'welcome', 'email')
-    if (!shouldEmail) {
-      console.log(`${LOG_PREFIX} Email notification disabled by user preferences`)
-      return { success: true, error: 'Disabled by preferences' }
-    }
-
-    // Send email if Resend is configured
     if (!isResendConfigured()) {
       console.warn(`${LOG_PREFIX} Resend not configured, skipping email`)
       return { success: false, error: 'Email service not configured' }

@@ -8,7 +8,7 @@
     "build": "npm run build:widget && next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run",
+    "test": "vitest run --exclude 'src/__tests__/integration/**'",
     "test:unit": "vitest run src/__tests__/unit/**",
     "test:integration": "vitest run src/__tests__/integration/**",
     "test:integration:pm-agent": "vitest run src/__tests__/integration/pm-agent/**",

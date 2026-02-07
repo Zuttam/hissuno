@@ -53,10 +53,10 @@ export function SupportHeroSection() {
             onClick={handleCTAClick}
             className="w-full bg-[var(--accent-selected)] hover:opacity-90 sm:w-auto"
           >
-            Join Waitlist
+            Join the Beta
           </Button>
           <p className="mt-2 text-sm text-[var(--text-tertiary)]">
-            Join now and get free credits
+            Get early access
           </p>
         </div>
       </motion.div>
