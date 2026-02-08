@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { verifyCronSecret } from '@/lib/auth/admin-api'
+import { UnauthorizedError } from '@/lib/auth/server'
 import { getConnectionsDueForSync, hasGongConnection } from '@/lib/integrations/gong'
 import { syncGongCalls } from '@/lib/integrations/gong/sync'
 
@@ -20,16 +22,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
   }
 
-  // Verify cron secret if configured
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = request.headers.get('Authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
-  }
-
   try {
+    verifyCronSecret(request)
     // Use service role for cron operations
     const supabase = await createClient()
 
@@ -100,6 +94,9 @@ export async function GET(request: NextRequest) {
       results,
     })
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
     console.error('[cron/gong-sync] Error:', error)
     return NextResponse.json(
       { error: 'Failed to process Gong sync.' },

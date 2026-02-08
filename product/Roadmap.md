@@ -118,7 +118,6 @@
 
 ### Marketing
 [] Run SDR agent
-[] Change theme to Samurai Pirate
 [] Docs portal
 
 ### Issues
@@ -131,11 +130,9 @@
 
 ### Platform
 [] API Access - support api keys and move cron to rely on admin api key value (change env var)
-[] Improve welcome email visualization
-[] Project multi-users access and RBAC
-[] Alerts and weekly reports(email, slack)
-[] MCP Access
-[] MCP Apps
+[x] Improve welcome email visualization
+[x] Alerts and in app notifications (email, slack)
+
 
 ## Phase 9
 
@@ -149,7 +146,6 @@
 
 ### Platform
 [] Project multi-users access and RBAC
-[] Alerts and weekly reports(email, slack)
 [] MCP Access
 [] MCP Apps
 

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { verifyCronSecret } from '@/lib/auth/admin-api'
+import { UnauthorizedError } from '@/lib/auth/server'
 import { checkEnforcement } from '@/lib/billing/enforcement-service'
 import { ensureSessionName } from '@/lib/sessions/name-generator'
 import { mastra } from '@/mastra'
@@ -20,14 +22,14 @@ const LOG_PREFIX = '[cron.session-lifecycle]'
  * Should be run every minute via Vercel cron.
  */
 export async function GET(request: NextRequest) {
-  // Verify cron secret if configured
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret) {
-    const authHeader = request.headers.get('authorization')
-    if (authHeader !== `Bearer ${cronSecret}`) {
+  try {
+    verifyCronSecret(request)
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
       console.error(`${LOG_PREFIX} Invalid cron secret`)
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    throw error
   }
 
   if (!isSupabaseConfigured()) {
