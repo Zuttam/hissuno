@@ -1,3 +1,4 @@
+import { useRef, useState, useEffect } from "react"
 import { Divider, Text } from "@/components/ui"
 
 export type AlertPriority = 'high' | 'medium' | 'low'
@@ -65,6 +66,15 @@ export function AppHeader({
   alerts,
 }: AppHeaderProps) {
   const visibleAlerts = alerts?.filter(Boolean) ?? []
+  const descriptionRef = useRef<HTMLSpanElement>(null)
+  const [isTruncated, setIsTruncated] = useState(false)
+
+  useEffect(() => {
+    const el = descriptionRef.current
+    if (el) {
+      setIsTruncated(el.scrollWidth > el.clientWidth)
+    }
+  }, [description])
 
   return (
     <header className="flex flex-col py-4 pr-4 pl-16 md:px-6 border-b border-[color:var(--border-subtle)] backdrop-blur-xl bg-[color:var(--background)]/80 relative z-10">
@@ -76,12 +86,13 @@ export function AppHeader({
           </span>
           <span className="text-[color:var(--text-tertiary)]">/</span>
           {description && (
-            <>
-              <span className="hidden md:inline text-[color:var(--text-tertiary)]">—</span>
-              <span className="hidden md:inline text-sm text-[color:var(--text-tertiary)] truncate max-w-md">
-                {description}
-              </span>
-            </>
+            <span
+              ref={descriptionRef}
+              title={isTruncated ? description : undefined}
+              className="hidden md:inline text-sm text-[color:var(--text-tertiary)] truncate max-w-xl"
+            >
+              {description}
+            </span>
           )}
         </div>
 

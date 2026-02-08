@@ -327,9 +327,9 @@ describe('decideIfShouldRespond', () => {
       mockGetAgent.mockReturnValue({ generate: mockGenerate })
 
       const threadHistory = [
-        { user: 'UUSER0001', text: 'How do I reset my password?', type: 'message' as const },
-        { user: BOT_USER_ID, text: 'You can reset it at...', type: 'message' as const, bot_id: 'B123' },
-        { user: 'UUSER0002', text: 'I have the same question', type: 'message' as const },
+        { user: 'UUSER0001', text: 'How do I reset my password?', type: 'message' as const, ts: '1700000001.000000' },
+        { user: BOT_USER_ID, text: 'You can reset it at...', type: 'message' as const, bot_id: 'B123', ts: '1700000002.000000' },
+        { user: 'UUSER0002', text: 'I have the same question', type: 'message' as const, ts: '1700000003.000000' },
       ]
 
       await decideIfShouldRespond({

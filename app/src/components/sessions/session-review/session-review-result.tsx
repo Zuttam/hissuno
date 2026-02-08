@@ -5,9 +5,10 @@ import type { SessionReviewResult as SessionReviewResultType } from '@/hooks/use
 
 interface SessionReviewResultProps {
   result: SessionReviewResultType
+  projectId: string
 }
 
-export function SessionReviewResult({ result }: SessionReviewResultProps) {
+export function SessionReviewResult({ result, projectId }: SessionReviewResultProps) {
   if (result.action === 'skipped') {
     return (
       <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
@@ -34,7 +35,7 @@ export function SessionReviewResult({ result }: SessionReviewResultProps) {
             {result.issueTitle && (
               result.issueId ? (
                 <Link
-                  href={`/issues?issue=${result.issueId}`}
+                  href={`/projects/${projectId}/issues?issue=${result.issueId}`}
                   className="text-xs text-[color:var(--accent-primary)] hover:underline"
                 >
                   {result.issueTitle}
@@ -64,7 +65,7 @@ export function SessionReviewResult({ result }: SessionReviewResultProps) {
             {result.issueTitle && (
               result.issueId ? (
                 <Link
-                  href={`/issues?issue=${result.issueId}`}
+                  href={`/projects/${projectId}/issues?issue=${result.issueId}`}
                   className="text-xs text-[color:var(--accent-primary)] hover:underline"
                 >
                   {result.issueTitle}

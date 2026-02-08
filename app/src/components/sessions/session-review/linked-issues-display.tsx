@@ -5,6 +5,7 @@ import type { SessionLinkedIssue } from '@/types/session'
 
 interface LinkedIssuesDisplayProps {
   issues: SessionLinkedIssue[]
+  projectId: string
 }
 
 const typeLabels = {
@@ -13,9 +14,9 @@ const typeLabels = {
   change_request: 'Change',
 }
 
-export function LinkedIssuesDisplay({ issues }: LinkedIssuesDisplayProps) {
+export function LinkedIssuesDisplay({ issues, projectId }: LinkedIssuesDisplayProps) {
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       {issues.map((issue) => (
         <div
           key={issue.id}
@@ -33,7 +34,7 @@ export function LinkedIssuesDisplay({ issues }: LinkedIssuesDisplayProps) {
                 </span>
               </div>
               <Link
-                href={`/issues?issue=${issue.id}`}
+                href={`/projects/${projectId}/issues?issue=${issue.id}`}
                 className="mt-1 block truncate text-sm text-[color:var(--accent-primary)] hover:underline"
               >
                 {issue.title}

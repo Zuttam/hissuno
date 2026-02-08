@@ -158,7 +158,7 @@ export function createSSEStream<T extends BaseSSEEvent = BaseSSEEvent>(
   let controllerRef: ReadableStreamDefaultController | null = null
 
   // Events that should not be logged (too noisy)
-  const silentEvents = new Set(['text-chunk', 'heartbeat', 'text-delta', 'message-chunk'])
+  const silentEvents = new Set(['text-chunk', 'heartbeat', 'text-delta', 'message-chunk', 'progress'])
 
   const safeEnqueue = (data: Uint8Array, eventType?: string) => {
     if (!isClosed && controllerRef) {
@@ -245,7 +245,7 @@ export function createSSEStreamWithExecutor<T extends BaseSSEEvent = BaseSSEEven
   const stream = new ReadableStream({
     async start(controller) {
       // Events that should not be logged (too noisy)
-      const silentEvents = new Set(['text-chunk', 'heartbeat', 'text-delta', 'message-chunk'])
+      const silentEvents = new Set(['text-chunk', 'heartbeat', 'text-delta', 'message-chunk', 'progress'])
 
       const safeEnqueue = (data: Uint8Array, eventType?: string) => {
         if (!isClosed) {

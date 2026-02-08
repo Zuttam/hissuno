@@ -57,7 +57,6 @@ interface SessionReviewSectionProps {
   showResult: boolean
   reviewTags: string[]
   steps: WorkflowStep[]
-  onTriggerReview: () => void
 }
 
 export function SessionReviewSection({
@@ -67,43 +66,26 @@ export function SessionReviewSection({
   showResult,
   reviewTags,
   steps,
-  onTriggerReview,
 }: SessionReviewSectionProps) {
   const wasReviewed = Boolean(session.pm_reviewed_at)
   const linkedIssues = session.linked_issues ?? []
   const hasLinkedIssues = linkedIssues.length > 0
 
-  // Show fresh result if available, otherwise show persisted linked issues
-  const showFreshResult = showResult && result && !isReviewing
-  const showPersistedResult = !showFreshResult && !isReviewing && wasReviewed
+  // When the session has refreshed with linked_issues, prefer that over the fresh SSE result
+  // since the DB is the source of truth (avoids stale/wrong SSE result showing "irrelevant")
+  const showPersistedIssues = !isReviewing && hasLinkedIssues
+  // Show fresh result only when persisted linked issues aren't available yet
+  const showFreshResult = !showPersistedIssues && showResult && result && !isReviewing
+  // Show fallback when reviewed but no issues from either source
+  const resultIndicatesIssue = result && (result.action === 'created' || result.action === 'upvoted')
+  const showNoIssuesFallback = !showPersistedIssues && !showFreshResult && !isReviewing && wasReviewed && !resultIndicatesIssue
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Session Review
-          </label>
-          {wasReviewed && (
-            <p className="text-xs text-[color:var(--text-secondary)]">
-              Last reviewed: {formatDateTime(session.pm_reviewed_at!)}
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={onTriggerReview}
-          disabled={isReviewing}
-          className="rounded-[4px] border-2 border-[color:var(--accent-primary)] bg-transparent px-3 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--accent-primary)] transition hover:bg-[color:var(--accent-primary)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isReviewing ? 'Analyzing...' : wasReviewed ? 'Re-analyze' : 'Run Review'}
-        </button>
-      </div>
-
       {/* Step-by-step progress visualization */}
       {isReviewing && (
         <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-4">
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {steps.map((step) => (
               <div key={step.id} className="flex items-center gap-3">
                 {/* Status icon */}
@@ -158,28 +140,38 @@ export function SessionReviewSection({
         </div>
       )}
 
-      {/* Show fresh result from current analysis */}
-      {showFreshResult && (
-        <SessionReviewResult result={result} />
-      )}
+      {/* Linked Issues */}
+      {!isReviewing && (showPersistedIssues || showFreshResult || showNoIssuesFallback) && (
+        <div className="flex flex-col gap-2">
+          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+            Linked Issues
+          </label>
 
-      {/* Show persisted result from database */}
-      {showPersistedResult && (
-        hasLinkedIssues ? (
-          <LinkedIssuesDisplay issues={linkedIssues} />
-        ) : (
-          <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
-            <div className="flex items-center gap-2">
-              <span className="text-lg text-[color:var(--text-tertiary)]">—</span>
-              <div>
-                <p className="font-medium text-[color:var(--foreground)]">No issues found</p>
-                <p className="text-xs text-[color:var(--text-secondary)]">
-                  Session does not contain actionable feedback
-                </p>
+          {/* Persisted linked issues from DB (source of truth) */}
+          {showPersistedIssues && (
+            <LinkedIssuesDisplay issues={linkedIssues} projectId={session.project_id} />
+          )}
+
+          {/* Fresh result from current analysis (before session refresh) */}
+          {showFreshResult && (
+            <SessionReviewResult result={result} projectId={session.project_id} />
+          )}
+
+          {/* No issues fallback */}
+          {showNoIssuesFallback && (
+            <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-[color:var(--text-tertiary)]">—</span>
+                <div>
+                  <p className="font-medium text-[color:var(--foreground)]">No issues found</p>
+                  <p className="text-xs text-[color:var(--text-secondary)]">
+                    Session does not contain actionable feedback
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        )
+          )}
+        </div>
       )}
     </div>
   )

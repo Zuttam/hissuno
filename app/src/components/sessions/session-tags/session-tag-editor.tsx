@@ -175,9 +175,9 @@ export function SessionTagEditor({
   )
 
   return (
-    <div className="space-y-2">
+    <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <label className="font-mono text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+        <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
           Tags
         </label>
         {isSaving && (

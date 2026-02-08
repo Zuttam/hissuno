@@ -27,9 +27,6 @@ export function IssuesTable({
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Type
             </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Project
-            </th>
             <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Upvotes
             </th>
@@ -105,11 +102,6 @@ function IssueRow({ issue, isSelected, onSelect, onArchive }: IssueRowProps) {
       </td>
       <td className="px-3 py-2">
         <TypeBadge type={issue.type} />
-      </td>
-      <td className="px-3 py-2">
-        <span className="text-[color:var(--foreground)]">
-          {issue.project?.name || '-'}
-        </span>
       </td>
       <td className="px-3 py-2 text-center">
         <span className="font-bold text-[color:var(--foreground)]">

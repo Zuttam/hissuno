@@ -15,14 +15,37 @@ import { createAdminClient, isServiceRoleConfigured } from '@/lib/supabase/serve
 import { getProjectCustomTags } from '@/lib/supabase/custom-tags'
 import type { CustomTagRecord } from '@/types/session'
 import {
-  createTestProject,
-  cleanupTestProject,
-  generateUniqueSlug,
-} from '../custom-tags/test-utils'
-import {
   parseSessionTaggingResponse,
   SESSION_TAGS,
 } from './test-utils'
+
+/** Create a test project in the database */
+async function createTestProject(): Promise<{ projectId: string }> {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({
+      name: `test-project-${Date.now()}`,
+      user_id: crypto.randomUUID(),
+    })
+    .select('id')
+    .single()
+  if (error) throw new Error(`Failed to create test project: ${error.message}`)
+  return { projectId: data.id }
+}
+
+/** Clean up a test project and its related data */
+async function cleanupTestProject(projectId: string): Promise<void> {
+  const supabase = createAdminClient()
+  await supabase.from('custom_tags').delete().eq('project_id', projectId)
+  await supabase.from('sessions').delete().eq('project_id', projectId)
+  await supabase.from('projects').delete().eq('id', projectId)
+}
+
+/** Generate a unique slug for testing */
+function generateUniqueSlug(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).substring(2, 10)}-${Date.now()}`
+}
 
 // Longer timeout for LLM calls
 const TEST_TIMEOUT = 60000

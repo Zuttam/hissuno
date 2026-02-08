@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Spinner, Select, MarkdownContent, Badge } from '@/components/ui'
+import { Spinner, MarkdownContent, Badge, CollapsibleSection } from '@/components/ui'
 import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType } from '@/types/issue'
 import type { JiraIssueSyncStatus } from '@/types/jira'
 import { useIssueDetail } from '@/hooks/use-issues'
@@ -10,6 +10,65 @@ import { useSpecGeneration } from '@/hooks/use-spec-generation'
 import { useJiraSyncStatus } from '@/hooks/use-jira-sync'
 import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+type DropdownId = 'type' | 'status' | 'priority'
+
+const TYPE_OPTIONS: { value: IssueType; label: string }[] = [
+  { value: 'bug', label: 'Bug' },
+  { value: 'feature_request', label: 'Feature' },
+  { value: 'change_request', label: 'Change' },
+]
+
+const TYPE_COLORS: Record<IssueType, string> = {
+  bug: 'var(--accent-danger)',
+  feature_request: 'var(--accent-info)',
+  change_request: 'var(--accent-warning)',
+}
+
+const STATUS_OPTIONS: { value: IssueStatus; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'ready', label: 'Ready' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'closed', label: 'Closed' },
+]
+
+const STATUS_COLORS: Record<IssueStatus, string> = {
+  open: 'var(--text-tertiary)',
+  ready: 'var(--accent-info)',
+  in_progress: 'var(--accent-warning)',
+  resolved: 'var(--accent-success)',
+  closed: 'var(--text-tertiary)',
+}
+
+const PRIORITY_OPTIONS: { value: IssuePriority; label: string }[] = [
+  { value: 'low', label: 'Low' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'high', label: 'High' },
+]
+
+const PRIORITY_COLORS: Record<IssuePriority, string> = {
+  low: 'var(--text-tertiary)',
+  medium: 'var(--accent-warning)',
+  high: 'var(--accent-danger)',
+}
+
+const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
+  widget: 'info',
+  slack: 'warning',
+  intercom: 'success',
+  gong: 'default',
+  api: 'default',
+  manual: 'default',
+}
+
+// ============================================================================
+// Issue Sidebar
+// ============================================================================
 
 interface IssueSidebarProps {
   projectId: string
@@ -32,6 +91,53 @@ export function IssueSidebar({
   } = useIssueDetail({ projectId, issueId })
   const { status: jiraStatus, isRetrying: isJiraRetrying, retrySync: retryJiraSync } = useJiraSyncStatus(projectId, issueId)
   const [isArchiving, setIsArchiving] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [openDropdown, setOpenDropdown] = useState<DropdownId | null>(null)
+  const dropdownContainerRef = useRef<HTMLDivElement>(null)
+
+  const {
+    isGenerating: isGeneratingSpec,
+    events: specEvents,
+    streamedText: specStreamedText,
+    activeTools: specActiveTools,
+    startGeneration: handleGenerateSpec,
+    cancelGeneration: handleCancelSpec,
+  } = useSpecGeneration({
+    projectId,
+    issueId,
+    onComplete: () => {
+      refreshIssue()
+      onIssueUpdated?.()
+    },
+  })
+
+  // Close dropdown on click outside or Escape
+  useEffect(() => {
+    if (!openDropdown) return
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!dropdownContainerRef.current?.contains(event.target as Node)) {
+        setOpenDropdown(null)
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpenDropdown(null)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [openDropdown])
+
+  const toggleDropdown = useCallback((id: DropdownId) => {
+    setOpenDropdown((prev) => (prev === id ? null : id))
+  }, [])
 
   const handleArchiveToggle = useCallback(async () => {
     if (!issue) return
@@ -53,39 +159,31 @@ export function IssueSidebar({
     }
   }, [projectId, issue, onIssueUpdated])
 
-  const {
-    isGenerating: isGeneratingSpec,
-    events: specEvents,
-    streamedText: specStreamedText,
-    activeTools: specActiveTools,
-    startGeneration: handleGenerateSpec,
-    cancelGeneration: handleCancelSpec,
-  } = useSpecGeneration({
-    projectId,
-    issueId,
-    onComplete: () => {
-      refreshIssue()
-      onIssueUpdated?.()
-    },
-  })
-
-  const handleStatusChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value as IssueStatus
-    await updateIssue({ status: newStatus })
-    onIssueUpdated?.()
-  }, [updateIssue, onIssueUpdated])
-
-  const handlePriorityChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newPriority = e.target.value as IssuePriority
-    await updateIssue({ priority: newPriority, priority_manual_override: true })
-    onIssueUpdated?.()
-  }, [updateIssue, onIssueUpdated])
-
-  const handleTypeChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newType = e.target.value as IssueType
+  const handleTypeSelect = useCallback(async (newType: IssueType) => {
+    setIsSaving(true)
     await updateIssue({ type: newType })
+    setIsSaving(false)
     onIssueUpdated?.()
+    setOpenDropdown(null)
   }, [updateIssue, onIssueUpdated])
+
+  const handleStatusSelect = useCallback(async (newStatus: IssueStatus) => {
+    setIsSaving(true)
+    await updateIssue({ status: newStatus })
+    setIsSaving(false)
+    onIssueUpdated?.()
+    setOpenDropdown(null)
+  }, [updateIssue, onIssueUpdated])
+
+  const handlePrioritySelect = useCallback(async (newPriority: IssuePriority) => {
+    setIsSaving(true)
+    await updateIssue({ priority: newPriority, priority_manual_override: true })
+    setIsSaving(false)
+    onIssueUpdated?.()
+    setOpenDropdown(null)
+  }, [updateIssue, onIssueUpdated])
+
+  const hasSpec = Boolean(issue?.product_spec)
 
   return (
     <>
@@ -99,179 +197,377 @@ export function IssueSidebar({
       {/* Sidebar */}
       <aside className="fixed right-0 top-0 z-50 flex h-full w-full max-w-2xl flex-col border-l-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b-2 border-[color:var(--border-subtle)] p-4">
-          <h2 className="font-mono text-lg font-bold uppercase tracking-tight text-[color:var(--foreground)]">
-            Issue Details
-          </h2>
-          <div className="flex items-center gap-2">
-            {issue && (
-              <button
-                type="button"
-                onClick={handleArchiveToggle}
-                disabled={isArchiving}
-                className="rounded-[4px] p-1.5 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label={issue.is_archived ? 'Unarchive issue' : 'Archive issue'}
-                title={issue.is_archived ? 'Unarchive' : 'Archive'}
-              >
-                {issue.is_archived ? (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="2" y="4" width="20" height="5" rx="2" />
-                    <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
-                    <path d="M12 13v4" />
-                    <path d="m9 16 3 3 3-3" />
-                  </svg>
-                ) : (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <rect x="2" y="4" width="20" height="5" rx="2" />
-                    <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
-                    <path d="M10 13h4" />
-                  </svg>
-                )}
-              </button>
-            )}
+        <div className="shrink-0 border-b-2 border-[color:var(--border-subtle)] p-4">
+          {/* Row 1: "Issue Details" + close */}
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+              Issue Details
+            </span>
             <button
               type="button"
               onClick={onClose}
               className="rounded-[4px] p-2 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
               aria-label="Close sidebar"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
           </div>
+
+          {/* Row 2: Issue title */}
+          {issue && (
+            <div className="mt-1">
+              <h3 className="text-lg font-semibold text-[color:var(--foreground)]">
+                {issue.title}
+              </h3>
+            </div>
+          )}
+
+          {/* Row 3: Action buttons */}
+          {issue && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5" ref={dropdownContainerRef}>
+              {/* Type (dropdown) */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('type')}
+                  className="inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={TYPE_COLORS[issue.type]} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M2 17l10 5 10-5" />
+                    <path d="M2 12l10 5 10-5" />
+                  </svg>
+                  <span>{TYPE_OPTIONS.find((o) => o.value === issue.type)?.label ?? issue.type}</span>
+                </button>
+                {openDropdown === 'type' && (
+                  <div className="absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3 shadow-lg">
+                    <span className="mb-2 block font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      Type
+                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      {TYPE_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => void handleTypeSelect(option.value)}
+                          disabled={isSaving}
+                          className="flex items-center gap-2 rounded-[4px] px-2 py-1.5 text-left text-sm transition hover:bg-[color:var(--surface-hover)] disabled:opacity-50"
+                        >
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: TYPE_COLORS[option.value] }}
+                          />
+                          <span className={issue.type === option.value ? 'font-medium text-[color:var(--foreground)]' : 'text-[color:var(--text-secondary)]'}>
+                            {option.label}
+                          </span>
+                          {issue.type === option.value && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-[color:var(--accent-primary)]">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Status (dropdown) */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('status')}
+                  className="inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={STATUS_COLORS[issue.status]} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" fill={STATUS_COLORS[issue.status]} fillOpacity="0.2" />
+                    <circle cx="12" cy="12" r="4" fill={STATUS_COLORS[issue.status]} />
+                  </svg>
+                  <span>{STATUS_OPTIONS.find((o) => o.value === issue.status)?.label ?? issue.status}</span>
+                </button>
+                {openDropdown === 'status' && (
+                  <div className="absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3 shadow-lg">
+                    <span className="mb-2 block font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      Status
+                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      {STATUS_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => void handleStatusSelect(option.value)}
+                          disabled={isSaving}
+                          className="flex items-center gap-2 rounded-[4px] px-2 py-1.5 text-left text-sm transition hover:bg-[color:var(--surface-hover)] disabled:opacity-50"
+                        >
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: STATUS_COLORS[option.value] }}
+                          />
+                          <span className={issue.status === option.value ? 'font-medium text-[color:var(--foreground)]' : 'text-[color:var(--text-secondary)]'}>
+                            {option.label}
+                          </span>
+                          {issue.status === option.value && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-[color:var(--accent-primary)]">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Priority (dropdown) */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleDropdown('priority')}
+                  className="inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={PRIORITY_COLORS[issue.priority]} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 19V5" />
+                    <path d="m5 12 7-7 7 7" />
+                  </svg>
+                  <span>
+                    {PRIORITY_OPTIONS.find((o) => o.value === issue.priority)?.label ?? issue.priority}
+                    {issue.priority_manual_override && ' (Manual)'}
+                  </span>
+                </button>
+                {openDropdown === 'priority' && (
+                  <div className="absolute left-0 top-full z-50 mt-1 min-w-[200px] rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3 shadow-lg">
+                    <span className="mb-2 block font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      Priority
+                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      {PRIORITY_OPTIONS.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => void handlePrioritySelect(option.value)}
+                          disabled={isSaving}
+                          className="flex items-center gap-2 rounded-[4px] px-2 py-1.5 text-left text-sm transition hover:bg-[color:var(--surface-hover)] disabled:opacity-50"
+                        >
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: PRIORITY_COLORS[option.value] }}
+                          />
+                          <span className={issue.priority === option.value ? 'font-medium text-[color:var(--foreground)]' : 'text-[color:var(--text-secondary)]'}>
+                            {option.label}
+                          </span>
+                          {issue.priority === option.value && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-auto text-[color:var(--accent-primary)]">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Archive (direct action) */}
+              <button
+                type="button"
+                onClick={() => void handleArchiveToggle()}
+                disabled={isArchiving}
+                className={`inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs transition hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 ${
+                  issue.is_archived
+                    ? 'text-[color:var(--accent-primary)]'
+                    : 'text-[color:var(--text-secondary)]'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="5" rx="2" />
+                  <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+                  <path d="M10 13h4" />
+                </svg>
+                <span>{isArchiving ? 'Updating...' : issue.is_archived ? 'Unarchive' : 'Archive'}</span>
+              </button>
+
+              {/* Analyze / Generate Spec (direct action) */}
+              <button
+                type="button"
+                onClick={handleGenerateSpec}
+                disabled={isGeneratingSpec}
+                className={`inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs transition hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 ${
+                  hasSpec
+                    ? 'text-[color:var(--accent-success)]'
+                    : 'text-[color:var(--text-secondary)]'
+                }`}
+              >
+                {hasSpec ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+                  </svg>
+                )}
+                <span>{isGeneratingSpec ? 'Generating...' : hasSpec ? 'Regenerate' : 'Generate Spec'}</span>
+              </button>
+            </div>
+          )}
         </div>
 
+        {/* Content */}
         {isLoading ? (
           <div className="flex flex-1 items-center justify-center">
             <Spinner />
           </div>
         ) : issue ? (
           <div className="flex-1 overflow-y-auto">
-            {/* Issue Header */}
+            {/* Analysis (expanded by default) */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <IssueHeader
-                issue={issue}
-                onStatusChange={handleStatusChange}
-                onPriorityChange={handlePriorityChange}
-                onTypeChange={handleTypeChange}
-              />
+              <CollapsibleSection title="Analysis" variant="flat" defaultExpanded>
+                <div className="flex flex-col gap-4">
+                  {/* Linked Sessions (lean list) */}
+                  <div className="flex flex-col gap-1">
+                    <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      Linked Sessions ({issue.sessions?.length || 0})
+                    </span>
+                    {issue.sessions && issue.sessions.length > 0 ? (
+                      <div className="flex flex-col gap-1 mt-1">
+                        {issue.sessions.map((session) => {
+                          const sourceVariant = SOURCE_BADGE_VARIANTS[session.source] || 'default'
+                          const sourceLabel = session.source.charAt(0).toUpperCase() + session.source.slice(1)
+                          return (
+                            <Link
+                              key={session.id}
+                              href={`/projects/${projectId}/sessions?session=${session.id}`}
+                              className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+                            >
+                              <Badge variant={sourceVariant}>
+                                {sourceLabel}
+                              </Badge>
+                              <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)] hover:underline">
+                                {session.name || 'Unnamed Session'}
+                              </span>
+                              <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
+                                {formatRelativeDate(session.created_at)}
+                              </span>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                        No linked sessions
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Product Spec */}
+                  <div className="flex flex-col gap-2">
+                    <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      Product Specification
+                    </span>
+
+                    {/* Progress indicator when generating */}
+                    {isGeneratingSpec && (
+                      <SpecGenerationProgress
+                        events={specEvents}
+                        isProcessing={isGeneratingSpec}
+                        onCancel={handleCancelSpec}
+                        streamedText={specStreamedText}
+                        activeTools={specActiveTools}
+                      />
+                    )}
+
+                    {issue.product_spec ? (
+                      <ProductSpecView
+                        spec={issue.product_spec}
+                        generatedAt={issue.product_spec_generated_at}
+                        issueTitle={issue.title}
+                      />
+                    ) : !isGeneratingSpec ? (
+                      <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-6 text-center">
+                        <p className="text-sm text-[color:var(--text-secondary)]">
+                          No product specification yet. Click &ldquo;Generate Spec&rdquo; above to create one.
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </CollapsibleSection>
             </div>
 
-            {/* Jira Sync Status */}
-            {jiraStatus.synced && (
-              <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-                <JiraSyncBadge
-                  status={jiraStatus}
-                  isRetrying={isJiraRetrying}
-                  onRetry={retryJiraSync}
+            {/* Metadata (collapsed by default) */}
+            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+              <CollapsibleSection title="Metadata" variant="flat" defaultExpanded={false}>
+                <div className="flex flex-col gap-4">
+                  {/* Stats */}
+                  <div className="flex items-center gap-4 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
+                    <div className="flex-1 text-center">
+                      <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
+                        {issue.upvote_count}
+                      </p>
+                      <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">
+                        Upvotes
+                      </p>
+                    </div>
+                    <div className="h-8 w-px bg-[color:var(--border-subtle)]" />
+                    <div className="flex-1 text-center">
+                      <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
+                        {issue.sessions?.length || 0}
+                      </p>
+                      <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">
+                        Sessions
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Timestamps */}
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
+                        Created
+                      </label>
+                      <p className="text-[color:var(--foreground)]">
+                        {formatDateTime(issue.created_at)}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
+                        Updated
+                      </label>
+                      <p className="text-[color:var(--foreground)]">
+                        {formatDateTime(issue.updated_at)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Jira Sync Status */}
+                  {jiraStatus.synced && (
+                    <JiraSyncBadge
+                      status={jiraStatus}
+                      isRetrying={isJiraRetrying}
+                      onRetry={retryJiraSync}
+                    />
+                  )}
+                </div>
+              </CollapsibleSection>
+            </div>
+
+            {/* Description (collapsed by default) */}
+            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+              <CollapsibleSection
+                title="Description"
+                variant="flat"
+                defaultExpanded={false}
+                collapsedSummary={issue.description ? truncateText(issue.description, 60) : undefined}
+              >
+                <MarkdownContent
+                  content={issue.description}
+                  className="text-sm"
                 />
-              </div>
-            )}
-
-            {/* Description */}
-            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                Description
-              </h3>
-              <MarkdownContent
-                content={issue.description}
-                className="text-sm"
-              />
-            </div>
-
-            {/* Linked Sessions */}
-            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                Linked Sessions ({issue.sessions?.length || 0})
-              </h3>
-              {issue.sessions && issue.sessions.length > 0 ? (
-                <div className="space-y-2">
-                  {issue.sessions.map((session) => (
-                    <LinkedSessionCard key={session.id} session={session} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-[color:var(--text-secondary)]">
-                  No linked sessions
-                </p>
-              )}
-            </div>
-
-            {/* Product Spec */}
-            <div className="p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <h3 className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                  Product Specification
-                </h3>
-                {!isGeneratingSpec && (
-                  <button
-                    type="button"
-                    onClick={handleGenerateSpec}
-                    className="rounded-[4px] border-2 border-[color:var(--accent-primary)] bg-transparent px-3 py-1 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--accent-primary)] transition hover:bg-[color:var(--accent-primary)] hover:text-white"
-                  >
-                    {issue.product_spec ? 'Regenerate Spec' : 'Generate Spec'}
-                  </button>
-                )}
-              </div>
-
-              {/* Progress indicator when generating */}
-              {isGeneratingSpec && (
-                <div className="mb-4">
-                  <SpecGenerationProgress
-                    events={specEvents}
-                    isProcessing={isGeneratingSpec}
-                    onCancel={handleCancelSpec}
-                    streamedText={specStreamedText}
-                    activeTools={specActiveTools}
-                  />
-                </div>
-              )}
-
-              {issue.product_spec ? (
-                <ProductSpecView
-                  spec={issue.product_spec}
-                  generatedAt={issue.product_spec_generated_at}
-                  issueTitle={issue.title}
-                />
-              ) : !isGeneratingSpec ? (
-                <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-6 text-center">
-                  <p className="text-sm text-[color:var(--text-secondary)]">
-                    No product specification yet. Click "Generate Spec" to create one.
-                  </p>
-                </div>
-              ) : null}
+              </CollapsibleSection>
             </div>
           </div>
         ) : (
@@ -284,112 +580,9 @@ export function IssueSidebar({
   )
 }
 
-interface IssueHeaderProps {
-  issue: IssueWithSessions
-  onStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
-  onPriorityChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
-  onTypeChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
-}
-
-function IssueHeader({ issue, onStatusChange, onPriorityChange, onTypeChange }: IssueHeaderProps) {
-  return (
-    <div className="space-y-4">
-      {/* Title and Project */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-[color:var(--text-secondary)]">
-            {issue.project?.name || 'Unknown Project'}
-          </span>
-          {issue.is_archived && (
-            <span className="rounded-full bg-[color:var(--surface)] px-2 py-0.5 text-xs font-medium text-[color:var(--text-secondary)]">
-              Archived
-            </span>
-          )}
-        </div>
-        <h3 className="text-lg font-semibold text-[color:var(--foreground)]">
-          {issue.title}
-        </h3>
-      </div>
-
-      {/* Type, Status, and Priority Controls */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Type
-          </label>
-          <Select value={issue.type} onChange={onTypeChange} className="w-full">
-            <option value="bug">Bug</option>
-            <option value="feature_request">Feature Request</option>
-            <option value="change_request">Change Request</option>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Status
-          </label>
-          <Select value={issue.status} onChange={onStatusChange} className="w-full">
-            <option value="open">Open</option>
-            <option value="ready">Ready</option>
-            <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Priority {issue.priority_manual_override && '(Manual)'}
-          </label>
-          <Select value={issue.priority} onChange={onPriorityChange} className="w-full">
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </Select>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="flex items-center gap-4 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
-        <div className="flex-1 text-center">
-          <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
-            {issue.upvote_count}
-          </p>
-          <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">
-            Upvotes
-          </p>
-        </div>
-        <div className="h-8 w-px bg-[color:var(--border-subtle)]" />
-        <div className="flex-1 text-center">
-          <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
-            {issue.sessions?.length || 0}
-          </p>
-          <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">
-            Sessions
-          </p>
-        </div>
-      </div>
-
-      {/* Timestamps */}
-      <div className="grid grid-cols-2 gap-4 text-xs">
-        <div className="space-y-1">
-          <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Created
-          </label>
-          <p className="text-[color:var(--foreground)]">
-            {formatDateTime(issue.created_at)}
-          </p>
-        </div>
-        <div className="space-y-1">
-          <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Updated
-          </label>
-          <p className="text-[color:var(--foreground)]">
-            {formatDateTime(issue.updated_at)}
-          </p>
-        </div>
-      </div>
-    </div>
-  )
-}
+// ============================================================================
+// Helpers
+// ============================================================================
 
 function formatDateTime(dateString: string): string {
   const date = new Date(dateString)
@@ -417,6 +610,11 @@ function formatRelativeDate(dateString: string): string {
   if (diffDays < 7) return `${diffDays}d ago`
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
   return `${Math.floor(diffDays / 30)}mo ago`
+}
+
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text
+  return text.slice(0, maxLength).trimEnd() + '...'
 }
 
 // ============================================================================
@@ -487,55 +685,5 @@ function JiraSyncBadge({ status, isRetrying, onRetry }: JiraSyncBadgeProps) {
         </button>
       )}
     </div>
-  )
-}
-
-// ============================================================================
-// Linked Session Card
-// ============================================================================
-
-const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
-  widget: 'info',
-  slack: 'warning',
-  intercom: 'success',
-  gong: 'default',
-  api: 'default',
-  manual: 'default',
-}
-
-interface LinkedSessionCardProps {
-  session: IssueWithSessions['sessions'][number]
-}
-
-function LinkedSessionCard({ session }: LinkedSessionCardProps) {
-  const sourceVariant = SOURCE_BADGE_VARIANTS[session.source] || 'default'
-  const sourceLabel = session.source.charAt(0).toUpperCase() + session.source.slice(1)
-
-  return (
-    <Link
-      href={`/sessions?session=${session.id}`}
-      className="block rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 transition hover:border-[color:var(--accent-primary)] hover:bg-[color:var(--surface-hover)]"
-    >
-      {/* Session Name */}
-      <p className="truncate text-sm font-medium text-[color:var(--foreground)]">
-        {session.name || 'Unnamed Session'}
-      </p>
-
-      {/* Source badge, User ID, and Date */}
-      <div className="mt-1.5 flex items-center gap-2 text-xs text-[color:var(--text-secondary)]">
-        <Badge variant={sourceVariant}>
-          {sourceLabel}
-        </Badge>
-        {session.user_id && (
-          <>
-            <span className="truncate font-mono" title={session.user_id}>
-              {session.user_id.length > 12 ? `${session.user_id.slice(0, 12)}...` : session.user_id}
-            </span>
-            <span>|</span>
-          </>
-        )}
-        <span>{formatRelativeDate(session.created_at)}</span>
-      </div>
-    </Link>
   )
 }

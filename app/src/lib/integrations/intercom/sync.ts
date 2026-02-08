@@ -30,7 +30,7 @@ type AnySupabase = SupabaseClient<any>
  * Progress event during sync
  */
 export interface SyncProgressEvent {
-  type: 'progress' | 'synced' | 'skipped' | 'error'
+  type: 'progress' | 'synced' | 'error'
   conversationId?: string
   sessionId?: string
   message: string
@@ -50,12 +50,19 @@ export interface SyncResult {
 }
 
 /**
+ * Sync mode
+ */
+export type SyncMode = 'incremental' | 'full'
+
+/**
  * Sync options
  */
 export interface SyncOptions {
   triggeredBy: 'manual' | 'cron'
   filterConfig?: IntercomFilterConfig
+  syncMode?: SyncMode
   onProgress?: (event: SyncProgressEvent) => void
+  signal?: AbortSignal
 }
 
 /**
@@ -302,6 +309,13 @@ export async function syncIntercomConversations(
   // Mark sync as in progress
   await updateSyncState(client, projectId, { status: 'in_progress' })
 
+  // Handle sync mode
+  const syncMode = options.syncMode ?? 'incremental'
+
+  if (syncMode === 'full') {
+    console.log('[intercom.sync] Full sync: scanning from configured start date')
+  }
+
   // Initialize API client
   const intercom = new IntercomClient(credentials.accessToken)
 
@@ -315,28 +329,23 @@ export async function syncIntercomConversations(
     toDate = new Date(options.filterConfig.toDate)
   }
 
+  // In incremental mode, use lastSyncAt as fromDate floor if it's more recent
+  if (syncMode === 'incremental' && credentials.lastSyncAt) {
+    const lastSyncDate = new Date(credentials.lastSyncAt)
+    if (!fromDate || lastSyncDate > fromDate) {
+      fromDate = lastSyncDate
+      console.log(`[intercom.sync] Incremental sync: using lastSyncAt ${credentials.lastSyncAt} as fromDate`)
+    }
+  }
+
+  const CONCURRENCY = 5
   let conversationsFound = 0
   let conversationsSynced = 0
   let conversationsSkipped = 0
 
   try {
-    // Collect conversations to sync
-    const conversationsToSync: IntercomConversationListItem[] = []
-
-    // First pass: collect all conversation IDs
-    for await (const conversation of intercom.listAllConversations({
-      fromDate,
-      toDate,
-      onProgress: (fetched, total) => {
-        conversationsFound = total
-        options.onProgress?.({
-          type: 'progress',
-          message: `Scanning conversations... ${fetched}/${total}`,
-          current: fetched,
-          total,
-        })
-      },
-    })) {
+    // Process a single conversation: check dedup, fetch full details, create session
+    const processConversation = async (conversation: IntercomConversationListItem) => {
       // Check if already synced
       const alreadySynced = await isConversationSynced(
         client,
@@ -346,26 +355,13 @@ export async function syncIntercomConversations(
 
       if (alreadySynced) {
         conversationsSkipped++
-        options.onProgress?.({
-          type: 'skipped',
-          conversationId: conversation.id,
-          message: `Skipped (already synced): ${conversation.id}`,
-          current: conversationsSkipped + conversationsSynced,
-          total: conversationsFound,
-        })
-        continue
+        console.log(`[intercom.sync] Skipped conversation ${conversation.id} (already synced)`)
+        return
       }
-
-      conversationsToSync.push(conversation)
-    }
-
-    // Second pass: fetch full conversations and create sessions
-    for (let i = 0; i < conversationsToSync.length; i++) {
-      const conversationListItem = conversationsToSync[i]
 
       try {
         // Fetch full conversation with parts
-        const fullConversation = await intercom.getConversation(conversationListItem.id)
+        const fullConversation = await intercom.getConversation(conversation.id)
 
         // Create session and messages
         const result = await createSessionFromConversation(
@@ -378,35 +374,54 @@ export async function syncIntercomConversations(
 
         if (result) {
           conversationsSynced++
-          options.onProgress?.({
-            type: 'synced',
-            conversationId: fullConversation.id,
-            sessionId: result.sessionId,
-            message: `Synced: ${fullConversation.title || fullConversation.id} (${result.messageCount} messages)`,
-            current: conversationsSynced + conversationsSkipped,
-            total: conversationsToSync.length + conversationsSkipped,
-          })
+          console.log(`[intercom.sync] Synced conversation ${fullConversation.id} → session ${result.sessionId} (${result.messageCount} messages)`)
         } else {
           conversationsSkipped++
-          options.onProgress?.({
-            type: 'error',
-            conversationId: fullConversation.id,
-            message: `Failed to create session for: ${fullConversation.id}`,
-            current: conversationsSynced + conversationsSkipped,
-            total: conversationsToSync.length + conversationsSkipped,
-          })
+          console.warn(`[intercom.sync] Failed to create session for: ${fullConversation.id}`)
         }
       } catch (convError) {
-        console.error(`[intercom.sync] Error processing conversation ${conversationListItem.id}:`, convError)
+        console.error(`[intercom.sync] Error processing conversation ${conversation.id}:`, convError)
         conversationsSkipped++
+      }
+    }
+
+    // Single pass: iterate conversations, process in parallel batches
+    let batch: IntercomConversationListItem[] = []
+
+    for await (const conversation of intercom.searchConversations({
+      fromDate,
+      toDate,
+      onProgress: (_fetched, total) => {
+        conversationsFound = total
+      },
+    })) {
+      if (options.signal?.aborted) break
+
+      batch.push(conversation)
+
+      if (batch.length >= CONCURRENCY) {
+        await Promise.all(batch.map(processConversation))
+        batch = []
+
         options.onProgress?.({
-          type: 'error',
-          conversationId: conversationListItem.id,
-          message: `Error: ${convError instanceof Error ? convError.message : 'Unknown error'}`,
+          type: 'progress',
+          message: `Syncing... ${conversationsSynced} synced, ${conversationsSkipped} skipped of ${conversationsFound}`,
           current: conversationsSynced + conversationsSkipped,
-          total: conversationsToSync.length + conversationsSkipped,
+          total: conversationsFound,
         })
       }
+    }
+
+    // Process remaining partial batch
+    if (batch.length > 0 && !options.signal?.aborted) {
+      await Promise.all(batch.map(processConversation))
+
+      options.onProgress?.({
+        type: 'progress',
+        message: `Syncing... ${conversationsSynced} synced, ${conversationsSkipped} skipped of ${conversationsFound}`,
+        current: conversationsSynced + conversationsSkipped,
+        total: conversationsFound,
+      })
     }
 
     // Update sync state

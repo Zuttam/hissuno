@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import type { SessionWithProject, SessionFilters } from '@/types/session'
+import type { SessionWithProject, SessionFilters, SessionSource } from '@/types/session'
 import { useProject } from '@/components/providers/project-provider'
 import { useSessions, useSessionDetail } from '@/hooks/use-sessions'
 import { SessionsFilters } from '@/components/sessions/sessions-filters'
@@ -10,31 +10,39 @@ import { SessionsTable } from '@/components/sessions/sessions-table'
 import { SessionSidebar } from '@/components/sessions/session-sidebar'
 import { CreateSessionDialog } from '@/components/sessions/create-session-dialog'
 import { SessionsSettingsDialog } from '@/components/projects/edit-dialogs/sessions-settings-dialog'
-import { Button, PageHeader, Spinner } from '@/components/ui'
+import { Button, PageHeader, Pagination, Spinner } from '@/components/ui'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { AnalyticsStrip } from '@/components/analytics'
 import { generateCSV, formatDateForCSV, formatArrayForCSV, type CSVColumn } from '@/lib/utils/csv'
 import { downloadAsCSV, generateExportFilename } from '@/lib/utils/download'
 
-type SessionView = 'messages' | 'details'
+const PAGE_SIZE = 25
 
 export default function ProjectSessionsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { project, projectId, isLoading: isLoadingProject } = useProject()
   const [filters, setFilters] = useState<SessionFilters>({})
+  const [currentPage, setCurrentPage] = useState(1)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
-  const [view, setView] = useState<SessionView>('messages')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
-  // Auto-open dialog based on URL param
+  // Auto-open dialog or sidebar based on URL params
   useEffect(() => {
     const dialog = searchParams.get('dialog')
     if (dialog === 'settings') {
       setShowSettingsDialog(true)
     } else if (dialog === 'create') {
       setShowCreateDialog(true)
+    }
+    const sessionParam = searchParams.get('session')
+    if (sessionParam) {
+      setSelectedSessionId(sessionParam)
+    }
+    const sourceParam = searchParams.get('source')
+    if (sourceParam) {
+      setFilters(prev => ({ ...prev, source: sourceParam as SessionSource }))
     }
   }, [searchParams])
 
@@ -60,14 +68,11 @@ export default function ProjectSessionsPage() {
     }
   }, [projectId])
 
-  // Update URL when selectedSessionId or view changes
+  // Update URL when selectedSessionId changes
   useEffect(() => {
     if (!projectId) return
     if (selectedSessionId) {
-      const basePath = `/projects/${projectId}/sessions`
-      const path = view === 'messages'
-        ? `${basePath}/${selectedSessionId}/messages`
-        : `${basePath}/${selectedSessionId}`
+      const path = `/projects/${projectId}/sessions/${selectedSessionId}`
       if (window.location.pathname !== path) {
         window.history.pushState(null, '', path)
       }
@@ -77,15 +82,14 @@ export default function ProjectSessionsPage() {
         window.history.pushState(null, '', basePath)
       }
     }
-  }, [selectedSessionId, view, projectId])
+  }, [selectedSessionId, projectId])
 
   // Handle browser back/forward navigation
   useEffect(() => {
     const handlePopState = () => {
-      const match = window.location.pathname.match(/\/projects\/[^/]+\/sessions\/([^/]+)(\/messages)?$/)
+      const match = window.location.pathname.match(/\/projects\/[^/]+\/sessions\/([^/]+)/)
       if (match) {
         setSelectedSessionId(match[1])
-        setView(match[2] ? 'messages' : 'details')
       } else {
         setSelectedSessionId(null)
       }
@@ -95,8 +99,14 @@ export default function ProjectSessionsPage() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  const { sessions, isLoading, error, refresh, createSession, archiveSession } = useSessions({
-    filters,
+  const paginatedFilters = {
+    ...filters,
+    limit: PAGE_SIZE,
+    offset: (currentPage - 1) * PAGE_SIZE,
+  }
+
+  const { sessions, total, isLoading, error, refresh, createSession, archiveSession } = useSessions({
+    filters: paginatedFilters,
   })
 
   const {
@@ -114,21 +124,12 @@ export default function ProjectSessionsPage() {
     // Keep project filter fixed
     if (projectId) {
       setFilters({ ...newFilters, projectId })
+      setCurrentPage(1)
     }
   }, [projectId])
 
   const handleSessionSelect = useCallback((session: SessionWithProject) => {
     setSelectedSessionId(session.id)
-    setView('details')
-  }, [])
-
-  const handleOpenMessages = useCallback((session: SessionWithProject) => {
-    setSelectedSessionId(session.id)
-    setView('messages')
-  }, [])
-
-  const handleViewChange = useCallback((newView: SessionView) => {
-    setView(newView)
   }, [])
 
   const handleCloseSidebar = useCallback(() => {
@@ -243,13 +244,21 @@ export default function ProjectSessionsPage() {
         ) : sessions.length === 0 ? (
           <EmptyState />
         ) : (
-          <SessionsTable
-            sessions={sessions}
-            selectedSessionId={selectedSessionId}
-            onSelectSession={handleSessionSelect}
-            onOpenMessages={handleOpenMessages}
-            onArchive={handleArchiveSession}
-          />
+          <>
+            <SessionsTable
+              sessions={sessions}
+              selectedSessionId={selectedSessionId}
+              onSelectSession={handleSessionSelect}
+              onOpenMessages={handleSessionSelect}
+              onArchive={handleArchiveSession}
+            />
+            <Pagination
+              currentPage={currentPage}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onPageChange={setCurrentPage}
+            />
+          </>
         )}
       </FloatingCard>
 
@@ -261,8 +270,6 @@ export default function ProjectSessionsPage() {
           onClose={handleCloseSidebar}
           onSessionUpdated={handleSessionUpdated}
           onUpdateSession={updateSession}
-          view={view}
-          onViewChange={handleViewChange}
         />
       )}
 

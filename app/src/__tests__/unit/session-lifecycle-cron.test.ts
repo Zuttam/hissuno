@@ -526,7 +526,7 @@ describe('Project Settings', () => {
   describe('Default Values', () => {
     it('should use default idle timeout when not configured', () => {
       const defaultIdleTimeout = 5 // minutes
-      const settings: MockProjectSettings | undefined = undefined
+      const settings = undefined as MockProjectSettings | undefined
 
       const idleTimeoutMinutes = settings?.session_idle_timeout_minutes ?? defaultIdleTimeout
       expect(idleTimeoutMinutes).toBe(5)
@@ -534,7 +534,7 @@ describe('Project Settings', () => {
 
     it('should use default response timeout when not configured', () => {
       const defaultResponseTimeout = 60 // seconds
-      const settings: MockProjectSettings | undefined = undefined
+      const settings = undefined as MockProjectSettings | undefined
 
       const responseTimeoutSeconds = settings?.session_idle_response_timeout_seconds ?? defaultResponseTimeout
       expect(responseTimeoutSeconds).toBe(60)
@@ -542,7 +542,7 @@ describe('Project Settings', () => {
 
     it('should use default goodbye delay when not configured', () => {
       const defaultGoodbyeDelay = 90 // seconds
-      const settings: MockProjectSettings | undefined = undefined
+      const settings = undefined as MockProjectSettings | undefined
 
       const goodbyeDelaySeconds = settings?.session_goodbye_delay_seconds ?? defaultGoodbyeDelay
       expect(goodbyeDelaySeconds).toBe(90)

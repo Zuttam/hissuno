@@ -8,7 +8,7 @@ import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
 import { hasGongConnection } from '@/lib/integrations/gong'
-import { syncGongCalls, type SyncProgressEvent } from '@/lib/integrations/gong/sync'
+import { syncGongCalls, type SyncProgressEvent, type SyncMode } from '@/lib/integrations/gong/sync'
 
 export const runtime = 'nodejs'
 
@@ -119,17 +119,29 @@ export async function GET(request: NextRequest) {
   // Get filter config from status
   const filterConfig = status.filterConfig || undefined
 
+  // Parse sync mode from query params
+  const modeParam = request.nextUrl.searchParams.get('mode')
+  const syncMode: SyncMode | undefined =
+    modeParam === 'incremental' || modeParam === 'full' ? modeParam : undefined
+
   return createSSEStreamWithExecutor<GongSyncSSEEvent>({
     logPrefix: '[gong-sync.stream]',
     executor: async ({ emit, close, isClosed }) => {
       emit(createSSEEvent('connected', { message: 'Starting sync...' }) as GongSyncSSEEvent)
 
+      const controller = new AbortController()
+
       try {
         const result = await syncGongCalls(supabase, projectId, {
           triggeredBy: 'manual',
           filterConfig,
+          syncMode,
+          signal: controller.signal,
           onProgress: (event: SyncProgressEvent) => {
-            if (isClosed()) return
+            if (isClosed()) {
+              controller.abort()
+              return
+            }
 
             emit({
               type: event.type as GongSyncSSEEvent['type'],

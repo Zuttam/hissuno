@@ -101,7 +101,7 @@
 
 ### Sessions
 [x] Gong integration (API Key - https://gong.app.gong.io/settings/api/documentation#overview)
-[] Expend sessions type to different use cases: behavioral session (events), meeting (multi user conversation like gong -> show transcript), chat (intercom, widget) and show the contents accordingly
+[x] Expend sessions type to different use cases: behavioral session (events), meeting (multi user conversation like gong -> show transcript), chat (intercom, widget) and show the contents accordingly 
 
 
 ### Platform 
@@ -112,6 +112,8 @@
 
 ## Phase 8
 
+### Sessions
+[] Make each source badge and icon badge (also in filters)
 
 ### Suport
 [] Email agent
@@ -129,7 +131,7 @@
 [] Create initial implementation 
 
 ### Platform
-[] API Access - support api keys and move cron to rely on admin api key value (change env var)
+[] Improve onboarding experience
 [x] Improve welcome email visualization
 [x] Alerts and in app notifications (email, slack)
 
@@ -145,6 +147,7 @@
 [] Facebook community channels
 
 ### Platform
+[] API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] Project multi-users access and RBAC
 [] MCP Access
 [] MCP Apps

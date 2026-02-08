@@ -5,6 +5,7 @@ import type { SessionWithProject, SessionWithMessages, SessionFilters, ChatMessa
 
 interface UseSessionsState {
   sessions: SessionWithProject[]
+  total: number
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -22,6 +23,7 @@ export function useSessions({
   filters = {},
 }: UseSessionsOptions = {}): UseSessionsState {
   const [sessions, setSessions] = useState<SessionWithProject[]>(initialSessions)
+  const [total, setTotal] = useState<number>(0)
   const [isLoading, setIsLoading] = useState<boolean>(initialSessions.length === 0)
   const [error, setError] = useState<string | null>(null)
 
@@ -60,6 +62,7 @@ export function useSessions({
 
       const payload = await response.json()
       setSessions(payload.sessions ?? [])
+      setTotal(payload.total ?? 0)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unexpected error loading sessions.'
       setError(message)
@@ -123,13 +126,14 @@ export function useSessions({
   return useMemo(
     () => ({
       sessions,
+      total,
       isLoading,
       error,
       refresh: fetchSessions,
       createSession,
       archiveSession,
     }),
-    [sessions, isLoading, error, fetchSessions, createSession, archiveSession]
+    [sessions, total, isLoading, error, fetchSessions, createSession, archiveSession]
   )
 }
 

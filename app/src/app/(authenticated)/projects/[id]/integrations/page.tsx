@@ -74,6 +74,10 @@ function IntercomIcon() {
   return <Image src="/logos/intercom.svg" alt="Intercom" width={32} height={32} />
 }
 
+function GmailIcon() {
+  return <Image src="/logos/gmail.svg" alt="Gmail" width={32} height={32} />
+}
+
 function AmplitudeIcon() {
   return <Image src="/logos/amplitude.svg" alt="Amplitude" width={32} height={32} />
 }
@@ -343,6 +347,15 @@ export default function IntegrationsPage() {
         status: intercomConnected ? 'active' : 'not_connected',
         icon: <IntercomIcon />,
         category: 'sessions',
+      },
+      {
+        id: 'gmail',
+        name: 'Gmail',
+        description: 'Import customer emails and support threads from Gmail',
+        status: 'not_connected',
+        icon: <GmailIcon />,
+        category: 'sessions',
+        comingSoon: true,
       },
       {
         id: 'github',

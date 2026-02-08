@@ -72,9 +72,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined,
     }
 
-    const sessions = await listSessions(filters)
+    const { sessions, total } = await listSessions(filters)
 
-    return NextResponse.json({ sessions })
+    return NextResponse.json({ sessions, total })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })

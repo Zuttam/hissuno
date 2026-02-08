@@ -27,13 +27,12 @@ export function SessionsTable({
   const columns: ColumnConfig[] = useMemo(
     () => [
       { id: 'session', header: 'Session', defaultWidth: 140, minWidth: 80 },
-      { id: 'user', header: 'User', defaultWidth: 100, minWidth: 60 },
-      { id: 'project', header: 'Project', defaultWidth: 130, minWidth: 80 },
-      { id: 'source', header: 'Source', defaultWidth: 90, minWidth: 70 },
-      { id: 'page', header: 'Page', defaultWidth: 180, minWidth: 80 },
+      { id: 'user', header: 'User', defaultWidth: 60, minWidth: 50 },
       { id: 'messages', header: 'Messages', defaultWidth: 90, minWidth: 70, align: 'center' },
       { id: 'tags', header: 'Tags', defaultWidth: 150, minWidth: 80 },
+      { id: 'source', header: 'Source', defaultWidth: 90, minWidth: 70 },
       { id: 'status', header: 'Status', defaultWidth: 120, minWidth: 80 },
+      { id: 'page', header: 'Page', defaultWidth: 180, minWidth: 80 },
       { id: 'lastActivity', header: 'Last Activity', defaultWidth: 120, minWidth: 80 },
       { id: 'actions', header: <span className="sr-only">Actions</span>, defaultWidth: 80, minWidth: 60 },
     ],
@@ -131,20 +130,6 @@ function SessionRow({
           <span className="text-[color:var(--text-tertiary)]">-</span>
         )}
       </td>
-      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'project', columns)}>
-        <span className="text-[color:var(--foreground)]">{session.project?.name || '-'}</span>
-      </td>
-      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'source', columns)}>
-        <Badge variant={sourceInfo.variant}>{sourceInfo.label}</Badge>
-      </td>
-      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'page', columns)}>
-        <span
-          className="text-[color:var(--text-secondary)]"
-          title={session.page_url || undefined}
-        >
-          {truncatedPage || '-'}
-        </span>
-      </td>
       <td
         className="px-3 py-2 text-center"
         style={useColumnStyle(columnWidths, 'messages', columns)}
@@ -158,6 +143,9 @@ function SessionRow({
           <span className="text-[color:var(--text-tertiary)]">-</span>
         )}
       </td>
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'source', columns)}>
+        <Badge variant={sourceInfo.variant}>{sourceInfo.label}</Badge>
+      </td>
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'status', columns)}>
         <span className="inline-flex items-center gap-1">
           {session.is_human_takeover && <Badge variant="warning">Needs Human</Badge>}
@@ -165,6 +153,14 @@ function SessionRow({
             {session.status}
           </Badge>
           {session.is_archived && <Badge variant="default">Archived</Badge>}
+        </span>
+      </td>
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'page', columns)}>
+        <span
+          className="text-[color:var(--text-secondary)]"
+          title={session.page_url || undefined}
+        >
+          {truncatedPage || '-'}
         </span>
       </td>
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'lastActivity', columns)}>

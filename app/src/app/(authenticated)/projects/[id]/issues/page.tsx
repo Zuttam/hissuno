@@ -10,26 +10,33 @@ import { IssuesTable } from '@/components/issues/issues-table'
 import { IssueSidebar } from '@/components/issues/issue-sidebar'
 import { CreateIssueDialog } from '@/components/issues/create-issue-dialog'
 import { IssuesSettingsDialog } from '@/components/projects/edit-dialogs/issues-settings-dialog'
-import { Button, PageHeader, Spinner } from '@/components/ui'
+import { Button, PageHeader, Pagination, Spinner } from '@/components/ui'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { AnalyticsStrip } from '@/components/analytics'
+
+const PAGE_SIZE = 25
 
 export default function ProjectIssuesPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { project, projectId, isLoading: isLoadingProject } = useProject()
   const [filters, setFilters] = useState<IssueFilters>({})
+  const [currentPage, setCurrentPage] = useState(1)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
-  // Auto-open dialog based on URL param
+  // Auto-open dialog or sidebar based on URL params
   useEffect(() => {
     const dialog = searchParams.get('dialog')
     if (dialog === 'settings') {
       setShowSettingsDialog(true)
     } else if (dialog === 'create') {
       setShowCreateDialog(true)
+    }
+    const issueParam = searchParams.get('issue')
+    if (issueParam) {
+      setSelectedIssueId(issueParam)
     }
   }, [searchParams])
 
@@ -55,8 +62,14 @@ export default function ProjectIssuesPage() {
     }
   }, [projectId])
 
-  const { issues, isLoading, error, refresh, createIssue, archiveIssue } = useIssues({
-    filters,
+  const paginatedFilters = {
+    ...filters,
+    limit: PAGE_SIZE,
+    offset: (currentPage - 1) * PAGE_SIZE,
+  }
+
+  const { issues, total, isLoading, error, refresh, createIssue, archiveIssue } = useIssues({
+    filters: paginatedFilters,
   })
 
   // Update URL when selectedIssueId changes
@@ -97,6 +110,7 @@ export default function ProjectIssuesPage() {
     // Keep project filter fixed
     if (projectId) {
       setFilters({ ...newFilters, projectId })
+      setCurrentPage(1)
     }
   }, [projectId])
 
@@ -183,12 +197,20 @@ export default function ProjectIssuesPage() {
         ) : issues.length === 0 ? (
           <EmptyState />
         ) : (
-          <IssuesTable
-            issues={issues}
-            selectedIssueId={selectedIssueId}
-            onSelectIssue={handleIssueSelect}
-            onArchive={handleArchiveIssue}
-          />
+          <>
+            <IssuesTable
+              issues={issues}
+              selectedIssueId={selectedIssueId}
+              onSelectIssue={handleIssueSelect}
+              onArchive={handleArchiveIssue}
+            />
+            <Pagination
+              currentPage={currentPage}
+              pageSize={PAGE_SIZE}
+              total={total}
+              onPageChange={setCurrentPage}
+            />
+          </>
         )}
       </FloatingCard>
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { Dialog, Button, Alert, Spinner } from '@/components/ui'
 
 interface GongConfigDialogProps {
@@ -11,6 +12,7 @@ interface GongConfigDialogProps {
 }
 
 type SyncFrequency = 'manual' | '1h' | '6h' | '24h'
+type SyncMode = 'incremental' | 'full'
 
 interface FilterConfig {
   fromDate?: string
@@ -62,6 +64,7 @@ export function GongConfigDialog({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
+  const [showSessionsLink, setShowSessionsLink] = useState(false)
 
   // Connect form state
   const [baseUrl, setBaseUrl] = useState('')
@@ -81,6 +84,7 @@ export function GongConfigDialog({
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
+  const [syncMode, setSyncMode] = useState<SyncMode>('incremental')
 
   const eventSourceRef = useRef<EventSource | null>(null)
 
@@ -226,30 +230,35 @@ export function GongConfigDialog({
     }
   }
 
+  const saveSettings = async (): Promise<{ success: boolean }> => {
+    const filterConfig: FilterConfig = {}
+    if (fromDate) filterConfig.fromDate = fromDate
+    if (toDate) filterConfig.toDate = toDate
+
+    const response = await fetch('/api/integrations/gong', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        projectId,
+        syncFrequency,
+        filterConfig: Object.keys(filterConfig).length > 0 ? filterConfig : {},
+      }),
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Failed to update settings')
+    }
+
+    return { success: true }
+  }
+
   const handleUpdateSettings = async () => {
     setIsUpdatingSettings(true)
     setError(null)
 
     try {
-      const filterConfig: FilterConfig = {}
-      if (fromDate) filterConfig.fromDate = fromDate
-      if (toDate) filterConfig.toDate = toDate
-
-      const response = await fetch('/api/integrations/gong', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId,
-          syncFrequency,
-          filterConfig: Object.keys(filterConfig).length > 0 ? filterConfig : {},
-        }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to update settings')
-      }
-
+      await saveSettings()
       setSuccessMessage('Settings updated successfully.')
       await fetchStatus()
     } catch (err) {
@@ -259,18 +268,42 @@ export function GongConfigDialog({
     }
   }
 
+  const handleStopSync = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+    const synced = syncProgress?.current ?? 0
+    setIsSyncing(false)
+    setSuccessMessage(`Sync stopped. ${synced} call${synced === 1 ? '' : 's'} synced.`)
+    setShowSessionsLink(synced > 0)
+    void fetchStatus()
+    onStatusChanged?.()
+  }
+
   const handleSync = async () => {
     setIsSyncing(true)
     setSyncProgress(null)
     setError(null)
+    setShowSessionsLink(false)
+
+    // Auto-save settings so the sync uses the current UI state
+    try {
+      await saveSettings()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save settings before sync')
+      setIsSyncing(false)
+      return
+    }
 
     // Close any existing event source
     if (eventSourceRef.current) {
       eventSourceRef.current.close()
     }
 
+    const modeParam = status.lastSyncAt ? `&mode=${syncMode}` : '&mode=full'
     const eventSource = new EventSource(
-      `/api/integrations/gong/sync?projectId=${projectId}`
+      `/api/integrations/gong/sync?projectId=${projectId}${modeParam}`
     )
     eventSourceRef.current = eventSource
 
@@ -284,13 +317,16 @@ export function GongConfigDialog({
           eventSourceRef.current = null
           setIsSyncing(false)
           setSuccessMessage(data.message)
+          setShowSessionsLink(true)
           void fetchStatus()
+          onStatusChanged?.()
         } else if (data.type === 'error') {
           eventSource.close()
           eventSourceRef.current = null
           setIsSyncing(false)
           setError(data.message)
           void fetchStatus()
+          onStatusChanged?.()
         }
       } catch {
         // Ignore parse errors
@@ -303,6 +339,7 @@ export function GongConfigDialog({
       setIsSyncing(false)
       setError('Connection to sync stream lost.')
       void fetchStatus()
+      onStatusChanged?.()
     }
   }
 
@@ -323,6 +360,18 @@ export function GongConfigDialog({
         {successMessage && (
           <Alert variant="success">
             {successMessage}
+            {showSessionsLink && (
+              <>
+                {' '}
+                <Link
+                  href={`/projects/${projectId}/sessions?source=gong`}
+                  className="font-medium underline hover:text-[color:var(--foreground)]"
+                  onClick={onClose}
+                >
+                  View synced sessions
+                </Link>
+              </>
+            )}
           </Alert>
         )}
 
@@ -343,7 +392,13 @@ export function GongConfigDialog({
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-[color:var(--text-secondary)]">Total Synced:</span>{' '}
-                  <span className="font-medium">{status.stats?.totalSynced || 0} calls</span>
+                  <Link
+                    href={`/projects/${projectId}/sessions?source=gong`}
+                    className="font-medium text-[color:var(--accent-selected)] hover:underline"
+                    onClick={onClose}
+                  >
+                    {status.stats?.totalSynced || 0} calls
+                  </Link>
                 </div>
                 <div>
                   <span className="text-[color:var(--text-secondary)]">Last Sync:</span>{' '}
@@ -429,6 +484,43 @@ export function GongConfigDialog({
             <div className="space-y-3 border-t border-[color:var(--border-subtle)] pt-4">
               <h4 className="text-sm font-medium text-[color:var(--foreground)]">Manual Sync</h4>
 
+              {status.lastSyncAt && !isSyncing && (
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gong-sync-mode"
+                      value="incremental"
+                      checked={syncMode === 'incremental'}
+                      onChange={() => setSyncMode('incremental')}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="text-sm text-[color:var(--foreground)]">Sync new only</span>
+                      <p className="text-xs text-[color:var(--text-tertiary)]">
+                        Only import calls since {formatDate(status.lastSyncAt)}
+                      </p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="gong-sync-mode"
+                      value="full"
+                      checked={syncMode === 'full'}
+                      onChange={() => setSyncMode('full')}
+                      className="mt-1"
+                    />
+                    <div>
+                      <span className="text-sm text-[color:var(--foreground)]">Sync from start date</span>
+                      <p className="text-xs text-[color:var(--text-tertiary)]">
+                        Re-scan all calls from your configured date range. Already imported sessions will be skipped.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+
               {isSyncing && syncProgress && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -450,14 +542,15 @@ export function GongConfigDialog({
                 </div>
               )}
 
-              <Button
-                variant="secondary"
-                onClick={handleSync}
-                loading={isSyncing}
-                disabled={isSyncing}
-              >
-                {isSyncing ? 'Syncing...' : 'Sync Now'}
-              </Button>
+              {isSyncing ? (
+                <Button variant="danger" onClick={handleStopSync}>
+                  Stop Sync
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={handleSync}>
+                  Sync Now
+                </Button>
+              )}
 
               <p className="text-xs text-[color:var(--text-tertiary)]">
                 Manually trigger a sync to import call transcripts from Gong.

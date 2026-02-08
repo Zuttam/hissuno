@@ -56,6 +56,7 @@ export function HissunoWidget({
   bubblePosition: propBubblePosition,
   bubbleOffset,
   drawerBadgeLabel: propDrawerBadgeLabel,
+  drawerBadgeInitialY: propDrawerBadgeInitialY,
   dialogWidth: propDialogWidth,
   dialogHeight: propDialogHeight,
   renderTrigger,
@@ -298,6 +299,7 @@ export function HissunoWidget({
             onClick={toggle}
             label={resolvedDrawerBadgeLabel}
             theme={resolvedTheme}
+            initialY={propDrawerBadgeInitialY}
           />
         );
       case 'headless':

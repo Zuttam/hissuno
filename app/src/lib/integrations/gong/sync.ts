@@ -50,12 +50,19 @@ export interface SyncResult {
 }
 
 /**
+ * Sync mode
+ */
+export type SyncMode = 'incremental' | 'full'
+
+/**
  * Sync options
  */
 export interface SyncOptions {
   triggeredBy: 'manual' | 'cron'
   filterConfig?: GongFilterConfig
+  syncMode?: SyncMode
   onProgress?: (event: SyncProgressEvent) => void
+  signal?: AbortSignal
 }
 
 /**
@@ -278,6 +285,13 @@ export async function syncGongCalls(
   // Mark sync as in progress
   await updateSyncState(client, projectId, { status: 'in_progress' })
 
+  // Handle sync mode
+  const syncMode = options.syncMode ?? 'incremental'
+
+  if (syncMode === 'full') {
+    console.log('[gong.sync] Full sync: scanning from configured start date')
+  }
+
   // Initialize API client
   const gong = new GongClient(credentials.accessKey, credentials.accessKeySecret, credentials.baseUrl)
 
@@ -289,6 +303,15 @@ export async function syncGongCalls(
   }
   if (options.filterConfig?.toDate) {
     toDate = new Date(options.filterConfig.toDate)
+  }
+
+  // In incremental mode, use lastSyncAt as fromDate floor if it's more recent
+  if (syncMode === 'incremental' && credentials.lastSyncAt) {
+    const lastSyncDate = new Date(credentials.lastSyncAt)
+    if (!fromDate || lastSyncDate > fromDate) {
+      fromDate = lastSyncDate
+      console.log(`[gong.sync] Incremental sync: using lastSyncAt ${credentials.lastSyncAt} as fromDate`)
+    }
   }
 
   let callsFound = 0
@@ -312,6 +335,8 @@ export async function syncGongCalls(
         })
       },
     })) {
+      if (options.signal?.aborted) break
+
       // Check if already synced
       const alreadySynced = await isCallAlreadySynced(
         client,
@@ -335,7 +360,7 @@ export async function syncGongCalls(
     }
 
     // Enrichment pass: fetch detailed party data with speakerIds
-    if (callsToSync.length > 0) {
+    if (callsToSync.length > 0 && !options.signal?.aborted) {
       try {
         const callIds = callsToSync.map((c) => c.id)
         const partiesMap = await gong.getCallsWithParties(callIds)
@@ -356,6 +381,8 @@ export async function syncGongCalls(
 
     // Second pass: fetch transcripts and create sessions
     for (let i = 0; i < callsToSync.length; i++) {
+      if (options.signal?.aborted) break
+
       const call = callsToSync[i]
 
       try {

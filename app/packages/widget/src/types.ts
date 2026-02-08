@@ -129,6 +129,14 @@ export interface HissunoWidgetProps {
   drawerBadgeLabel?: string;
 
   /**
+   * Initial vertical position (0-100%) for the drawer badge
+   * Only applies when trigger='drawer-badge'
+   * User drag position (persisted in localStorage) overrides this value
+   * @default 50
+   */
+  drawerBadgeInitialY?: number;
+
+  /**
    * Width of the dialog display
    * Only applies when display='dialog'
    * @default 600

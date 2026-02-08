@@ -3,3 +3,4 @@ export type { SessionEntry, UseHissunoChatOptions, UseHissunoChatReturn } from '
 export { useKeyboardShortcut, formatShortcut } from './useKeyboardShortcut';
 export { useResolvedTheme } from './useResolvedTheme';
 export { useFocusTrap } from './useFocusTrap';
+export { useDraggable } from './useDraggable';

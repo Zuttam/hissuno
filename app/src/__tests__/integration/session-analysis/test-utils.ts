@@ -87,6 +87,7 @@ export function createMockSession(
     page_title: testCase.session.title,
     name: null,
     source: 'widget',
+    session_type: 'chat',
     message_count: testCase.session.messages.length,
     status: 'closed',
     first_message_at: new Date().toISOString(),
@@ -100,6 +101,9 @@ export function createMockSession(
     is_archived: false,
     is_human_takeover: false,
     human_takeover_at: null,
+    human_takeover_user_id: null,
+    human_takeover_slack_channel_id: null,
+    human_takeover_slack_thread_ts: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }

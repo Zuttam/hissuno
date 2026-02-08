@@ -159,7 +159,7 @@ export async function updateSessionActivity(sessionId: string): Promise<void> {
  * Lists sessions with optional filters. Requires authenticated user context.
  * Only returns sessions for projects owned by the current user.
  */
-export const listSessions = cache(async (filters: SessionFilters = {}): Promise<SessionWithProject[]> => {
+export const listSessions = cache(async (filters: SessionFilters = {}): Promise<{ sessions: SessionWithProject[], total: number }> => {
   if (!isSupabaseConfigured()) {
     throw new Error('Supabase must be configured.')
   }
@@ -183,7 +183,7 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     // Build query - join with projects to filter by user ownership
     let query = supabase
       .from('sessions')
-      .select(selectSessionWithProject)
+      .select(selectSessionWithProject, { count: 'exact' })
       .order('last_activity_at', { ascending: false })
 
     // Filter to only projects owned by this user
@@ -194,9 +194,9 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
       .eq('user_id', user.id)
 
     const projectIds = userProjects?.map(p => p.id) ?? []
-    
+
     if (projectIds.length === 0) {
-      return []
+      return { sessions: [], total: 0 }
     }
 
     query = query.in('project_id', projectIds)
@@ -240,21 +240,21 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     if (filters.dateTo) {
       query = query.lte('created_at', filters.dateTo)
     }
-    if (filters.limit) {
-      query = query.limit(filters.limit)
-    }
-    if (filters.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit ?? 50) - 1)
-    }
 
-    const { data, error } = await query
+    // Apply pagination via .range() (handles both limit and offset in one call)
+    const limit = filters.limit ?? 50
+    const offset = filters.offset ?? 0
+    query = query.range(offset, offset + limit - 1)
+
+    const { data, count, error } = await query
 
     if (error) {
       console.error('[supabase.sessions] failed to list sessions', error)
       throw new Error('Unable to load sessions from Supabase.')
     }
 
-    return enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[])
+    const sessions = await enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[])
+    return { sessions, total: count ?? 0 }
   } catch (error) {
     console.error('[supabase.sessions] unexpected error listing sessions', error)
     throw error

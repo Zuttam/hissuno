@@ -5,6 +5,7 @@ import type { IssueWithProject, IssueWithSessions, IssueFilters, CreateIssueInpu
 
 interface UseIssuesState {
   issues: IssueWithProject[]
+  total: number
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -22,6 +23,7 @@ export function useIssues({
   filters = {},
 }: UseIssuesOptions = {}): UseIssuesState {
   const [issues, setIssues] = useState<IssueWithProject[]>(initialIssues)
+  const [total, setTotal] = useState<number>(0)
   const [isLoading, setIsLoading] = useState<boolean>(initialIssues.length === 0)
   const [error, setError] = useState<string | null>(null)
 
@@ -55,6 +57,7 @@ export function useIssues({
 
       const payload = await response.json()
       setIssues(payload.issues ?? [])
+      setTotal(payload.total ?? 0)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unexpected error loading issues.'
       setError(message)
@@ -118,13 +121,14 @@ export function useIssues({
   return useMemo(
     () => ({
       issues,
+      total,
       isLoading,
       error,
       refresh: fetchIssues,
       createIssue,
       archiveIssue,
     }),
-    [issues, isLoading, error, fetchIssues, createIssue, archiveIssue]
+    [issues, total, isLoading, error, fetchIssues, createIssue, archiveIssue]
   )
 }
 

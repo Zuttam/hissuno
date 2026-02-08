@@ -120,11 +120,11 @@ export async function hasIntercomConnection(
 export async function getIntercomCredentials(
   supabase: SupabaseClient<Database> | AnySupabase,
   projectId: string
-): Promise<{ connectionId: string; accessToken: string; workspaceId: string } | null> {
+): Promise<{ connectionId: string; accessToken: string; workspaceId: string; lastSyncAt: string | null } | null> {
   const client = supabase as AnySupabase
   const { data, error } = await client
     .from('intercom_connections')
-    .select('id, access_token, workspace_id')
+    .select('id, access_token, workspace_id, last_sync_at')
     .eq('project_id', projectId)
     .single()
 
@@ -136,6 +136,7 @@ export async function getIntercomCredentials(
     connectionId: data.id,
     accessToken: data.access_token,
     workspaceId: data.workspace_id,
+    lastSyncAt: data.last_sync_at,
   }
 }
 
@@ -251,6 +252,26 @@ export async function disconnectIntercom(
   }
 
   return { success: true }
+}
+
+/**
+ * Clear all synced conversation records for a connection.
+ * Used by "start from scratch" sync mode.
+ */
+export async function clearSyncedConversations(
+  supabase: SupabaseClient<Database> | AnySupabase,
+  connectionId: string
+): Promise<void> {
+  const client = supabase as AnySupabase
+  const { error } = await client
+    .from('intercom_synced_conversations')
+    .delete()
+    .eq('connection_id', connectionId)
+
+  if (error) {
+    console.error('[intercom.clearSyncedConversations] Failed:', error)
+    throw new Error('Failed to clear synced conversations.')
+  }
 }
 
 /**

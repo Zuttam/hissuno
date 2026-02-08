@@ -273,34 +273,6 @@ export class IntercomClient {
   }
 
   /**
-   * List conversations with pagination
-   */
-  async listConversations(options: {
-    perPage?: number
-    startingAfter?: string
-  } = {}): Promise<IntercomListResponse<IntercomConversationListItem>> {
-    // Intercom API returns conversations under a `conversations` key, not `data`
-    const response = await this.request<{
-      type: string
-      conversations: IntercomConversationListItem[]
-      pages: IntercomListResponse<IntercomConversationListItem>['pages']
-      total_count: number
-    }>('GET', '/conversations', {
-      params: {
-        per_page: options.perPage || 20,
-        starting_after: options.startingAfter,
-      },
-    })
-
-    return {
-      type: response.type,
-      data: response.conversations ?? [],
-      pages: response.pages,
-      total_count: response.total_count,
-    }
-  }
-
-  /**
    * Get a single conversation with all parts
    */
   async getConversation(conversationId: string): Promise<IntercomConversation> {
@@ -313,9 +285,9 @@ export class IntercomClient {
 
   /**
    * Iterate through all conversations with optional date filtering.
-   * This is an async generator that handles pagination automatically.
+   * Uses POST /conversations/search for server-side filtering by created_at.
    */
-  async *listAllConversations(options: {
+  async *searchConversations(options: {
     fromDate?: Date
     toDate?: Date
     onProgress?: (fetched: number, total: number) => void
@@ -324,33 +296,41 @@ export class IntercomClient {
     let fetched = 0
     let totalCount = 0
     let page = 0
-    const maxPages = 100 // Safety limit
+    const maxPages = 500 // Safety limit
 
     while (page < maxPages) {
-      const response = await this.listConversations({
-        perPage: 20,
-        startingAfter: cursor,
-      })
+      // Build created_at query filters (Intercom expects Unix seconds)
+      const filters: Array<{ field: string; operator: string; value: number }> = []
+      if (options.fromDate) {
+        filters.push({ field: 'created_at', operator: '>', value: Math.floor(options.fromDate.getTime() / 1000) })
+      }
+      if (options.toDate) {
+        filters.push({ field: 'created_at', operator: '<', value: Math.floor(options.toDate.getTime() / 1000) })
+      }
+
+      const query = filters.length > 1
+        ? { operator: 'AND', value: filters }
+        : filters[0]
+
+      const body: Record<string, unknown> = {
+        sort_field: 'created_at',
+        sort_order: 'descending',
+        pagination: { per_page: 20, ...(cursor ? { starting_after: cursor } : {}) },
+      }
+      if (query) body.query = query
+
+      const response = await this.request<{
+        type: string
+        conversations: IntercomConversationListItem[]
+        pages: IntercomListResponse<IntercomConversationListItem>['pages']
+        total_count: number
+      }>('POST', '/conversations/search', { body })
 
       if (page === 0) {
         totalCount = response.total_count
       }
 
-      for (const conversation of response.data) {
-        // Apply date filtering (Intercom timestamps are Unix seconds)
-        const createdAt = new Date(conversation.created_at * 1000)
-
-        if (options.fromDate && createdAt < options.fromDate) {
-          // Since results are ordered by most recent first,
-          // if we hit a conversation older than fromDate, we can stop
-          return
-        }
-
-        if (options.toDate && createdAt > options.toDate) {
-          // Skip conversations newer than toDate
-          continue
-        }
-
+      for (const conversation of response.conversations ?? []) {
         fetched++
         yield conversation
 

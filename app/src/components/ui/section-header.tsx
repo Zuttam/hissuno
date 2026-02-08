@@ -20,7 +20,7 @@ export function SectionHeader({
   descriptionClassName,
   ...props
 }: SectionHeaderProps) {
-  const containerClasses = className ? `space-y-2 ${className}` : 'space-y-2'
+  const containerClasses = className ? `flex flex-col gap-2 ${className}` : 'flex flex-col gap-2'
   const titleClasses =
     titleClassName ??
     'text-xl font-mono font-bold uppercase tracking-tight text-[--foreground]'

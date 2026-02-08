@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         const result = await syncGongCalls(supabase, connection.projectId, {
           triggeredBy: 'cron',
           filterConfig,
+          syncMode: 'incremental',
         })
 
         results.push({

@@ -321,7 +321,7 @@ export async function updateIssueArchiveStatusById(
  * Lists issues with optional filters. Requires authenticated user context.
  * Only returns issues for projects owned by the current user.
  */
-export const listIssues = cache(async (filters: IssueFilters = {}): Promise<IssueWithProject[]> => {
+export const listIssues = cache(async (filters: IssueFilters = {}): Promise<{ issues: IssueWithProject[], total: number }> => {
   if (!isSupabaseConfigured()) {
     throw new Error('Supabase must be configured.')
   }
@@ -351,13 +351,13 @@ export const listIssues = cache(async (filters: IssueFilters = {}): Promise<Issu
     const projectIds = userProjects?.map(p => p.id) ?? []
 
     if (projectIds.length === 0) {
-      return []
+      return { issues: [], total: 0 }
     }
 
     // Build query
     let query = supabase
       .from('issues')
-      .select(selectIssueWithProject)
+      .select(selectIssueWithProject, { count: 'exact' })
       .in('project_id', projectIds)
       .order('updated_at', { ascending: false })
 
@@ -382,21 +382,20 @@ export const listIssues = cache(async (filters: IssueFilters = {}): Promise<Issu
     if (filters.search) {
       query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`)
     }
-    if (filters.limit) {
-      query = query.limit(filters.limit)
-    }
-    if (filters.offset) {
-      query = query.range(filters.offset, filters.offset + (filters.limit ?? 50) - 1)
-    }
 
-    const { data, error } = await query
+    // Apply pagination via .range()
+    const limit = filters.limit ?? 50
+    const offset = filters.offset ?? 0
+    query = query.range(offset, offset + limit - 1)
+
+    const { data, count, error } = await query
 
     if (error) {
       console.error('[supabase.issues] failed to list issues', error)
       throw new Error('Unable to load issues from Supabase.')
     }
 
-    return (data ?? []) as IssueWithProject[]
+    return { issues: (data ?? []) as IssueWithProject[], total: count ?? 0 }
   } catch (error) {
     console.error('[supabase.issues] unexpected error listing issues', error)
     throw error

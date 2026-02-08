@@ -96,11 +96,11 @@ export async function hasGongConnection(
 export async function getGongCredentials(
   supabase: SupabaseClient<Database> | AnySupabase,
   projectId: string
-): Promise<{ connectionId: string; accessKey: string; accessKeySecret: string; baseUrl: string } | null> {
+): Promise<{ connectionId: string; accessKey: string; accessKeySecret: string; baseUrl: string; lastSyncAt: string | null } | null> {
   const client = supabase as AnySupabase
   const { data, error } = await client
     .from('gong_connections')
-    .select('id, access_key, access_key_secret, base_url')
+    .select('id, access_key, access_key_secret, base_url, last_sync_at')
     .eq('project_id', projectId)
     .single()
 
@@ -113,6 +113,7 @@ export async function getGongCredentials(
     accessKey: data.access_key,
     accessKeySecret: data.access_key_secret,
     baseUrl: data.base_url,
+    lastSyncAt: data.last_sync_at,
   }
 }
 
@@ -228,6 +229,26 @@ export async function disconnectGong(
   }
 
   return { success: true }
+}
+
+/**
+ * Clear all synced call records for a connection.
+ * Used by "start from scratch" sync mode.
+ */
+export async function clearSyncedCalls(
+  supabase: SupabaseClient<Database> | AnySupabase,
+  connectionId: string
+): Promise<void> {
+  const client = supabase as AnySupabase
+  const { error } = await client
+    .from('gong_synced_calls')
+    .delete()
+    .eq('connection_id', connectionId)
+
+  if (error) {
+    console.error('[gong.clearSyncedCalls] Failed:', error)
+    throw new Error('Failed to clear synced calls.')
+  }
 }
 
 /**
