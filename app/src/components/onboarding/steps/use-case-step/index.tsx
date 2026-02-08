@@ -71,7 +71,7 @@ export function UseCaseStep({ context, onValidationChange, title, description }:
               {/* Content */}
               <div className="flex-1">
                 <h3 className="font-mono font-semibold text-[--foreground]">
-                  {option.label}
+                  <span className="mr-2">{option.emoji}</span>{option.label}
                 </h3>
                 <p className="mt-1 text-sm text-[--text-secondary]">
                   {option.description}

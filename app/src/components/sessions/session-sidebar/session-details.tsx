@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { Badge, Select } from '@/components/ui'
 import type { SessionWithProject, SessionStatus, SessionSource, SessionType, UpdateSessionInput } from '@/types/session'
-import { SESSION_SOURCE_INFO, SESSION_TYPE_INFO } from '@/types/session'
+import { SESSION_SOURCE_INFO, SESSION_TYPE_INFO, getSessionUserDisplay } from '@/types/session'
 
 function formatDateTime(dateString: string): string {
   const date = new Date(dateString)
@@ -21,10 +21,9 @@ interface SessionDetailsProps {
 
 export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps) {
   const sourceInfo = SESSION_SOURCE_INFO[session.source as SessionSource] || SESSION_SOURCE_INFO.widget
+  const isExternalSource = session.source === 'gong' || session.source === 'intercom'
   const [isEditingName, setIsEditingName] = useState(false)
   const [editedName, setEditedName] = useState(session.name || '')
-  const [isEditingUserId, setIsEditingUserId] = useState(false)
-  const [editedUserId, setEditedUserId] = useState(session.user_id || '')
   const [isSaving, setIsSaving] = useState(false)
   const [editingMetadataKey, setEditingMetadataKey] = useState<string | null>(null)
   const [editedMetadataValue, setEditedMetadataValue] = useState('')
@@ -35,8 +34,7 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
   // Sync edited values when session changes
   useEffect(() => {
     setEditedName(session.name || '')
-    setEditedUserId(session.user_id || '')
-  }, [session.name, session.user_id])
+  }, [session.name])
 
   const handleNameSave = useCallback(async () => {
     if (!onUpdateSession) return
@@ -57,26 +55,6 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
       setIsEditingName(false)
     }
   }, [handleNameSave, session.name])
-
-  const handleUserIdSave = useCallback(async () => {
-    if (!onUpdateSession) return
-    setIsSaving(true)
-    const success = await onUpdateSession({ user_id: editedUserId || null })
-    setIsSaving(false)
-    if (success) {
-      setIsEditingUserId(false)
-    }
-  }, [onUpdateSession, editedUserId])
-
-  const handleUserIdKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      void handleUserIdSave()
-    } else if (e.key === 'Escape') {
-      setEditedUserId(session.user_id || '')
-      setIsEditingUserId(false)
-    }
-  }, [handleUserIdSave, session.user_id])
 
   const handleStatusChange = useCallback(async (e: React.ChangeEvent<HTMLSelectElement>) => {
     if (!onUpdateSession) return
@@ -196,7 +174,7 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
         </div>
 
         {/* Status Dropdown - Top Right */}
-        {onUpdateSession ? (
+        {onUpdateSession && !isExternalSource ? (
           <Select
             value={session.status}
             onChange={handleStatusChange}
@@ -215,8 +193,8 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
         )}
       </div>
 
-      {/* Human Takeover Toggle */}
-      {onUpdateSession && (
+      {/* Human Takeover Toggle - hidden for closed sessions */}
+      {onUpdateSession && session.status !== 'closed' && (
         <div className="flex items-center justify-between rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-3 py-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-[color:var(--foreground)]">Human Takeover</span>
@@ -277,55 +255,34 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
         </p>
       </div>
 
-      {/* User ID - Editable */}
-      <div className="space-y-1">
-        <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-          User ID
-        </label>
-        {isEditingUserId ? (
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={editedUserId}
-              onChange={(e) => setEditedUserId(e.target.value)}
-              onKeyDown={handleUserIdKeyDown}
-              onBlur={handleUserIdSave}
-              autoFocus
-              disabled={isSaving}
-              className="flex-1 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-2 py-1 font-mono text-sm text-[color:var(--foreground)] focus:border-[color:var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-primary)] disabled:opacity-50"
-              placeholder="Enter user ID..."
-            />
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onUpdateSession && setIsEditingUserId(true)}
-            disabled={!onUpdateSession}
-            className="group flex w-full items-center gap-2 text-left disabled:cursor-default"
-          >
-            <p className="font-mono text-sm text-[color:var(--foreground)]">
-              {session.user_id || <span className="text-[color:var(--text-tertiary)]">No user ID</span>}
-            </p>
-            {onUpdateSession && (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="text-[color:var(--text-tertiary)] opacity-0 transition group-hover:opacity-100"
-              >
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
+      {/* User */}
+      {(() => {
+        const userDisplay = getSessionUserDisplay(session)
+        return (
+          <div className="space-y-1">
+            <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+              User
+            </label>
+            {userDisplay.name ? (
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+                    userDisplay.isHissuno
+                      ? 'bg-[color:var(--accent-success)]'
+                      : 'bg-[color:var(--text-tertiary)]'
+                  }`}
+                />
+                <span className="text-sm text-[color:var(--foreground)]">{userDisplay.name}</span>
+                <Badge variant={userDisplay.isHissuno ? 'success' : 'default'}>
+                  {userDisplay.isHissuno ? 'Hissuno' : 'External'}
+                </Badge>
+              </div>
+            ) : (
+              <p className="text-sm text-[color:var(--text-tertiary)]">Unknown</p>
             )}
-          </button>
-        )}
-      </div>
+          </div>
+        )
+      })()}
 
       {/* User Metadata - Editable */}
       <div className="space-y-1">
@@ -452,6 +409,39 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
           )}
         </div>
       </div>
+
+      {/* Participants (Gong sessions only) */}
+      {session.source === 'gong' && session.user_metadata?.gong_participants && (
+        <div className="space-y-1">
+          <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+            Participants
+          </label>
+          <div className="space-y-1.5 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-2">
+            {(session.user_metadata.gong_participants as unknown as Array<{ name: string; email: string | null; title: string | null; affiliation: string }>).map((participant, idx) => (
+              <div key={idx} className="flex items-center gap-2 text-xs">
+                <span
+                  className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+                    participant.affiliation === 'external'
+                      ? 'bg-[color:var(--accent-info)]'
+                      : 'bg-[color:var(--text-tertiary)]'
+                  }`}
+                />
+                <span className="truncate font-medium text-[color:var(--foreground)]">
+                  {participant.name}
+                </span>
+                {participant.affiliation === 'external' && (
+                  <Badge variant="info">External</Badge>
+                )}
+                {participant.title && (
+                  <span className="truncate text-[color:var(--text-tertiary)]">
+                    {participant.title}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Page */}
       {(session.page_title || session.page_url) && (

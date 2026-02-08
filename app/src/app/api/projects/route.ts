@@ -4,6 +4,7 @@ import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/codebase'
 import { triggerKnowledgeAnalysis } from '@/lib/knowledge/analysis-service'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { enforceLimit, LimitExceededError } from '@/lib/billing/enforcement-service'
+import { createProjectSetupNotifications } from '@/lib/notifications/setup-notifications'
 import type { Database } from '@/types/supabase'
 import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
 import {
@@ -222,6 +223,11 @@ export async function POST(request: Request) {
         console.warn('[projects.post] Error triggering analysis:', analyzeError)
       }
     }
+
+    // Create setup notifications (fire-and-forget)
+    void createProjectSetupNotifications(user.id, id, {
+      hasKnowledgeSources: knowledgeSourcesToInsert.length > 0,
+    }).catch((err) => console.error('[projects.post] setup notifications error:', err))
 
     return NextResponse.json({ project: createdProject })
   } catch (error) {

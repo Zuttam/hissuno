@@ -56,10 +56,11 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { projectId, accessKey, accessKeySecret, syncFrequency, filterConfig } = body as {
+    const { projectId, accessKey, accessKeySecret, baseUrl, syncFrequency, filterConfig } = body as {
       projectId: string
       accessKey: string
       accessKeySecret: string
+      baseUrl: string
       syncFrequency: GongSyncFrequency
       filterConfig?: GongFilterConfig
     }
@@ -74,6 +75,9 @@ export async function POST(request: NextRequest) {
     if (!accessKeySecret) {
       return NextResponse.json({ error: 'accessKeySecret is required.' }, { status: 400 })
     }
+    if (!baseUrl) {
+      return NextResponse.json({ error: 'baseUrl is required.' }, { status: 400 })
+    }
     if (!syncFrequency) {
       return NextResponse.json({ error: 'syncFrequency is required.' }, { status: 400 })
     }
@@ -87,7 +91,7 @@ export async function POST(request: NextRequest) {
     const { supabase } = await resolveUserAndProject(projectId)
 
     // Test the credentials
-    const client = new GongClient(accessKey, accessKeySecret)
+    const client = new GongClient(accessKey, accessKeySecret, baseUrl)
 
     try {
       await client.testConnection()
@@ -109,6 +113,7 @@ export async function POST(request: NextRequest) {
       projectId,
       accessKey,
       accessKeySecret,
+      baseUrl,
       syncFrequency,
       filterConfig,
     })

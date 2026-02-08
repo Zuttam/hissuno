@@ -15,16 +15,17 @@ export const runtime = 'nodejs'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { accessKey, accessKeySecret } = body as {
+    const { accessKey, accessKeySecret, baseUrl } = body as {
       accessKey: string
       accessKeySecret: string
+      baseUrl: string
     }
 
-    if (!accessKey || !accessKeySecret) {
-      return NextResponse.json({ error: 'accessKey and accessKeySecret are required.' }, { status: 400 })
+    if (!accessKey || !accessKeySecret || !baseUrl) {
+      return NextResponse.json({ error: 'accessKey, accessKeySecret, and baseUrl are required.' }, { status: 400 })
     }
 
-    const client = new GongClient(accessKey, accessKeySecret)
+    const client = new GongClient(accessKey, accessKeySecret, baseUrl)
 
     try {
       await client.testConnection()

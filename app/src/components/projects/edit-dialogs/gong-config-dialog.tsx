@@ -64,6 +64,7 @@ export function GongConfigDialog({
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   // Connect form state
+  const [baseUrl, setBaseUrl] = useState('')
   const [accessKey, setAccessKey] = useState('')
   const [accessKeySecret, setAccessKeySecret] = useState('')
   const [syncFrequency, setSyncFrequency] = useState<SyncFrequency>('manual')
@@ -124,8 +125,8 @@ export function GongConfigDialog({
   }, [open, fetchStatus])
 
   const handleTestConnection = async () => {
-    if (!accessKey.trim() || !accessKeySecret.trim()) {
-      setTestResult({ success: false, message: 'Enter both access key and secret first.' })
+    if (!baseUrl.trim() || !accessKey.trim() || !accessKeySecret.trim()) {
+      setTestResult({ success: false, message: 'Enter base URL, access key, and secret first.' })
       return
     }
 
@@ -137,6 +138,7 @@ export function GongConfigDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          baseUrl: baseUrl.trim(),
           accessKey: accessKey.trim(),
           accessKeySecret: accessKeySecret.trim(),
         }),
@@ -156,8 +158,8 @@ export function GongConfigDialog({
   }
 
   const handleConnect = async () => {
-    if (!accessKey.trim() || !accessKeySecret.trim()) {
-      setError('Access key and secret are required.')
+    if (!baseUrl.trim() || !accessKey.trim() || !accessKeySecret.trim()) {
+      setError('Base URL, access key, and secret are required.')
       return
     }
 
@@ -174,6 +176,7 @@ export function GongConfigDialog({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
+          baseUrl: baseUrl.trim(),
           accessKey: accessKey.trim(),
           accessKeySecret: accessKeySecret.trim(),
           syncFrequency,
@@ -187,6 +190,7 @@ export function GongConfigDialog({
         throw new Error(data.error || 'Failed to connect Gong')
       }
 
+      setBaseUrl('')
       setAccessKey('')
       setAccessKeySecret('')
       setSuccessMessage('Connected to Gong successfully!')
@@ -496,6 +500,26 @@ export function GongConfigDialog({
 
             {/* Connect Form */}
             <div className="space-y-4">
+              {/* Base URL */}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-[color:var(--foreground)]">
+                  API Base URL
+                </label>
+                <input
+                  type="text"
+                  value={baseUrl}
+                  onChange={(e) => {
+                    setBaseUrl(e.target.value)
+                    setTestResult(null)
+                  }}
+                  placeholder="e.g. https://us-60267.api.gong.io"
+                  className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                />
+                <p className="text-xs text-[color:var(--text-tertiary)]">
+                  Find this in your Gong account under Settings &gt; API. It looks like https://xx-xxxxx.api.gong.io
+                </p>
+              </div>
+
               {/* Access Key */}
               <div className="space-y-1">
                 <label className="text-sm font-medium text-[color:var(--foreground)]">

@@ -3,11 +3,9 @@
  * Provides typed methods for common Gong API operations.
  *
  * API Documentation: https://gong.app.gong.io/settings/api/documentation
- * Base URL: https://api.gong.io/v2/
+ * Base URL: Region-specific, e.g. https://us-60267.api.gong.io/v2
  * Auth: Basic Auth (access_key:access_key_secret)
  */
-
-const GONG_API_BASE = 'https://api.gong.io/v2'
 
 /**
  * Error thrown when Gong API request fails
@@ -73,7 +71,7 @@ export interface GongCallListItem {
   duration: number
   direction?: string
   scope?: string
-  parties: GongParticipant[]
+  parties?: GongParticipant[]
 }
 
 /**
@@ -103,10 +101,13 @@ export interface GongCallTranscript {
 export class GongClient {
   private accessKey: string
   private accessKeySecret: string
+  private baseUrl: string
 
-  constructor(accessKey: string, accessKeySecret: string) {
+  constructor(accessKey: string, accessKeySecret: string, baseUrl: string) {
     this.accessKey = accessKey
     this.accessKeySecret = accessKeySecret
+    // Normalize: ensure baseUrl ends with /v2 and has no trailing slash
+    this.baseUrl = baseUrl.replace(/\/+$/, '').replace(/\/v2$/, '') + '/v2'
   }
 
   /**
@@ -128,7 +129,7 @@ export class GongClient {
       body?: Record<string, unknown>
     } = {}
   ): Promise<T> {
-    const url = new URL(`${GONG_API_BASE}${path}`)
+    const url = new URL(`${this.baseUrl}${path}`)
 
     // Add query params
     if (options.params) {
@@ -163,11 +164,31 @@ export class GongClient {
     }
 
     // Parse response
-    const data = await response.json()
+    const text = await response.text()
+    let data: Record<string, unknown>
+    try {
+      data = JSON.parse(text)
+    } catch {
+      console.error(`[GongClient] Non-JSON response (${response.status}): ${text.slice(0, 500)}`)
+      throw new GongApiError(`Gong returned non-JSON response (${response.status})`, response.status)
+    }
 
     if (!response.ok) {
-      const errorMessage = data.errors?.[0]?.message || data.message || 'Unknown Gong API error'
-      const errorCode = data.errors?.[0]?.code || data.type
+      console.error(`[GongClient] Error response (${response.status}):`, JSON.stringify(data))
+      const errors = data.errors as Array<string | { message?: string; code?: string }> | undefined
+      let errorMessage: string | undefined
+      let errorCode: string | undefined
+      if (errors?.[0]) {
+        const first = errors[0]
+        if (typeof first === 'string') {
+          errorMessage = first
+        } else {
+          errorMessage = first.message
+          errorCode = first.code
+        }
+      }
+      errorMessage = errorMessage || (data.message as string) || (data.error as string) || `Gong API error (${response.status}): ${text.slice(0, 200)}`
+      errorCode = errorCode || (data.type as string)
       throw new GongApiError(errorMessage, response.status, errorCode)
     }
 
@@ -178,16 +199,8 @@ export class GongClient {
    * Test the connection by listing calls with a minimal request
    */
   async testConnection(): Promise<{ success: boolean }> {
-    // Use list calls with a tiny window to verify credentials work
-    await this.request<{ calls: GongCallListItem[] }>('POST', '/calls', {
-      body: {
-        filter: {
-          fromDateTime: new Date(Date.now() - 60000).toISOString(),
-          toDateTime: new Date().toISOString(),
-        },
-        cursor: undefined,
-      },
-    })
+    // Use the users endpoint - it always returns data and verifies credentials
+    await this.request<{ users: unknown[] }>('GET', '/users')
     return { success: true }
   }
 
@@ -203,25 +216,17 @@ export class GongClient {
     records: { totalRecords: number; currentPageSize: number; currentPageNumber: number }
     cursor?: string
   }> {
-    // Gong uses POST for listing calls with filters
-    const body: Record<string, unknown> = {
-      filter: {},
-    }
-
-    const filter: Record<string, string> = {}
-    if (options.fromDateTime) filter.fromDateTime = options.fromDateTime
-    if (options.toDateTime) filter.toDateTime = options.toDateTime
-    body.filter = filter
-
-    if (options.cursor) {
-      body.cursor = options.cursor
-    }
-
     return this.request<{
       calls: GongCallListItem[]
       records: { totalRecords: number; currentPageSize: number; currentPageNumber: number }
       cursor?: string
-    }>('POST', '/calls', { body })
+    }>('GET', '/calls', {
+      params: {
+        fromDateTime: options.fromDateTime,
+        toDateTime: options.toDateTime,
+        cursor: options.cursor,
+      },
+    })
   }
 
   /**
@@ -233,6 +238,11 @@ export class GongClient {
         filter: {
           callIds: [callId],
         },
+        contentSelector: {
+          exposedFields: {
+            parties: true,
+          },
+        },
       },
     })
 
@@ -241,6 +251,39 @@ export class GongClient {
     }
 
     return response.calls[0]
+  }
+
+  /**
+   * Batch-fetch calls with full party data (including speakerId).
+   * Uses POST /v2/calls/extensive with contentSelector to get speaker IDs
+   * that are missing from the basic GET /v2/calls endpoint.
+   * Chunks call IDs in batches of 50.
+   */
+  async getCallsWithParties(callIds: string[]): Promise<Map<string, GongParticipant[]>> {
+    const result = new Map<string, GongParticipant[]>()
+    const batchSize = 50
+
+    for (let i = 0; i < callIds.length; i += batchSize) {
+      const batch = callIds.slice(i, i + batchSize)
+      const response = await this.request<{ calls: GongCall[] }>('POST', '/calls/extensive', {
+        body: {
+          filter: {
+            callIds: batch,
+          },
+          contentSelector: {
+            exposedFields: {
+              parties: true,
+            },
+          },
+        },
+      })
+
+      for (const call of response.calls || []) {
+        result.set(call.id, call.parties || [])
+      }
+    }
+
+    return result
   }
 
   /**

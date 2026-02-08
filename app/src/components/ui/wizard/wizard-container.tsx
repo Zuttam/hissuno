@@ -1,4 +1,7 @@
-import type { ReactNode } from 'react'
+'use client'
+
+import { type ReactNode, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { WizardStepMetadata } from './types'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils/class'
@@ -10,12 +13,15 @@ export type WizardContainerProps = {
   children: ReactNode
   // Mode determines button layout ('onboarding' behaves like 'create')
   mode?: 'create' | 'edit' | 'onboarding'
+  // When true, renders as a full-screen overlay with backdrop blur (like Dialog)
+  overlay?: boolean
   // Navigation props (create mode)
   onPrevious?: () => void
   onNext?: () => void
   onSubmit?: () => void
   onCancel?: () => void
   onStepClick?: (stepNumber: number) => void
+  maxReachableStep?: number
   isSubmitting?: boolean
   submitLabel?: string
   submittingLabel?: string
@@ -33,11 +39,13 @@ export function WizardContainer({
   steps,
   children,
   mode = 'create',
+  overlay = false,
   onPrevious,
   onNext,
   onSubmit,
   onCancel,
   onStepClick,
+  maxReachableStep,
   isSubmitting = false,
   submitLabel = 'Submit',
   submittingLabel = 'Submitting…',
@@ -52,7 +60,23 @@ export function WizardContainer({
   const isFirstStep = currentStep === 1
   const isEditMode = mode === 'edit'
 
-  return (
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Lock body scroll when overlay is active
+  useEffect(() => {
+    if (overlay && mounted) {
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = ''
+      }
+    }
+  }, [overlay, mounted])
+
+  const wizardContent = (
     <FloatingCard
       floating="none"
       variant="elevated"
@@ -111,7 +135,8 @@ export function WizardContainer({
               {steps.map((step, index) => {
                 const isCompleted = step.number < currentStep
                 const isCurrent = step.number === currentStep
-                const isClickable = onStepClick && !isSubmitting && !isCurrent
+                const effectiveMaxStep = maxReachableStep ?? steps.length
+                const isClickable = onStepClick && !isSubmitting && !isCurrent && step.number <= effectiveMaxStep
 
                 return (
                   <div key={step.id} className="flex items-start gap-2 sm:gap-3 flex-shrink-0">
@@ -238,4 +263,21 @@ export function WizardContainer({
       </div>
     </FloatingCard>
   )
+
+  // Overlay mode: portal to body with backdrop blur (same pattern as Dialog)
+  if (overlay && mounted) {
+    return createPortal(
+      <>
+        {/* Backdrop */}
+        <div className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm" aria-hidden="true" />
+        {/* Scrollable wizard container */}
+        <div className="fixed inset-0 z-[70] overflow-y-auto">
+          {wizardContent}
+        </div>
+      </>,
+      document.body
+    )
+  }
+
+  return wizardContent
 }

@@ -24,6 +24,7 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
   const [isPolling, setIsPolling] = useState(false)
   const [pollTimedOut, setPollTimedOut] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const checkoutOpenedRef = useRef(false)
 
   // Validate when plan selection changes
   useEffect(() => {
@@ -70,12 +71,11 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
     void loadData()
   }, [setFormData])
 
-  // Checkout return polling
-  useEffect(() => {
-    const isCheckoutReturn = searchParams.get('checkout') === 'success'
-    if (!isCheckoutReturn) return
-
+  // Start polling for subscription confirmation
+  const startPolling = useCallback(() => {
+    if (pollRef.current) clearInterval(pollRef.current)
     setIsPolling(true)
+    setPollTimedOut(false)
     let attempts = 0
 
     pollRef.current = setInterval(async () => {
@@ -86,7 +86,6 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
           const data = await res.json()
           const sub = data.billingInfo?.subscription
           if (sub && (sub.status === 'active' || sub.status === 'on_trial')) {
-            // Subscription found
             setCurrentPlanId(sub.plan_id)
             setFormData((prev) => {
               const onboarding = prev as OnboardingFormData
@@ -97,10 +96,7 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
             })
             setIsPolling(false)
             if (pollRef.current) clearInterval(pollRef.current)
-            // Clean up URL
-            router.replace('/onboarding', { scroll: false })
-            // Auto-advance to next step
-            onCheckoutComplete?.()
+            checkoutOpenedRef.current = false
             return
           }
         }
@@ -112,14 +108,67 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
         setIsPolling(false)
         setPollTimedOut(true)
         if (pollRef.current) clearInterval(pollRef.current)
-        router.replace('/onboarding', { scroll: false })
       }
     }, POLL_INTERVAL_MS)
+  }, [setFormData])
+
+  // Checkout return polling (page redirect with ?checkout=success)
+  useEffect(() => {
+    const isCheckoutReturn = searchParams.get('checkout') === 'success'
+    if (!isCheckoutReturn) return
+
+    startPolling()
+    // Clean up URL
+    router.replace('/onboarding', { scroll: false })
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [searchParams, setFormData, router, onCheckoutComplete])
+  }, [searchParams, router, startPolling])
+
+  // Listen for LemonSqueezy overlay checkout success event
+  useEffect(() => {
+    function handleLSEvent(event: { event: string }) {
+      if (event?.event === 'Checkout.Success' && checkoutOpenedRef.current) {
+        startPolling()
+      }
+    }
+
+    const win = window as unknown as {
+      LemonSqueezy?: { Setup: (opts: { eventHandler: (e: { event: string }) => void }) => void }
+    }
+    if (win.LemonSqueezy) {
+      win.LemonSqueezy.Setup({ eventHandler: handleLSEvent })
+    }
+  }, [startPolling])
+
+  const handleRetryPoll = useCallback(async () => {
+    setPollTimedOut(false)
+    setIsPolling(true)
+    try {
+      const res = await fetch('/api/billing/info')
+      if (res.ok) {
+        const data = await res.json()
+        const sub = data.billingInfo?.subscription
+        if (sub && (sub.status === 'active' || sub.status === 'on_trial')) {
+          setCurrentPlanId(sub.plan_id)
+          setFormData((prev) => {
+            const onboarding = prev as OnboardingFormData
+            return {
+              ...onboarding,
+              billing: { selectedPlanId: sub.plan_id, skipped: false },
+            }
+          })
+          setIsPolling(false)
+          return
+        }
+      }
+    } catch {
+      // Retry failed
+    }
+    setIsPolling(false)
+    setPollTimedOut(true)
+  }, [setFormData])
 
   const handleSelectPlan = useCallback(
     async (plan: Plan) => {
@@ -145,14 +194,12 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
           })
           const data = await response.json()
           if (data.checkoutUrl) {
-            if (
-              typeof window !== 'undefined' &&
-              (window as unknown as { LemonSqueezy?: { Url: { Open: (url: string) => void } } })
-                .LemonSqueezy
-            ) {
-              ;(
-                window as unknown as { LemonSqueezy: { Url: { Open: (url: string) => void } } }
-              ).LemonSqueezy.Url.Open(data.checkoutUrl)
+            const win = window as unknown as {
+              LemonSqueezy?: { Url: { Open: (url: string) => void } }
+            }
+            if (typeof window !== 'undefined' && win.LemonSqueezy) {
+              checkoutOpenedRef.current = true
+              win.LemonSqueezy.Url.Open(data.checkoutUrl)
             } else {
               window.open(data.checkoutUrl, '_blank')
             }
@@ -198,8 +245,16 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
       <WizardStepHeader title={title} description={description} />
 
       {pollTimedOut && (
-        <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-          We couldn&apos;t confirm your subscription yet, but it may still be processing. You can proceed and check your billing status later in account settings.
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+          <span>We couldn&apos;t confirm your subscription yet, but it may still be processing. You can proceed and check your billing status later in account settings.</span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={handleRetryPoll}
+          >
+            Retry
+          </Button>
         </div>
       )}
 
@@ -230,6 +285,24 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
                 {plan.is_recommended && (
                   <span className="absolute -top-3 left-4 rounded-full bg-blue-500 px-3 py-1 text-xs font-medium text-white">
                     Recommended
+                  </span>
+                )}
+
+                {isSelected && (
+                  <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-success)] text-white shadow-md">
+                    <svg
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
                   </span>
                 )}
 

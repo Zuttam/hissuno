@@ -178,6 +178,163 @@ export type Database = {
           },
         ]
       }
+      gong_connections: {
+        Row: {
+          access_key: string
+          access_key_secret: string
+          base_url: string
+          created_at: string
+          filter_config: Json | null
+          id: string
+          last_sync_at: string | null
+          last_sync_calls_count: number | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          next_sync_at: string | null
+          project_id: string
+          sync_enabled: boolean
+          sync_frequency: string
+          updated_at: string
+        }
+        Insert: {
+          access_key: string
+          access_key_secret: string
+          base_url?: string
+          created_at?: string
+          filter_config?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_calls_count?: number | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          next_sync_at?: string | null
+          project_id: string
+          sync_enabled?: boolean
+          sync_frequency?: string
+          updated_at?: string
+        }
+        Update: {
+          access_key?: string
+          access_key_secret?: string
+          base_url?: string
+          created_at?: string
+          filter_config?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_calls_count?: number | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          next_sync_at?: string | null
+          project_id?: string
+          sync_enabled?: boolean
+          sync_frequency?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gong_connections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gong_sync_runs: {
+        Row: {
+          calls_found: number | null
+          calls_skipped: number | null
+          calls_synced: number | null
+          completed_at: string | null
+          connection_id: string
+          error_message: string | null
+          id: string
+          started_at: string
+          status: string
+          triggered_by: string
+        }
+        Insert: {
+          calls_found?: number | null
+          calls_skipped?: number | null
+          calls_synced?: number | null
+          completed_at?: string | null
+          connection_id: string
+          error_message?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          triggered_by: string
+        }
+        Update: {
+          calls_found?: number | null
+          calls_skipped?: number | null
+          calls_synced?: number | null
+          completed_at?: string | null
+          connection_id?: string
+          error_message?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gong_sync_runs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "gong_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gong_synced_calls: {
+        Row: {
+          call_created_at: string | null
+          call_duration_seconds: number | null
+          connection_id: string
+          gong_call_id: string
+          id: string
+          messages_count: number | null
+          session_id: string
+          synced_at: string
+        }
+        Insert: {
+          call_created_at?: string | null
+          call_duration_seconds?: number | null
+          connection_id: string
+          gong_call_id: string
+          id?: string
+          messages_count?: number | null
+          session_id: string
+          synced_at?: string
+        }
+        Update: {
+          call_created_at?: string | null
+          call_duration_seconds?: number | null
+          connection_id?: string
+          gong_call_id?: string
+          id?: string
+          messages_count?: number | null
+          session_id?: string
+          synced_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gong_synced_calls_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "gong_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gong_synced_calls_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       intercom_connections: {
         Row: {
           access_token: string
@@ -1584,8 +1741,10 @@ export type Database = {
         Row: {
           channel: string
           dedup_key: string | null
+          dismissed_at: string | null
           id: string
           metadata: Json | null
+          project_id: string | null
           sent_at: string
           type: string
           user_id: string
@@ -1593,8 +1752,10 @@ export type Database = {
         Insert: {
           channel?: string
           dedup_key?: string | null
+          dismissed_at?: string | null
           id?: string
           metadata?: Json | null
+          project_id?: string | null
           sent_at?: string
           type: string
           user_id: string
@@ -1602,13 +1763,23 @@ export type Database = {
         Update: {
           channel?: string
           dedup_key?: string | null
+          dismissed_at?: string | null
           id?: string
           metadata?: Json | null
+          project_id?: string | null
           sent_at?: string
           type?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_profiles: {
         Row: {

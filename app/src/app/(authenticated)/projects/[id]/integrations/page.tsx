@@ -107,8 +107,8 @@ export default function IntegrationsPage() {
   const [intercomConnected, setIntercomConnected] = useState(false)
   const [gongConnected, setGongConnected] = useState(false)
   const [jiraConnected, setJiraConnected] = useState(false)
-  const {enabled: gongEnabled, isLoading: isGongLoading}  = useFeatureFlag('gong_integration')
-  const {enabled: jiraEnabled, isLoading: isJiraLoading}  = useFeatureFlag('jira_integration')
+  const {enabled: gongEnabled, isLoading: isGongLoading}  = useFeatureFlag('gong-integration')
+  const {enabled: jiraEnabled, isLoading: isJiraLoading}  = useFeatureFlag('jira-integration')
 
   const handleRequestAccess = async (feature: string, setRequested: (v: boolean) => void, setRequesting: (v: boolean) => void) => {
     if (!user?.email) return

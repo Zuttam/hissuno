@@ -96,11 +96,11 @@ export async function hasGongConnection(
 export async function getGongCredentials(
   supabase: SupabaseClient<Database> | AnySupabase,
   projectId: string
-): Promise<{ connectionId: string; accessKey: string; accessKeySecret: string } | null> {
+): Promise<{ connectionId: string; accessKey: string; accessKeySecret: string; baseUrl: string } | null> {
   const client = supabase as AnySupabase
   const { data, error } = await client
     .from('gong_connections')
-    .select('id, access_key, access_key_secret')
+    .select('id, access_key, access_key_secret, base_url')
     .eq('project_id', projectId)
     .single()
 
@@ -112,6 +112,7 @@ export async function getGongCredentials(
     connectionId: data.id,
     accessKey: data.access_key,
     accessKeySecret: data.access_key_secret,
+    baseUrl: data.base_url,
   }
 }
 
@@ -124,6 +125,7 @@ export async function storeGongCredentials(
     projectId: string
     accessKey: string
     accessKeySecret: string
+    baseUrl: string
     syncFrequency: GongSyncFrequency
     filterConfig?: GongFilterConfig
   }
@@ -138,6 +140,7 @@ export async function storeGongCredentials(
         project_id: params.projectId,
         access_key: params.accessKey,
         access_key_secret: params.accessKeySecret,
+        base_url: params.baseUrl,
         sync_frequency: params.syncFrequency,
         sync_enabled: params.syncFrequency !== 'manual',
         filter_config: params.filterConfig || {},

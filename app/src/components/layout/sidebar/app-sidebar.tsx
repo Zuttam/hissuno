@@ -112,7 +112,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
             ) : (
               <>
                 <ThemeLogo width={56} height={16} priority />
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-red-500 leading-none">beta</span>
+                {/* <span className="text-[10px] font-semibold uppercase tracking-wider text-red-500 leading-none">beta</span> */}
               </>
             )}
           </Link>

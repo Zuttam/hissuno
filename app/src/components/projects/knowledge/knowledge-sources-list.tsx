@@ -61,16 +61,19 @@ export function KnowledgeSourcesList({ sources, isLoading, onConfigure }: Knowle
 
   if (sources.length === 0) {
     return (
-      <div className="flex flex-col items-center text-center py-4">
-        <div className="w-12 h-12 rounded-full bg-[color:var(--background-secondary)] flex items-center justify-center mb-4">
+      <div className="flex flex-col items-center text-center gap-4">
+        <div className="w-12 rounded-full bg-[color:var(--background-secondary)] flex items-center justify-center">
           <span className="text-2xl">🔗</span>
         </div>
-        <p className="text-sm font-medium text-[color:var(--foreground)] mb-1">
+        <div>
+        <p className="text-sm font-medium text-[color:var(--foreground)]">
           No resources connected
         </p>
-        <p className="text-sm text-[color:var(--text-secondary)] mb-4">
+        <p className="text-sm text-[color:var(--text-secondary)]">
           Connect your codebase, documentation, or other knowledge sources to power your agents.
         </p>
+
+        </div>
         <Button variant="primary" size="md" onClick={onConfigure}>
           Configure Resources
         </Button>

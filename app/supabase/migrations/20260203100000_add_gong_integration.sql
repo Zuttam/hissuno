@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS public.gong_connections (
   project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
 
   -- Credentials (Basic Auth: access_key:access_key_secret)
+  base_url text NOT NULL DEFAULT 'https://api.gong.io',
   access_key text NOT NULL,
   access_key_secret text NOT NULL,
 

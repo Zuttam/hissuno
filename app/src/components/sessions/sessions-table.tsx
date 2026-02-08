@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { Badge } from '@/components/ui'
 import { ResizableTable, useColumnStyle, type ColumnConfig } from '@/components/ui/resizable-table'
 import type { SessionWithProject } from '@/types/session'
-import { SESSION_SOURCE_INFO, type SessionSource } from '@/types/session'
+import { SESSION_SOURCE_INFO, type SessionSource, getSessionUserDisplay } from '@/types/session'
 import { SessionTagList } from './session-tags'
 
 interface SessionsTableProps {
@@ -27,7 +27,7 @@ export function SessionsTable({
   const columns: ColumnConfig[] = useMemo(
     () => [
       { id: 'session', header: 'Session', defaultWidth: 140, minWidth: 80 },
-      { id: 'user', header: 'User', defaultWidth: 120, minWidth: 60 },
+      { id: 'user', header: 'User', defaultWidth: 100, minWidth: 60 },
       { id: 'project', header: 'Project', defaultWidth: 130, minWidth: 80 },
       { id: 'source', header: 'Source', defaultWidth: 90, minWidth: 70 },
       { id: 'page', header: 'Page', defaultWidth: 180, minWidth: 80 },
@@ -91,6 +91,7 @@ function SessionRow({
     label: session.source,
     variant: 'default' as const,
   }
+  const userDisplay = getSessionUserDisplay(session)
 
   return (
     <tr
@@ -114,7 +115,21 @@ function SessionRow({
         </div>
       </td>
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'user', columns)}>
-        <span className="text-[color:var(--text-secondary)]">{session.user_id || '-'}</span>
+        {userDisplay.name ? (
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                userDisplay.isHissuno
+                  ? 'bg-[color:var(--accent-success)]'
+                  : 'bg-[color:var(--text-tertiary)]'
+              }`}
+              title={userDisplay.isHissuno ? 'Hissuno user' : 'External user'}
+            />
+            <span className="truncate text-[color:var(--text-secondary)]">{userDisplay.name}</span>
+          </div>
+        ) : (
+          <span className="text-[color:var(--text-tertiary)]">-</span>
+        )}
       </td>
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'project', columns)}>
         <span className="text-[color:var(--foreground)]">{session.project?.name || '-'}</span>

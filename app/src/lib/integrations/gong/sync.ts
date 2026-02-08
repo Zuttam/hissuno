@@ -79,8 +79,9 @@ function getParticipantName(participant: GongParticipant): string {
 /**
  * Build a speaker ID to participant map from call parties
  */
-function buildSpeakerMap(parties: GongParticipant[]): Map<string, GongParticipant> {
+function buildSpeakerMap(parties?: GongParticipant[]): Map<string, GongParticipant> {
   const map = new Map<string, GongParticipant>()
+  if (!parties) return map
   for (const party of parties) {
     if (party.speakerId) {
       map.set(party.speakerId, party)
@@ -122,13 +123,23 @@ function buildUserMetadata(
     gong_duration_seconds: call.duration,
     gong_direction: call.direction,
     gong_scope: call.scope,
-    gong_participants_count: call.parties.length,
+    gong_participants_count: call.parties?.length || 0,
   }
 
   if (externalParticipant) {
     if (externalParticipant.name) metadata.name = externalParticipant.name
     if (externalParticipant.emailAddress) metadata.email = externalParticipant.emailAddress
     if (externalParticipant.title) metadata.title = externalParticipant.title
+  }
+
+  // Store participant details for display in session details
+  if (call.parties && call.parties.length > 0) {
+    metadata.gong_participants = call.parties.map((p) => ({
+      name: p.name || p.emailAddress || 'Unknown',
+      email: p.emailAddress || null,
+      title: p.title || null,
+      affiliation: p.affiliation || 'unknown',
+    }))
   }
 
   return metadata
@@ -145,10 +156,11 @@ async function createSessionFromGongCall(
   transcript: GongCallTranscript | null
 ): Promise<{ sessionId: string; messageCount: number } | null> {
   const sessionId = generateSessionId(call.id)
-  const speakerMap = buildSpeakerMap(call.parties)
+  const parties = call.parties || []
+  const speakerMap = buildSpeakerMap(parties)
 
   // Find the first external participant for user metadata
-  const externalParticipant = call.parties.find((p) => p.affiliation === 'external') || null
+  const externalParticipant = parties.find((p) => p.affiliation === 'external') || null
   const userId = externalParticipant?.emailAddress || externalParticipant?.name || null
   const userMetadata = buildUserMetadata(call, externalParticipant)
 
@@ -267,7 +279,7 @@ export async function syncGongCalls(
   await updateSyncState(client, projectId, { status: 'in_progress' })
 
   // Initialize API client
-  const gong = new GongClient(credentials.accessKey, credentials.accessKeySecret)
+  const gong = new GongClient(credentials.accessKey, credentials.accessKeySecret, credentials.baseUrl)
 
   // Parse date filters
   let fromDate: Date | undefined
@@ -320,6 +332,26 @@ export async function syncGongCalls(
       }
 
       callsToSync.push(call)
+    }
+
+    // Enrichment pass: fetch detailed party data with speakerIds
+    if (callsToSync.length > 0) {
+      try {
+        const callIds = callsToSync.map((c) => c.id)
+        const partiesMap = await gong.getCallsWithParties(callIds)
+
+        for (const call of callsToSync) {
+          const enrichedParties = partiesMap.get(call.id)
+          if (enrichedParties) {
+            call.parties = enrichedParties
+          }
+        }
+
+        console.log(`[gong.sync] Enriched ${partiesMap.size}/${callsToSync.length} calls with speaker data`)
+      } catch (err) {
+        console.warn('[gong.sync] Failed to enrich calls with speaker data, continuing with basic party info:', err)
+        // Graceful degradation: speakers will show "Unknown Speaker" like before
+      }
     }
 
     // Second pass: fetch transcripts and create sessions

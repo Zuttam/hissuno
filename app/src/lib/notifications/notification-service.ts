@@ -32,6 +32,8 @@ export interface SendNotificationOptions {
    * Example: 'limit_reached:sessions:2026-01' prevents duplicate per billing period
    */
   dedupKey?: string
+  /** Optional project scope */
+  projectId?: string
 }
 
 /**
@@ -76,7 +78,7 @@ export async function hasNotificationBeenSent(
 export async function recordNotification(
   options: SendNotificationOptions
 ): Promise<NotificationResult> {
-  const { userId, type, channel = 'email', metadata = {}, dedupKey } = options
+  const { userId, type, channel = 'email', metadata = {}, dedupKey, projectId } = options
   const supabase = createAdminClient()
 
   // Check for duplicate if dedup key is provided
@@ -97,6 +99,7 @@ export async function recordNotification(
       channel,
       metadata,
       dedup_key: dedupKey ?? null,
+      project_id: projectId ?? null,
     })
     .select('id')
     .single()

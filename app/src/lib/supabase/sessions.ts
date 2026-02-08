@@ -7,6 +7,8 @@ import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-no
 import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, SessionType, CreateSessionInput, UpdateSessionInput } from '@/types/session'
 import { getDefaultSessionType } from '@/types/session'
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 const selectSessionWithProject = '*, project:projects(id, name)'
 const selectSessionWithLinkedIssues = `
   *,
@@ -15,6 +17,44 @@ const selectSessionWithLinkedIssues = `
     issue:issues(id, title, type, status, upvote_count)
   )
 `
+
+/**
+ * Enrich sessions with user profile data when user_id matches a Hissuno platform user.
+ * Looks up user_profiles by user_id for any session whose user_id is a valid UUID.
+ */
+async function enrichSessionsWithUserProfiles(
+  sessions: SessionWithProject[]
+): Promise<SessionWithProject[]> {
+  if (sessions.length === 0) return sessions
+
+  const uuidUserIds = [...new Set(
+    sessions
+      .map((s) => s.user_id)
+      .filter((uid): uid is string => Boolean(uid && UUID_REGEX.test(uid)))
+  )]
+
+  if (uuidUserIds.length === 0) return sessions
+
+  try {
+    const supabase = await createClient()
+    const { data: profiles } = await supabase
+      .from('user_profiles')
+      .select('user_id, full_name')
+      .in('user_id', uuidUserIds)
+
+    if (!profiles || profiles.length === 0) return sessions
+
+    const profileMap = new Map(profiles.map((p) => [p.user_id, { full_name: p.full_name }]))
+
+    return sessions.map((s) => ({
+      ...s,
+      user_profile: (s.user_id && profileMap.get(s.user_id)) || null,
+    }))
+  } catch (err) {
+    console.warn('[supabase.sessions] Failed to enrich sessions with user profiles:', err)
+    return sessions
+  }
+}
 
 /**
  * Upserts a session record. Uses admin client since this is called
@@ -214,7 +254,7 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
       throw new Error('Unable to load sessions from Supabase.')
     }
 
-    return (data ?? []) as SessionWithProject[]
+    return enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[])
   } catch (error) {
     console.error('[supabase.sessions] unexpected error listing sessions', error)
     throw error
@@ -284,11 +324,14 @@ export const getSessionById = cache(async (sessionId: string): Promise<SessionWi
       })
       .filter((issue): issue is SessionLinkedIssue => issue !== null)
 
-    return {
+    const result = {
       ...session,
       linked_issues,
       issue_sessions: undefined,
     } as unknown as SessionWithProject
+
+    const [enriched] = await enrichSessionsWithUserProfiles([result])
+    return enriched
   } catch (error) {
     console.error('[supabase.sessions] unexpected error getting session', sessionId, error)
     throw error
@@ -338,7 +381,7 @@ export const getProjectSessions = cache(async (projectId: string, limit = 5): Pr
       throw new Error('Unable to load project sessions.')
     }
 
-    return (data ?? []) as SessionWithProject[]
+    return enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[])
   } catch (error) {
     console.error('[supabase.sessions] unexpected error getting project sessions', projectId, error)
     throw error

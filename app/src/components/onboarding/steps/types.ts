@@ -67,9 +67,9 @@ export type UseCaseOption = 'knowledge' | 'slack' | 'triage' | 'specs'
  */
 export interface UseCaseOptionInfo {
   id: UseCaseOption
+  emoji: string
   label: string
   description: string
-  /** References project wizard step IDs for feature association */
 }
 
 /**
@@ -143,21 +143,25 @@ export interface StepDefinition {
 export const USE_CASE_OPTIONS: UseCaseOptionInfo[] = [
   {
     id: 'knowledge',
+    emoji: '🧠',
     label: 'Build support agent knowledge',
     description: 'Build support agent knowledge from codebase and more'
   },
   {
     id: 'slack',
+    emoji: '💬',
     label: 'Customer success in Slack',
     description: 'Integrate a customer success AI agent in Slack',
   },
   {
     id: 'triage',
+    emoji: '🔀',
     label: 'Automated triage',
     description: 'Automated triage of customer conversations',
   },
   {
     id: 'specs',
+    emoji: '📋',
     label: 'Product specs automation',
     description: 'Automate product specs and code changes from customer requests',
   },

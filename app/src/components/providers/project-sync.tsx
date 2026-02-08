@@ -12,14 +12,13 @@ interface ProjectSyncProps {
  * Used in project page layouts to ensure the app state reflects the current route.
  */
 export function ProjectSync({ projectId }: ProjectSyncProps) {
-  const { setProjectId, projectId: currentProjectId } = useProject()
+  const { setProjectId } = useProject()
 
   useEffect(() => {
-    // Only update if the project ID differs to avoid unnecessary state updates
-    if (projectId && projectId !== currentProjectId) {
+    if (projectId) {
       setProjectId(projectId)
     }
-  }, [projectId, currentProjectId, setProjectId])
+  }, [projectId, setProjectId])
 
   return null
 }

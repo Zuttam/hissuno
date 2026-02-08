@@ -179,7 +179,9 @@ export function OnboardingWizard() {
       const nextIndex = currentStepIndex + 1
       const nextStepId = steps[nextIndex]?.id
       // Save profile data on each step transition, persisting the next step
-      void saveProfile(nextStepId)
+      // Await to ensure step is saved before user can interact with next step
+      // (prevents stale saved step if user opens external checkout immediately)
+      await saveProfile(nextStepId)
       setCurrentStepIndex(nextIndex)
     }
   }, [currentStepIndex, steps, formData, saveProfile])
@@ -192,12 +194,30 @@ export function OnboardingWizard() {
   }, [currentStepIndex])
 
   const handleStepClick = useCallback((stepNumber: number) => {
-    setError(null)
     const targetIndex = stepNumber - 1
-    if (targetIndex >= 0 && targetIndex < steps.length) {
+    if (targetIndex < 0 || targetIndex >= steps.length) return
+
+    // Backward navigation is always allowed
+    if (targetIndex <= currentStepIndex) {
+      setError(null)
       setCurrentStepIndex(targetIndex)
+      return
     }
-  }, [steps.length])
+
+    // Forward navigation: validate all intermediate steps
+    for (let i = currentStepIndex; i < targetIndex; i++) {
+      const step = steps[i]
+      if (step.isOptional) continue
+      const validation = step.validate(formData)
+      if (!validation.isValid) {
+        setError(`${step.title}: ${validation.error}`)
+        return
+      }
+    }
+
+    setError(null)
+    setCurrentStepIndex(targetIndex)
+  }, [steps, currentStepIndex, formData])
 
   const handleSubmit = useCallback(async () => {
     // Validate all required steps
@@ -285,6 +305,17 @@ export function OnboardingWizard() {
     }
   }, [formData, steps, router])
 
+  // Compute the furthest step the user can reach by validating forward from current
+  const maxReachableStep = useMemo(() => {
+    for (let i = currentStepIndex; i < steps.length; i++) {
+      const step = steps[i]
+      if (step.isOptional) continue
+      const validation = step.validate(formData)
+      if (!validation.isValid) return i + 1 // 1-indexed: can reach this step but not beyond
+    }
+    return steps.length
+  }, [currentStepIndex, steps, formData])
+
   // Convert to wizard step metadata format
   const wizardSteps: WizardStepMetadata[] = useMemo(
     () =>
@@ -305,18 +336,23 @@ export function OnboardingWizard() {
         ? 'Creating...'
         : 'Redirecting...'
 
-  // Show loading skeleton while fetching profile
+  // Show loading skeleton while fetching profile (with overlay backdrop)
   if (isLoadingProfile) {
     return (
-      <div className="mx-auto max-w-2xl animate-pulse space-y-6 py-8">
-        <div className="h-8 w-48 rounded bg-slate-200 dark:bg-slate-700" />
-        <div className="h-4 w-64 rounded bg-slate-200 dark:bg-slate-700" />
-        <div className="space-y-4 pt-8">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-lg bg-slate-200 dark:bg-slate-700" />
-          ))}
+      <>
+        <div className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm" aria-hidden="true" />
+        <div className="fixed inset-0 z-[70] flex items-center justify-center">
+          <div className="mx-auto max-w-2xl animate-pulse space-y-6 py-8">
+            <div className="h-8 w-48 rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="h-4 w-64 rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="space-y-4 pt-8">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-lg bg-slate-200 dark:bg-slate-700" />
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      </>
     )
   }
 
@@ -326,10 +362,12 @@ export function OnboardingWizard() {
         currentStep={currentStepIndex + 1}
         steps={wizardSteps}
         mode="onboarding"
+        overlay
         onPrevious={handlePrevious}
         onNext={handleNext}
         onSubmit={handleSubmit}
         onStepClick={handleStepClick}
+        maxReachableStep={maxReachableStep}
         isSubmitting={isSubmitting}
         submitLabel={submitLabel}
         submittingLabel={submittingLabel}

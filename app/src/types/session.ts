@@ -140,6 +140,8 @@ export interface SessionWithProject extends SessionRecord {
   } | null
   /** Issues linked to this session from PM review */
   linked_issues?: SessionLinkedIssue[]
+  /** Matched Hissuno user profile (if user_id is a known platform user) */
+  user_profile?: { full_name: string | null } | null
 }
 
 /**
@@ -225,6 +227,37 @@ export interface UpdateSessionInput {
   user_id?: string | null
   user_metadata?: Record<string, string> | null
   is_human_takeover?: boolean
+}
+
+/**
+ * Resolved user display info from session data.
+ * Priority: user_profile.full_name > metadata.name > metadata.email > user_id
+ */
+export function getSessionUserDisplay(session: SessionWithProject): {
+  name: string | null
+  isHissuno: boolean
+} {
+  // 1. Hissuno platform user
+  if (session.user_profile?.full_name) {
+    return { name: session.user_profile.full_name, isHissuno: true }
+  }
+
+  // 2. External user with metadata
+  const metaName = session.user_metadata?.name as string | undefined
+  const metaEmail = session.user_metadata?.email as string | undefined
+  if (metaName) {
+    return { name: metaName, isHissuno: false }
+  }
+  if (metaEmail) {
+    return { name: metaEmail, isHissuno: false }
+  }
+
+  // 3. Raw user_id fallback
+  if (session.user_id) {
+    return { name: session.user_id, isHissuno: false }
+  }
+
+  return { name: null, isHissuno: false }
 }
 
 /**
