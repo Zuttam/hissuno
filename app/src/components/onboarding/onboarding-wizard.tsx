@@ -302,7 +302,7 @@ export function OnboardingWizard() {
     phase === 'profile'
       ? 'Saving profile...'
       : phase === 'project'
-        ? 'Creating campaign...'
+        ? 'Creating...'
         : 'Redirecting...'
 
   // Show loading skeleton while fetching profile

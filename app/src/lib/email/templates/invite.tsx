@@ -13,14 +13,17 @@ import {
   Text,
 } from '@react-email/components'
 
-const LOGO_URL = 'https://app.hissuno.com/logos/hissuno/light-mode-transparant.png'
-
 interface InviteEmailProps {
   inviteCode: string
   signupUrl: string
+  appUrl: string
+  promotionCode?: string
+  promotionDescription?: string
 }
 
-export function InviteEmail({ inviteCode, signupUrl }: InviteEmailProps) {
+export function InviteEmail({ inviteCode, signupUrl, appUrl, promotionCode, promotionDescription }: InviteEmailProps) {
+  const logoUrl = 'https://hissuno.com/logos/hissuno/light-mode-transparant.png'
+
   return (
     <Html>
       <Head />
@@ -28,7 +31,7 @@ export function InviteEmail({ inviteCode, signupUrl }: InviteEmailProps) {
       <Body style={main}>
         <Container style={container}>
           <Section style={logoContainer}>
-            <Img src={LOGO_URL} alt="Hissuno" width={140} height={46} style={logo} />
+            <Img src={logoUrl} alt="Hissuno" width={64} height={64} style={logo} />
           </Section>
 
           <Heading style={h1}>You&apos;re invited! &#127881;</Heading>
@@ -43,6 +46,20 @@ export function InviteEmail({ inviteCode, signupUrl }: InviteEmailProps) {
               Accept Invitation
             </Button>
           </Section>
+
+          {promotionCode && (
+            <Section style={promoBanner}>
+              {promotionDescription && (
+                <Text style={promoDescription}>{promotionDescription}</Text>
+              )}
+              <Section style={promoCodeBox}>
+                <Text style={promoCodeText}>{promotionCode}</Text>
+              </Section>
+              <Text style={promoHint}>
+                Copy this code and apply it at checkout.
+              </Text>
+            </Section>
+          )}
 
           <Text style={codeText}>
             Or use this invite code during signup: <strong>{inviteCode}</strong>
@@ -120,6 +137,47 @@ const button = {
   textDecoration: 'none',
   textAlign: 'center' as const,
   padding: '14px 28px',
+}
+
+const promoBanner = {
+  backgroundColor: '#f0f7ff',
+  borderRadius: '8px',
+  padding: '20px',
+  margin: '0 0 20px',
+  textAlign: 'center' as const,
+}
+
+const promoDescription = {
+  color: '#1a1a1a',
+  fontSize: '16px',
+  fontWeight: '600' as const,
+  lineHeight: '24px',
+  margin: '0 0 12px',
+}
+
+const promoCodeBox = {
+  backgroundColor: '#ffffff',
+  border: '2px dashed #2563eb',
+  borderRadius: '6px',
+  padding: '10px 16px',
+  margin: '0 auto',
+  maxWidth: '200px',
+}
+
+const promoCodeText = {
+  color: '#2563eb',
+  fontSize: '20px',
+  fontWeight: '700' as const,
+  letterSpacing: '2px',
+  margin: '0',
+  textAlign: 'center' as const,
+}
+
+const promoHint = {
+  color: '#8898aa',
+  fontSize: '12px',
+  lineHeight: '16px',
+  margin: '8px 0 0',
 }
 
 const hr = {

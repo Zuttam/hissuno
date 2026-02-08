@@ -5,7 +5,7 @@ export default function AccountPromotionsPage() {
   return (
     <div className="mx-auto w-full max-w-6xl">
       <div className="my-8">
-        <PageHeader title="Invites" />
+        <PageHeader title="Referrals" />
       </div>
 
       <div className="flex flex-col gap-8">

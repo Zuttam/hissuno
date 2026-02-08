@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     // Verify invite belongs to the user and is unclaimed
     const { data: invite, error: fetchError } = await supabase
       .from('invites')
-      .select('id, code, owner_user_id, claimed_by_user_id')
+      .select('id, code, owner_user_id, claimed_by_user_id, promotion_code, promotion_description')
       .eq('id', inviteId)
       .single()
 
@@ -42,8 +42,8 @@ export async function POST(request: Request) {
     }
 
     // Build signup URL with invite code
-    const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://hissuno.com'
-    const signupUrl = `${baseUrl}/signup?invite=${invite.code}`
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hissuno.com'
+    const signupUrl = `${baseUrl}/sign-up?invite=${invite.code}`
 
     // Send invite email with dedup and tracking
     const result = await sendInviteEmailIfNeeded({
@@ -52,6 +52,8 @@ export async function POST(request: Request) {
       inviteCode: invite.code,
       recipientEmail,
       signupUrl,
+      promotionCode: invite.promotion_code ?? undefined,
+      promotionDescription: invite.promotion_description ?? undefined,
     })
 
     if (!result.success) {

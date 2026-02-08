@@ -123,7 +123,7 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
               ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
               : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
           }`}
-          title="Invites"
+          title="Referral"
         >
           <GiftIcon className="h-4 w-4" />
         </Link>
@@ -211,7 +211,7 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
         }`}
       >
         <GiftIcon className="h-4 w-4 flex-shrink-0" />
-        <span>Invites</span>
+        <span>Referral</span>
       </Link>
       <Link
         href="/account/billing"

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import type { Plan } from '@/types/billing'
 import { FloatingCard } from '@/components/ui/floating-card'
-import { Button, Heading } from '@/components/ui'
+import { Button, Heading, Input } from '@/components/ui'
 import { cn } from '@/lib/utils/class'
 
 interface PlansSectionProps {
@@ -14,6 +14,8 @@ interface PlansSectionProps {
 
 export function PlansSection({ plans, currentPlanId, onPlanChange }: PlansSectionProps) {
   const [isLoading, setIsLoading] = useState<string | null>(null)
+  const [discountCode, setDiscountCode] = useState('')
+  const [showDiscountInput, setShowDiscountInput] = useState(false)
 
   const formatPrice = (cents: number) => {
     if (cents === 0) return 'Free'
@@ -34,7 +36,11 @@ export function PlansSection({ plans, currentPlanId, onPlanChange }: PlansSectio
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId: plan.id, redirectPath: '/account/billing' }),
+        body: JSON.stringify({
+          planId: plan.id,
+          redirectPath: '/account/billing',
+          ...(discountCode.trim() ? { discountCode: discountCode.trim() } : {}),
+        }),
       })
       const data = await response.json()
 
@@ -66,6 +72,31 @@ export function PlansSection({ plans, currentPlanId, onPlanChange }: PlansSectio
         <p className="text-sm text-slate-500 dark:text-slate-400">
           Compare plans and upgrade to unlock more features.
         </p>
+      </div>
+
+      <div>
+        {showDiscountInput ? (
+          <div className="flex items-center gap-2">
+            <Input
+              type="text"
+              placeholder="Enter promotion code"
+              value={discountCode}
+              onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+              className="max-w-[220px]"
+            />
+            <Button variant="ghost" size="sm" onClick={() => { setShowDiscountInput(false); setDiscountCode('') }}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowDiscountInput(true)}
+            className="text-sm text-[--accent-selected] hover:underline"
+          >
+            Have a promotion code?
+          </button>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">

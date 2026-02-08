@@ -42,7 +42,7 @@ export function useIntegrationStatuses(projectId: string | null) {
 
       if (widgetRes.ok) {
         const data = await widgetRes.json()
-        updated.widget = data.stats?.isActive ?? false
+        updated.widget = data.stats?.hasAnySessions ?? false
       }
       if (slackRes.ok) {
         const data = await slackRes.json()

@@ -101,7 +101,7 @@ export default function IntegrationsPage() {
   const [showJiraDialog, setShowJiraDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [integrations, setIntegrations] = useState<Integration[]>([])
-  const [widgetStats, setWidgetStats] = useState<{ isActive: boolean } | null>(null)
+  const [widgetStats, setWidgetStats] = useState<{ isActive: boolean; hasAnySessions: boolean } | null>(null)
   const [slackConnected, setSlackConnected] = useState(false)
   const [githubConnected, setGithubConnected] = useState(false)
   const [intercomConnected, setIntercomConnected] = useState(false)
@@ -315,7 +315,7 @@ export default function IntegrationsPage() {
         id: 'widget',
         name: 'Widget',
         description: 'Embed the support chat widget in your application',
-        status: widgetStats?.isActive ? 'active' : 'idle',
+        status: widgetStats?.isActive ? 'active' : widgetStats?.hasAnySessions ? 'idle' : 'not_connected',
         icon: <WidgetIcon />,
         category: 'sessions',
       },

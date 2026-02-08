@@ -3,7 +3,6 @@ import crypto from 'crypto'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { getWebhookSecret } from '@/lib/billing/lemon-squeezy'
 import { getPlanById } from '@/lib/billing/plans-cache'
-import { findInviteUsedByUser, markPromotionEligible } from '@/lib/promotions/promotion-service'
 
 export const runtime = 'nodejs'
 
@@ -108,18 +107,6 @@ export async function POST(request: Request) {
         }
 
         console.log(`[webhook.lemon-squeezy] Created subscription for user ${userId} with plan ${resolvedPlanName}`)
-
-        // Mark referral promotion as eligible for the inviter
-        try {
-          const inviteId = await findInviteUsedByUser(userId)
-          if (inviteId) {
-            await markPromotionEligible(inviteId)
-            console.log(`[webhook.lemon-squeezy] Marked promotion eligible for invite ${inviteId}`)
-          }
-        } catch (promoError) {
-          // Log but don't fail the webhook
-          console.error('[webhook.lemon-squeezy] Failed to mark promotion eligible:', promoError)
-        }
         break
       }
 

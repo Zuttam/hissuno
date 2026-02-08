@@ -344,6 +344,8 @@ export type Database = {
           expires_at: string | null
           id: string
           owner_user_id: string
+          promotion_code: string | null
+          promotion_description: string | null
           target_email: string | null
         }
         Insert: {
@@ -354,6 +356,8 @@ export type Database = {
           expires_at?: string | null
           id?: string
           owner_user_id: string
+          promotion_code?: string | null
+          promotion_description?: string | null
           target_email?: string | null
         }
         Update: {
@@ -364,6 +368,8 @@ export type Database = {
           expires_at?: string | null
           id?: string
           owner_user_id?: string
+          promotion_code?: string | null
+          promotion_description?: string | null
           target_email?: string | null
         }
         Relationships: []
@@ -1144,53 +1150,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      promotions: {
-        Row: {
-          claimed_at: string | null
-          created_at: string
-          eligible_at: string | null
-          expires_at: string | null
-          id: string
-          invite_id: string
-          status: string
-          type: string
-          user_id: string
-          value: number
-        }
-        Insert: {
-          claimed_at?: string | null
-          created_at?: string
-          eligible_at?: string | null
-          expires_at?: string | null
-          id?: string
-          invite_id: string
-          status?: string
-          type: string
-          user_id: string
-          value: number
-        }
-        Update: {
-          claimed_at?: string | null
-          created_at?: string
-          eligible_at?: string | null
-          expires_at?: string | null
-          id?: string
-          invite_id?: string
-          status?: string
-          type?: string
-          user_id?: string
-          value?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "promotions_invite_id_fkey"
-            columns: ["invite_id"]
-            isOneToOne: false
-            referencedRelation: "invites"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       session_messages: {
         Row: {

@@ -78,7 +78,6 @@ export async function validateInviteCode(code: string): Promise<InviteValidation
 
 /**
  * Claims an invite code for a user after successful signup.
- * Creates a pending promotion for the invite owner.
  */
 export async function claimInvite(code: string, userId: string): Promise<void> {
   const normalizedCode = code.trim().toUpperCase()
@@ -123,20 +122,6 @@ export async function claimInvite(code: string, userId: string): Promise<void> {
 
   if (activateError) {
     console.error('[invite-service.claimInvite] Failed to activate user profile:', activateError)
-  }
-
-  // Create a pending promotion for the invite owner
-  const { error: promotionError } = await supabase.from('promotions').insert({
-    user_id: invite.owner_user_id,
-    invite_id: invite.id,
-    type: 'referral_credit',
-    value: 500, // $5.00 credit in cents
-    status: 'pending',
-  })
-
-  if (promotionError) {
-    // Log but don't fail - the invite was successfully claimed
-    console.error('[invite-service.claimInvite] Failed to create promotion:', promotionError)
   }
 
   console.log(`[invite-service.claimInvite] Invite ${normalizedCode} claimed by user ${userId}`)

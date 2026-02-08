@@ -135,8 +135,8 @@ function InviteRow({ invite }: InviteRowProps) {
   const [showSendDialog, setShowSendDialog] = useState(false)
 
   const inviteLink = typeof window !== 'undefined'
-    ? `${window.location.origin}/signup?invite=${invite.code}`
-    : `https://hissuno.com/signup?invite=${invite.code}`
+    ? `${window.location.origin}/sign-up?invite=${invite.code}`
+    : `https://hissuno.com/sign-up?invite=${invite.code}`
 
   const handleCopyLink = useCallback(async () => {
     try {
@@ -168,30 +168,47 @@ function InviteRow({ invite }: InviteRowProps) {
 
   return (
     <>
-      <div className="flex items-center justify-between rounded-[4px] border-2 border-[--border-subtle] bg-[--surface] px-3 py-2">
-        <span className="font-mono text-sm font-semibold text-[--foreground]">{invite.code}</span>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void handleCopyLink()}
-            className="flex items-center gap-1"
-          >
-            {copiedLink ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
-            <span className="text-xs">{copiedLink ? 'Copied!' : 'Copy Link'}</span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowSendDialog(true)}
-            className="flex items-center gap-1"
-          >
-            <MailIcon className="h-3.5 w-3.5" />
-            <span className="text-xs">Send Invite</span>
-          </Button>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between rounded-[4px] border-2 border-[--border-subtle] bg-[--surface] px-3 py-2">
+          <span className="font-mono text-sm font-semibold text-[--foreground]">{invite.code}</span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => void handleCopyLink()}
+              className="flex items-center gap-1"
+            >
+              {copiedLink ? <CheckIcon className="h-3.5 w-3.5" /> : <CopyIcon className="h-3.5 w-3.5" />}
+              <span className="text-xs">{copiedLink ? 'Copied!' : 'Copy Link'}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSendDialog(true)}
+              className="flex items-center gap-1"
+            >
+              <MailIcon className="h-3.5 w-3.5" />
+              <span className="text-xs">Send Invite</span>
+            </Button>
+          </div>
         </div>
+        {invite.promotion_code && (
+          <div className="flex items-center gap-1.5 px-3">
+            <span className="text-[11px] text-[--text-tertiary]">
+                Includes: 
+              </span>
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+              {invite.promotion_code}
+            </span>
+            {invite.promotion_description && (
+              <span className="text-[11px] text-[--text-tertiary]">
+                - {invite.promotion_description}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       <SendInviteDialog
         invite={invite}
@@ -250,7 +267,7 @@ export function PromotionsSection() {
             ))}
           </div>
         ) : (
-          <p className="text-sm text-[--text-secondary]">No invites available.</p>
+          <p className="text-sm text-[--text-secondary]">No invites available at this time. Check in later to help spread the word.</p>
         )}
       </div>
 

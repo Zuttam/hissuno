@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const user = await requireSessionUser()
     const supabase = await createClient()
     const body = await request.json()
-    const { planId, redirectPath = '/onboarding' } = body
+    const { planId, redirectPath = '/onboarding', discountCode } = body
 
     if (!planId) {
       return NextResponse.json({ error: 'Plan ID is required.' }, { status: 400 })
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
     const { data: checkout, error: checkoutError } = await createCheckout(storeId, variantId, {
       checkoutData: {
         email: email ?? undefined,
+        discountCode: typeof discountCode === 'string' && discountCode.trim() ? discountCode.trim() : undefined,
         custom: {
           user_id: user.id,
           plan_id: plan.id,

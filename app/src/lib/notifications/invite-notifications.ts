@@ -31,6 +31,10 @@ interface SendInviteEmailOptions {
   recipientEmail: string
   /** Full signup URL with invite code */
   signupUrl: string
+  /** Optional Lemon Squeezy promotion code */
+  promotionCode?: string
+  /** Optional description for the promotion (e.g. "$15 off your first month") */
+  promotionDescription?: string
 }
 
 /**
@@ -39,7 +43,7 @@ interface SendInviteEmailOptions {
 export async function sendInviteEmailIfNeeded(
   options: SendInviteEmailOptions
 ): Promise<SendEmailResult> {
-  const { userId, inviteId, inviteCode, recipientEmail, signupUrl } = options
+  const { userId, inviteId, inviteCode, recipientEmail, signupUrl, promotionCode, promotionDescription } = options
   const dedupKey = generateInviteDedupKey(inviteId, recipientEmail)
 
   try {
@@ -56,7 +60,8 @@ export async function sendInviteEmailIfNeeded(
     }
 
     const resend = getResendClient()
-    const emailHtml = await render(InviteEmail({ inviteCode, signupUrl }))
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hissuno.com'
+    const emailHtml = await render(InviteEmail({ inviteCode, signupUrl, appUrl, promotionCode, promotionDescription }))
 
     const { data: result, error: sendError } = await resend.emails.send({
       from: getFromAddress(),

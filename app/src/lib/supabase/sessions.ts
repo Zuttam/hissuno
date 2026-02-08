@@ -394,11 +394,12 @@ export async function updateSessionTags(
 export interface IntegrationStats {
   lastActivityAt: string | null
   isActive: boolean // Has sessions in last 7 days
+  hasAnySessions: boolean // Has ever received any sessions
 }
 
 export const getProjectIntegrationStats = cache(async (projectId: string): Promise<IntegrationStats> => {
   if (!isSupabaseConfigured()) {
-    return { lastActivityAt: null, isActive: false }
+    return { lastActivityAt: null, isActive: false, hasAnySessions: false }
   }
 
   try {
@@ -409,7 +410,7 @@ export const getProjectIntegrationStats = cache(async (projectId: string): Promi
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
-      return { lastActivityAt: null, isActive: false }
+      return { lastActivityAt: null, isActive: false, hasAnySessions: false }
     }
 
     // Verify user owns this project
@@ -421,7 +422,7 @@ export const getProjectIntegrationStats = cache(async (projectId: string): Promi
       .single()
 
     if (!project) {
-      return { lastActivityAt: null, isActive: false }
+      return { lastActivityAt: null, isActive: false, hasAnySessions: false }
     }
 
     // Get most recent session
@@ -446,9 +447,10 @@ export const getProjectIntegrationStats = cache(async (projectId: string): Promi
     return {
       lastActivityAt: latest?.last_activity_at ?? null,
       isActive: (count ?? 0) > 0,
+      hasAnySessions: latest !== null,
     }
   } catch {
-    return { lastActivityAt: null, isActive: false }
+    return { lastActivityAt: null, isActive: false, hasAnySessions: false }
   }
 })
 

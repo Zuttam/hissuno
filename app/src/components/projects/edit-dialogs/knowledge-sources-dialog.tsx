@@ -604,19 +604,8 @@ export function KnowledgeSourcesDialog({
           {/* Add buttons */}
           {!addingType && !editingSourceId && (
             <div className="flex flex-wrap gap-2">
-              {githubStatus.connected && !hasCodebaseSource && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => startAdding('codebase')}
-                >
-                  <span className="flex items-center gap-1.5">
-                    {SOURCE_TYPE_CONFIG.codebase.icon} Add Codebase
-                  </span>
-                </Button>
-              )}
               {(Object.keys(SOURCE_TYPE_CONFIG) as AddableSourceType[])
-                .filter(type => type !== 'codebase')
+                .filter(type => type !== 'codebase' || !hasCodebaseSource)
                 .map(type => (
                   <Button
                     key={type}
@@ -810,23 +799,6 @@ export function KnowledgeSourcesDialog({
             </p>
           ) : null}
 
-          {/* Connect GitHub prompt (if not connected and no codebase) */}
-          {!githubStatus.connected && !hasCodebaseSource && !addingType && !editingSourceId && (
-            <Alert variant="info">
-              Connect GitHub to add your codebase as a knowledge source.
-              <Button
-                variant="primary"
-                size="sm"
-                className="ml-4"
-                onClick={() => {
-                  const nextUrl = `/projects/${projectId}/agents`
-                  window.open(`/api/integrations/github/connect?projectId=${projectId}&nextUrl=${encodeURIComponent(nextUrl)}`, '_blank')
-                }}
-              >
-                Connect GitHub
-              </Button>
-            </Alert>
-          )}
         </div>
       )}
     </EditDialog>
