@@ -114,6 +114,7 @@
 
 ### Sessions
 [] Make each source badge and icon badge (also in filters)
+[x] Check session lifecycle for closed sessions (from integrations)
 
 ### Suport
 [] Email agent

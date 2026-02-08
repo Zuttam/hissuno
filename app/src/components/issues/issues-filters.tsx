@@ -132,7 +132,6 @@ export function IssuesFilters({
 
   const activeFilterCount = useMemo(() => {
     let count = 0
-    if (filters.projectId) count++
     if (filters.type) count++
     if (filters.priority) count++
     if (filters.status) count++

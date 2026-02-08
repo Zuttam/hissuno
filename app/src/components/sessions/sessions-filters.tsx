@@ -145,7 +145,6 @@ export function SessionsFilters({
 
   const activeFilterCount = useMemo(() => {
     let count = 0
-    if (filters.projectId) count++
     if (filters.userId) count++
     if (filters.sessionId) count++
     if (filters.name) count++

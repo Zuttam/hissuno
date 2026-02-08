@@ -4,14 +4,15 @@
  * Tests for the session lifecycle cron job that handles:
  * 1. Sending idle prompts to inactive sessions
  * 2. Auto-closing sessions scheduled for close
- * 3. Triggering PM review for closed sessions
+ * 3. Triggering PM review for closed sessions (decoupled from close)
  *
  * Key scenarios:
  * - Idle prompt sent when session exceeds idle timeout
  * - Human takeover should prevent idle prompt (if implemented)
  * - Session closes after no response to idle prompt
  * - Session closes after goodbye detection (closing_soon status)
- * - PM review triggered when session closes
+ * - PM reviews triggered for all closed sessions without a review (any source)
+ * - Stale running reviews cleaned up automatically
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -47,6 +48,15 @@ interface MockSessionMessage {
   created_at: string
 }
 
+interface MockSessionReview {
+  id: string
+  session_id: string
+  project_id: string
+  run_id: string
+  status: 'running' | 'completed' | 'failed'
+  created_at: string
+}
+
 function createMockSession(overrides: Partial<MockSession> = {}): MockSession {
   return {
     id: `session-${Math.random().toString(36).substring(7)}`,
@@ -66,6 +76,18 @@ function createMockProjectSettings(overrides: Partial<MockProjectSettings> = {})
     session_idle_timeout_minutes: 5,
     session_idle_response_timeout_seconds: 60,
     session_goodbye_delay_seconds: 90,
+    ...overrides,
+  }
+}
+
+function createMockReview(overrides: Partial<MockSessionReview> = {}): MockSessionReview {
+  return {
+    id: `review-${Math.random().toString(36).substring(7)}`,
+    session_id: 'session-123',
+    project_id: 'project-123',
+    run_id: `pm-review-session-123-${Date.now()}`,
+    status: 'completed',
+    created_at: new Date().toISOString(),
     ...overrides,
   }
 }
@@ -404,6 +426,23 @@ describe('Session Close Logic', () => {
     })
   })
 
+  describe('Close does NOT trigger review directly', () => {
+    it('should only update status to closed without creating review records', () => {
+      // The close phase sets status to 'closed' but does NOT insert session_reviews.
+      // Reviews are handled by triggerPendingReviews as a separate phase.
+      const session = createMockSession({
+        status: 'awaiting_idle_response',
+        scheduled_close_at: new Date(Date.now() - 1000).toISOString(),
+      })
+
+      // After close phase, session is closed but no review exists yet
+      session.status = 'closed'
+      expect(session.status).toBe('closed')
+
+      // Review will be picked up by triggerPendingReviews on the same or next cron tick
+    })
+  })
+
   describe('Scheduled Close Calculation', () => {
     it('should calculate correct scheduled close time from response timeout', () => {
       const now = new Date()
@@ -469,38 +508,129 @@ describe('Goodbye Detection', () => {
 })
 
 // ============================================================================
-// PM REVIEW TRIGGER TESTS
+// PM REVIEW TRIGGER TESTS (DECOUPLED)
 // ============================================================================
 
-describe('PM Review Trigger', () => {
-  describe('Review Triggered on Close', () => {
-    it('should trigger PM review when session closes', () => {
-      const session = createMockSession({ status: 'closed' })
-      const runId = `pm-review-${session.id}-${Date.now()}`
+describe('PM Review Trigger (Decoupled)', () => {
+  describe('Review Triggered for Closed Sessions', () => {
+    it('should identify closed sessions without a completed or running review', () => {
+      const closedSessions = [
+        createMockSession({ id: 'session-1', status: 'closed' }),
+        createMockSession({ id: 'session-2', status: 'closed' }),
+        createMockSession({ id: 'session-3', status: 'closed' }),
+      ]
 
-      const reviewEntry = {
-        session_id: session.id,
-        project_id: session.project_id,
-        run_id: runId,
-        status: 'running',
-        metadata: {
-          triggeredBy: 'session-lifecycle-cron',
-          sessionId: session.id,
-          projectId: session.project_id,
-        },
-      }
+      const existingReviews = [
+        createMockReview({ session_id: 'session-1', status: 'completed' }),
+      ]
 
-      expect(reviewEntry.session_id).toBe(session.id)
-      expect(reviewEntry.status).toBe('running')
-      expect(reviewEntry.metadata.triggeredBy).toBe('session-lifecycle-cron')
+      const reviewedSessionIds = new Set(existingReviews.map((r) => r.session_id))
+      const unreviewedSessions = closedSessions.filter((s) => !reviewedSessionIds.has(s.id))
+
+      expect(unreviewedSessions).toHaveLength(2)
+      expect(unreviewedSessions.map((s) => s.id)).toEqual(['session-2', 'session-3'])
     })
 
-    it('should generate unique run_id for each review', () => {
-      const session = createMockSession({ status: 'closed' })
-      const runId1 = `pm-review-${session.id}-${Date.now()}`
-      const runId2 = `pm-review-${session.id}-${Date.now() + 1}`
+    it('should not re-trigger review for session with running review', () => {
+      const closedSessions = [
+        createMockSession({ id: 'session-1', status: 'closed' }),
+      ]
 
-      expect(runId1).not.toBe(runId2)
+      const existingReviews = [
+        createMockReview({ session_id: 'session-1', status: 'running' }),
+      ]
+
+      const reviewedSessionIds = new Set(existingReviews.map((r) => r.session_id))
+      const unreviewedSessions = closedSessions.filter((s) => !reviewedSessionIds.has(s.id))
+
+      expect(unreviewedSessions).toHaveLength(0)
+    })
+
+    it('should retry review for session with failed review', () => {
+      // Failed reviews are NOT in the exclusion set (only 'completed' and 'running')
+      const closedSessions = [
+        createMockSession({ id: 'session-1', status: 'closed' }),
+      ]
+
+      const existingReviews = [
+        createMockReview({ session_id: 'session-1', status: 'failed' }),
+      ]
+
+      // Only completed/running reviews block re-triggering
+      const blockingReviews = existingReviews.filter((r) => r.status === 'completed' || r.status === 'running')
+      const reviewedSessionIds = new Set(blockingReviews.map((r) => r.session_id))
+      const unreviewedSessions = closedSessions.filter((s) => !reviewedSessionIds.has(s.id))
+
+      expect(unreviewedSessions).toHaveLength(1)
+    })
+  })
+
+  describe('Batch Limit', () => {
+    it('should respect batch limit of 10 sessions per cron tick', () => {
+      const REVIEW_BATCH_LIMIT = 10
+      const closedSessions = Array.from({ length: 25 }, (_, i) =>
+        createMockSession({ id: `session-${i}`, status: 'closed' })
+      )
+
+      const batch = closedSessions.slice(0, REVIEW_BATCH_LIMIT)
+      expect(batch).toHaveLength(10)
+    })
+
+    it('should process remaining sessions on next cron tick', () => {
+      const REVIEW_BATCH_LIMIT = 10
+      const totalSessions = 25
+
+      // First tick processes 10
+      const firstBatch = REVIEW_BATCH_LIMIT
+      // Remaining need subsequent ticks
+      const remaining = totalSessions - firstBatch
+
+      expect(remaining).toBe(15)
+      // Would need 2 more ticks (10 + 5)
+      expect(Math.ceil(remaining / REVIEW_BATCH_LIMIT)).toBe(2)
+    })
+  })
+
+  describe('Stale Review Cleanup', () => {
+    it('should mark running reviews older than 15 minutes as failed', () => {
+      const STALE_REVIEW_MINUTES = 15
+      const staleThreshold = new Date(Date.now() - STALE_REVIEW_MINUTES * 60 * 1000)
+
+      const staleReview = createMockReview({
+        status: 'running',
+        created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(), // 20 min ago
+      })
+
+      const reviewCreatedAt = new Date(staleReview.created_at)
+      const isStale = reviewCreatedAt <= staleThreshold
+
+      expect(isStale).toBe(true)
+    })
+
+    it('should not mark recent running reviews as stale', () => {
+      const STALE_REVIEW_MINUTES = 15
+      const staleThreshold = new Date(Date.now() - STALE_REVIEW_MINUTES * 60 * 1000)
+
+      const recentReview = createMockReview({
+        status: 'running',
+        created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 min ago
+      })
+
+      const reviewCreatedAt = new Date(recentReview.created_at)
+      const isStale = reviewCreatedAt <= staleThreshold
+
+      expect(isStale).toBe(false)
+    })
+
+    it('should not affect completed reviews', () => {
+      const completedReview = createMockReview({
+        status: 'completed',
+        created_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // 1 hour ago
+      })
+
+      // Stale cleanup only targets 'running' status
+      const isTargeted = completedReview.status === 'running'
+      expect(isTargeted).toBe(false)
     })
   })
 
@@ -514,6 +644,75 @@ describe('PM Review Trigger', () => {
       const shouldIgnore = mockError.code === '23505'
 
       expect(shouldIgnore).toBe(true)
+    })
+  })
+
+  describe('Review Trigger Sources', () => {
+    it('should pick up widget-closed sessions for review', () => {
+      // Widget close route now only sets status to 'closed'
+      // The cron's triggerPendingReviews picks up all closed sessions without reviews
+      const widgetClosedSession = createMockSession({
+        id: 'widget-session',
+        status: 'closed',
+      })
+
+      const existingReviews: MockSessionReview[] = []
+      const reviewedSessionIds = new Set(existingReviews.map((r) => r.session_id))
+      const needsReview = !reviewedSessionIds.has(widgetClosedSession.id)
+
+      expect(needsReview).toBe(true)
+    })
+
+    it('should pick up intercom-synced sessions for review', () => {
+      // Intercom sync creates sessions directly as 'closed'
+      const intercomSession = createMockSession({
+        id: 'intercom-session',
+        status: 'closed',
+      })
+
+      const existingReviews: MockSessionReview[] = []
+      const reviewedSessionIds = new Set(existingReviews.map((r) => r.session_id))
+      const needsReview = !reviewedSessionIds.has(intercomSession.id)
+
+      expect(needsReview).toBe(true)
+    })
+
+    it('should pick up gong-synced sessions for review', () => {
+      // Gong sync creates sessions directly as 'closed'
+      const gongSession = createMockSession({
+        id: 'gong-session',
+        status: 'closed',
+      })
+
+      const existingReviews: MockSessionReview[] = []
+      const reviewedSessionIds = new Set(existingReviews.map((r) => r.session_id))
+      const needsReview = !reviewedSessionIds.has(gongSession.id)
+
+      expect(needsReview).toBe(true)
+    })
+
+    it('should pick up cron-closed sessions for review', () => {
+      // Cron closes sessions in phase 1, then triggerPendingReviews picks them up in phase 3
+      const cronClosedSession = createMockSession({
+        id: 'cron-session',
+        status: 'closed',
+      })
+
+      const existingReviews: MockSessionReview[] = []
+      const reviewedSessionIds = new Set(existingReviews.map((r) => r.session_id))
+      const needsReview = !reviewedSessionIds.has(cronClosedSession.id)
+
+      expect(needsReview).toBe(true)
+    })
+  })
+
+  describe('Generate unique run_id for each review', () => {
+    it('should generate unique run_id for each review', () => {
+      const session = createMockSession({ status: 'closed' })
+      const runId1 = `pm-review-${session.id}-${Date.now()}`
+      const runId2 = `pm-review-${session.id}-${Date.now() + 1}`
+
+      expect(runId1).not.toBe(runId2)
     })
   })
 })
@@ -647,6 +846,15 @@ describe('Cron Job Results', () => {
       results.errors.push('Failed to close session session-123')
       expect(results.errors).toHaveLength(1)
     })
+
+    it('should aggregate errors from all phases', () => {
+      const closeErrors = ['Failed to close session session-1']
+      const idleErrors = ['Failed to send idle prompt to session session-2']
+      const reviewErrors = ['Review failed for session session-3: timeout']
+
+      const allErrors = [...closeErrors, ...idleErrors, ...reviewErrors]
+      expect(allErrors).toHaveLength(3)
+    })
   })
 })
 
@@ -676,10 +884,12 @@ describe('End-to-End Lifecycle Scenarios', () => {
       expect(session.status).toBe('awaiting_idle_response')
       expect(session.idle_prompt_sent_at).not.toBeNull()
 
-      // T=6min: No response, cron closes session
+      // T=6min: No response, cron closes session (close phase only)
       session.status = 'closed'
 
       expect(session.status).toBe('closed')
+
+      // Review is triggered separately by triggerPendingReviews phase
     })
   })
 
@@ -755,6 +965,24 @@ describe('End-to-End Lifecycle Scenarios', () => {
       const shouldSendIdlePrompt = session.idle_prompt_sent_at === null && !hasHumanTakeover
 
       expect(shouldSendIdlePrompt).toBe(false)
+    })
+  })
+
+  describe('Scenario: Intercom/Gong session created as closed', () => {
+    it('should trigger review for sessions created directly as closed', () => {
+      // Intercom/Gong sync creates sessions with status='closed' directly
+      const session = createMockSession({
+        id: 'intercom-session',
+        status: 'closed',
+      })
+
+      // No review exists for this session
+      const existingReviews: MockSessionReview[] = []
+      const reviewedSessionIds = new Set(existingReviews.map((r) => r.session_id))
+
+      // triggerPendingReviews should pick this up
+      const needsReview = session.status === 'closed' && !reviewedSessionIds.has(session.id)
+      expect(needsReview).toBe(true)
     })
   })
 })

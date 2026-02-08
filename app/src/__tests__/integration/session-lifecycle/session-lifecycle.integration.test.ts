@@ -190,7 +190,9 @@ async function simulateIdlePromptLogic(sessionId: string, idleTimeoutMinutes = 5
 }
 
 /**
- * Helper to simulate the cron logic for closing sessions
+ * Helper to simulate the cron logic for closing sessions.
+ * Close phase only updates status - does NOT create review records.
+ * Reviews are triggered separately by triggerPendingReviews.
  */
 async function simulateCloseLogic(sessionId: string) {
   const supabase = await getAdminClient()
@@ -213,7 +215,7 @@ async function simulateCloseLogic(sessionId: string) {
     return { closed: false, reason: 'Scheduled close time not reached' }
   }
 
-  // Close the session
+  // Close the session (close phase only - no review trigger)
   await supabase
     .from('sessions')
     .update({
@@ -222,7 +224,33 @@ async function simulateCloseLogic(sessionId: string) {
     })
     .eq('id', sessionId)
 
-  // Trigger PM review
+  return { closed: true }
+}
+
+/**
+ * Helper to simulate the triggerPendingReviews phase for a specific session.
+ * Creates a review record for a closed session that doesn't have one yet.
+ */
+async function simulateReviewTrigger(sessionId: string) {
+  const supabase = await getAdminClient()
+
+  const session = await getSession(sessionId)
+  if (!session) return { triggered: false, reason: 'Session not found' }
+  if (session.status !== 'closed') return { triggered: false, reason: `Status is ${session.status}, not closed` }
+
+  // Check for existing completed/running review
+  const { data: existingReview } = await supabase
+    .from('session_reviews')
+    .select('id')
+    .eq('session_id', sessionId)
+    .in('status', ['completed', 'running'])
+    .limit(1)
+    .single()
+
+  if (existingReview) {
+    return { triggered: false, reason: 'Review already exists' }
+  }
+
   const runId = `pm-review-${sessionId}-${Date.now()}`
   const { error: pmError } = await supabase.from('session_reviews').insert({
     session_id: sessionId,
@@ -237,8 +265,7 @@ async function simulateCloseLogic(sessionId: string) {
   })
 
   return {
-    closed: true,
-    pmReviewTriggered: !pmError || pmError.code === '23505',
+    triggered: !pmError || pmError.code === '23505',
   }
 }
 
@@ -363,15 +390,19 @@ describe.skipIf(!shouldRun)('Session Lifecycle Integration', () => {
         scheduled_close_at: new Date(Date.now() - 1000).toISOString(), // 1 second ago
       })
 
-      // Run close logic
+      // Run close logic (close phase only - no review)
       const result = await simulateCloseLogic(session.id)
 
       expect(result.closed).toBe(true)
-      expect(result.pmReviewTriggered).toBe(true)
 
       // Verify session was closed
       const updatedSession = await getSession(session.id)
       expect(updatedSession?.status).toBe('closed')
+
+      // Close phase does NOT create a review - that's handled by triggerPendingReviews
+      // Simulate the review trigger phase
+      const reviewResult = await simulateReviewTrigger(session.id)
+      expect(reviewResult.triggered).toBe(true)
 
       // Verify PM review was created
       const pmReview = await getPMReview(session.id)
@@ -431,15 +462,19 @@ describe.skipIf(!shouldRun)('Session Lifecycle Integration', () => {
   })
 
   describe('PM Review Trigger', () => {
-    it('should trigger PM review when session is closed', async () => {
+    it('should trigger PM review for closed session via separate phase', async () => {
       // Create closable session
       const session = await createTestSession({
         status: 'awaiting_idle_response',
         scheduled_close_at: new Date(Date.now() - 1000).toISOString(),
       })
 
-      // Close session
+      // Close session (close phase only)
       await simulateCloseLogic(session.id)
+
+      // Trigger review (separate phase)
+      const reviewResult = await simulateReviewTrigger(session.id)
+      expect(reviewResult.triggered).toBe(true)
 
       // Verify PM review
       const pmReview = await getPMReview(session.id)
@@ -448,16 +483,15 @@ describe.skipIf(!shouldRun)('Session Lifecycle Integration', () => {
       expect(pmReview?.metadata?.triggeredBy).toBe('session-lifecycle-cron-test')
     })
 
-    it('should handle duplicate PM review gracefully', async () => {
+    it('should not re-trigger review for session with existing running review', async () => {
       const supabase = await getAdminClient()
 
-      // Create session and manually create a review
+      // Create closed session with existing running review
       const session = await createTestSession({
-        status: 'awaiting_idle_response',
-        scheduled_close_at: new Date(Date.now() - 1000).toISOString(),
+        status: 'closed',
       })
 
-      // Create first PM review manually
+      // Create a running review manually
       await supabase.from('session_reviews').insert({
         session_id: session.id,
         project_id: session.project_id,
@@ -466,11 +500,22 @@ describe.skipIf(!shouldRun)('Session Lifecycle Integration', () => {
         metadata: { triggeredBy: 'manual' },
       })
 
-      // Close session (should not fail due to existing review)
-      const result = await simulateCloseLogic(session.id)
+      // Review trigger should skip (already has running review)
+      const reviewResult = await simulateReviewTrigger(session.id)
+      expect(reviewResult.triggered).toBe(false)
+    })
 
-      expect(result.closed).toBe(true)
-      // pmReviewTriggered may be true or false depending on unique constraint
+    it('should pick up unreviewed sessions from any source', async () => {
+      // Create sessions from different sources, all closed with no reviews
+      const widgetSession = await createTestSession({ status: 'closed' })
+      const intercomSession = await createTestSession({ status: 'closed' })
+      const gongSession = await createTestSession({ status: 'closed' })
+
+      // All should be eligible for review trigger
+      for (const session of [widgetSession, intercomSession, gongSession]) {
+        const result = await simulateReviewTrigger(session.id)
+        expect(result.triggered).toBe(true)
+      }
     })
   })
 
@@ -517,13 +562,17 @@ describe.skipIf(!shouldRun)('Session Lifecycle Integration', () => {
       // Step 3: Wait for scheduled close time (1 second)
       await new Promise((resolve) => setTimeout(resolve, 1100))
 
-      // Step 4: Close session
+      // Step 4: Close session (close phase only)
       const closeResult = await simulateCloseLogic(session.id)
       expect(closeResult.closed).toBe(true)
 
       // Verify final state
       currentSession = await getSession(session.id)
       expect(currentSession?.status).toBe('closed')
+
+      // Step 5: Trigger review (separate phase)
+      const reviewResult = await simulateReviewTrigger(session.id)
+      expect(reviewResult.triggered).toBe(true)
 
       // Verify PM review was triggered
       const pmReview = await getPMReview(session.id)

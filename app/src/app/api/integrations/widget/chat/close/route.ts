@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { checkEnforcement } from '@/lib/billing/enforcement-service'
 import { getProjectById } from '@/lib/projects/keys'
 import { isOriginAllowed, verifyWidgetJWT } from '@/lib/utils/widget-auth'
 
@@ -50,7 +49,7 @@ export async function OPTIONS(request: NextRequest) {
 
 /**
  * POST /api/integrations/widget/chat/close
- * Closes a session and triggers async session review (classification + PM analysis).
+ * Closes a session. Reviews are triggered separately by the session-lifecycle cron.
  *
  * Request Body:
  * - sessionId: string
@@ -59,8 +58,6 @@ export async function OPTIONS(request: NextRequest) {
  *
  * Response:
  * - success: boolean
- * - reviewTriggered: boolean - whether session review was triggered
- * - runId?: string - review run ID if triggered
  */
 export async function POST(request: NextRequest) {
   const origin = getRequestOrigin(request)
@@ -141,7 +138,7 @@ export async function POST(request: NextRequest) {
     // This handles the case where close is called before any message was sent
     if (sessionError || !session) {
       return addCorsHeaders(
-        NextResponse.json({ success: true, reviewTriggered: false }),
+        NextResponse.json({ success: true }),
         origin
       )
     }
@@ -163,89 +160,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let reviewTriggered = false
-    let runId: string | undefined
-
-    // Check analyzed sessions limit before triggering PM review
-    // Get project owner for limit check
-    const { data: projectRecord } = await supabase
-      .from('projects')
-      .select('user_id')
-      .eq('id', session.project_id)
-      .single()
-
-    if (projectRecord?.user_id) {
-      const limitResult = await checkEnforcement({
-        userId: projectRecord.user_id,
-        dimension: 'analyzed_sessions',
-      })
-
-      if (!limitResult.allowed) {
-        console.log('[widget/chat/close] Skipping PM review - analyzed sessions limit reached:', sessionId)
-        return addCorsHeaders(
-          NextResponse.json({
-            success: true,
-            reviewTriggered: false,
-            skippedReason: 'limit_reached',
-          }),
-          origin
-        )
-      }
-    }
-
-    // Trigger async session review
-    try {
-      // Check if a review is already running
-      const { data: existingReview } = await supabase
-        .from('session_reviews')
-        .select('id, run_id')
-        .eq('session_id', sessionId)
-        .eq('status', 'running')
-        .single()
-
-      if (existingReview) {
-        // Review already in progress
-        reviewTriggered = true
-        runId = existingReview.run_id
-      } else {
-        // Create new review record for async execution
-        runId = `session-review-${sessionId}-${Date.now()}`
-
-        const { error: insertError } = await supabase
-          .from('session_reviews')
-          .insert({
-            session_id: sessionId,
-            project_id: session.project_id,
-            run_id: runId,
-            status: 'running',
-            metadata: {
-              triggeredBy: 'session-close',
-              sessionId,
-              projectId: session.project_id,
-              type: 'session-review',
-            },
-          })
-
-        if (insertError) {
-          // Check for unique constraint violation (race condition)
-          if (insertError.code === '23505') {
-            console.log('[widget/chat/close] Session review already in progress (race condition)')
-            reviewTriggered = true
-          } else {
-            console.error('[widget/chat/close] Failed to create review record:', insertError)
-            // Don't fail the close operation if review trigger fails
-          }
-        } else {
-          reviewTriggered = true
-        }
-      }
-    } catch (reviewError) {
-      console.error('[widget/chat/close] Failed to trigger session review:', reviewError)
-      // Don't fail the close operation if review fails
-    }
-
     return addCorsHeaders(
-      NextResponse.json({ success: true, reviewTriggered, runId }),
+      NextResponse.json({ success: true }),
       origin
     )
   } catch (error) {
