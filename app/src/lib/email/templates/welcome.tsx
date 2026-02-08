@@ -13,7 +13,7 @@ import {
   Text,
 } from '@react-email/components'
 
-const LOGO_URL = 'https://app.hissuno.com/logos/hissuno/light-mode-transparant.png'
+const LOGO_URL = 'https://hissuno.com/logos/hissuno/light-mode-transparant.png'
 
 interface WelcomeEmailProps {
   fullName?: string | null
@@ -30,7 +30,7 @@ export function WelcomeEmail({ fullName, dashboardUrl }: WelcomeEmailProps) {
       <Body style={main}>
         <Container style={container}>
           <Section style={logoContainer}>
-            <Img src={LOGO_URL} alt="Hissuno" width={140} height={46} style={logo} />
+            <Img src={LOGO_URL} alt="Hissuno" width={64} height={64} style={logo} />
           </Section>
 
           <Heading style={h1}>{greeting}</Heading>

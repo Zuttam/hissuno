@@ -69,7 +69,7 @@ export async function sendLimitNotificationIfNeeded(
     // Check email preference and send if allowed
     const shouldEmail = await shouldSendNotification(userId, 'limit_reached', 'email')
     if (shouldEmail && isResendConfigured()) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.hissuno.com'
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://hissuno.com'
       const upgradeUrl = `${appUrl}/account/billing`
 
       try {
@@ -124,7 +124,7 @@ export async function sendLimitNotificationIfNeeded(
     const shouldSlack = await shouldSendNotification(userId, 'limit_reached', 'slack')
     if (shouldSlack) {
       try {
-        const slackText = `You've reached your ${result.dimension} limit on Hissuno (${result.current}/${result.limit}). Upgrade your plan to continue: ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.hissuno.com'}/account/billing`
+        const slackText = `You've reached your ${result.dimension} limit on Hissuno (${result.current}/${result.limit}). Upgrade your plan to continue: ${process.env.NEXT_PUBLIC_APP_URL ?? 'https://hissuno.com'}/account/billing`
         const slackResult = await sendSlackNotification({ userId, text: slackText })
 
         if (slackResult.ok) {

@@ -177,7 +177,7 @@ export async function addComment(cloudId: string, issueKey: string, comment: str
 ```
 JIRA_CLIENT_ID=
 JIRA_CLIENT_SECRET=
-JIRA_REDIRECT_URI=https://app.hissuno.com/api/integrations/jira/callback
+JIRA_REDIRECT_URI=https://hissuno.com/api/integrations/jira/callback
 ```
 
 ---

@@ -61,7 +61,7 @@ export async function sendHumanNeededNotification(
     }
 
     // Build session URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.hissuno.com'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://hissuno.com'
     const sessionUrl = `${appUrl}/projects/${projectId}/sessions?sessionId=${sessionId}`
 
     // Check email preference and send if allowed

@@ -45,7 +45,7 @@ export async function sendWelcomeNotificationIfNeeded(
       return { success: false, error: 'Email service not configured' }
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.hissuno.com'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://hissuno.com'
     const dashboardUrl = `${appUrl}/projects`
 
     try {
