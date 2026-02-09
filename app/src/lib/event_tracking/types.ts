@@ -12,7 +12,7 @@ export interface SignupEventData {
 }
 
 export interface OnboardingCompletedEventData {
-  selectedUseCases: string[]
+  selectedChannels: string[]
   utm?: UTMParams
 }
 

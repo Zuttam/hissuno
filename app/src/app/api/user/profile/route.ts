@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       companyName,
       role,
       companySize,
-      selectedUseCases,
+      communicationChannels,
       onboardingCompleted,
       onboardingCurrentStep,
     } = body
@@ -81,8 +81,8 @@ export async function POST(request: Request) {
     if (companySize !== undefined) {
       updateData.company_size = companySize || null
     }
-    if (selectedUseCases !== undefined) {
-      updateData.selected_use_cases = selectedUseCases ?? []
+    if (communicationChannels !== undefined) {
+      updateData.communication_channels = communicationChannels ?? []
     }
 
     // Onboarding step tracking

@@ -13,7 +13,7 @@ const COMPANY_SIZE_OPTIONS: { value: CompanySize; label: string }[] = [
   { value: '500+', label: '500+ employees' },
 ]
 
-export function ProfileStep({ context, onValidationChange, title, description }: StepProps) {
+export function AccountStep({ context, onValidationChange, title, description }: StepProps) {
   const { formData, setFormData } = context
   const onboardingData = formData as OnboardingFormData
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, type ChangeEvent } from 'react'
-import { WizardStepHeader } from '@/components/ui'
+import { FormField, Textarea, WizardStepHeader } from '@/components/ui'
 import { ProjectInfoSection } from '@/components/projects/edit-dialogs/project-details-dialog'
 import type { StepProps, OnboardingFormData } from '../types'
 
@@ -9,10 +9,11 @@ export function ProjectStep({ context, onValidationChange, title, description }:
   const { formData, setFormData } = context
   const onboardingData = formData as OnboardingFormData
 
-  // Always valid - this step is optional/skippable
+  // Validate: project name is required
   useEffect(() => {
-    onValidationChange?.(true)
-  }, [onValidationChange])
+    const isValid = (onboardingData.project?.name?.trim().length ?? 0) > 0
+    onValidationChange?.(isValid)
+  }, [onboardingData.project?.name, onValidationChange])
 
   const handleNameChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +47,22 @@ export function ProjectStep({ context, onValidationChange, title, description }:
     [setFormData]
   )
 
+  const handleAdditionalDetailsChange = useCallback(
+    (e: ChangeEvent<HTMLTextAreaElement>) => {
+      setFormData((prev) => {
+        const onboarding = prev as OnboardingFormData
+        return {
+          ...onboarding,
+          project: {
+            ...onboarding.project,
+            additionalDetails: e.target.value,
+          },
+        }
+      })
+    },
+    [setFormData]
+  )
+
   return (
     <div>
       <WizardStepHeader title={title} description={description} />
@@ -56,6 +73,20 @@ export function ProjectStep({ context, onValidationChange, title, description }:
         onNameChange={handleNameChange}
         onDescriptionChange={handleDescriptionChange}
       />
+
+      <div className="mt-4">
+        <FormField
+          label="Additional Context (optional)"
+          description="Paste any product docs, feature descriptions, or context that will help Hissuno understand your product better. This will be saved as a knowledge source."
+        >
+          <Textarea
+            placeholder="e.g. Our product is a B2B SaaS platform for managing customer relationships..."
+            value={onboardingData.project.additionalDetails ?? ''}
+            onChange={handleAdditionalDetailsChange}
+            rows={4}
+          />
+        </FormField>
+      </div>
     </div>
   )
 }

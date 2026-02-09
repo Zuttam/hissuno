@@ -6,10 +6,6 @@ export {
   storeUTM,
   getStoredUTM,
   clearStoredUTM,
-  storePreselectedUseCase,
-  getPreselectedUseCase,
-  clearPreselectedUseCase,
-  utmContentToUseCase,
   buildUTMQueryString,
 } from './utm'
 

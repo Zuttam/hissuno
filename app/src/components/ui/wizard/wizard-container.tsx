@@ -15,6 +15,8 @@ export type WizardContainerProps = {
   mode?: 'create' | 'edit' | 'onboarding'
   // When true, renders as a full-screen overlay with backdrop blur (like Dialog)
   overlay?: boolean
+  // When true, the step is showing a reveal message — Continue is the only action
+  isInRevealState?: boolean
   // Navigation props (create mode)
   onPrevious?: () => void
   onNext?: () => void
@@ -40,6 +42,7 @@ export function WizardContainer({
   children,
   mode = 'create',
   overlay = false,
+  isInRevealState = false,
   onPrevious,
   onNext,
   onSubmit,
@@ -221,6 +224,15 @@ export function WizardContainer({
                 >
                   {saveSuccess ? '✓ Saved' : isSubmitting ? savingLabel : saveLabel}
                 </Button>
+              ) : isInRevealState ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={onNext}
+                  disabled={isSubmitting}
+                >
+                  Continue
+                </Button>
               ) : isLastStep ? (
                 <Button
                   type="button"
@@ -238,7 +250,7 @@ export function WizardContainer({
                   onClick={onNext}
                   disabled={isSubmitting}
                 >
-                  Next →
+                  {mode === 'onboarding' ? 'Continue' : 'Next →'}
                 </Button>
               )}
             </div>
