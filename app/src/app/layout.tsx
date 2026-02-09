@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Hissuno',
-  description: 'Hissuno - AI Developer Studio',
+  description: 'Turn customer conversations into engineering work',
 }
 
 export default function RootLayout({
