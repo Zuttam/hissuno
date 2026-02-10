@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import { Input, Select, CollapsibleSection, Button } from '@/components/ui'
+import { Input, Select, CollapsibleSection, Button, FilterChip, FilterLabel } from '@/components/ui'
 import type { IssueFilters, IssueType, IssuePriority, IssueStatus } from '@/types/issue'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 
@@ -12,33 +12,6 @@ interface IssuesFiltersProps {
   hideProjectFilter?: boolean
 }
 
-interface FilterChipProps {
-  label: string
-  active: boolean
-  onClick: () => void
-}
-
-function FilterChip({ label, active, onClick }: FilterChipProps) {
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      selected={active}
-      onClick={onClick}
-      className="!rounded-full !px-2.5 !py-0.5 !text-[10px]"
-    >
-      {label}
-    </Button>
-  )
-}
-
-function FilterLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="mr-1 font-mono text-[10px] uppercase text-[color:var(--text-tertiary)]">
-      {children}
-    </span>
-  )
-}
 
 const STATUS_OPTIONS: { value: IssueStatus; label: string }[] = [
   { value: 'open', label: 'Open' },

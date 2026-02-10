@@ -39,6 +39,7 @@ interface SessionSidebarProps {
   session: SessionWithProject | null
   messages: ChatMessage[]
   isLoading: boolean
+  expandMessages?: boolean
   onClose: () => void
   onSessionUpdated?: () => void
   onUpdateSession?: (input: UpdateSessionInput) => Promise<boolean>
@@ -48,6 +49,7 @@ export function SessionSidebar({
   session,
   messages,
   isLoading,
+  expandMessages,
   onClose,
   onSessionUpdated,
   onUpdateSession,
@@ -447,7 +449,7 @@ export function SessionSidebar({
             {/* Session Messages/Transcript (closed by default) */}
             <div className="border-b-2 border-[color:var(--border-subtle)]">
               <div className="p-4">
-                <CollapsibleSection title={`${typeInfo.contentLabel} (${messages.length})`} variant="flat" defaultExpanded={false}>
+                <CollapsibleSection title={`${typeInfo.contentLabel} (${messages.length})`} variant="flat" defaultExpanded={false} expanded={expandMessages}>
                   <div className="mx-[-1rem] mt-[-1rem]">
                     <SessionContentView
                       session={session}

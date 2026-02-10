@@ -25,7 +25,7 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
 
   about: {
     id: 'about',
-    title: 'How do you get your feedbacks?',
+    title: 'How do usually get your feedbacks?',
     shortTitle: 'Feedbacks',
     description:
       'Select the communication channels you use. This helps us understand your stack.',
@@ -65,7 +65,7 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
 
   personalize: {
     id: 'personalize',
-    title: 'Personalize your workspace',
+    title: 'Personalize your landing experience',
     shortTitle: 'Personalize',
     description: 'Choose how you want to get started.',
     component: PersonalizeStep,

@@ -42,7 +42,7 @@ export async function GET(_request: Request, context: RouteContext) {
  * PATCH /api/projects/[id]/settings/issues
  *
  * Update issue tracking settings for a project.
- * Supports: issue_tracking_enabled, issue_spec_threshold, spec_guidelines
+ * Supports: issue_tracking_enabled
  */
 export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params
@@ -63,20 +63,6 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (typeof payload.issue_tracking_enabled === 'boolean') {
     updates.issue_tracking_enabled = payload.issue_tracking_enabled
-  }
-
-  if (typeof payload.issue_spec_threshold === 'number') {
-    if (payload.issue_spec_threshold < 1 || payload.issue_spec_threshold > 100) {
-      return NextResponse.json({ error: 'Threshold must be between 1 and 100.' }, { status: 400 })
-    }
-    updates.issue_spec_threshold = payload.issue_spec_threshold
-  }
-
-  if (typeof payload.spec_guidelines === 'string') {
-    const trimmed = payload.spec_guidelines.trim()
-    updates.spec_guidelines = trimmed.length > 0 ? trimmed : null
-  } else if (payload.spec_guidelines === null) {
-    updates.spec_guidelines = null
   }
 
   if (Object.keys(updates).length === 0) {

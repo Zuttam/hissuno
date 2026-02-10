@@ -112,47 +112,80 @@
 
 ## Phase 8
 
-### Sessions
-[] Make each source badge and icon badge (also in filters)
+### Feedback
+[x] Make each source badge and icon badge (also in filters)
 [x] Check session lifecycle for closed sessions (from integrations)
 
-### Suport
-[] Email agent
-
-### Marketing
-[] Run SDR agent
-[] Docs portal
+### Customers 
+[] Introduce new screen to manage contact and company data. this will be used for issue analysis later. users can add manually company and contact information using form (1 entry) or csv. When uploading a csv they will see a mapping screen with auto suggestion. Each user can define up to 10 additional custom fields for company and user information beyond the regular field. 
 
 ### Issues
-[] Calculate issue upvotes over time and alert or change priority if there's an anomaly
-[] Lieaner Integration
-[] Jira Integration 
+[] Issue review process:
+  - issue velocity - times mentioned in given sliding window
+  - issue impact - analysis based on customer and product area (+ guidelines)
+  - issue effort - grounded with codebase 
+[] Add in PM Specialist the option for review guidelines (address specific fields) 
+[x] Keep Spec genration manual  
 
-### Code
-[] Create initial implementation 
+
+
 
 ### Platform
-[] Improve onboarding experience
+[] Add dimension of analyzed issues 
+[] Add coming soon of crm integrations (hubspot and salesforce)
+[x] Improve onboarding experience
 [x] Improve welcome email visualization
 [x] Alerts and in app notifications (email, slack)
 
 
 ## Phase 9
 
-### Marketing
-[] Ad Campaign for AI FDE 
-[] Support promotions
+### Feedback (f.k.a sessions)
+[] match participants with customer information
+[] show additional details in a cleaner way (based on customer/user data)
+[] Add an option in each channel integration to automatically add customers from session information
 
-### Sessions
+### Issues 
+[] show customer data as part of the review 
+[] Add product area to the issue analysis - Classify on product area
+[] Draft email response to users
+
+### Marketing
+[] Docs portal
+
+### Platform
+[] Project multi-users access and RBAC
+[] connect to customer data (crm or dw)
+[] Delete project
+
+### Analytics
+[] segmentation by customer / user 
+[] segmentation by product area / (maybe from code)
+
+
+## Phase 10
+
+### Marketing
+[] Support promotions
+[] Run SDR agent
+
+### Suport
+[] Email agent
+
+### Feedback (f.k.a sessions)
 [] Improve participants identification - show additional details in a cleaner way
-[] Facebook community channels
+[] Add posthog sessions support
+
+
+### Code
+[] Create initial implementation 
+
 
 ### Platform
 [] API Access - support api keys and move cron to rely on admin api key value (change env var)
-[] Project multi-users access and RBAC
 [] MCP Access
 [] MCP Apps
 
 ### Issues
-[] Support Actions items (not necessary code related)
-[] Draft response email to the user
+[] Lieaner Integration
+[] Jira Integration 

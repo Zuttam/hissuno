@@ -67,10 +67,9 @@ async function setupTestProject(): Promise<string> {
     throw new Error(`Failed to create test project: ${error?.message}`)
   }
 
-  // Create project settings with a low threshold for testing
+  // Create project settings
   await supabase.from('project_settings').insert({
     project_id: project.id,
-    issue_spec_threshold: 3, // Low threshold for testing
   })
 
   return project.id

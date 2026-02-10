@@ -1192,14 +1192,12 @@ export type Database = {
         Row: {
           allowed_origins: string[] | null
           created_at: string
-          issue_spec_threshold: number | null
           issue_tracking_enabled: boolean | null
           pm_dedup_include_closed: boolean | null
           project_id: string
           session_goodbye_delay_seconds: number | null
           session_idle_response_timeout_seconds: number | null
           session_idle_timeout_minutes: number | null
-          spec_guidelines: string | null
           support_agent_package_id: string | null
           updated_at: string
           widget_display_type: string | null
@@ -1216,14 +1214,12 @@ export type Database = {
         Insert: {
           allowed_origins?: string[] | null
           created_at?: string
-          issue_spec_threshold?: number | null
           issue_tracking_enabled?: boolean | null
           pm_dedup_include_closed?: boolean | null
           project_id: string
           session_goodbye_delay_seconds?: number | null
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
-          spec_guidelines?: string | null
           support_agent_package_id?: string | null
           updated_at?: string
           widget_display_type?: string | null
@@ -1240,14 +1236,12 @@ export type Database = {
         Update: {
           allowed_origins?: string[] | null
           created_at?: string
-          issue_spec_threshold?: number | null
           issue_tracking_enabled?: boolean | null
           pm_dedup_include_closed?: boolean | null
           project_id?: string
           session_goodbye_delay_seconds?: number | null
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
-          spec_guidelines?: string | null
           support_agent_package_id?: string | null
           updated_at?: string
           widget_display_type?: string | null
@@ -1783,6 +1777,7 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          communication_channels: string[] | null
           company_name: string | null
           company_size: string | null
           created_at: string
@@ -1795,13 +1790,13 @@ export type Database = {
           onboarding_completed_at: string | null
           onboarding_current_step: string | null
           role: string | null
-          selected_use_cases: string[] | null
           slack_notification_channel: string | null
           slack_user_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          communication_channels?: string[] | null
           company_name?: string | null
           company_size?: string | null
           created_at?: string
@@ -1814,13 +1809,13 @@ export type Database = {
           onboarding_completed_at?: string | null
           onboarding_current_step?: string | null
           role?: string | null
-          selected_use_cases?: string[] | null
           slack_notification_channel?: string | null
           slack_user_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          communication_channels?: string[] | null
           company_name?: string | null
           company_size?: string | null
           created_at?: string
@@ -1833,7 +1828,6 @@ export type Database = {
           onboarding_completed_at?: string | null
           onboarding_current_step?: string | null
           role?: string | null
-          selected_use_cases?: string[] | null
           slack_notification_channel?: string | null
           slack_user_id?: string | null
           updated_at?: string

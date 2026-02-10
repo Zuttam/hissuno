@@ -45,8 +45,6 @@ export const cleanupCodebase = createStep({
       issueId: inputData.issueId,
       issueTitle: inputData.issueTitle,
       skipReason: inputData.skipReason,
-      thresholdMet: inputData.thresholdMet,
-      specGenerated: inputData.specGenerated,
       impactScore: inputData.impactScore,
       effortEstimate: inputData.effortEstimate,
       codebaseLeaseId: leaseId,

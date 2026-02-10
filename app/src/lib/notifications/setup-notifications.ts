@@ -43,7 +43,7 @@ export async function createProjectSetupNotifications(
         dedupKey: `setup_knowledge_sources:${projectId}`,
         metadata: {
           title: 'Add knowledge sources',
-          message: 'Add knowledge sources to power your AI support agent.',
+          message: 'Add knowledge sources to empower your agents.',
           link: `/projects/${projectId}/agents`,
           priority: 'medium',
         },

@@ -124,9 +124,7 @@ export type WidgetPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top
  */
 export interface ProjectSettingsRecord {
   project_id: string
-  issue_spec_threshold: number
   issue_tracking_enabled: boolean
-  spec_guidelines: string | null
   pm_dedup_include_closed: boolean
   // Widget settings (new trigger/display model)
   widget_trigger_type: WidgetTrigger
@@ -219,8 +217,6 @@ export interface UpvoteResult {
   issueId: string
   newUpvoteCount: number
   newPriority: IssuePriority
-  thresholdMet: boolean
-  shouldGenerateSpec: boolean
 }
 
 /**
@@ -231,8 +227,6 @@ export interface PMReviewResult {
   issueId?: string
   issueTitle?: string
   skipReason?: string
-  thresholdMet?: boolean
-  specGenerated?: boolean
   // Enriched fields from multi-step workflow
   impactScore?: number
   effortEstimate?: EffortEstimate

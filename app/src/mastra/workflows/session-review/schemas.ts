@@ -148,7 +148,6 @@ export const preparedPMContextSchema = z.object({
   ),
   settings: z.object({
     issueTrackingEnabled: z.boolean(),
-    issueSpecThreshold: z.number(),
     pmDedupIncludeClosed: z.boolean(),
   }),
   // Codebase lease fields (passed through)
@@ -204,8 +203,6 @@ export const executeDecisionOutputSchema = z.object({
   issueId: z.string().optional(),
   issueTitle: z.string().optional(),
   skipReason: z.string().optional(),
-  thresholdMet: z.boolean().optional(),
-  specGenerated: z.boolean().optional(),
   impactScore: z.number().optional(),
   effortEstimate: z.string().optional(),
   // Codebase lease fields (passed through)
@@ -229,8 +226,6 @@ export const workflowOutputSchema = z.object({
   issueId: z.string().optional(),
   issueTitle: z.string().optional(),
   skipReason: z.string().optional(),
-  thresholdMet: z.boolean().optional(),
-  specGenerated: z.boolean().optional(),
   // Enriched fields
   impactScore: z.number().optional(),
   effortEstimate: z.string().optional(),

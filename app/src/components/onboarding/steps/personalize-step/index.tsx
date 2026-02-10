@@ -46,13 +46,13 @@ export function PersonalizeStep({ context, onValidationChange, title, descriptio
           onClick={() => handleSelect(true)}
           className={`flex flex-col items-center gap-3 rounded-lg border-2 p-6 text-center transition-all cursor-pointer ${
             selected
-              ? 'border-[--accent-selected] bg-[--accent-selected]/5'
-              : 'border-[--border-subtle] hover:border-[--accent-primary]'
+              ? 'border-[var(--accent-selected)] bg-[var(--accent-selected)]/5'
+              : 'border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'
           }`}
         >
           <span className="text-3xl">🚀</span>
-          <h3 className="font-mono font-semibold text-[--foreground]">Try with demo data</h3>
-          <p className="text-sm text-[--text-secondary]">
+          <h3 className="font-mono font-semibold text-[var(--foreground)]">Try with demo data</h3>
+          <p className="text-sm text-[var(--text-secondary)]">
             We'll create a few sample conversations so you can see the agents in action right away.
           </p>
         </button>
@@ -63,13 +63,13 @@ export function PersonalizeStep({ context, onValidationChange, title, descriptio
           onClick={() => handleSelect(false)}
           className={`flex flex-col items-center gap-3 rounded-lg border-2 p-6 text-center transition-all cursor-pointer ${
             !selected
-              ? 'border-[--accent-selected] bg-[--accent-selected]/5'
-              : 'border-[--border-subtle] hover:border-[--accent-primary]'
+              ? 'border-[var(--accent-selected)] bg-[var(--accent-selected)]/5'
+              : 'border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'
           }`}
         >
           <span className="text-3xl">📋</span>
-          <h3 className="font-mono font-semibold text-[--foreground]">Start from scratch</h3>
-          <p className="text-sm text-[--text-secondary]">
+          <h3 className="font-mono font-semibold text-[var(--foreground)]">Start from scratch</h3>
+          <p className="text-sm text-[var(--text-secondary)]">
             Jump straight into your workspace and add real conversations manually or via integrations.
           </p>
         </button>

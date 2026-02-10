@@ -25,6 +25,7 @@ export default function ProjectSessionsPage() {
   const [filters, setFilters] = useState<SessionFilters>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [expandMessages, setExpandMessages] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
@@ -130,6 +131,12 @@ export default function ProjectSessionsPage() {
 
   const handleSessionSelect = useCallback((session: SessionWithProject) => {
     setSelectedSessionId(session.id)
+    setExpandMessages(false)
+  }, [])
+
+  const handleOpenMessages = useCallback((session: SessionWithProject) => {
+    setSelectedSessionId(session.id)
+    setExpandMessages(true)
   }, [])
 
   const handleCloseSidebar = useCallback(() => {
@@ -249,7 +256,7 @@ export default function ProjectSessionsPage() {
               sessions={sessions}
               selectedSessionId={selectedSessionId}
               onSelectSession={handleSessionSelect}
-              onOpenMessages={handleSessionSelect}
+              onOpenMessages={handleOpenMessages}
               onArchive={handleArchiveSession}
             />
             <Pagination
@@ -267,6 +274,7 @@ export default function ProjectSessionsPage() {
           session={selectedSession}
           messages={messages}
           isLoading={isLoadingDetail}
+          expandMessages={expandMessages}
           onClose={handleCloseSidebar}
           onSessionUpdated={handleSessionUpdated}
           onUpdateSession={updateSession}

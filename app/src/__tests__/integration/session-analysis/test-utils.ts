@@ -180,8 +180,6 @@ export interface ParsedPMReviewResult {
   issuePriority?: IssuePriority
   existingIssueId?: string
   skipReason?: string
-  thresholdMet?: boolean
-  specGenerated?: boolean
 }
 
 /**
@@ -393,22 +391,12 @@ export function parsePMReviewResponse(responseText: string): ParsedPMReviewResul
     }
   }
 
-  // Check for threshold and spec generation
-  const thresholdMet =
-    textLower.includes('threshold') &&
-    (textLower.includes('met') || textLower.includes('reached'))
-  const specGenerated =
-    textLower.includes('spec') &&
-    (textLower.includes('generated') || textLower.includes('created'))
-
   return {
     action,
     issueType,
     issueTitle,
     issuePriority,
     skipReason,
-    thresholdMet,
-    specGenerated,
   }
 }
 
@@ -424,8 +412,6 @@ export interface ParsedPMResponse {
   issuePriority?: IssuePriority
   existingIssueId?: string
   skipReason?: string
-  thresholdMet?: boolean
-  specGenerated?: boolean
 }
 
 export function parsePMAgentResponse(responseText: string): ParsedPMResponse {
@@ -436,8 +422,6 @@ export function parsePMAgentResponse(responseText: string): ParsedPMResponse {
     issueTitle: pmResult.issueTitle,
     issuePriority: pmResult.issuePriority,
     skipReason: pmResult.skipReason,
-    thresholdMet: pmResult.thresholdMet,
-    specGenerated: pmResult.specGenerated,
   }
 }
 

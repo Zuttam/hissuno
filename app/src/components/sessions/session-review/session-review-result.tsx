@@ -46,11 +46,6 @@ export function SessionReviewResult({ result, projectId }: SessionReviewResultPr
             )}
           </div>
         </div>
-        {result.thresholdMet && (
-          <p className="mt-2 text-xs text-[color:var(--accent-success)]">
-            Threshold reached! {result.specGenerated ? 'Product spec generated.' : 'Generating product spec...'}
-          </p>
-        )}
       </div>
     )
   }
@@ -76,11 +71,6 @@ export function SessionReviewResult({ result, projectId }: SessionReviewResultPr
             )}
           </div>
         </div>
-        {result.thresholdMet && (
-          <p className="mt-2 text-xs text-[color:var(--accent-primary)]">
-            Threshold reached! {result.specGenerated ? 'Product spec generated.' : 'Generating product spec...'}
-          </p>
-        )}
       </div>
     )
   }

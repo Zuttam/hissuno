@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { createManualSession } from '@/lib/supabase/sessions'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { createIssueAdmin } from '@/lib/issues/issues-service'
 import type { SessionTag } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -10,11 +11,20 @@ export const runtime = 'nodejs'
 type RouteParams = { id: string }
 type RouteContext = { params: Promise<RouteParams> }
 
-const DEMO_SESSIONS: Array<{
+interface DemoSession {
   name: string
   tags: SessionTag[]
   messages: Array<{ role: 'user' | 'assistant'; content: string }>
-}> = [
+  /** If set, session will be marked as closed with a linked issue */
+  issue?: {
+    type: 'bug' | 'feature_request' | 'change_request'
+    title: string
+    description: string
+    priority: 'low' | 'medium' | 'high'
+  }
+}
+
+const DEMO_SESSIONS: DemoSession[] = [
   {
     name: 'Login page crashes on mobile Safari',
     tags: ['bug'],
@@ -25,6 +35,12 @@ const DEMO_SESSIONS: Array<{
       { role: 'assistant', content: 'Thank you for those details. This sounds like it could be related to our autofill handling on iOS. I\'ve flagged this for our engineering team to investigate. In the meantime, could you try using the "Sign in with Google" option as a workaround?' },
       { role: 'user', content: 'That works, thanks! But please fix the regular login — my team members don\'t all have Google accounts.' },
     ],
+    issue: {
+      type: 'bug',
+      title: 'Login page crashes on mobile Safari (iOS 17+)',
+      description: 'The login page freezes and reloads when tapping the password field on iOS Safari. Likely caused by autofill handling interfering with the input focus event. Affects iPhone 14 Pro on iOS 17.2, possibly other devices. Workaround: Sign in with Google.',
+      priority: 'high',
+    },
   },
   {
     name: 'Feature request: Bulk export to CSV',
@@ -36,6 +52,12 @@ const DEMO_SESSIONS: Array<{
       { role: 'assistant', content: 'That makes a lot of sense. I\'ll pass this along as a feature request. Being able to bulk export filtered sessions with date ranges and tag filters would be very useful for reporting workflows.' },
       { role: 'user', content: 'Exactly. Even a simple CSV with session name, date, tags, and summary would be incredibly helpful. Thanks!' },
     ],
+    issue: {
+      type: 'feature_request',
+      title: 'Bulk CSV export with date range and tag filters',
+      description: 'Users need the ability to export filtered subsets of sessions to CSV for quarterly reviews. Should support filtering by date range and tags, and include columns for session name, date, tags, and summary. Currently only individual session export is available.',
+      priority: 'medium',
+    },
   },
   {
     name: 'API rate limits too restrictive for our use case',
@@ -68,6 +90,12 @@ const DEMO_SESSIONS: Array<{
       { role: 'user', content: 'Ah, yes — we were doing database writes synchronously. We\'ll queue those instead. But 10 seconds seems short, could you increase the timeout or add retry logic?' },
       { role: 'assistant', content: 'We do retry failed deliveries up to 3 times with exponential backoff, but only for 5xx responses — timeouts currently aren\'t retried. I\'ll flag this as a bug since timeouts should definitely trigger retries too.' },
     ],
+    issue: {
+      type: 'bug',
+      title: 'Webhook timeouts not retried (only 5xx responses trigger retry)',
+      description: 'Webhook delivery retries only trigger for 5xx HTTP responses. Timeouts (10s limit) silently fail without retries, causing ~30% event loss for endpoints with slower processing. Should treat timeouts as retriable failures with the same exponential backoff logic.',
+      priority: 'high',
+    },
   },
 ]
 
@@ -87,7 +115,7 @@ async function resolveUser() {
 
 /**
  * POST /api/projects/[id]/demo-sessions
- * Creates demo sessions for onboarding.
+ * Creates demo sessions with optional linked issues for onboarding.
  */
 export async function POST(_request: NextRequest, context: RouteContext) {
   const { id: projectId } = await context.params
@@ -100,7 +128,9 @@ export async function POST(_request: NextRequest, context: RouteContext) {
     const { supabase, user } = await resolveUser()
     await assertUserOwnsProject(supabase, user.id, projectId)
 
-    const created: string[] = []
+    const adminSupabase = createAdminClient()
+    const createdSessions: string[] = []
+    const createdIssues: string[] = []
 
     for (const demo of DEMO_SESSIONS) {
       try {
@@ -110,16 +140,59 @@ export async function POST(_request: NextRequest, context: RouteContext) {
           tags: demo.tags,
           messages: demo.messages,
         })
-        if (session) {
-          created.push(session.id)
+
+        if (!session) continue
+        createdSessions.push(session.id)
+
+        // If this session has a linked issue, close the session and create the issue
+        if (demo.issue) {
+          // Mark session as closed and PM reviewed
+          await adminSupabase
+            .from('sessions')
+            .update({
+              status: 'closed',
+              pm_reviewed_at: new Date().toISOString(),
+            })
+            .eq('id', session.id)
+
+          // Create the linked issue
+          try {
+            const { issue } = await createIssueAdmin({
+              projectId,
+              sessionId: session.id,
+              type: demo.issue.type,
+              title: demo.issue.title,
+              description: demo.issue.description,
+              priority: demo.issue.priority,
+            })
+            createdIssues.push(issue.id)
+          } catch (err) {
+            console.error('[demo-sessions.post] failed to create issue for:', demo.name, err)
+          }
         }
       } catch (err) {
         console.error('[demo-sessions.post] failed to create demo session:', demo.name, err)
       }
     }
 
-    console.log('[demo-sessions.post] created', created.length, 'demo sessions for project:', projectId)
-    return NextResponse.json({ created: created.length, sessionIds: created }, { status: 201 })
+    console.log(
+      '[demo-sessions.post] created',
+      createdSessions.length,
+      'sessions and',
+      createdIssues.length,
+      'issues for project:',
+      projectId
+    )
+
+    return NextResponse.json(
+      {
+        created: createdSessions.length,
+        sessionIds: createdSessions,
+        issuesCreated: createdIssues.length,
+        issueIds: createdIssues,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })

@@ -163,7 +163,7 @@ export const STEP_REVEAL_MESSAGES: Record<OnboardingStepId, StepRevealConfig> = 
     message: 'Welcome to Hissuno. Before we begin, we want to know you better.',
   },
   about: {
-    message: 'Hissuno turns customer feedback into ready-made engineering work. We do this by analyzing conversations across your stack.',
+    message: 'Hissuno turns customer feedback into ready-made engineering work. We do this by analyzing conversations and signals across your stack.',
   },
   billing: {
     message: 'Before we let your new AI sidekicks roam, let us know how you want to pay for them.',

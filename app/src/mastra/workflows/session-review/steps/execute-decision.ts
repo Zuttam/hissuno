@@ -97,7 +97,6 @@ export const executeDecision = createStep({
         logger?.info('[execute-decision] Upvoted', {
           issueId,
           newUpvoteCount: result.newUpvoteCount,
-          thresholdMet: result.thresholdMet,
         })
 
         return {
@@ -108,7 +107,6 @@ export const executeDecision = createStep({
           action: 'upvoted' as const,
           issueId,
           issueTitle: '', // Title not returned from upvote, but not critical
-          thresholdMet: result.thresholdMet,
           localCodePath,
           codebaseLeaseId,
           codebaseCommitSha,

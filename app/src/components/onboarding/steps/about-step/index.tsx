@@ -100,8 +100,8 @@ export function AboutStep({ context, onValidationChange, title, description }: S
               }}
               className={`relative flex flex-col items-center gap-2 rounded-lg border-2 px-3 py-4 text-center transition-all cursor-pointer ${
                 isSelected
-                  ? 'border-[--accent-selected] bg-[--accent-selected]/5'
-                  : 'border-[--border-subtle] hover:border-[--accent-primary]'
+                  ? 'border-[var(--accent-selected)] bg-[var(--accent-selected)]/5'
+                  : 'border-[var(--border-subtle)] hover:border-[var(--accent-primary)]'
               }`}
             >
               {/* Selection indicator */}

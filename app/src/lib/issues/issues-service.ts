@@ -27,7 +27,6 @@ import {
   updateIssueArchiveStatusById,
   verifyProjectOwnership,
   getIssueProjectId,
-  getProjectSettings,
   type InsertIssueData,
 } from '@/lib/supabase/issues'
 import { upsertIssueEmbedding } from './embedding-service'
@@ -407,20 +406,10 @@ export async function upvoteIssueAdmin(
   // Mark session as PM reviewed
   await markSessionPMReviewed(supabase, sessionId)
 
-  // Get project settings for threshold
-  const settings = await getProjectSettings(issue.projectId)
-  const threshold = settings?.issue_spec_threshold ?? 3
-
-  // Check if spec threshold met
-  const thresholdMet = newUpvoteCount >= threshold && !issue.productSpec
-  const shouldGenerateSpec = thresholdMet
-
   return {
     issueId,
     newUpvoteCount,
     newPriority,
-    thresholdMet,
-    shouldGenerateSpec,
   }
 }
 
