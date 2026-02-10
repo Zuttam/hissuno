@@ -122,7 +122,7 @@ export function SessionListSidebar({
       {/* Header */}
       <div className="flex items-center justify-between border-b-2 border-[color:var(--border-subtle)] px-4 py-3">
         <h3 className="font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--foreground)]">
-          Sessions
+          Conversations
         </h3>
         <button
           type="button"
@@ -168,10 +168,10 @@ export function SessionListSidebar({
         ) : sessions.length === 0 ? (
           <div className="p-3 text-center">
             <p className="text-xs text-[color:var(--text-secondary)]">
-              No previous sessions
+              No previous conversations
             </p>
             <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-              Start chatting to create your first session
+              Start chatting to create your first conversation
             </p>
           </div>
         ) : (

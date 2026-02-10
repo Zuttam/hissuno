@@ -563,6 +563,7 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
 export const getProjectIssueStats = cache(async (projectId: string): Promise<{
   total: number
   open: number
+  ready: number
   inProgress: number
   resolved: number
   closed: number
@@ -596,6 +597,7 @@ export const getProjectIssueStats = cache(async (projectId: string): Promise<{
     return {
       total: issues.length,
       open: issues.filter(i => i.status === 'open').length,
+      ready: issues.filter(i => i.status === 'ready').length,
       inProgress: issues.filter(i => i.status === 'in_progress').length,
       resolved: issues.filter(i => i.status === 'resolved').length,
       closed: issues.filter(i => i.status === 'closed').length,
@@ -642,4 +644,54 @@ export async function getIssueProjectId(
     .single()
 
   return data?.project_id ?? null
+}
+
+/**
+ * Gets top ranked issues for a project, sorted by combined score.
+ * Score = (upvote_count * 2) + (impact_score ?? 0) + priorityWeight(priority)
+ */
+export async function getTopRankedIssues(
+  projectId: string,
+  limit = 5
+): Promise<IssueWithProject[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return []
+  }
+
+  const { data, error } = await supabase
+    .from('issues')
+    .select(selectIssueWithProject)
+    .eq('project_id', projectId)
+    .eq('is_archived', false)
+    .not('status', 'in', '("closed")')
+    .order('updated_at', { ascending: false })
+
+  if (error || !data) {
+    console.error('[supabase.issues.getTopRankedIssues] Failed', projectId, error)
+    return []
+  }
+
+  const priorityWeight: Record<string, number> = { high: 3, medium: 2, low: 1 }
+
+  const scored = (data as IssueWithProject[]).map((issue) => ({
+    issue,
+    score:
+      (issue.upvote_count ?? 0) * 2 +
+      (issue.impact_score ?? 0) +
+      (priorityWeight[issue.priority] ?? 0),
+  }))
+
+  scored.sort((a, b) => b.score - a.score)
+
+  return scored.slice(0, limit).map((s) => s.issue)
 }

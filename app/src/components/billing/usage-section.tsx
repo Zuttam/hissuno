@@ -76,8 +76,8 @@ export function UsageSection({ usage }: UsageSectionProps) {
               {analyzedSessionsPercentage >= 75 && (
                 <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
                   {analyzedSessionsPercentage >= 90
-                    ? 'You are approaching your analyzed sessions limit. Consider upgrading.'
-                    : 'You have used over 75% of your analyzed sessions.'}
+                    ? 'You are approaching your analyzed feedback limit. Consider upgrading.'
+                    : 'You have used over 75% of your analyzed feedback.'}
                 </p>
               )}
             </>

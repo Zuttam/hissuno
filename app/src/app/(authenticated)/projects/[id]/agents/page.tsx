@@ -226,7 +226,7 @@ export default function AgentsPage() {
         <AgentCard
           avatar="🧭"
           title="Product Specialist"
-          description="Reviews sessions, creates issues, and generates specs"
+          description="Reviews feedback, creates issues, and generates specs"
           channels={buildPmSources(integrationStatuses)}
           destinations={buildPmDestinations(integrationStatuses)}
           onClick={() => setShowPmDialog(true)}

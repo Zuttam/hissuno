@@ -86,7 +86,7 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       {
         id: 'export',
         title: 'Data Export',
-        description: 'Export sessions and issues to CSV for your own analysis.',
+        description: 'Export feedback and issues to CSV for your own analysis.',
       },
     ],
   },

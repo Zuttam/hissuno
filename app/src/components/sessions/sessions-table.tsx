@@ -26,7 +26,7 @@ export function SessionsTable({
 }: SessionsTableProps) {
   const columns: ColumnConfig[] = useMemo(
     () => [
-      { id: 'session', header: 'Session', defaultWidth: 140, minWidth: 80 },
+      { id: 'session', header: 'Feedback', defaultWidth: 140, minWidth: 80 },
       { id: 'user', header: 'User', defaultWidth: 60, minWidth: 50 },
       { id: 'messages', header: 'Messages', defaultWidth: 90, minWidth: 70, align: 'center' },
       { id: 'tags', header: 'Tags', defaultWidth: 150, minWidth: 80 },
@@ -201,7 +201,7 @@ function SessionRow({
               onArchive()
             }}
             className="rounded-[4px] p-1.5 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--accent-primary)]"
-            aria-label={session.is_archived ? 'Unarchive session' : 'Archive session'}
+            aria-label={session.is_archived ? 'Unarchive feedback' : 'Archive feedback'}
             title={session.is_archived ? 'Unarchive' : 'Archive'}
           >
             {session.is_archived ? (

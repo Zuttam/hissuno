@@ -395,7 +395,7 @@ export default function IntegrationsPage() {
       {
         id: 'posthog',
         name: 'PostHog',
-        description: 'Sync user behavior data for deeper session context',
+        description: 'Sync user behavior data for deeper feedback context',
         status: 'not_connected',
         icon: <PostHogIcon />,
         category: 'analytics',
@@ -452,7 +452,7 @@ export default function IntegrationsPage() {
       {/* Session Sources */}
       <div>
         <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] mb-4">
-          Session Sources
+          Feedback Sources
         </h3>
         <div className="grid gap-4 md:grid-cols-2">
           {sessionIntegrations.map((integration) => (

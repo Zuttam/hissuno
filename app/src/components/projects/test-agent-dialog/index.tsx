@@ -230,8 +230,8 @@ export function TestAgentDialog({ project, packageId, onClose }: TestAgentDialog
                 type="button"
                 onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                 className="rounded-[4px] p-1 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
-                aria-label={isSidebarOpen ? 'Hide session history' : 'Show session history'}
-                title={isSidebarOpen ? 'Hide session history' : 'Show session history'}
+                aria-label={isSidebarOpen ? 'Hide conversation history' : 'Show conversation history'}
+                title={isSidebarOpen ? 'Hide conversation history' : 'Show conversation history'}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

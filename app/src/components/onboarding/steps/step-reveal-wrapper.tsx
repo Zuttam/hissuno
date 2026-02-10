@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode } from 'react'
+import { type ReactNode, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import type { OnboardingStepId, StepRevealConfig } from './types'
 
@@ -16,8 +16,28 @@ export function StepRevealWrapper({
   stepId,
   revealConfig,
   isRevealed,
+  onRevealComplete,
   children,
 }: StepRevealWrapperProps) {
+  const handleReveal = useCallback(() => {
+    onRevealComplete(stepId)
+  }, [onRevealComplete, stepId])
+
+  // Listen for Enter key to dismiss reveal
+  useEffect(() => {
+    if (isRevealed) return
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        handleReveal()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isRevealed, handleReveal])
+
   // Already revealed — render children directly with a subtle enter animation
   if (isRevealed) {
     return (
@@ -33,7 +53,7 @@ export function StepRevealWrapper({
   }
 
   // Not yet revealed — show the cinematic reveal message
-  // The wizard "Continue" button (in WizardContainer) will call onRevealComplete
+  // The wizard "Continue" button (in WizardContainer) or Enter key will call onRevealComplete
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -64,6 +84,16 @@ export function StepRevealWrapper({
               {revealConfig.subtitle}
             </motion.p>
           )}
+
+          {/* "Press Enter" hint — fades in after 1s */}
+          <motion.p
+            className="mt-8 text-xs text-[var(--text-tertiary)]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 1 }}
+          >
+            Press Enter to continue
+          </motion.p>
         </div>
       </motion.div>
     </AnimatePresence>

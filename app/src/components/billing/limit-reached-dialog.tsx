@@ -12,8 +12,8 @@ const dimensionConfig: Record<LimitDimension, { title: string; description: stri
     description: "You've reached the maximum number of projects for your current plan.",
   },
   analyzed_sessions: {
-    title: 'Session analysis limit reached',
-    description: "You've used all your session analyses for this billing period.",
+    title: 'Feedback analysis limit reached',
+    description: "You've used all your feedback analyses for this billing period.",
   },
 }
 
@@ -35,7 +35,7 @@ export function LimitReachedDialog({
   dimension = 'analyzed_sessions',
 }: LimitReachedDialogProps) {
   const config = dimensionConfig[dimension]
-  const unitLabel = dimension === 'projects' ? 'projects' : 'sessions analyzed'
+  const unitLabel = dimension === 'projects' ? 'projects' : 'feedback analyzed'
 
   return (
     <Dialog open={open} onClose={onClose} title="Limit Reached">

@@ -116,7 +116,7 @@ function SessionsStrip({ projectId, isExpanded, onToggle, className }: StripCont
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-1">
               <span className="font-mono text-sm font-bold text-[color:var(--foreground)]">{total}</span>
-              <span className="font-mono text-xs text-[color:var(--text-secondary)]">sessions</span>
+              <span className="font-mono text-xs text-[color:var(--text-secondary)]">feedbacks</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="font-mono text-xs text-[color:var(--accent-success)]">{active}</span>
@@ -166,13 +166,13 @@ function SessionsStrip({ projectId, isExpanded, onToggle, className }: StripCont
           {fullData?.timeSeries?.sessions && fullData.timeSeries.sessions.length > 0 && (
             <div>
               <h4 className="font-mono text-xs uppercase text-[color:var(--text-secondary)] mb-3">
-                Sessions Over Time (30 days)
+                Feedback Over Time (30 days)
               </h4>
               <LineChart
                 data={fullData.timeSeries.sessions}
                 color="var(--accent-primary)"
                 height={180}
-                label="Sessions"
+                label="Feedback"
               />
             </div>
           )}

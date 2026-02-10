@@ -217,7 +217,7 @@ export function SessionSidebar({
           {/* Row 1: "Session Details" + close */}
           <div className="flex items-center justify-between">
             <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-              Session Details
+              Feedback Details
             </span>
             <button
               type="button"
@@ -246,7 +246,7 @@ export function SessionSidebar({
                     autoFocus
                     disabled={isSaving}
                     className="w-full rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-2 py-1 text-lg font-semibold text-[color:var(--foreground)] focus:border-[color:var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-primary)] disabled:opacity-50"
-                    placeholder="Session name..."
+                    placeholder="Feedback name..."
                   />
                 ) : (
                   <button
@@ -256,7 +256,7 @@ export function SessionSidebar({
                     className="group flex w-full items-center gap-2 text-left disabled:cursor-default"
                   >
                     <h3 className="truncate text-lg font-semibold text-[color:var(--foreground)]">
-                      {session.name || 'Unnamed Session'}
+                      {session.name || 'Unnamed Feedback'}
                     </h3>
                     {session.source && (
                       <Badge variant={SESSION_SOURCE_INFO[session.source as SessionSource]?.variant ?? 'default'}>
@@ -413,7 +413,7 @@ export function SessionSidebar({
           <div className="flex-1 overflow-y-auto">
             {/* Session Analysis (open by default) */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <CollapsibleSection title="Session Analysis" variant="flat" defaultExpanded>
+              <CollapsibleSection title="Feedback Analysis" variant="flat" defaultExpanded>
                 <div className="flex flex-col gap-4">
                   {/* Tags */}
                   <SessionTagEditor
@@ -439,7 +439,7 @@ export function SessionSidebar({
 
             {/* Session Metadata (closed by default) */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <CollapsibleSection title="Session Metadata" variant="flat" defaultExpanded={false}>
+              <CollapsibleSection title="Feedback Metadata" variant="flat" defaultExpanded={false}>
                 <SessionDetails session={session} onUpdateSession={onUpdateSession} />
               </CollapsibleSection>
             </div>

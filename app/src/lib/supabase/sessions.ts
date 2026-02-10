@@ -790,6 +790,54 @@ export async function setSessionHumanTakeover(
 /**
  * Checks if a session is in human takeover mode. Uses admin client for widget route use.
  */
+/**
+ * Gets closed sessions that haven't been PM reviewed yet (pending reviews).
+ * Returns limited results plus total count for the badge.
+ */
+export async function getPendingPMReviews(
+  projectId: string,
+  limit = 8
+): Promise<{ sessions: { id: string; name: string | null; user_id: string | null; user_metadata: Record<string, string> | null; source: SessionSource; message_count: number; created_at: string }[]; count: number }> {
+  if (!isSupabaseConfigured()) {
+    return { sessions: [], count: 0 }
+  }
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return { sessions: [], count: 0 }
+    }
+
+    const { data, count, error } = await supabase
+      .from('sessions')
+      .select('id, name, user_id, user_metadata, source, message_count, created_at', { count: 'exact' })
+      .eq('project_id', projectId)
+      .is('pm_reviewed_at', null)
+      .eq('status', 'closed')
+      .eq('is_archived', false)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('[supabase.sessions.getPendingPMReviews] Failed', projectId, error)
+      return { sessions: [], count: 0 }
+    }
+
+    return {
+      sessions: (data ?? []) as { id: string; name: string | null; user_id: string | null; user_metadata: Record<string, string> | null; source: SessionSource; message_count: number; created_at: string }[],
+      count: count ?? 0,
+    }
+  } catch (error) {
+    console.error('[supabase.sessions.getPendingPMReviews] Unexpected error', projectId, error)
+    return { sessions: [], count: 0 }
+  }
+}
+
 export async function isSessionInHumanTakeover(sessionId: string): Promise<boolean> {
   if (!isServiceRoleConfigured()) {
     return false

@@ -447,7 +447,7 @@ export function IssueSidebar({
                                 {sourceLabel}
                               </Badge>
                               <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)] hover:underline">
-                                {session.name || 'Unnamed Session'}
+                                {session.name || 'Unnamed Feedback'}
                               </span>
                               <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
                                 {formatRelativeDate(session.created_at)}

@@ -20,7 +20,7 @@ export const SESSION_TYPE_INFO: Record<
   SessionType,
   { label: string; description: string; contentLabel: string; variant: 'info' | 'success' | 'warning' | 'default' }
 > = {
-  chat: { label: 'Chat', description: 'Conversational support session', contentLabel: 'Messages', variant: 'info' },
+  chat: { label: 'Chat', description: 'Live chat conversation', contentLabel: 'Messages', variant: 'info' },
   meeting: { label: 'Meeting', description: 'Call or meeting transcript', contentLabel: 'Transcript', variant: 'success' },
   behavioral: { label: 'Behavioral', description: 'User behavior events', contentLabel: 'Events', variant: 'warning' },
 }

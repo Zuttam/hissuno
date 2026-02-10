@@ -83,7 +83,7 @@ function CloseIcon({ className }: { className?: string }) {
 // Navigation items configuration - project-scoped routes
 const PROJECT_NAV_ITEMS: NavItemConfig[] = [
   { href: '/projects/[id]/dashboard', label: 'Dashboard', icon: <DashboardIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/sessions', label: 'Sessions', icon: <SessionsIcon className="h-4 w-4" /> },
+  { href: '/projects/[id]/sessions', label: 'Feedback', icon: <SessionsIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/issues', label: 'Issues', icon: <IssuesIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/agents', label: 'Agents', icon: <AgentsIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/integrations', label: 'Integrations', icon: <IntegrationsIcon className="h-4 w-4" /> },

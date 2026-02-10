@@ -6,6 +6,8 @@ import { StatCard, StatCardGrid } from './stat-card'
 import { LineChart, BarChart } from './charts'
 import { ImpactFlowGraph } from './impact-flow-graph'
 import { Spinner } from '@/components/ui/spinner'
+import { VelocityChart } from '@/components/dashboard/velocity-chart'
+import type { IssueVelocityData } from '@/types/dashboard'
 
 const TAG_LABEL_MAP: Record<string, string> = {
   bug: 'Bug',
@@ -39,9 +41,10 @@ const SOURCE_LABEL_MAP: Record<string, string> = {
 
 interface ProjectAnalyticsProps {
   projectId: string
+  velocityData?: IssueVelocityData | null
 }
 
-export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
+export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsProps) {
   const { data, isLoading, error, period, setPeriod } = useProjectAnalytics({
     projectId,
   })
@@ -83,7 +86,7 @@ export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
       {/* Summary Cards */}
       <StatCardGrid columns={4}>
         <StatCard
-          label="Sessions"
+          label="Feedback"
           value={data.sessions.total}
           change={data.sessions.change}
           size="sm"
@@ -108,13 +111,20 @@ export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
         />
       </StatCardGrid>
 
+      {/* Issue Velocity */}
+      {velocityData && (
+        <ChartCard title="Issue Velocity">
+          <VelocityChart velocity={velocityData} />
+        </ChartCard>
+      )}
+
       {/* Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Sessions Over Time">
+        <ChartCard title="Feedback Over Time">
           {data.timeSeries.sessions.length > 0 ? (
             <LineChart
               data={data.timeSeries.sessions}
-              label="Sessions"
+              label="Feedback"
               color="var(--accent-info)"
               height={180}
             />
@@ -123,7 +133,7 @@ export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
           )}
         </ChartCard>
 
-        <ChartCard title="Sessions by Tag">
+        <ChartCard title="Feedback by Tag">
           {data.distributions.sessionsByTag.length > 0 ? (
             <BarChart
               data={data.distributions.sessionsByTag}
@@ -137,7 +147,7 @@ export function ProjectAnalytics({ projectId }: ProjectAnalyticsProps) {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Sessions by Source">
+        <ChartCard title="Feedback by Source">
           {data.distributions.sessionsBySource.length > 0 ? (
             <BarChart
               data={data.distributions.sessionsBySource}
@@ -197,7 +207,7 @@ interface ChartCardProps {
   children: React.ReactNode
 }
 
-function ChartCard({ title, children }: ChartCardProps) {
+export function ChartCard({ title, children }: ChartCardProps) {
   return (
     <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3">
       <h4 className="mb-3 font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)]">

@@ -17,7 +17,7 @@ export function SessionReviewResult({ result, projectId }: SessionReviewResultPr
           <div>
             <p className="font-medium text-[color:var(--foreground)]">Marked as irrelevant</p>
             <p className="text-xs text-[color:var(--text-secondary)]">
-              {result.skipReason || 'Session does not contain actionable feedback'}
+              {result.skipReason || 'Does not contain actionable feedback'}
             </p>
           </div>
         </div>

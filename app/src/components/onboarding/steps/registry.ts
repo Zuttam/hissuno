@@ -25,8 +25,8 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
 
   about: {
     id: 'about',
-    title: 'How do you talk with your customers?',
-    shortTitle: 'Channels',
+    title: 'How do you get your feedbacks?',
+    shortTitle: 'Feedbacks',
     description:
       'Select the communication channels you use. This helps us understand your stack.',
     component: AboutStep,
