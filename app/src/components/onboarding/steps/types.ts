@@ -6,7 +6,7 @@
 /**
  * Onboarding step identifiers
  */
-export type OnboardingStepId = 'account' | 'about' | 'billing' | 'project' | 'personalize'
+export type OnboardingStepId = 'account' | 'about' | 'billing' | 'project'
 
 // ============================================
 // Validation
@@ -52,6 +52,7 @@ export interface BillingFormData {
  * Project form data for onboarding
  */
 export interface ProjectFormData {
+  projectMode: 'demo' | 'blank'
   name: string
   description: string
   additionalDetails: string
@@ -81,13 +82,6 @@ export interface AboutFormData {
   otherChannelText: string
 }
 
-/**
- * Personalize step form data
- */
-export interface PersonalizeFormData {
-  useDemoData: boolean
-}
-
 // ============================================
 // Complete Form Data
 // ============================================
@@ -100,7 +94,6 @@ export interface OnboardingFormData {
   about: AboutFormData
   billing: BillingFormData
   project: ProjectFormData
-  personalize: PersonalizeFormData
 }
 
 // ============================================
@@ -169,10 +162,7 @@ export const STEP_REVEAL_MESSAGES: Record<OnboardingStepId, StepRevealConfig> = 
     message: 'Before we let your new AI sidekicks roam, let us know how you want to pay for them.',
   },
   project: {
-    message: 'Almost there! Tell us about your project so we can set up your workspace.',
-  },
-  personalize: {
-    message: 'Last step! To see the agents in action, let\'s put in some bootstrap data.',
+    message: 'Almost there! Choose how you want to get started.',
   },
 }
 
@@ -250,17 +240,11 @@ export const DEFAULT_ABOUT_DATA: AboutFormData = {
  * Default project form data
  */
 export const DEFAULT_PROJECT_DATA: ProjectFormData = {
+  projectMode: 'demo',
   name: '',
   description: '',
   additionalDetails: '',
   skipped: false,
-}
-
-/**
- * Default personalize form data
- */
-export const DEFAULT_PERSONALIZE_DATA: PersonalizeFormData = {
-  useDemoData: false,
 }
 
 /**
@@ -271,5 +255,4 @@ export const DEFAULT_ONBOARDING_DATA: OnboardingFormData = {
   about: DEFAULT_ABOUT_DATA,
   billing: DEFAULT_BILLING_DATA,
   project: DEFAULT_PROJECT_DATA,
-  personalize: DEFAULT_PERSONALIZE_DATA,
 }

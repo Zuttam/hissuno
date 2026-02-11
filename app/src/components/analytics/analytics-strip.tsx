@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useSessionsStripAnalytics, useIssuesStripAnalytics, useAnalytics } from '@/hooks/use-analytics'
+import { useCustomerAnalytics } from '@/hooks/use-customer-analytics'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { MiniBar } from './charts/sparkline'
 import { LineChart } from './charts/line-chart'
@@ -44,8 +45,16 @@ const PRIORITY_LABEL_MAP: Record<string, string> = {
   low: 'Low',
 }
 
+const STAGE_LABEL_MAP: Record<string, string> = {
+  prospect: 'Prospect',
+  onboarding: 'Onboarding',
+  active: 'Active',
+  churned: 'Churned',
+  expansion: 'Expansion',
+}
+
 interface AnalyticsStripProps {
-  type: 'sessions' | 'issues'
+  type: 'sessions' | 'issues' | 'customers'
   projectId?: string
   className?: string
 }
@@ -57,6 +66,17 @@ export function AnalyticsStrip({ type, projectId, className = '' }: AnalyticsStr
   if (type === 'sessions') {
     return (
       <SessionsStrip
+        projectId={projectId}
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(!isExpanded)}
+        className={baseAnalyticsStripClasses}
+      />
+    )
+  }
+
+  if (type === 'customers') {
+    return (
+      <CustomersStrip
         projectId={projectId}
         isExpanded={isExpanded}
         onToggle={() => setIsExpanded(!isExpanded)}
@@ -365,6 +385,144 @@ function IssuesStrip({ projectId, isExpanded, onToggle, className }: StripConten
                     low: 'var(--accent-success)',
                   }}
                 />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </FloatingCard>
+  )
+}
+
+function CustomersStrip({ projectId, isExpanded, onToggle, className }: StripContentProps) {
+  const { data: stripData, isLoading: stripLoading } = useCustomerAnalytics({ projectId })
+
+  if (stripLoading && !stripData) {
+    return null
+  }
+
+  const { totalCompanies, totalContacts, champions, totalARR, avgARR, byStage } = stripData ?? {
+    totalCompanies: 0,
+    totalContacts: 0,
+    champions: 0,
+    totalARR: 0,
+    avgARR: 0,
+    byStage: [],
+  }
+
+  const formatARR = (num: number) => {
+    if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`
+    if (num >= 1_000) return `$${(num / 1_000).toFixed(0)}K`
+    return `$${num.toFixed(0)}`
+  }
+
+  return (
+    <FloatingCard floating="gentle" variant="default" className={className}>
+      {/* Header - always visible */}
+      <button
+        onClick={onToggle}
+        className="flex w-full items-center justify-between px-2 py-1 text-left"
+      >
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4 flex-1 min-w-0">
+          <span className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">
+            Analytics
+          </span>
+          {/* Collapsed summary - key metrics in one line */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-sm font-bold text-[color:var(--foreground)]">{totalCompanies}</span>
+              <span className="font-mono text-xs text-[color:var(--text-secondary)]">{totalCompanies === 1 ? 'company' : 'companies'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-xs text-[color:var(--foreground)]">{totalContacts}</span>
+              <span className="font-mono text-xs text-[color:var(--text-secondary)]">{totalContacts === 1 ? 'contact' : 'contacts'}</span>
+            </div>
+            {champions > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-xs text-[color:var(--accent-warning)]">{champions}</span>
+                <span className="font-mono text-xs text-[color:var(--text-secondary)]">{champions === 1 ? 'champion' : 'champions'}</span>
+              </div>
+            )}
+            {totalARR > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-xs text-[color:var(--accent-success)]">{formatARR(totalARR)}</span>
+                <span className="font-mono text-xs text-[color:var(--text-secondary)]">ARR</span>
+              </div>
+            )}
+            {byStage.length > 0 && (
+              <div className="hidden sm:block">
+                <MiniBar
+                  data={byStage.map((s) => ({ label: s.label, value: s.value }))}
+                  colorMap={{
+                    prospect: 'var(--text-tertiary)',
+                    onboarding: 'var(--accent-info)',
+                    active: 'var(--accent-success)',
+                    churned: 'var(--accent-danger)',
+                    expansion: 'var(--accent-warning)',
+                  }}
+                  height={10}
+                  width={60}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        <svg
+          className={`h-3 w-3 flex-shrink-0 text-[color:var(--text-secondary)] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {/* Expanded content - charts */}
+      {isExpanded && (
+        <div className="border-t border-[color:var(--border-subtle)] p-4 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* By Stage */}
+            {byStage.length > 0 && (
+              <div>
+                <h4 className="font-mono text-xs uppercase text-[color:var(--text-secondary)] mb-3">
+                  Companies by Stage
+                </h4>
+                <BarChart
+                  data={byStage}
+                  labelFormatter={(label) => STAGE_LABEL_MAP[label] ?? label}
+                  height={150}
+                  colorMap={{
+                    prospect: 'var(--text-tertiary)',
+                    onboarding: 'var(--accent-info)',
+                    active: 'var(--accent-success)',
+                    churned: 'var(--accent-danger)',
+                    expansion: 'var(--accent-warning)',
+                  }}
+                />
+              </div>
+            )}
+
+            {/* ARR Summary */}
+            {totalARR > 0 && (
+              <div>
+                <h4 className="font-mono text-xs uppercase text-[color:var(--text-secondary)] mb-3">
+                  Revenue
+                </h4>
+                <div className="flex items-center gap-6 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-4">
+                  <div className="text-center">
+                    <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
+                      {formatARR(totalARR)}
+                    </p>
+                    <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Total ARR</p>
+                  </div>
+                  <div className="h-8 w-px bg-[color:var(--border-subtle)]" />
+                  <div className="text-center">
+                    <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
+                      {formatARR(avgARR)}
+                    </p>
+                    <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Avg ARR</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

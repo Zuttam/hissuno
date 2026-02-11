@@ -117,7 +117,7 @@
 [x] Check session lifecycle for closed sessions (from integrations)
 
 ### Customers 
-[] Introduce new screen to manage contact and company data. this will be used for issue analysis later. users can add manually company and contact information using form (1 entry) or csv. When uploading a csv they will see a mapping screen with auto suggestion. Each user can define up to 10 additional custom fields for company and user information beyond the regular field. 
+[] Introduce new screen to manage contact and company data. 
 
 ### Issues
 [] Issue review process:
@@ -132,7 +132,7 @@
 
 ### Platform
 [] Add dimension of analyzed issues 
-[] Add coming soon of crm integrations (hubspot and salesforce)
+[x] Add coming soon of crm integrations (hubspot and salesforce)
 [x] Improve onboarding experience
 [x] Improve welcome email visualization
 [x] Alerts and in app notifications (email, slack)
@@ -155,7 +155,6 @@
 
 ### Platform
 [] Project multi-users access and RBAC
-[] connect to customer data (crm or dw)
 [] Delete project
 
 ### Analytics
@@ -171,6 +170,7 @@
 
 ### Suport
 [] Email agent
+[] Add Hissuno MCP to Support agent  
 
 ### Feedback (f.k.a sessions)
 [] Improve participants identification - show additional details in a cleaner way
@@ -182,9 +182,11 @@
 
 
 ### Platform
+
 [] API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] MCP Access
 [] MCP Apps
+[] connect to customer data (crm or dw)
 
 ### Issues
 [] Lieaner Integration

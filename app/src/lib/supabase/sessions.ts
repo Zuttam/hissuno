@@ -7,6 +7,10 @@ import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-no
 import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, SessionType, CreateSessionInput, UpdateSessionInput } from '@/types/session'
 import { getDefaultSessionType } from '@/types/session'
 
+function sanitizeSearchInput(input: string): string {
+  return input.replace(/[%_.,()]/g, '\\$&')
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const selectSessionWithProject = '*, project:projects(id, name)'
@@ -211,13 +215,13 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
       query = query.eq('project_id', filters.projectId)
     }
     if (filters.userId) {
-      query = query.ilike('user_id', `%${filters.userId}%`)
+      query = query.ilike('user_id', `%${sanitizeSearchInput(filters.userId)}%`)
     }
     if (filters.sessionId) {
-      query = query.ilike('id', `%${filters.sessionId}%`)
+      query = query.ilike('id', `%${sanitizeSearchInput(filters.sessionId)}%`)
     }
     if (filters.name) {
-      query = query.ilike('name', `%${filters.name}%`)
+      query = query.ilike('name', `%${sanitizeSearchInput(filters.name)}%`)
     }
     if (filters.status) {
       query = query.eq('status', filters.status)

@@ -10,7 +10,6 @@ export type {
   BillingFormData,
   AboutFormData,
   ProjectFormData,
-  PersonalizeFormData,
   CompanySize,
   CommunicationChannel,
   CommunicationChannelInfo,
@@ -23,7 +22,6 @@ export {
   DEFAULT_BILLING_DATA,
   DEFAULT_ABOUT_DATA,
   DEFAULT_PROJECT_DATA,
-  DEFAULT_PERSONALIZE_DATA,
   COMMUNICATION_CHANNELS,
   STEP_REVEAL_MESSAGES,
 } from './types'
@@ -44,5 +42,4 @@ export { AccountStep } from './account-step'
 export { AboutStep } from './about-step'
 export { BillingStep } from './billing-step'
 export { ProjectStep } from './project-step'
-export { PersonalizeStep } from './personalize-step'
 export { StepRevealWrapper } from './step-reveal-wrapper'

@@ -13,8 +13,21 @@
  * Session tagging happens FIRST in the workflow, before PM review decides whether to create issues.
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { RuntimeContext } from '@mastra/core/runtime-context'
+
+vi.mock('@/mastra', async (importOriginal) => {
+  if (process.env.RUN_INTEGRATION_TESTS === 'true') {
+    return importOriginal()
+  }
+  return {
+    mastra: {
+      getWorkflow: () => null,
+      getAgent: () => null,
+    },
+  }
+})
+
 import { mastra } from '@/mastra'
 import {
   pmEvalDataset,
@@ -36,8 +49,17 @@ import {
 // Test timeout for LLM calls (30 seconds)
 const TEST_TIMEOUT = 30000
 
+const shouldRun = process.env.RUN_INTEGRATION_TESTS === 'true'
+
+if (!shouldRun) {
+  console.log('[session-tagging] Skipping integration tests')
+  console.log('  To run: RUN_INTEGRATION_TESTS=true npm run test:integration')
+}
+
 // Test project context
 let testProjectId: string
+
+describe('Session Tagging', { skip: !shouldRun }, () => {
 
 beforeAll(() => {
   const { projectId } = createTestContext(pmEvalDataset.seedIssues)
@@ -490,3 +512,5 @@ describe('Session Tagging - Dataset Validation', () => {
     expect(skips.length).toBeGreaterThan(0)
   })
 })
+
+}) // end Session Tagging

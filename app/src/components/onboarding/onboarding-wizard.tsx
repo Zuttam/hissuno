@@ -32,7 +32,12 @@ function loadRevealedSteps(): Set<OnboardingStepId> {
   try {
     const stored = localStorage.getItem(REVEALED_STEPS_KEY)
     if (stored) {
-      return new Set(JSON.parse(stored) as OnboardingStepId[])
+      const parsed = JSON.parse(stored) as string[]
+      // Filter out legacy 'personalize' step if present
+      const valid = parsed.filter((s): s is OnboardingStepId =>
+        ['account', 'about', 'billing', 'project'].includes(s)
+      )
+      return new Set(valid)
     }
   } catch {
     // ignore parse errors
@@ -118,8 +123,14 @@ export function OnboardingWizard() {
           }))
 
           // Restore saved step (only if not returning from checkout)
-          const savedStepId = data.profile.onboarding_current_step as OnboardingStepId | null
+          let savedStepId = data.profile.onboarding_current_step as string | null
           const isCheckoutReturn = searchParams.get('checkout') === 'success'
+
+          // Map legacy 'personalize' step to 'project'
+          if (savedStepId === 'personalize') {
+            savedStepId = 'project'
+          }
+
           if (savedStepId && !isCheckoutReturn) {
             const stepsForFlow = getStepsForFlow()
             const savedIndex = stepsForFlow.findIndex((s) => s.id === savedStepId)
@@ -250,6 +261,8 @@ export function OnboardingWizard() {
     setPhase('profile')
     setError(null)
 
+    const isDemoMode = formData.project.projectMode === 'demo'
+
     try {
       // 1. Save profile with channels, clear current step
       const profileResponse = await fetch('/api/user/profile', {
@@ -280,63 +293,72 @@ export function OnboardingWizard() {
       // 3. Clear stored UTM after successful onboarding
       clearStoredUTM()
 
-      // 4. Create project (required)
-      const projectName = formData.project?.name?.trim()
-      if (projectName) {
-        setPhase('project')
+      if (isDemoMode) {
+        // Demo flow: create demo project via dedicated endpoint
+        setPhase('demo')
         try {
-          const projectFormData = new FormData()
-          projectFormData.append('name', projectName)
-          if (formData.project.description?.trim()) {
-            projectFormData.append('description', formData.project.description.trim())
-          }
-
-          // If additional details provided, pass as a knowledge source
-          const additionalDetails = formData.project.additionalDetails?.trim()
-          if (additionalDetails) {
-            projectFormData.append(
-              'knowledgeSources',
-              JSON.stringify([{ type: 'raw_text', content: additionalDetails }])
-            )
-          }
-
-          const projectResponse = await fetch('/api/projects', {
+          const demoResponse = await fetch('/api/projects/demo', {
             method: 'POST',
-            body: projectFormData,
           })
 
-          if (projectResponse.ok) {
-            const projectData = await projectResponse.json()
-
-            // 5. If user chose demo data, create demo sessions
-            if (formData.personalize?.useDemoData) {
-              setPhase('demo')
-              try {
-                await fetch(`/api/projects/${projectData.project.id}/demo-sessions`, {
-                  method: 'POST',
-                })
-              } catch (err) {
-                console.error('[onboarding] Failed to create demo sessions:', err)
-                // Non-critical — continue to dashboard
-              }
-            }
-
+          if (demoResponse.ok) {
+            const demoData = await demoResponse.json()
             setPhase('redirecting')
-            // Clear revealed steps on completion
             localStorage.removeItem(REVEALED_STEPS_KEY)
-            router.push(`/projects/${projectData.project.id}/dashboard`)
+            router.push(`/projects/${demoData.project.id}/dashboard`)
             return
           }
         } catch (err) {
-          console.error('[onboarding] Failed to create project:', err)
-          // Fall through to /projects/new
+          console.error('[onboarding] Failed to create demo project:', err)
         }
-      }
 
-      // 6. Redirect to project creation if no project was created
-      setPhase('redirecting')
-      localStorage.removeItem(REVEALED_STEPS_KEY)
-      router.push('/projects/new')
+        // Fallback if demo creation fails
+        setPhase('redirecting')
+        localStorage.removeItem(REVEALED_STEPS_KEY)
+        router.push('/projects/new')
+      } else {
+        // Blank flow: create user-configured project
+        const projectName = formData.project?.name?.trim()
+        if (projectName) {
+          setPhase('project')
+          try {
+            const projectFormData = new FormData()
+            projectFormData.append('name', projectName)
+            if (formData.project.description?.trim()) {
+              projectFormData.append('description', formData.project.description.trim())
+            }
+
+            // If additional details provided, pass as a knowledge source
+            const additionalDetails = formData.project.additionalDetails?.trim()
+            if (additionalDetails) {
+              projectFormData.append(
+                'knowledgeSources',
+                JSON.stringify([{ type: 'raw_text', content: additionalDetails }])
+              )
+            }
+
+            const projectResponse = await fetch('/api/projects', {
+              method: 'POST',
+              body: projectFormData,
+            })
+
+            if (projectResponse.ok) {
+              const projectData = await projectResponse.json()
+              setPhase('redirecting')
+              localStorage.removeItem(REVEALED_STEPS_KEY)
+              router.push(`/projects/${projectData.project.id}/dashboard`)
+              return
+            }
+          } catch (err) {
+            console.error('[onboarding] Failed to create project:', err)
+          }
+        }
+
+        // Fallback: redirect to project creation
+        setPhase('redirecting')
+        localStorage.removeItem(REVEALED_STEPS_KEY)
+        router.push('/projects/new')
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to complete onboarding'
       setError(message)
@@ -375,7 +397,7 @@ export function OnboardingWizard() {
       : phase === 'project'
         ? 'Creating project...'
         : phase === 'demo'
-          ? 'Setting up demo data...'
+          ? 'Creating demo project...'
           : 'Redirecting...'
 
   // Show loading skeleton while fetching profile (with overlay backdrop)

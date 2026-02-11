@@ -2,7 +2,6 @@ import { AccountStep } from './account-step'
 import { AboutStep } from './about-step'
 import { BillingStep } from './billing-step'
 import { ProjectStep } from './project-step'
-import { PersonalizeStep } from './personalize-step'
 import type { OnboardingStepId, OnboardingFormData, StepDefinition } from './types'
 
 /**
@@ -25,8 +24,8 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
 
   about: {
     id: 'about',
-    title: 'How do usually get your feedbacks?',
-    shortTitle: 'Feedbacks',
+    title: 'How do you usually get your feedback?',
+    shortTitle: 'Feedback',
     description:
       'Select the communication channels you use. This helps us understand your stack.',
     component: AboutStep,
@@ -50,11 +49,14 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
 
   project: {
     id: 'project',
-    title: 'Create your first project',
+    title: 'Set up your first project',
     shortTitle: 'Project',
-    description: 'Set up a project to start collecting customer conversations.',
+    description: 'Choose how you want to get started.',
     component: ProjectStep,
     validate: (data: OnboardingFormData) => {
+      if (data.project?.projectMode === 'demo') {
+        return { isValid: true }
+      }
       if (!data.project?.name?.trim()) {
         return { isValid: false, error: 'Project name is required' }
       }
@@ -62,22 +64,12 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
     },
     isOptional: false,
   },
-
-  personalize: {
-    id: 'personalize',
-    title: 'Personalize your landing experience',
-    shortTitle: 'Personalize',
-    description: 'Choose how you want to get started.',
-    component: PersonalizeStep,
-    validate: () => ({ isValid: true }),
-    isOptional: true,
-  },
 }
 
 /**
  * Default step ordering for onboarding flow
  */
-export const ONBOARDING_FLOW_ORDER: OnboardingStepId[] = ['account', 'about', 'billing', 'project', 'personalize']
+export const ONBOARDING_FLOW_ORDER: OnboardingStepId[] = ['account', 'about', 'billing', 'project']
 
 /**
  * Get step definitions for onboarding flow

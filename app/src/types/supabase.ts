@@ -81,6 +81,149 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          arr: number | null
+          country: string | null
+          created_at: string
+          custom_fields: Json | null
+          domain: string
+          employee_count: number | null
+          health_score: number | null
+          id: string
+          industry: string | null
+          is_archived: boolean | null
+          name: string
+          notes: string | null
+          plan_tier: string | null
+          product_used: string | null
+          project_id: string
+          renewal_date: string | null
+          stage: string | null
+          updated_at: string
+        }
+        Insert: {
+          arr?: number | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          domain: string
+          employee_count?: number | null
+          health_score?: number | null
+          id?: string
+          industry?: string | null
+          is_archived?: boolean | null
+          name: string
+          notes?: string | null
+          plan_tier?: string | null
+          product_used?: string | null
+          project_id: string
+          renewal_date?: string | null
+          stage?: string | null
+          updated_at?: string
+        }
+        Update: {
+          arr?: number | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          domain?: string
+          employee_count?: number | null
+          health_score?: number | null
+          id?: string
+          industry?: string | null
+          is_archived?: boolean | null
+          name?: string
+          notes?: string | null
+          plan_tier?: string | null
+          product_used?: string | null
+          project_id?: string
+          renewal_date?: string | null
+          stage?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          company_id: string | null
+          company_url: string | null
+          created_at: string
+          custom_fields: Json | null
+          email: string
+          id: string
+          is_archived: boolean | null
+          is_champion: boolean | null
+          last_contacted_at: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          project_id: string
+          role: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          company_url?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          email: string
+          id?: string
+          is_archived?: boolean | null
+          is_champion?: boolean | null
+          last_contacted_at?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          project_id: string
+          role?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          company_url?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          email?: string
+          id?: string
+          is_archived?: boolean | null
+          is_champion?: boolean | null
+          last_contacted_at?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          project_id?: string
+          role?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_tags: {
         Row: {
           color: string | null
@@ -118,6 +261,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "custom_tags_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_custom_field_definitions: {
+        Row: {
+          created_at: string
+          entity_type: string
+          field_key: string
+          field_label: string
+          field_type: string
+          id: string
+          is_required: boolean | null
+          position: number
+          project_id: string
+          select_options: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          field_key: string
+          field_label: string
+          field_type: string
+          id?: string
+          is_required?: boolean | null
+          position?: number
+          project_id: string
+          select_options?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          field_key?: string
+          field_label?: string
+          field_type?: string
+          id?: string
+          is_required?: boolean | null
+          position?: number
+          project_id?: string
+          select_options?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_custom_field_definitions_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -1277,6 +1470,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_demo: boolean | null
           name: string
           secret_key: string | null
           updated_at: string
@@ -1286,6 +1480,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_demo?: boolean | null
           name: string
           secret_key?: string | null
           updated_at?: string
@@ -1295,6 +1490,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_demo?: boolean | null
           name?: string
           secret_key?: string | null
           updated_at?: string

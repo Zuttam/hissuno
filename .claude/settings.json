@@ -1,7 +1,9 @@
 {
   "enabledPlugins": {
     "context7@claude-plugins-official": true,
-    "threejs-ecs@wolf-skills-marketplace": true,
     "ad-alchemist@business-growth-marketplace": true
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   }
 }

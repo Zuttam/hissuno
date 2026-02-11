@@ -14,6 +14,19 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
+
+vi.mock('@/mastra', async (importOriginal) => {
+  if (process.env.RUN_INTEGRATION_TESTS === 'true') {
+    return importOriginal()
+  }
+  return {
+    mastra: {
+      getWorkflow: () => null,
+      getAgent: () => null,
+    },
+  }
+})
+
 import { mastra } from '@/mastra'
 import {
   setupTestProject,
@@ -32,6 +45,13 @@ import { mockOpenAIEmbeddings } from '@/__tests__/mocks/openai-embeddings'
 
 // Test timeout for workflow tests
 const TEST_TIMEOUT = 60000
+
+const shouldRun = process.env.RUN_INTEGRATION_TESTS === 'true'
+
+if (!shouldRun) {
+  console.log('[knowledge-analysis.workflow] Skipping integration tests')
+  console.log('  To run: RUN_INTEGRATION_TESTS=true npm run test:integration')
+}
 
 // ============================================================================
 // Mock LLM Agents
@@ -149,6 +169,8 @@ let testContext: TestContext
 // ============================================================================
 // Setup & Teardown
 // ============================================================================
+
+describe('Knowledge Analysis Workflow', { skip: !shouldRun }, () => {
 
 beforeAll(async () => {
   // Mock OpenAI embeddings API for deterministic tests
@@ -871,3 +893,5 @@ describe('Error Scenarios', () => {
     TEST_TIMEOUT
   )
 })
+
+}) // end Knowledge Analysis Workflow

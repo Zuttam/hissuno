@@ -9,6 +9,10 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
+
+function sanitizeSearchInput(input: string): string {
+  return input.replace(/[%_.,()]/g, '\\$&')
+}
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
 import type {
@@ -380,7 +384,8 @@ export const listIssues = cache(async (filters: IssueFilters = {}): Promise<{ is
       query = query.eq('status', filters.status)
     }
     if (filters.search) {
-      query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`)
+      const s = sanitizeSearchInput(filters.search)
+      query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%`)
     }
 
     // Apply pagination via .range()
