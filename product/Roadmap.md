@@ -117,7 +117,7 @@
 [x] Check session lifecycle for closed sessions (from integrations)
 
 ### Customers 
-[] Introduce new screen to manage contact and company data. 
+[x] Introduce new screen to manage contact and company data. 
 
 ### Issues
 [] Issue review process:

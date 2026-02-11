@@ -32,7 +32,7 @@ const selectIssueWithSessions = `
   *,
   project:projects(id, name),
   issue_sessions(
-    session:sessions(id, user_id, page_url, message_count, created_at, name, source)
+    session:sessions(id, user_id, page_url, message_count, created_at, name, source, contact_id, contact:contacts(id, name, email, company:companies(id, name, arr, stage)))
   )
 `
 

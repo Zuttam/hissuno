@@ -13,10 +13,11 @@ function sanitizeSearchInput(input: string): string {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const selectSessionWithProject = '*, project:projects(id, name)'
+const selectSessionWithProject = '*, project:projects(id, name), contact:contacts(id, name, email, company:companies(id, name, domain, arr, stage))'
 const selectSessionWithLinkedIssues = `
   *,
   project:projects(id, name),
+  contact:contacts(id, name, email, company:companies(id, name, domain, arr, stage)),
   issue_sessions(
     issue:issues(id, title, type, status, upvote_count)
   )

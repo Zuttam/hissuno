@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, useParams } from 'next/navigation'
 import type { CompanyWithContacts, CompanyFilters, ContactWithCompany, ContactFilters } from '@/types/customer'
 import { useProject } from '@/components/providers/project-provider'
 import { useCompanies } from '@/hooks/use-companies'
@@ -25,46 +25,58 @@ type ActiveTab = 'companies' | 'contacts'
 export default function ProjectCustomersPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const params = useParams<{ id: string; slug?: string[] }>()
   const { project, projectId, isLoading: isLoadingProject } = useProject()
 
-  // Tab state
+  // Derive selected entity from URL path: /customers/companies/{id} or /customers/contacts/{id}
+  const slug = params.slug
+  const slugEntity = slug?.[0] as 'companies' | 'contacts' | undefined
+  const slugEntityId = slug?.[1] ?? null
+
+  const selectedCompanyId = slugEntity === 'companies' ? slugEntityId : null
+  const selectedContactId = slugEntity === 'contacts' ? slugEntityId : null
+
+  // Tab state - derived from URL path or search params
   const [activeTab, setActiveTab] = useState<ActiveTab>('companies')
 
   // Company state
   const [companyFilters, setCompanyFilters] = useState<CompanyFilters>({})
   const [companyPage, setCompanyPage] = useState(1)
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null)
 
   // Contact state
   const [contactFilters, setContactFilters] = useState<ContactFilters>({})
   const [contactPage, setContactPage] = useState(1)
-  const [selectedContactId, setSelectedContactId] = useState<string | null>(null)
 
   // Dialog state
   const [showAddDataDialog, setShowAddDataDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
-  // URL-driven dialog/sidebar opening
+  // URL-driven state
   useEffect(() => {
     const dialog = searchParams.get('dialog')
     if (dialog === 'settings') setShowSettingsDialog(true)
     else if (dialog === 'add-data' || dialog === 'import' || dialog === 'create-company' || dialog === 'create-contact') setShowAddDataDialog(true)
 
+    // Backward compat: redirect old ?company=X / ?contact=X to new path format
     const companyParam = searchParams.get('company')
-    if (companyParam) {
-      setSelectedCompanyId(companyParam)
-      setActiveTab('companies')
+    if (companyParam && projectId) {
+      router.replace(`/projects/${projectId}/customers/companies/${companyParam}`)
+      return
     }
 
     const contactParam = searchParams.get('contact')
-    if (contactParam) {
-      setSelectedContactId(contactParam)
-      setActiveTab('contacts')
+    if (contactParam && projectId) {
+      router.replace(`/projects/${projectId}/customers/contacts/${contactParam}`)
+      return
     }
 
-    const tab = searchParams.get('tab')
-    if (tab === 'contacts') setActiveTab('contacts')
-  }, [searchParams])
+    // Set active tab from URL
+    if (slugEntity === 'contacts' || searchParams.get('tab') === 'contacts') {
+      setActiveTab('contacts')
+    } else if (slugEntity === 'companies') {
+      setActiveTab('companies')
+    }
+  }, [searchParams, slugEntity, projectId, router])
 
   // Set project filter when projectId becomes available
   useEffect(() => {
@@ -130,20 +142,28 @@ export default function ProjectCustomersPage() {
   )
 
   const handleCompanySelect = useCallback((company: CompanyWithContacts) => {
-    setSelectedCompanyId(company.id)
-  }, [])
+    if (projectId) {
+      router.push(`/projects/${projectId}/customers/companies/${company.id}`)
+    }
+  }, [projectId, router])
 
   const handleContactSelect = useCallback((contact: ContactWithCompany) => {
-    setSelectedContactId(contact.id)
-  }, [])
+    if (projectId) {
+      router.push(`/projects/${projectId}/customers/contacts/${contact.id}`)
+    }
+  }, [projectId, router])
 
   const handleCloseCompanySidebar = useCallback(() => {
-    setSelectedCompanyId(null)
-  }, [])
+    if (projectId) {
+      router.push(`/projects/${projectId}/customers`)
+    }
+  }, [projectId, router])
 
   const handleCloseContactSidebar = useCallback(() => {
-    setSelectedContactId(null)
-  }, [])
+    if (projectId) {
+      router.push(`/projects/${projectId}/customers?tab=contacts`)
+    }
+  }, [projectId, router])
 
   const handleCompanyUpdated = useCallback(() => {
     void refreshCompanies()

@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Spinner, MarkdownContent, Badge, CollapsibleSection } from '@/components/ui'
-import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType } from '@/types/issue'
+import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType, IssueCustomerImpact } from '@/types/issue'
 import type { JiraIssueSyncStatus } from '@/types/jira'
 import { useIssueDetail } from '@/hooks/use-issues'
 import { useSpecGeneration } from '@/hooks/use-spec-generation'
@@ -498,6 +498,9 @@ export function IssueSidebar({
               </CollapsibleSection>
             </div>
 
+            {/* Customer Impact */}
+            <CustomerImpactSection sessions={issue.sessions} projectId={projectId} />
+
             {/* Metadata (collapsed by default) */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
               <CollapsibleSection title="Metadata" variant="flat" defaultExpanded={false}>
@@ -615,6 +618,137 @@ function formatRelativeDate(dateString: string): string {
 function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
   return text.slice(0, maxLength).trimEnd() + '...'
+}
+
+// ============================================================================
+// Customer Impact Section
+// ============================================================================
+
+const STAGE_COLORS: Record<string, string> = {
+  prospect: 'var(--text-tertiary)',
+  onboarding: 'var(--accent-info)',
+  active: 'var(--accent-success)',
+  expansion: 'var(--accent-warning)',
+  churned: 'var(--accent-danger)',
+}
+
+function computeCustomerImpact(sessions: IssueWithSessions['sessions']): IssueCustomerImpact {
+  const contactMap = new Map<string, { companyId?: string }>()
+  const companyMap = new Map<string, { id: string; name: string; arr: number | null; stage: string; contacts: Set<string> }>()
+
+  for (const session of sessions) {
+    if (!session.contact) continue
+    contactMap.set(session.contact.id, { companyId: session.contact.company?.id })
+    if (session.contact.company) {
+      const existing = companyMap.get(session.contact.company.id)
+      if (existing) {
+        existing.contacts.add(session.contact.id)
+      } else {
+        companyMap.set(session.contact.company.id, {
+          id: session.contact.company.id,
+          name: session.contact.company.name,
+          arr: session.contact.company.arr,
+          stage: session.contact.company.stage,
+          contacts: new Set([session.contact.id]),
+        })
+      }
+    }
+  }
+
+  const companies = Array.from(companyMap.values()).map((c) => ({
+    id: c.id,
+    name: c.name,
+    arr: c.arr,
+    stage: c.stage,
+    contactCount: c.contacts.size,
+  }))
+
+  const totalARR = companies.reduce((sum, c) => sum + (c.arr ?? 0), 0)
+
+  return {
+    contactCount: contactMap.size,
+    companyCount: companyMap.size,
+    totalARR,
+    companies,
+  }
+}
+
+function formatARR(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
+  return `$${value}`
+}
+
+function CustomerImpactSection({ sessions, projectId }: { sessions: IssueWithSessions['sessions']; projectId: string }) {
+  const impact = computeCustomerImpact(sessions ?? [])
+
+  if (impact.contactCount === 0) {
+    return (
+      <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+        <CollapsibleSection title="Customer Impact" variant="flat" defaultExpanded={false}>
+          <p className="text-sm text-[color:var(--text-secondary)]">
+            No identified customers
+          </p>
+        </CollapsibleSection>
+      </div>
+    )
+  }
+
+  const summaryParts: string[] = []
+  summaryParts.push(`${impact.contactCount} contact${impact.contactCount !== 1 ? 's' : ''}`)
+  if (impact.companyCount > 0) {
+    summaryParts.push(`${impact.companyCount} compan${impact.companyCount !== 1 ? 'ies' : 'y'}`)
+  }
+  if (impact.totalARR > 0) {
+    summaryParts.push(`${formatARR(impact.totalARR)} ARR at risk`)
+  }
+
+  return (
+    <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+      <CollapsibleSection
+        title="Customer Impact"
+        variant="flat"
+        defaultExpanded
+        collapsedSummary={summaryParts.join(' / ')}
+      >
+        <div className="flex flex-col gap-3">
+          {/* Summary */}
+          <p className="text-sm text-[color:var(--text-secondary)]">
+            {summaryParts.join(' / ')}
+          </p>
+
+          {/* Company rows */}
+          {impact.companies.length > 0 && (
+            <div className="flex flex-col gap-1">
+              {impact.companies.map((company) => (
+                <Link
+                  key={company.id}
+                  href={`/projects/${projectId}/customers/companies/${company.id}`}
+                  className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+                >
+                  <span
+                    className="inline-block h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: STAGE_COLORS[company.stage] ?? 'var(--text-tertiary)' }}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
+                    {company.name}
+                  </span>
+                  {company.arr != null && company.arr > 0 && (
+                    <span className="shrink-0 text-xs font-medium text-[color:var(--text-secondary)]">
+                      {formatARR(company.arr)}
+                    </span>
+                  )}
+                  <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
+                    {company.contactCount} contact{company.contactCount !== 1 ? 's' : ''}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
+    </div>
+  )
 }
 
 // ============================================================================

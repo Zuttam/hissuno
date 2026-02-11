@@ -14,6 +14,8 @@ import type {
   ContactFilters,
   UpdateContactInput,
 } from '@/types/customer'
+import type { SessionSource } from '@/types/session'
+import type { IssueType, IssueStatus } from '@/types/issue'
 
 /** Escape special PostgREST filter characters to prevent filter injection. */
 function sanitizeSearchInput(input: string): string {
@@ -263,5 +265,106 @@ export const getContactById = cache(async (contactId: string): Promise<ContactWi
   } catch (error) {
     console.error('[supabase.contacts] unexpected error getting contact', contactId, error)
     throw error
+  }
+})
+
+// ============================================================================
+// Linked Sessions & Issues for Contact Sidebar
+// ============================================================================
+
+export interface ContactLinkedSession {
+  id: string
+  name: string | null
+  source: SessionSource
+  message_count: number
+  created_at: string
+  status: string
+}
+
+export interface ContactLinkedIssue {
+  id: string
+  title: string
+  type: IssueType
+  status: IssueStatus
+  upvote_count: number
+  created_at: string
+}
+
+/**
+ * Get sessions linked to a contact.
+ */
+export const getContactLinkedSessions = cache(async (contactId: string, limit = 20): Promise<ContactLinkedSession[]> => {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const supabase = await createClient()
+
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('id, name, source, message_count, created_at, status')
+      .eq('contact_id', contactId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('[supabase.contacts] failed to get contact sessions', contactId, error)
+      return []
+    }
+
+    return (data ?? []) as ContactLinkedSession[]
+  } catch (error) {
+    console.error('[supabase.contacts] unexpected error getting contact sessions', contactId, error)
+    return []
+  }
+})
+
+/**
+ * Get issues linked to a contact (through sessions via issue_sessions junction).
+ */
+export const getContactLinkedIssues = cache(async (contactId: string, limit = 20): Promise<ContactLinkedIssue[]> => {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  try {
+    const supabase = await createClient()
+
+    // Get session IDs for this contact
+    const { data: sessions } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('contact_id', contactId)
+
+    if (!sessions || sessions.length === 0) {
+      return []
+    }
+
+    const sessionIds = sessions.map((s) => s.id)
+
+    // Get issues linked to those sessions
+    const { data: issueSessionLinks } = await supabase
+      .from('issue_sessions')
+      .select('issue:issues(id, title, type, status, upvote_count, created_at)')
+      .in('session_id', sessionIds)
+
+    if (!issueSessionLinks) {
+      return []
+    }
+
+    // Deduplicate issues (one issue can be linked to multiple sessions from same contact)
+    const issueMap = new Map<string, ContactLinkedIssue>()
+    for (const link of issueSessionLinks) {
+      const issue = Array.isArray(link.issue) ? link.issue[0] : link.issue
+      if (issue && !issueMap.has(issue.id)) {
+        issueMap.set(issue.id, issue as ContactLinkedIssue)
+      }
+    }
+
+    return Array.from(issueMap.values()).slice(0, limit)
+  } catch (error) {
+    console.error('[supabase.contacts] unexpected error getting contact issues', contactId, error)
+    return []
   }
 })

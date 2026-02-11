@@ -14,10 +14,7 @@
 ```
 AI coding tools speed up the part that was already fast.
 
-Writing code was never the bottleneck.
-Understanding what to build was.
-
-We automated the output. The input is still manual.
+Writing code was never the bottleneck. Understanding what to build was. We automated the output but the input is still fairly manual.
 ```
 
 ---
@@ -28,13 +25,14 @@ We automated the output. The input is still manual.
 **Format:** Short take
 
 ```
-Customer feedback doesn't disappear.
+It's 2026 and PM-Support-Dev communication is still a broken telephone game.
 
-It just decays at every handoff.
-Support to PM. PM to eng. Eng to ticket.
+Customer says "I can't find my invoices."
+Support logs "user reports billing issue."
+PM writes "improve billing UX."
+Dev gets a Jira ticket that says "billing."
 
-By the time it reaches the person building, the signal is gone.
-What's left is a one-line description of something nobody fully understood.
+Four people. One sentence left. Nobody knows what the customer actually meant.
 ```
 
 ---
@@ -143,6 +141,58 @@ I started building an open-source skills marketplace that empowers AI Agents (li
 Prospecting, outreach, community engagement, campaign setup.
 
 Still early but believe you can all enjoy this. Also feel free to contribute and help everyone take their GTM skills to the next level.
+
+github.com/Zuttam/business-growth-mp
+```
+
+---
+
+### Post 8 (Thread - Solo founder GTM from the terminal)
+
+**Pillar:** AI + Engineering
+**Format:** Thread (5 tweets)
+**Status:** Ready
+**Context:** Follow-up to Post 7. Expands on the marketplace idea with the bigger thesis.
+
+```
+Solo founders used to choose: build the product or build the pipeline.
+
+Now you can do both from the same terminal.
+
+A thread on engineering your GTM.
+```
+
+```
+[2/] Claude Code skills changed the game for me.
+
+Install a skill. Get a new capability. Prospecting, outreach, community engagement, content ops.
+
+Your terminal becomes a GTM command center. Not a chatbot. A composable system you configure once and run on demand.
+```
+
+```
+[3/] Agent teams take it further.
+
+One orchestration layer coordinating Reddit, LinkedIn, X, Hacker News. Each agent knows its platform. Each agent follows your voice.
+
+You don't context-switch between five dashboards. You run one command.
+```
+
+```
+[4/] The mental model shift:
+
+Old way — hire a team, manage people, wait for deliverables.
+New way — build your agent team, define the workflows, iterate in minutes.
+
+You're not replacing humans with AI. You're replacing the wait with execution.
+```
+
+```
+[5/] That's why I'm building an open-source skills marketplace for this.
+
+Installable GTM skills anyone can use or contribute to. Prospecting, campaigns, engagement — all composable.
+
+The ecosystem makes the terminal more powerful for everyone.
 
 github.com/Zuttam/business-growth-mp
 ```

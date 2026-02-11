@@ -104,6 +104,7 @@ export function createMockSession(
     human_takeover_user_id: null,
     human_takeover_slack_channel_id: null,
     human_takeover_slack_thread_ts: null,
+    contact_id: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }

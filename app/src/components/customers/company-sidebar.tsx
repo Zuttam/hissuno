@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Spinner, CollapsibleSection, Dialog, Button } from '@/components/ui'
+import { useState, useCallback, useEffect } from 'react'
+import Link from 'next/link'
+import { Spinner, CollapsibleSection, Dialog, Button, Badge } from '@/components/ui'
 import { useCompanyDetail } from '@/hooks/use-companies'
 import type { CompanyStage, UpdateCompanyInput } from '@/types/customer'
 
@@ -182,33 +183,8 @@ export function CompanySidebar({
           <div className="flex flex-1 items-center justify-center"><Spinner /></div>
         ) : company ? (
           <div className="flex-1 overflow-y-auto">
-            {/* Key Metrics */}
-            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <CollapsibleSection title="Key Metrics" variant="flat" defaultExpanded>
-                <div className="flex items-center gap-4 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
-                  <div className="flex-1 text-center">
-                    <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
-                      {company.arr ? `$${formatNumber(company.arr)}` : '-'}
-                    </p>
-                    <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">ARR</p>
-                  </div>
-                  <div className="h-8 w-px bg-[color:var(--border-subtle)]" />
-                  <div className="flex-1 text-center">
-                    <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
-                      {company.health_score ?? '-'}
-                    </p>
-                    <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Health</p>
-                  </div>
-                  <div className="h-8 w-px bg-[color:var(--border-subtle)]" />
-                  <div className="flex-1 text-center">
-                    <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
-                      {company.contact_count}
-                    </p>
-                    <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Contacts</p>
-                  </div>
-                </div>
-              </CollapsibleSection>
-            </div>
+            {/* Feedback Activity */}
+            <CompanyActivitySection companyId={companyId} projectId={projectId} />
 
             {/* Contacts */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
@@ -216,10 +192,14 @@ export function CompanySidebar({
                 {company.contacts && company.contacts.length > 0 ? (
                   <div className="flex flex-col gap-1 mt-1">
                     {company.contacts.map((contact) => (
-                      <div key={contact.id} className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
+                      <Link
+                        key={contact.id}
+                        href={`/projects/${projectId}/customers/contacts/${contact.id}`}
+                        className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+                      >
                         <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">{contact.name}</span>
                         <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">{contact.email}</span>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 ) : (
@@ -244,21 +224,19 @@ export function CompanySidebar({
                     onSave={handleFieldSave}
                     type="date"
                   />
-                  <EditableDetailField label="ARR" value={company.arr?.toString()} fieldKey="arr" onSave={handleFieldSave} type="number" />
+                  <EditableDetailField label="ARR" value={company.arr?.toString()} fieldKey="arr" onSave={handleFieldSave} type="number" displayPrefix="$" />
                   <EditableDetailField label="Health Score" value={company.health_score?.toString()} fieldKey="healthScore" onSave={handleFieldSave} type="number" />
                   <DetailField label="Created" value={formatDateTime(company.created_at)} />
                   <DetailField label="Updated" value={formatDateTime(company.updated_at)} />
-                </div>
-
-                {/* Notes */}
-                <div className="mt-4">
-                  <EditableDetailField
-                    label="Notes"
-                    value={company.notes}
-                    fieldKey="notes"
-                    onSave={handleFieldSave}
-                    type="textarea"
-                  />
+                  <div className="col-span-2">
+                    <EditableDetailField
+                      label="Notes"
+                      value={company.notes}
+                      fieldKey="notes"
+                      onSave={handleFieldSave}
+                      type="textarea"
+                    />
+                  </div>
                 </div>
               </CollapsibleSection>
             </div>
@@ -299,12 +277,14 @@ function EditableDetailField({
   fieldKey,
   onSave,
   type = 'text',
+  displayPrefix,
 }: {
   label: string
   value: string | null | undefined
   fieldKey: string
   onSave: (fieldKey: string, newValue: string) => Promise<boolean>
   type?: 'text' | 'number' | 'date' | 'textarea'
+  displayPrefix?: string
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(value ?? '')
@@ -386,7 +366,7 @@ function EditableDetailField({
     <div className="group flex flex-col gap-1">
       <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">{label}</label>
       <div className="flex items-center gap-1">
-        <p className="flex-1 text-[color:var(--foreground)]">{value || '-'}</p>
+        <p className="flex-1 text-[color:var(--foreground)]">{value ? `${displayPrefix ?? ''}${value}` : '-'}</p>
         <button
           type="button"
           onClick={handleStartEdit}
@@ -400,12 +380,140 @@ function EditableDetailField({
   )
 }
 
-function formatNumber(num: number): string {
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`
-  if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K`
-  return num.toFixed(0)
-}
-
 function formatDateTime(dateString: string): string {
   return new Date(dateString).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function formatRelativeDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    if (diffHours === 0) return 'just now'
+    return `${diffHours}h ago`
+  }
+  if (diffDays === 1) return 'yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  return `${Math.floor(diffDays / 30)}mo ago`
+}
+
+const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
+  widget: 'info', slack: 'warning', intercom: 'success', gong: 'default', api: 'default', manual: 'default',
+}
+
+const TYPE_BADGE_VARIANTS: Record<string, 'info' | 'danger' | 'warning' | 'default'> = {
+  bug: 'danger', feature_request: 'info', change_request: 'warning',
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  bug: 'Bug', feature_request: 'Feature', change_request: 'Change',
+}
+
+// ============================================================================
+// Company Activity Section
+// ============================================================================
+
+interface CompanyActivity {
+  sessions: Array<{ id: string; name: string | null; source: string; created_at: string }>
+  issues: Array<{ id: string; title: string; type: string; status: string }>
+}
+
+function CompanyActivitySection({ companyId, projectId }: { companyId: string; projectId: string }) {
+  const [activity, setActivity] = useState<CompanyActivity | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchActivity() {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/customers/companies/${companyId}/activity`)
+        if (res.ok) {
+          const data = await res.json()
+          setActivity(data)
+        }
+      } catch (err) {
+        console.error('[company-sidebar] failed to fetch activity:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    void fetchActivity()
+  }, [companyId, projectId])
+
+  const sessionCount = activity?.sessions.length ?? 0
+  const issueCount = activity?.issues.length ?? 0
+
+  return (
+    <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+      <CollapsibleSection
+        title={`Feedback Activity${!isLoading ? ` (${sessionCount} sessions, ${issueCount} issues)` : ''}`}
+        variant="flat"
+        defaultExpanded
+      >
+        {isLoading ? (
+          <div className="flex justify-center py-2"><Spinner /></div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {/* Sessions */}
+            {sessionCount > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  Sessions
+                </span>
+                {activity!.sessions.map((session) => (
+                  <Link
+                    key={session.id}
+                    href={`/projects/${projectId}/sessions?session=${session.id}`}
+                    className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+                  >
+                    <Badge variant={SOURCE_BADGE_VARIANTS[session.source] ?? 'default'}>
+                      {session.source.charAt(0).toUpperCase() + session.source.slice(1)}
+                    </Badge>
+                    <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
+                      {session.name || 'Unnamed'}
+                    </span>
+                    <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
+                      {formatRelativeDate(session.created_at)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* Issues */}
+            {issueCount > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  Issues
+                </span>
+                {activity!.issues.map((issue) => (
+                  <Link
+                    key={issue.id}
+                    href={`/projects/${projectId}/issues?issue=${issue.id}`}
+                    className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+                  >
+                    <Badge variant={TYPE_BADGE_VARIANTS[issue.type] ?? 'default'}>
+                      {TYPE_LABELS[issue.type] ?? issue.type}
+                    </Badge>
+                    <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
+                      {issue.title}
+                    </span>
+                    <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
+                      {issue.status}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {sessionCount === 0 && issueCount === 0 && (
+              <p className="text-sm text-[color:var(--text-secondary)]">No feedback activity yet</p>
+            )}
+          </div>
+        )}
+      </CollapsibleSection>
+    </div>
+  )
 }

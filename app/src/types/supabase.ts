@@ -1470,7 +1470,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
-          is_demo: boolean | null
+          is_demo: boolean
           name: string
           secret_key: string | null
           updated_at: string
@@ -1480,7 +1480,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          is_demo?: boolean | null
+          is_demo?: boolean
           name: string
           secret_key?: string | null
           updated_at?: string
@@ -1490,7 +1490,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
-          is_demo?: boolean | null
+          is_demo?: boolean
           name?: string
           secret_key?: string | null
           updated_at?: string
@@ -1602,6 +1602,7 @@ export type Database = {
       }
       sessions: {
         Row: {
+          contact_id: string | null
           created_at: string
           first_message_at: string | null
           goodbye_detected_at: string | null
@@ -1628,6 +1629,7 @@ export type Database = {
           user_metadata: Json | null
         }
         Insert: {
+          contact_id?: string | null
           created_at?: string
           first_message_at?: string | null
           goodbye_detected_at?: string | null
@@ -1654,6 +1656,7 @@ export type Database = {
           user_metadata?: Json | null
         }
         Update: {
+          contact_id?: string | null
           created_at?: string
           first_message_at?: string | null
           goodbye_detected_at?: string | null
@@ -1680,6 +1683,13 @@ export type Database = {
           user_metadata?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sessions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sessions_project_id_fkey"
             columns: ["project_id"]

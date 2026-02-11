@@ -76,7 +76,7 @@ export interface IssueWithProject extends IssueRecord {
 }
 
 /**
- * Issue with linked sessions
+ * Issue with linked sessions (includes contact/company data for customer impact)
  */
 export interface IssueWithSessions extends IssueWithProject {
   sessions: {
@@ -87,7 +87,35 @@ export interface IssueWithSessions extends IssueWithProject {
     created_at: string
     name: string | null
     source: 'widget' | 'slack' | 'intercom' | 'gong' | 'api' | 'manual'
+    contact_id: string | null
+    contact: {
+      id: string
+      name: string
+      email: string
+      company: {
+        id: string
+        name: string
+        arr: number | null
+        stage: string
+      } | null
+    } | null
   }[]
+}
+
+/**
+ * Computed customer impact summary for an issue
+ */
+export interface IssueCustomerImpact {
+  contactCount: number
+  companyCount: number
+  totalARR: number
+  companies: Array<{
+    id: string
+    name: string
+    arr: number | null
+    stage: string
+    contactCount: number
+  }>
 }
 
 /**

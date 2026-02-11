@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { Spinner, Dialog, Button } from '@/components/ui'
+import { useState, useCallback, useEffect } from 'react'
+import Link from 'next/link'
+import { Spinner, Dialog, Button, Badge, CollapsibleSection } from '@/components/ui'
 import { useContactDetail } from '@/hooks/use-contacts'
 import type { UpdateContactInput } from '@/types/customer'
+import type { ContactLinkedSession, ContactLinkedIssue } from '@/lib/supabase/contacts'
 
 interface ContactSidebarProps {
   projectId: string
@@ -87,6 +89,14 @@ export function ContactSidebar({
               <div className="mt-1">
                 <h3 className="text-lg font-semibold text-[color:var(--foreground)]">{contact.name}</h3>
                 <p className="text-sm text-[color:var(--text-secondary)]">{contact.email}</p>
+                {contact.company && (
+                  <Link
+                    href={`/projects/${projectId}/customers/companies/${contact.company.id}`}
+                    className="mt-0.5 inline-flex items-center gap-1.5 text-sm text-[color:var(--accent-primary)] hover:underline"
+                  >
+                    {contact.company.name}
+                  </Link>
+                )}
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -129,33 +139,39 @@ export function ContactSidebar({
         {isLoading ? (
           <div className="flex flex-1 items-center justify-center"><Spinner /></div>
         ) : contact ? (
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="grid grid-cols-2 gap-4 text-xs">
-              <DetailField label="Company" value={contact.company?.name ?? null} />
-              <EditableDetailField label="Title" value={contact.title} fieldKey="title" onSave={handleFieldSave} />
-              <EditableDetailField label="Role" value={contact.role} fieldKey="role" onSave={handleFieldSave} />
-              <EditableDetailField label="Phone" value={contact.phone} fieldKey="phone" onSave={handleFieldSave} />
-              <DetailField label="Email" value={contact.email} />
-              <DetailField label="Champion" value={contact.is_champion ? 'Yes' : 'No'} />
-              <EditableDetailField
-                label="Last Contacted"
-                value={contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleDateString() : null}
-                fieldKey="lastContactedAt"
-                onSave={handleFieldSave}
-                type="date"
-              />
-              <DetailField label="Created" value={formatDateTime(contact.created_at)} />
-            </div>
+          <div className="flex-1 overflow-y-auto">
+            {/* Feedback Activity (top, open by default) */}
+            <ContactActivitySections contactId={contactId} projectId={projectId} />
 
-            {/* Notes */}
-            <div className="mt-6 text-xs">
-              <EditableDetailField
-                label="Notes"
-                value={contact.notes}
-                fieldKey="notes"
-                onSave={handleFieldSave}
-                type="textarea"
-              />
+            {/* Details */}
+            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+              <CollapsibleSection title="Details" variant="flat" defaultExpanded={false}>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <DetailField label="Company" value={contact.company?.name ?? null} />
+                  <EditableDetailField label="Title" value={contact.title} fieldKey="title" onSave={handleFieldSave} />
+                  <EditableDetailField label="Role" value={contact.role} fieldKey="role" onSave={handleFieldSave} />
+                  <EditableDetailField label="Phone" value={contact.phone} fieldKey="phone" onSave={handleFieldSave} />
+                  <DetailField label="Email" value={contact.email} />
+                  <DetailField label="Champion" value={contact.is_champion ? 'Yes' : 'No'} />
+                  <EditableDetailField
+                    label="Last Contacted"
+                    value={contact.last_contacted_at ? new Date(contact.last_contacted_at).toLocaleDateString() : null}
+                    fieldKey="lastContactedAt"
+                    onSave={handleFieldSave}
+                    type="date"
+                  />
+                  <DetailField label="Created" value={formatDateTime(contact.created_at)} />
+                  <div className="col-span-2">
+                    <EditableDetailField
+                      label="Notes"
+                      value={contact.notes}
+                      fieldKey="notes"
+                      onSave={handleFieldSave}
+                      type="textarea"
+                    />
+                  </div>
+                </div>
+              </CollapsibleSection>
             </div>
           </div>
         ) : (
@@ -305,4 +321,150 @@ function EditableDetailField({
 
 function formatDateTime(dateString: string): string {
   return new Date(dateString).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+function formatRelativeDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) {
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    if (diffHours === 0) return 'just now'
+    return `${diffHours}h ago`
+  }
+  if (diffDays === 1) return 'yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  return `${Math.floor(diffDays / 30)}mo ago`
+}
+
+const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
+  widget: 'info',
+  slack: 'warning',
+  intercom: 'success',
+  gong: 'default',
+  api: 'default',
+  manual: 'default',
+}
+
+const TYPE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'danger' | 'default'> = {
+  bug: 'danger',
+  feature_request: 'info',
+  change_request: 'warning',
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  bug: 'Bug',
+  feature_request: 'Feature',
+  change_request: 'Change',
+}
+
+// ============================================================================
+// Contact Activity Sections (Sessions & Issues) - similar to CompanyActivitySection
+// ============================================================================
+
+function ContactActivitySections({ contactId, projectId }: { contactId: string; projectId: string }) {
+  const [sessions, setSessions] = useState<ContactLinkedSession[]>([])
+  const [issues, setIssues] = useState<ContactLinkedIssue[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchActivity() {
+      try {
+        const [sessionsRes, issuesRes] = await Promise.all([
+          fetch(`/api/projects/${projectId}/customers/contacts/${contactId}/sessions`),
+          fetch(`/api/projects/${projectId}/customers/contacts/${contactId}/issues`),
+        ])
+        if (sessionsRes.ok) {
+          const data = await sessionsRes.json()
+          setSessions(data.sessions ?? [])
+        }
+        if (issuesRes.ok) {
+          const data = await issuesRes.json()
+          setIssues(data.issues ?? [])
+        }
+      } catch (err) {
+        console.error('[contact-sidebar] failed to fetch activity:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    void fetchActivity()
+  }, [contactId, projectId])
+
+  const sessionCount = sessions.length
+  const issueCount = issues.length
+
+  return (
+    <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+      <CollapsibleSection
+        title={`Feedback Activity${!isLoading ? ` (${sessionCount} sessions, ${issueCount} issues)` : ''}`}
+        variant="flat"
+        defaultExpanded
+      >
+        {isLoading ? (
+          <div className="flex justify-center py-2"><Spinner /></div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {/* Sessions */}
+            {sessionCount > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  Sessions
+                </span>
+                {sessions.map((session) => (
+                  <Link
+                    key={session.id}
+                    href={`/projects/${projectId}/sessions?session=${session.id}`}
+                    className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+                  >
+                    <Badge variant={SOURCE_BADGE_VARIANTS[session.source] ?? 'default'}>
+                      {session.source.charAt(0).toUpperCase() + session.source.slice(1)}
+                    </Badge>
+                    <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
+                      {session.name || 'Unnamed'}
+                    </span>
+                    <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
+                      {formatRelativeDate(session.created_at)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* Issues */}
+            {issueCount > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  Issues
+                </span>
+                {issues.map((issue) => (
+                  <Link
+                    key={issue.id}
+                    href={`/projects/${projectId}/issues?issue=${issue.id}`}
+                    className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+                  >
+                    <Badge variant={TYPE_BADGE_VARIANTS[issue.type] ?? 'default'}>
+                      {TYPE_LABELS[issue.type] ?? issue.type}
+                    </Badge>
+                    <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
+                      {issue.title}
+                    </span>
+                    <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
+                      {issue.status}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {sessionCount === 0 && issueCount === 0 && (
+              <p className="text-sm text-[color:var(--text-secondary)]">No feedback activity yet</p>
+            )}
+          </div>
+        )}
+      </CollapsibleSection>
+    </div>
+  )
 }

@@ -1,6 +1,6 @@
 # Reddit Comments - 2026-02-11
 
-## Status: READY TO POST
+## Status: 8/9 POSTED | 1 SKIPPED | 0 PENDING
 
 ---
 
@@ -22,7 +22,7 @@ We had a feature request resurface as a "new" priority. Scoped it from scratch w
 
 Now I do what you do - kill the ticket - but I keep a lightweight doc with the raw customer signal. Who said what, what they were trying to do, what workaround they're using. Takes 5 min to maintain and saves the painful re-research when something inevitably comes back.
 
-- **Posted**: [ ]
+- **Posted**: [x] 2026-02-11 morning session
 
 ---
 
@@ -46,7 +46,7 @@ What actually happened on my team is we started producing more polished-looking 
 
 The burnout isn't from AI making us more productive. It's from the gap between looking productive and actually making progress.
 
-- **Posted**: [ ]
+- **Posted**: [x] 2026-02-11 morning session
 
 ---
 
@@ -66,9 +66,9 @@ We had this stupid situation where support was hearing the same 3-4 complaints d
 
 Set up a basic system that tagged conversations by topic and generated a weekly digest of top themes by volume. First week it ran, the #1 topic was something product didn't even know existed. Turned out to be a 2-day fix that affected like 30% of our users.
 
-The automation itself was simple. The hard part was admitting we'd been flying blind on what customers were actually saying.
+Set up a basic system that tagged conversations by topic and generated a weekly digest of top themes by volume. First week it ran, the #1 topic was something product didn't even know existed. Turned out to be a 2-day fix that affected like 30% of our users.
 
-- **Posted**: [ ]
+- **Posted**: [x] 2026-02-11 afternoon session (last sentence removed per user request)
 
 ---
 
@@ -88,7 +88,7 @@ What helped was lowering the stakes. Stopped thinking of it as "pitch my product
 
 Also discovered the best distribution doesn't feel like distribution. Hanging out in communities where people discuss the problem, answering questions, sharing what I've learned. Nobody feels sold to and you get way better signal than a landing page ever gives you.
 
-- **Posted**: [ ]
+- **Posted**: [x] 2026-02-11 afternoon session (MindVegetable9898)
 
 ---
 
@@ -110,7 +110,7 @@ What's actually procrastination is building features nobody asked for. Settings 
 
 Agree on the distribution part though. Once you've built the core validated thing, every hour in the IDE instead of talking to potential users is wasted.
 
-- **Posted**: [ ]
+- **Posted**: [x] 2026-02-11 afternoon session (MindVegetable9898)
 
 ---
 
@@ -130,7 +130,7 @@ One thing that helped me: stop measuring progress by user count and start measur
 
 Also the decision fatigue thing is way more universal than you think. I'd lean into that angle hard. Everyone experiences it, few people realize it's a solvable problem.
 
-- **Posted**: [ ]
+- **Posted**: [x] 2026-02-11 afternoon session (MindVegetable9898)
 
 ---
 
@@ -158,7 +158,7 @@ What I've done after similar situations:
 
 The friendship part makes it harder emotionally but easier practically. Real friends can handle uncomfortable conversations and come out fine.
 
-- **Posted**: [ ]
+- **Posted**: [x] 2026-02-11 evening session (eng_lead_ftw)
 
 ---
 
@@ -186,7 +186,7 @@ Few things that helped when I was in your spot:
 
 The fact that you're noticing these issues is a good sign not a bad one. The people who should worry are the ones who join chaos and think it's fine.
 
-- **Posted**: [ ]
+- **Posted**: [SKIPPED] Thread removed by moderators
 
 ---
 
@@ -206,7 +206,7 @@ Specific praise hits different than generic praise. And doing it privately means
 
 The other thing - engineers are terrible at accepting compliments. Most will deflect with "oh that was easy" or "anyone would have done that." Just let them. The message still lands even if they don't show it.
 
-- **Posted**: [ ]
+- **Posted**: [x] 2026-02-11 evening session (eng_lead_ftw)
 
 ---
 
