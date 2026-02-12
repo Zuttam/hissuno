@@ -80,7 +80,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: `Too many rows. Maximum is ${MAX_ROW_COUNT.toLocaleString()} rows (got ${rows.length.toLocaleString()}).` }, { status: 400 })
     }
 
-    const result = await validateAndImportRows(projectId, entityType, rows, mappings, supabase)
+    const createMissingCompanies = formData.get('create_missing_companies') === 'true'
+    const result = await validateAndImportRows(projectId, entityType, rows, mappings, supabase, { createMissingCompanies })
 
     return NextResponse.json({ result })
   } catch (error) {

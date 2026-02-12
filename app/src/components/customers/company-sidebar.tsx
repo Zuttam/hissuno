@@ -210,7 +210,7 @@ export function CompanySidebar({
 
             {/* Details */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <CollapsibleSection title="Details" variant="flat" defaultExpanded={false}>
+              <CollapsibleSection title="Details" variant="flat" defaultExpanded>
                 <div className="grid grid-cols-2 gap-4 text-xs">
                   <EditableDetailField label="Industry" value={company.industry} fieldKey="industry" onSave={handleFieldSave} />
                   <EditableDetailField label="Plan Tier" value={company.plan_tier} fieldKey="planTier" onSave={handleFieldSave} />

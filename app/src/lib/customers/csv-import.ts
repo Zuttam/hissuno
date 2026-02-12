@@ -109,6 +109,8 @@ const CONTACT_FIELD_ALIASES: Record<string, string[]> = {
   company_url: ['website', 'company_website', 'linkedin'],
   is_champion: ['champion', 'advocate', 'promoter'],
   notes: ['note', 'comments', 'description'],
+  company_name: ['company', 'account', 'account_name', 'organization', 'org'],
+  company_domain: ['domain', 'company_website', 'website'],
 }
 
 /**
@@ -161,7 +163,8 @@ export async function validateAndImportRows(
   entityType: CustomerEntityType,
   rows: Record<string, string>[],
   mappings: CSVImportMapping[],
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  options: { createMissingCompanies?: boolean } = {}
 ): Promise<CSVImportResult> {
   const result: CSVImportResult = {
     created: 0,
@@ -212,13 +215,35 @@ export async function validateAndImportRows(
     }
   }
 
+  // For contact imports, batch-fetch existing companies by domain for auto-linking
+  const companyMap = new Map<string, string>() // domain -> company id
+  if (entityType === 'contact') {
+    const companyDomainCol = fieldMap.get('company_domain')
+    if (companyDomainCol) {
+      const domains = rows
+        .map((r) => (r[companyDomainCol] ?? '').trim().toLowerCase())
+        .filter(Boolean)
+      if (domains.length > 0) {
+        const uniqueDomains = [...new Set(domains)]
+        const { data } = await supabase
+          .from('companies')
+          .select('id, domain')
+          .eq('project_id', projectId)
+          .in('domain', uniqueDomains)
+        for (const row of data ?? []) {
+          companyMap.set(row.domain, row.id)
+        }
+      }
+    }
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     try {
       if (entityType === 'company') {
         await importCompanyRow(supabase, projectId, row, fieldMap, result, i, existingMap)
       } else {
-        await importContactRow(supabase, projectId, row, fieldMap, result, i, existingMap)
+        await importContactRow(supabase, projectId, row, fieldMap, result, i, existingMap, companyMap, options.createMissingCompanies ?? false)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
@@ -323,7 +348,9 @@ async function importContactRow(
   fieldMap: Map<string, string>,
   result: CSVImportResult,
   rowIndex: number,
-  existingMap: Map<string, string>
+  existingMap: Map<string, string>,
+  companyMap: Map<string, string>,
+  createMissingCompanies: boolean
 ) {
   const getValue = (field: string) => {
     const col = fieldMap.get(field)
@@ -352,6 +379,32 @@ async function importContactRow(
     name,
     email,
     custom_fields: customFields,
+  }
+
+  // Auto-resolve company by domain
+  const companyDomain = getValue('company_domain').toLowerCase()
+  const companyName = getValue('company_name')
+  if (companyDomain) {
+    const existingCompanyId = companyMap.get(companyDomain)
+    if (existingCompanyId) {
+      contactData.company_id = existingCompanyId
+    } else if (createMissingCompanies) {
+      // Create the company and cache its ID for subsequent rows
+      const newCompanyData = {
+        project_id: projectId,
+        name: companyName || companyDomain,
+        domain: companyDomain,
+      }
+      const { data: newCompany, error: companyError } = await supabase
+        .from('companies')
+        .insert(newCompanyData)
+        .select('id')
+        .single()
+      if (!companyError && newCompany) {
+        companyMap.set(companyDomain, newCompany.id)
+        contactData.company_id = newCompany.id
+      }
+    }
   }
 
   const role = getValue('role')

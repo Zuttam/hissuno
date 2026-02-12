@@ -553,6 +553,7 @@ export async function createManualSession(input: CreateSessionInput): Promise<Se
         id: sessionId,
         project_id: input.project_id,
         user_id: input.user_id || null,
+        user_metadata: input.user_metadata || {},
         page_url: input.page_url || null,
         page_title: input.page_title || null,
         name: sessionName,

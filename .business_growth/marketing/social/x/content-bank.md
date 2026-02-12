@@ -199,6 +199,22 @@ github.com/Zuttam/business-growth-mp
 
 ---
 
+### Post 9 (Short take - Agentic Browser Control)
+
+**Pillar:** AI + Engineering
+**Format:** Short take
+**Status:** Ready
+
+```
+Give an AI agent a browser and it stops being a dev tool.
+
+Research. Prospecting. QA. Campaign ops. Data collection. All the work that lives in browser tabs, not in your IDE.
+
+Everyone's debating which model writes the best code. The bigger unlock is automating everything else you do in Chrome all day.
+```
+
+---
+
 ## Queue (Week 2+)
 
 *Add future post drafts below as ideas come up.*

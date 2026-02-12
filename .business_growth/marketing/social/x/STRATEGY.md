@@ -163,7 +163,10 @@ With 48 followers, original posts won't get reach. Replies to larger accounts ar
 - No founding story posts (stealth mode)
 - No build-in-public updates until Phase 1 milestone (250+ followers)
 - No emojis, no engagement bait in posts
-- Voice: short declarative lines, confident, observational, analogies over anecdotes
+- Voice: casual, short declarative lines, confident, observational, lowercase on X
+- Personal touch: always prefer first-person experience ("watched a customer...", "I started using...", "what I see building...") over generic observations. Posts should feel like real moments, not a content calendar. This applies to both original posts and replies.
+- Avoid LinkedIn energy: no structured lists, no "here's what I learned" format. Just say the thing.
+- Space out posts and replies throughout the day. Don't publish everything at once — stagger content for natural presence.
 
 ---
 

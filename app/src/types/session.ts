@@ -230,6 +230,7 @@ export interface CreateMessageInput {
 export interface CreateSessionInput {
   project_id: string
   user_id?: string
+  user_metadata?: Record<string, string>
   page_url?: string
   page_title?: string
   name?: string

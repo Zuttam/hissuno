@@ -68,6 +68,7 @@ export function AddDataDialog({
   const [mappings, setMappings] = useState<CSVImportMapping[]>([])
   const [isImporting, setIsImporting] = useState(false)
   const [csvResult, setCsvResult] = useState<CSVImportResult | null>(null)
+  const [createMissingCompanies, setCreateMissingCompanies] = useState(false)
 
   // Manual form state - Company
   const [companyName, setCompanyName] = useState('')
@@ -123,7 +124,7 @@ export function AddDataDialog({
   const csvTargetFields =
     entityType === 'company'
       ? ['name', 'domain', 'arr', 'stage', 'product_used', 'industry', 'employee_count', 'plan_tier', 'renewal_date', 'health_score', 'country', 'notes']
-      : ['name', 'email', 'role', 'title', 'phone', 'company_url', 'is_champion', 'notes']
+      : ['name', 'email', 'role', 'title', 'phone', 'company_url', 'is_champion', 'notes', 'company_name', 'company_domain']
 
   // Reset all state
   const resetAll = useCallback(() => {
@@ -135,6 +136,7 @@ export function AddDataDialog({
     setMappings([])
     setCsvResult(null)
     setIsImporting(false)
+    setCreateMissingCompanies(false)
     setCompanyName('')
     setCompanyDomain('')
     setCompanyArr('')
@@ -217,6 +219,9 @@ export function AddDataDialog({
       formData.append('file', file)
       formData.append('entity_type', entityType)
       formData.append('mappings', JSON.stringify(mappings))
+      if (createMissingCompanies) {
+        formData.append('create_missing_companies', 'true')
+      }
 
       const response = await fetch(`/api/projects/${projectId}/customers/import`, {
         method: 'POST',
@@ -237,7 +242,7 @@ export function AddDataDialog({
     } finally {
       setIsImporting(false)
     }
-  }, [file, entityType, mappings, projectId, onDataAdded])
+  }, [file, entityType, mappings, projectId, onDataAdded, createMissingCompanies])
 
   // ── Manual form handlers ──
 
@@ -408,7 +413,7 @@ export function AddDataDialog({
                               <Select
                                 value={mapping.targetField ?? ''}
                                 onChange={(e) => handleMappingChange(mapping.csvColumn, e.target.value || null)}
-                                className="h-6 text-xs"
+                                className="py-1 text-xs"
                               >
                                 <option value="">-- Skip --</option>
                                 {csvTargetFields.map((f) => (
@@ -424,6 +429,21 @@ export function AddDataDialog({
                       </tbody>
                     </table>
                   </div>
+
+                  {entityType === 'contact' && mappings.some((m) => m.targetField === 'company_domain') && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="csv-create-missing-companies"
+                        checked={createMissingCompanies}
+                        onChange={(e) => setCreateMissingCompanies(e.target.checked)}
+                        className="h-4 w-4 rounded border-[color:var(--border)] accent-[color:var(--accent-selected)]"
+                      />
+                      <label htmlFor="csv-create-missing-companies" className="text-xs text-[color:var(--text-secondary)]">
+                        Create companies that don&apos;t exist yet
+                      </label>
+                    </div>
+                  )}
 
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => { setCsvStep('upload'); setFile(null); setHeaders([]); setRows([]); setMappings([]); }}>

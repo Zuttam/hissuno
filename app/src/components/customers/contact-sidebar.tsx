@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { Spinner, Dialog, Button, Badge, CollapsibleSection } from '@/components/ui'
+import { Spinner, Dialog, Button, Badge, CollapsibleSection, Combobox } from '@/components/ui'
 import { useContactDetail } from '@/hooks/use-contacts'
 import type { UpdateContactInput } from '@/types/customer'
 import type { ContactLinkedSession, ContactLinkedIssue } from '@/lib/supabase/contacts'
@@ -28,9 +28,25 @@ export function ContactSidebar({
   onClose,
   onContactUpdated,
 }: ContactSidebarProps) {
-  const { contact, isLoading, updateContact, archiveContact } = useContactDetail({ projectId, contactId })
+  const { contact, isLoading, updateContact, archiveContact, refresh: refreshContact } = useContactDetail({ projectId, contactId })
   const [isArchiving, setIsArchiving] = useState(false)
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const response = await fetch(`/api/projects/${projectId}/customers/companies?limit=100`)
+        if (response.ok) {
+          const data = await response.json()
+          setCompanies((data.companies ?? []).map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })))
+        }
+      } catch {
+        // silent
+      }
+    }
+    void fetchCompanies()
+  }, [projectId])
 
   const handleArchiveToggle = useCallback(async () => {
     if (!contact) return
@@ -145,9 +161,21 @@ export function ContactSidebar({
 
             {/* Details */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <CollapsibleSection title="Details" variant="flat" defaultExpanded={false}>
+              <CollapsibleSection title="Details" variant="flat" defaultExpanded>
                 <div className="grid grid-cols-2 gap-4 text-xs">
-                  <DetailField label="Company" value={contact.company?.name ?? null} />
+                  <EditableCompanyField
+                    company={contact.company}
+                    companies={companies}
+                    projectId={projectId}
+                    onSave={async (companyId) => {
+                      const success = await updateContact({ company_id: companyId } as UpdateContactInput)
+                      if (success) {
+                        await refreshContact()
+                        onContactUpdated?.()
+                      }
+                      return success
+                    }}
+                  />
                   <EditableDetailField label="Title" value={contact.title} fieldKey="title" onSave={handleFieldSave} />
                   <EditableDetailField label="Role" value={contact.role} fieldKey="role" onSave={handleFieldSave} />
                   <EditableDetailField label="Phone" value={contact.phone} fieldKey="phone" onSave={handleFieldSave} />
@@ -311,6 +339,119 @@ function EditableDetailField({
           onClick={handleStartEdit}
           className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
           aria-label={`Edit ${label}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// EditableCompanyField
+// ============================================================================
+
+function EditableCompanyField({
+  company,
+  companies,
+  projectId,
+  onSave,
+}: {
+  company: { id: string; name: string; domain: string } | null
+  companies: { id: string; name: string }[]
+  projectId: string
+  onSave: (companyId: string | null) => Promise<boolean>
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>(company?.id ?? undefined)
+  const [isSaving, setIsSaving] = useState(false)
+
+  const companyItems = useMemo(
+    () => [
+      { value: '__none__', label: 'None' },
+      ...companies.map((c) => ({ value: c.id, label: c.name })),
+    ],
+    [companies]
+  )
+
+  const handleStartEdit = () => {
+    setSelectedCompanyId(company?.id ?? undefined)
+    setIsEditing(true)
+  }
+
+  const handleCancel = () => {
+    setSelectedCompanyId(company?.id ?? undefined)
+    setIsEditing(false)
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    const newId = selectedCompanyId === '__none__' ? null : (selectedCompanyId ?? null)
+    const success = await onSave(newId)
+    setIsSaving(false)
+    if (success) setIsEditing(false)
+  }
+
+  if (isEditing) {
+    return (
+      <div className="flex flex-col gap-1">
+        <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">Company</label>
+        <div className="flex items-center gap-1">
+          <Combobox
+            items={companyItems}
+            value={selectedCompanyId ?? '__none__'}
+            onValueChange={(val) => setSelectedCompanyId(val)}
+            placeholder="Search companies..."
+            emptyMessage="No companies found"
+            size="sm"
+            className="flex-1"
+            inputClassName="!rounded-[4px] !border !border-[color:var(--border-subtle)] !px-2 !py-1 !text-xs"
+          />
+          <button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={isSaving}
+            className="rounded-[4px] p-1 text-[color:var(--accent-success)] transition hover:bg-[color:var(--surface-hover)] disabled:opacity-50"
+            aria-label="Save"
+          >
+            {isSaving ? (
+              <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" /></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="rounded-[4px] p-1 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
+            aria-label="Cancel"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group flex flex-col gap-1">
+      <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">Company</label>
+      <div className="flex items-center gap-1">
+        {company ? (
+          <Link
+            href={`/projects/${projectId}/customers/companies/${company.id}`}
+            className="flex-1 text-[color:var(--accent-primary)] hover:underline"
+          >
+            {company.name}
+          </Link>
+        ) : (
+          <p className="flex-1 text-[color:var(--foreground)]">-</p>
+        )}
+        <button
+          type="button"
+          onClick={handleStartEdit}
+          className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+          aria-label="Edit Company"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
         </button>

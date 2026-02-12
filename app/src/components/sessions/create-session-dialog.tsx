@@ -30,6 +30,7 @@ export function CreateSessionDialog({
 }: CreateSessionDialogProps) {
   const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? '')
   const [userId, setUserId] = useState('')
+  const [email, setEmail] = useState('')
   const [pageUrl, setPageUrl] = useState('')
   const [pageTitle, setPageTitle] = useState('')
   const [selectedTags, setSelectedTags] = useState<SessionTag[]>([])
@@ -140,6 +141,7 @@ export function CreateSessionDialog({
         const input: CreateSessionInput = {
           project_id: projectId,
           user_id: userId || undefined,
+          user_metadata: email ? { email: email.trim() } : undefined,
           page_url: pageUrl || undefined,
           page_title: pageTitle || undefined,
           tags: selectedTags.length > 0 ? selectedTags : undefined,
@@ -151,6 +153,7 @@ export function CreateSessionDialog({
           // Reset form and close
           setProjectId(projects[0]?.id ?? '')
           setUserId('')
+          setEmail('')
           setPageUrl('')
           setPageTitle('')
           setSelectedTags([])
@@ -169,6 +172,7 @@ export function CreateSessionDialog({
     [
       projectId,
       userId,
+      email,
       pageUrl,
       pageTitle,
       selectedTags,
@@ -213,6 +217,18 @@ export function CreateSessionDialog({
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
             placeholder="Optional user identifier"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-[color:var(--text-secondary)]">
+            Email
+          </label>
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="customer@example.com"
           />
         </div>
 
