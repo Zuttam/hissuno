@@ -12,6 +12,7 @@ export const workflowInputSchema = z.object({
   issueId: z.string(),
   projectId: z.string(),
   runId: z.string(),
+  analysisGuidelines: z.string().optional(),
 })
 
 export type WorkflowInput = z.infer<typeof workflowInputSchema>

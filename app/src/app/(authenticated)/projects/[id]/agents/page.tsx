@@ -24,7 +24,7 @@ interface AgentSettings {
   pmAgent: {
     classificationGuidelines: string
     specGuidelines: string
-    autoSpecThreshold: number
+    analysisGuidelines: string
   }
 }
 
@@ -37,7 +37,7 @@ const DEFAULT_SETTINGS: AgentSettings = {
   pmAgent: {
     classificationGuidelines: '',
     specGuidelines: '',
-    autoSpecThreshold: 3,
+    analysisGuidelines: '',
   },
 }
 
@@ -64,9 +64,10 @@ export default function AgentsPage() {
     if (!projectId) return
 
     try {
-      const [settingsRes, supportAgentRes] = await Promise.all([
+      const [settingsRes, supportAgentRes, pmAgentRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/settings`),
         fetch(`/api/projects/${projectId}/settings/support-agent`),
+        fetch(`/api/projects/${projectId}/settings/pm-agent`),
       ])
 
       if (settingsRes.ok) {
@@ -78,11 +79,6 @@ export default function AgentsPage() {
               ...prev.supportAgent,
               toneOfVoice: data.settings.support_agent_tone ?? 'professional',
               brandGuidelines: data.settings.brand_guidelines ?? '',
-            },
-            pmAgent: {
-              classificationGuidelines: data.settings.classification_guidelines ?? '',
-              specGuidelines: data.settings.spec_guidelines ?? '',
-              autoSpecThreshold: data.settings.auto_spec_threshold ?? 3,
             },
           }))
         }
@@ -96,6 +92,20 @@ export default function AgentsPage() {
             supportAgent: {
               ...prev.supportAgent,
               packageId: data.settings.support_agent_package_id ?? null,
+            },
+          }))
+        }
+      }
+
+      if (pmAgentRes.ok) {
+        const data = await pmAgentRes.json()
+        if (data.settings) {
+          setSettings((prev) => ({
+            ...prev,
+            pmAgent: {
+              classificationGuidelines: data.settings.classification_guidelines ?? '',
+              specGuidelines: data.settings.spec_guidelines ?? '',
+              analysisGuidelines: data.settings.analysis_guidelines ?? '',
             },
           }))
         }

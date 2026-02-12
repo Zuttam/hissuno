@@ -120,13 +120,13 @@
 [x] Introduce new screen to manage contact and company data. 
 
 ### Issues
-[] Issue review process:
+[x] Issue review process:
   - issue velocity - times mentioned in given sliding window
   - issue impact - analysis based on customer and product area (+ guidelines)
   - issue effort - grounded with codebase 
-[] Add in PM Specialist the option for review guidelines (address specific fields) 
+[x] Add in PM Specialist the option for review guidelines (address specific fields) 
 [x] Keep Spec genration manual  
-
+[x] show customer data as part of the review 
 
 
 
@@ -145,7 +145,6 @@
 [] Add an option in each channel integration to automatically add customers from session information
 
 ### Issues 
-[] show customer data as part of the review 
 [] Add product area to the issue analysis - Classify on product area
 [] Draft email response to users
 

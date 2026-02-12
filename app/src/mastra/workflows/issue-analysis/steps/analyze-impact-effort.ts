@@ -52,7 +52,7 @@ export const analyzeImpactEffort = createStep({
       throw new Error('Input data not found')
     }
 
-    const { issue, localCodePath, knowledgeContext } = inputData
+    const { issue, localCodePath, knowledgeContext, analysisGuidelines } = inputData
     logger?.info('[analyze-impact-effort] Starting', { issueId: issue.id, hasCodebase: !!localCodePath })
     await writer?.write({ type: 'progress', message: 'Analyzing technical impact...' })
 
@@ -76,7 +76,7 @@ ${knowledgeContext || 'No knowledge available.'}
 ## Codebase Context
 ${localCodePath ? `Local path: ${localCodePath}` : 'No codebase available - use your general knowledge to estimate.'}
 
-Analyze the issue and return your assessment as JSON with this structure:
+${analysisGuidelines ? `## Analysis Guidelines\n\n${analysisGuidelines}\n\n` : ''}Analyze the issue and return your assessment as JSON with this structure:
 {
   "impactAnalysis": {
     "affectedAreas": [{ "area": "...", "category": "...", "relevance": 0.0-1.0 }],

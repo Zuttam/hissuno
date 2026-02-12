@@ -40,6 +40,7 @@ export type SessionTagType = z.infer<typeof sessionTagSchema>
 export const workflowInputSchema = z.object({
   sessionId: z.string(),
   projectId: z.string(),
+  classificationGuidelines: z.string().optional(),
 })
 
 export type WorkflowInput = z.infer<typeof workflowInputSchema>

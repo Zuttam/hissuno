@@ -199,6 +199,7 @@ export function IssueSidebar({
   }, [updateIssue, onIssueUpdated])
 
   const hasSpec = Boolean(issue?.product_spec)
+  const hasAnalysis = Boolean(issue?.analysis_computed_at)
 
   return (
     <>
@@ -390,14 +391,25 @@ export function IssueSidebar({
                 type="button"
                 onClick={() => void handleRunAnalysis()}
                 disabled={isAnalyzing}
-                className="inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                className={`inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs transition hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 ${
+                  hasAnalysis
+                    ? 'text-[color:var(--accent-success)]'
+                    : 'text-[color:var(--text-secondary)]'
+                }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="20" x2="18" y2="10" />
-                  <line x1="12" y1="20" x2="12" y2="4" />
-                  <line x1="6" y1="20" x2="6" y2="14" />
-                </svg>
-                <span>{isAnalyzing ? 'Analyzing...' : 'Analyze'}</span>
+                {hasAnalysis ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                  </svg>
+                )}
+                <span>{isAnalyzing ? 'Analyzing...' : hasAnalysis ? 'Re-analyze' : 'Analyze'}</span>
               </button>
 
               {/* Generate Spec (direct action) */}
@@ -458,38 +470,44 @@ export function IssueSidebar({
               <CollapsibleSection title="Analysis" variant="flat" defaultExpanded>
                 <div className="flex flex-col gap-4">
                   {/* Analysis Scores */}
-                  {(issue.velocity_score != null || issue.impact_score != null || issue.effort_score != null) && (
-                    <div className="flex flex-col gap-2">
-                      <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                        Scores
-                      </span>
-                      <div className="grid grid-cols-3 gap-3 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
-                        <div className="text-center">
-                          <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.velocity_reasoning ?? undefined}>
-                            {issue.velocity_score != null ? `${issue.velocity_score}/5` : '-'}
-                          </p>
-                          <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Velocity</p>
+                  <div className="flex flex-col gap-2">
+                    <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      Scores
+                    </span>
+                    {issue.velocity_score != null || issue.impact_score != null || issue.effort_score != null ? (
+                      <>
+                        <div className="grid grid-cols-3 gap-3 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
+                          <div className="text-center">
+                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.velocity_reasoning ?? undefined}>
+                              {issue.velocity_score != null ? `${issue.velocity_score}/5` : '-'}
+                            </p>
+                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Velocity</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.impact_analysis?.reasoning ?? undefined}>
+                              {issue.impact_score != null ? `${issue.impact_score}/5` : '-'}
+                            </p>
+                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Impact</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.effort_reasoning ?? undefined}>
+                              {issue.effort_score != null ? `${issue.effort_score}/5` : '-'}
+                            </p>
+                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Effort</p>
+                          </div>
                         </div>
-                        <div className="text-center">
-                          <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.impact_analysis?.reasoning ?? undefined}>
-                            {issue.impact_score != null ? `${issue.impact_score}/5` : '-'}
+                        {issue.analysis_computed_at && (
+                          <p className="text-xs text-[color:var(--text-tertiary)]">
+                            Last analyzed {formatRelativeDate(issue.analysis_computed_at)}
                           </p>
-                          <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Impact</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.effort_reasoning ?? undefined}>
-                            {issue.effort_score != null ? `${issue.effort_score}/5` : '-'}
-                          </p>
-                          <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Effort</p>
-                        </div>
-                      </div>
-                      {issue.analysis_computed_at && (
-                        <p className="text-xs text-[color:var(--text-tertiary)]">
-                          Last analyzed {formatRelativeDate(issue.analysis_computed_at)}
-                        </p>
-                      )}
-                    </div>
-                  )}
+                        )}
+                      </>
+                    ) : (
+                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                        Not yet analyzed. Click &ldquo;Analyze&rdquo; above to calculate scores.
+                      </p>
+                    )}
+                  </div>
 
                   {/* Analysis Progress */}
                   {isAnalyzing && (
@@ -563,11 +581,9 @@ export function IssueSidebar({
                         issueTitle={issue.title}
                       />
                     ) : !isGeneratingSpec ? (
-                      <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-6 text-center">
-                        <p className="text-sm text-[color:var(--text-secondary)]">
-                          No product specification yet. Click &ldquo;Generate Spec&rdquo; above to create one.
-                        </p>
-                      </div>
+                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                        No specification yet. Click &ldquo;Generate Spec&rdquo; above to generate one.
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -769,7 +785,7 @@ function CustomerImpactInline({ sessions, projectId }: { sessions: IssueWithSess
   return (
     <div className="flex flex-col gap-1">
       <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-        Customer Impact {impact.contactCount > 0 ? `(${summaryParts.join(' / ')})` : ''}
+        Related Customers {impact.contactCount > 0 ? `(${summaryParts.join(' / ')})` : ''}
       </span>
       {impact.companies.length > 0 ? (
         <div className="flex flex-col gap-1 mt-1">

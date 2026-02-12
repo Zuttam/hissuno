@@ -100,8 +100,31 @@ export const DEFAULT_ISSUE_SETTINGS: IssueSettings = {
 }
 
 /**
+ * PM agent settings subset of ProjectSettingsRecord
+ */
+export interface PmAgentSettings {
+  classification_guidelines: string | null
+  spec_guidelines: string | null
+  analysis_guidelines: string | null
+}
+
+/**
+ * Input for updating PM agent settings
+ */
+export type PmAgentSettingsInput = Partial<PmAgentSettings>
+
+/**
  * Default support agent settings
  */
 export const DEFAULT_SUPPORT_AGENT_SETTINGS: SupportAgentSettings = {
   support_agent_package_id: null,
+}
+
+/**
+ * Default PM agent settings
+ */
+export const DEFAULT_PM_AGENT_SETTINGS: PmAgentSettings = {
+  classification_guidelines: null,
+  spec_guidelines: null,
+  analysis_guidelines: null,
 }
