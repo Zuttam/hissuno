@@ -31,7 +31,7 @@ everyone's arguing about which model writes the best code. the bigger unlock is 
 
 **Time:** Afternoon
 **Pillar:** AI + Engineering
-**Status:** PENDING
+**Status:** POSTED
 
 ---
 

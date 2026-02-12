@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 const LOG_PREFIX = '[cron.session-lifecycle]'
 
-const REVIEW_BATCH_LIMIT = 100
+const REVIEW_BATCH_LIMIT = 10
 const STALE_REVIEW_MINUTES = 15
 
 // =========================================
@@ -366,7 +366,7 @@ export async function triggerPendingReviews(supabase: AdminClient): Promise<Phas
 
   console.log(`${LOG_PREFIX} Found ${unreviewedSessions.length} unreviewed closed sessions`)
 
-  // Pre-fetch project → user mappings to track rate-limited users across the batch
+  // Pre-fetch project → user mappings to check limits per-user (not per-session)
   const projectIds = [...new Set(unreviewedSessions.map((s) => s.project_id))]
   const { data: projects } = await supabase
     .from('projects')
@@ -374,31 +374,65 @@ export async function triggerPendingReviews(supabase: AdminClient): Promise<Phas
     .in('id', projectIds)
 
   const projectUserMap = new Map((projects ?? []).map((p) => [p.id, p.user_id]))
-  const limitReachedUserIds = new Set<string>()
+
+  // Pre-check enforcement for all unique users in parallel (one call per user)
+  const uniqueUserIds = [...new Set(
+    unreviewedSessions
+      .map((s) => projectUserMap.get(s.project_id))
+      .filter((id): id is string => !!id)
+  )]
+
+  const enforcementResults = await Promise.all(
+    uniqueUserIds.map(async (userId) => {
+      const check = await checkEnforcement({ userId, dimension: 'analyzed_sessions', supabaseClient: supabase })
+      console.log(`${LOG_PREFIX} Enforcement check for user ${userId}: allowed=${check.allowed}, current=${check.current}, limit=${check.limit}`)
+      return { userId, allowed: check.allowed }
+    })
+  )
+
+  const limitReachedUserIds = new Set(
+    enforcementResults.filter((r) => !r.allowed).map((r) => r.userId)
+  )
+
+  // Separate sessions: limited users vs eligible for review
+  const limitedSessions: SessionToReview[] = []
+  const eligibleSessions: SessionToReview[] = []
 
   for (const session of unreviewedSessions) {
-    try {
-      // Skip sessions for users already known to be rate-limited in this batch
-      const userId = projectUserMap.get(session.project_id)
-      if (userId && limitReachedUserIds.has(userId)) {
-        console.log(`${LOG_PREFIX} Session ${session.id} skipped - user ${userId} already at limit in this batch`)
-        await markSessionLimitSkipped(supabase, session)
-        continue
-      }
+    const userId = projectUserMap.get(session.project_id)
+    if (userId && limitReachedUserIds.has(userId)) {
+      limitedSessions.push(session)
+    } else {
+      eligibleSessions.push(session)
+    }
+  }
 
-      const reviewResult = await executeSessionReview(supabase, session)
-      if (reviewResult.triggered) {
-        console.log(`${LOG_PREFIX} Session ${session.id} review triggered successfully`)
-        result.count++
-      } else if (reviewResult.limitReachedUserId) {
-        console.log(`${LOG_PREFIX} Session ${session.id} skipped - user ${reviewResult.limitReachedUserId} hit limit (enforcement check)`)
-        limitReachedUserIds.add(reviewResult.limitReachedUserId)
-      } else if (reviewResult.error && reviewResult.error !== 'limit_reached') {
-        result.errors.push(`Review failed for session ${session.id}: ${reviewResult.error}`)
+  // Mark limited sessions as skipped in parallel
+  if (limitedSessions.length > 0) {
+    console.log(`${LOG_PREFIX} Marking ${limitedSessions.length} sessions as limit-skipped`)
+    await Promise.all(limitedSessions.map((s) => markSessionLimitSkipped(supabase, s)))
+  }
+
+  // Run eligible session reviews in parallel
+  if (eligibleSessions.length > 0) {
+    console.log(`${LOG_PREFIX} Running ${eligibleSessions.length} session reviews in parallel`)
+    const reviewResults = await Promise.allSettled(
+      eligibleSessions.map((session) => executeSessionReview(supabase, session))
+    )
+
+    for (let i = 0; i < reviewResults.length; i++) {
+      const res = reviewResults[i]
+      const session = eligibleSessions[i]
+      if (res.status === 'fulfilled') {
+        if (res.value.triggered) {
+          result.count++
+        } else if (res.value.error && res.value.error !== 'limit_reached') {
+          result.errors.push(`Review failed for session ${session.id}: ${res.value.error}`)
+        }
+      } else {
+        console.error(`${LOG_PREFIX} Error reviewing session ${session.id}:`, res.reason)
+        result.errors.push(`Failed to review session ${session.id}`)
       }
-    } catch (err) {
-      console.error(`${LOG_PREFIX} Error reviewing session ${session.id}:`, err)
-      result.errors.push(`Failed to review session ${session.id}`)
     }
   }
 
