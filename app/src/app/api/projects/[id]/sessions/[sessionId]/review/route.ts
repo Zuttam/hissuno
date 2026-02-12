@@ -35,7 +35,7 @@ export interface SessionReviewStatusResponse {
   isRunning: boolean
   reviewId: string | null
   runId: string | null
-  status: 'running' | 'completed' | 'failed' | null
+  status: 'running' | 'completed' | 'failed' | 'skipped' | null
   startedAt: string | null
   completedAt: string | null
   result: SessionReviewResult | null

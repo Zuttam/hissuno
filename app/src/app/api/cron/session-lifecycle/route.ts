@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 
 const LOG_PREFIX = '[cron.session-lifecycle]'
 
-const REVIEW_BATCH_LIMIT = 10
+const REVIEW_BATCH_LIMIT = 100
 const STALE_REVIEW_MINUTES = 15
 
 // =========================================
@@ -174,7 +174,7 @@ export async function sendIdlePrompts(supabase: AdminClient, now: Date): Promise
 export async function executeSessionReview(
   supabase: AdminClient,
   session: SessionToReview
-): Promise<{ triggered: boolean; error?: string }> {
+): Promise<{ triggered: boolean; error?: string; limitReachedUserId?: string }> {
   // Ensure session has a name before PM review
   await ensureSessionName({
     sessionId: session.id,
@@ -192,11 +192,15 @@ export async function executeSessionReview(
     const limitResult = await checkEnforcement({
       userId: project.user_id,
       dimension: 'analyzed_sessions',
+      supabaseClient: supabase,
     })
+
+    console.log(`${LOG_PREFIX} Enforcement check for user ${project.user_id}: allowed=${limitResult.allowed}, current=${limitResult.current}, limit=${limitResult.limit}, remaining=${limitResult.remaining}`)
 
     if (!limitResult.allowed) {
       console.log(`${LOG_PREFIX} Skipping PM review for session ${session.id} - analyzed sessions limit reached`)
-      return { triggered: false, error: 'limit_reached' }
+      await markSessionLimitSkipped(supabase, session)
+      return { triggered: false, error: 'limit_reached', limitReachedUserId: project.user_id }
     }
   }
 
@@ -238,7 +242,7 @@ export async function executeSessionReview(
     await supabase
       .from('session_reviews')
       .update({
-        status: 'completed',
+        status: 'skipped',
         completed_at: new Date().toISOString(),
         result: { action: 'skipped', skipReason: 'Workflow not configured' },
       })
@@ -299,6 +303,22 @@ export async function executeSessionReview(
 }
 
 /**
+ * Insert a completed session_reviews record for a session skipped due to billing limit.
+ * This removes the session from the "unreviewed" queue so it won't be re-fetched.
+ */
+async function markSessionLimitSkipped(supabase: AdminClient, session: SessionToReview): Promise<void> {
+  await supabase.from('session_reviews').insert({
+    session_id: session.id,
+    project_id: session.project_id,
+    run_id: `pm-review-${session.id}-limit-skip-${Date.now()}`,
+    status: 'skipped',
+    completed_at: new Date().toISOString(),
+    result: { action: 'skipped', skipReason: 'Billing limit reached for analyzed sessions' },
+    metadata: { triggeredBy: 'session-lifecycle-cron', skippedReason: 'limit_reached' },
+  })
+}
+
+/**
  * Find all closed sessions that need review and trigger reviews for them.
  * Cleans up stale running records first, then processes up to REVIEW_BATCH_LIMIT sessions.
  */
@@ -322,46 +342,57 @@ export async function triggerPendingReviews(supabase: AdminClient): Promise<Phas
     console.log(`${LOG_PREFIX} Cleaned up ${staleRecords.length} stale review records`)
   }
 
-  // Query closed sessions (limit batch size to avoid timeouts)
-  const { data: closedSessions, error: fetchError } = await supabase
+  // Single query: closed sessions with no terminal review record (LEFT JOIN anti-pattern).
+  // The .in() scopes which reviews to join, and .is() keeps only sessions where no match exists.
+  // Sessions with only 'failed' reviews are included (eligible for retry).
+  const { data: unreviewedSessions, error: fetchError } = await supabase
     .from('sessions')
-    .select('id, project_id')
+    .select('id, project_id, session_reviews!left(id)')
     .eq('status', 'closed')
+    .in('session_reviews.status', ['completed', 'running', 'skipped'])
+    .is('session_reviews', null)
     .order('updated_at', { ascending: true })
     .limit(REVIEW_BATCH_LIMIT)
 
   if (fetchError) {
-    console.error(`${LOG_PREFIX} Error fetching closed sessions:`, fetchError)
-    result.errors.push('Failed to fetch closed sessions for review')
+    console.error(`${LOG_PREFIX} Error fetching unreviewed sessions:`, fetchError)
+    result.errors.push('Failed to fetch unreviewed sessions for review')
     return result
   }
 
-  if (!closedSessions || closedSessions.length === 0) {
-    return result
-  }
-
-  // Get existing review session IDs (completed or running) to filter out already-reviewed
-  const sessionIds = closedSessions.map((s) => s.id)
-  const { data: existingReviews } = await supabase
-    .from('session_reviews')
-    .select('session_id')
-    .in('session_id', sessionIds)
-    .in('status', ['completed', 'running'])
-
-  const reviewedSessionIds = new Set((existingReviews ?? []).map((r) => r.session_id))
-  const unreviewedSessions = closedSessions.filter((s) => !reviewedSessionIds.has(s.id))
-
-  if (unreviewedSessions.length === 0) {
+  if (!unreviewedSessions || unreviewedSessions.length === 0) {
     return result
   }
 
   console.log(`${LOG_PREFIX} Found ${unreviewedSessions.length} unreviewed closed sessions`)
 
+  // Pre-fetch project → user mappings to track rate-limited users across the batch
+  const projectIds = [...new Set(unreviewedSessions.map((s) => s.project_id))]
+  const { data: projects } = await supabase
+    .from('projects')
+    .select('id, user_id')
+    .in('id', projectIds)
+
+  const projectUserMap = new Map((projects ?? []).map((p) => [p.id, p.user_id]))
+  const limitReachedUserIds = new Set<string>()
+
   for (const session of unreviewedSessions) {
     try {
+      // Skip sessions for users already known to be rate-limited in this batch
+      const userId = projectUserMap.get(session.project_id)
+      if (userId && limitReachedUserIds.has(userId)) {
+        console.log(`${LOG_PREFIX} Session ${session.id} skipped - user ${userId} already at limit in this batch`)
+        await markSessionLimitSkipped(supabase, session)
+        continue
+      }
+
       const reviewResult = await executeSessionReview(supabase, session)
       if (reviewResult.triggered) {
+        console.log(`${LOG_PREFIX} Session ${session.id} review triggered successfully`)
         result.count++
+      } else if (reviewResult.limitReachedUserId) {
+        console.log(`${LOG_PREFIX} Session ${session.id} skipped - user ${reviewResult.limitReachedUserId} hit limit (enforcement check)`)
+        limitReachedUserIds.add(reviewResult.limitReachedUserId)
       } else if (reviewResult.error && reviewResult.error !== 'limit_reached') {
         result.errors.push(`Review failed for session ${session.id}: ${reviewResult.error}`)
       }

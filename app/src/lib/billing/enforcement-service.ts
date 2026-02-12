@@ -109,10 +109,12 @@ function getUsageForDimension(usage: UsageMetrics, dimension: LimitDimension): n
 export async function checkEnforcement(
   options: EnforcementCheckOptions
 ): Promise<EnforcementResult> {
-  const { userId, dimension, increment = 1 } = options
+  const { userId, dimension, increment = 1, supabaseClient } = options
 
-  const billingInfo = await getBillingInfo(userId)
-  const { subscription, usage } = billingInfo
+  const { subscription, usage } = await getBillingInfo(
+    userId,
+    supabaseClient as Parameters<typeof getBillingInfo>[1]
+  )
 
   const limit = getLimitForDimension(subscription, dimension)
   const current = getUsageForDimension(usage, dimension)

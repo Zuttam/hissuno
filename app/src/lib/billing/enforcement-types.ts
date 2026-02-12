@@ -50,6 +50,10 @@ export interface EnforcementCheckOptions {
   dimension: LimitDimension
   /** How many units to add (default 1) */
   increment?: number
+  /** Optional pre-built Supabase client (e.g., admin client for cron contexts without user session).
+   *  When omitted, a cookie-based client is created via createClient() (requires user session).
+   *  Typed as `unknown` — the billing service casts it internally. */
+  supabaseClient?: unknown
 }
 
 /**

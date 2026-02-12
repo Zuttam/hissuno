@@ -53,7 +53,7 @@ interface MockSessionReview {
   session_id: string
   project_id: string
   run_id: string
-  status: 'running' | 'completed' | 'failed'
+  status: 'running' | 'completed' | 'failed' | 'skipped'
   created_at: string
 }
 
@@ -547,7 +547,7 @@ describe('PM Review Trigger (Decoupled)', () => {
     })
 
     it('should retry review for session with failed review', () => {
-      // Failed reviews are NOT in the exclusion set (only 'completed' and 'running')
+      // Failed reviews are NOT in the exclusion set (only 'completed', 'running', and 'skipped')
       const closedSessions = [
         createMockSession({ id: 'session-1', status: 'closed' }),
       ]
@@ -556,12 +556,31 @@ describe('PM Review Trigger (Decoupled)', () => {
         createMockReview({ session_id: 'session-1', status: 'failed' }),
       ]
 
-      // Only completed/running reviews block re-triggering
-      const blockingReviews = existingReviews.filter((r) => r.status === 'completed' || r.status === 'running')
+      // Only completed/running/skipped reviews block re-triggering
+      const blockingStatuses: MockSessionReview['status'][] = ['completed', 'running', 'skipped']
+      const blockingReviews = existingReviews.filter((r) => blockingStatuses.includes(r.status))
       const reviewedSessionIds = new Set(blockingReviews.map((r) => r.session_id))
       const unreviewedSessions = closedSessions.filter((s) => !reviewedSessionIds.has(s.id))
 
       expect(unreviewedSessions).toHaveLength(1)
+    })
+
+    it('should not re-trigger review for session with skipped review', () => {
+      // Skipped reviews (billing limit, workflow not configured) are terminal — excluded from cron
+      const closedSessions = [
+        createMockSession({ id: 'session-1', status: 'closed' }),
+      ]
+
+      const existingReviews = [
+        createMockReview({ session_id: 'session-1', status: 'skipped' }),
+      ]
+
+      const blockingStatuses: MockSessionReview['status'][] = ['completed', 'running', 'skipped']
+      const blockingReviews = existingReviews.filter((r) => blockingStatuses.includes(r.status))
+      const reviewedSessionIds = new Set(blockingReviews.map((r) => r.session_id))
+      const unreviewedSessions = closedSessions.filter((s) => !reviewedSessionIds.has(s.id))
+
+      expect(unreviewedSessions).toHaveLength(0)
     })
   })
 

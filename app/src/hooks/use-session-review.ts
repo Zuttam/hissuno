@@ -98,7 +98,7 @@ export interface SessionReviewStatusResponse {
   isRunning: boolean
   reviewId: string | null
   runId: string | null
-  status: 'running' | 'completed' | 'failed' | null
+  status: 'running' | 'completed' | 'failed' | 'skipped' | null
   startedAt: string | null
   completedAt: string | null
   result: SessionReviewResult | null
@@ -298,6 +298,9 @@ export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptio
         setIsReviewing(true)
         // Connect to stream if running
         connectToStream()
+      } else if (data.status === 'skipped') {
+        // Session was skipped (billing limit, workflow not configured) — treat as not-yet-reviewed
+        setIsReviewing(false)
       } else if (data.result) {
         setResult(data.result)
         setTags(data.result.tags || [])

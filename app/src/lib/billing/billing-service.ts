@@ -8,11 +8,14 @@ import { configureLemonSqueezy } from './lemon-squeezy'
 import { getPlanById } from './plans-cache'
 import type { BillingInfo, Subscription, UsageMetrics, Plan, PlanLimits } from '@/types/billing'
 
+type BillingSupabaseClient = Awaited<ReturnType<typeof createClient>>
+
 /**
  * Get complete billing info for a user
+ * @param supabaseClient Optional pre-built Supabase client (for server contexts without user session)
  */
-export async function getBillingInfo(userId: string): Promise<BillingInfo> {
-  const supabase = await createClient()
+export async function getBillingInfo(userId: string, supabaseClient?: BillingSupabaseClient): Promise<BillingInfo> {
+  const supabase: BillingSupabaseClient = supabaseClient ?? (await createClient())
 
   // Get user's subscription from database
   const { data: subscriptionData } = await supabase
@@ -46,7 +49,7 @@ export async function getBillingInfo(userId: string): Promise<BillingInfo> {
   }
 
   // Get usage metrics
-  const usage = await getUsageMetrics(userId, subscription)
+  const usage = await getUsageMetrics(userId, subscription, supabase)
 
   // Get customer portal URL if customer exists
   let customerPortalUrl: string | null = null
@@ -67,9 +70,10 @@ export async function getBillingInfo(userId: string): Promise<BillingInfo> {
  */
 export async function getUsageMetrics(
   userId: string,
-  subscription: Subscription | null
+  subscription: Subscription | null,
+  supabaseClient?: BillingSupabaseClient
 ): Promise<UsageMetrics> {
-  const supabase = await createClient()
+  const supabase: BillingSupabaseClient = supabaseClient ?? (await createClient())
 
   // Calculate period start (beginning of current billing period or month)
   const now = new Date()
