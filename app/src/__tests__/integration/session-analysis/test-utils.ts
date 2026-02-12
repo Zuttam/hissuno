@@ -151,6 +151,11 @@ export function createMockIssue(
     effort_estimate: null,
     effort_reasoning: null,
     affected_files: [],
+    // Analysis metrics
+    velocity_score: null,
+    velocity_reasoning: null,
+    effort_score: null,
+    analysis_computed_at: null,
   }
 }
 

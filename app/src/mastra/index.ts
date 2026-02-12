@@ -5,6 +5,7 @@ import { PostgresStore } from '@mastra/pg';
 import { knowledgeAnalysisWorkflow } from './workflows/knowledge-analysis';
 import { sessionReviewWorkflow } from './workflows/session-review';
 import { specGenerationWorkflow } from './workflows/spec-generation';
+import { issueAnalysisWorkflow } from './workflows/issue-analysis';
 import { supportAgent } from './agents/support-agent';
 import { codebaseAnalyzerAgent } from './agents/codebase-analyzer-agent';
 import { webScraperAgent } from './agents/web-scraper-agent';
@@ -35,7 +36,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const mastra = new Mastra({
-  workflows: { knowledgeAnalysisWorkflow, sessionReviewWorkflow, specGenerationWorkflow },
+  workflows: { knowledgeAnalysisWorkflow, sessionReviewWorkflow, specGenerationWorkflow, issueAnalysisWorkflow },
   agents: {
     supportAgent,
     codebaseAnalyzerAgent,

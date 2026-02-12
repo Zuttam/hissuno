@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react'
 import { Input, Select, CollapsibleSection, Button, FilterChip, FilterLabel } from '@/components/ui'
-import type { IssueFilters, IssueType, IssuePriority, IssueStatus } from '@/types/issue'
+import type { IssueFilters, IssueType, IssuePriority, IssueStatus, MetricLevel } from '@/types/issue'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 
 interface IssuesFiltersProps {
@@ -34,6 +34,12 @@ const TYPE_OPTIONS: { value: IssueType; label: string }[] = [
 ]
 
 const PRIORITY_OPTIONS: { value: IssuePriority; label: string }[] = [
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+]
+
+const METRIC_LEVEL_OPTIONS: { value: MetricLevel; label: string }[] = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' },
@@ -78,6 +84,39 @@ export function IssuesFilters({
     [filters, onFilterChange]
   )
 
+  // Velocity handler
+  const handleVelocityToggle = useCallback(
+    (level: MetricLevel) => {
+      onFilterChange({
+        ...filters,
+        velocityLevel: filters.velocityLevel === level ? undefined : level,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Impact handler
+  const handleImpactToggle = useCallback(
+    (level: MetricLevel) => {
+      onFilterChange({
+        ...filters,
+        impactLevel: filters.impactLevel === level ? undefined : level,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Effort handler
+  const handleEffortToggle = useCallback(
+    (level: MetricLevel) => {
+      onFilterChange({
+        ...filters,
+        effortLevel: filters.effortLevel === level ? undefined : level,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
   // Archived handler
   const handleArchivedToggle = useCallback(() => {
     onFilterChange({ ...filters, showArchived: !filters.showArchived || undefined })
@@ -110,6 +149,9 @@ export function IssuesFilters({
     if (filters.status) count++
     if (filters.search) count++
     if (filters.showArchived) count++
+    if (filters.velocityLevel) count++
+    if (filters.impactLevel) count++
+    if (filters.effortLevel) count++
     return count
   }, [filters])
 
@@ -189,7 +231,40 @@ export function IssuesFilters({
         />
       </div>
 
-      {/* Row 3: Project + Search */}
+      {/* Row 3: Velocity + Impact + Effort */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FilterLabel>Velocity:</FilterLabel>
+        {METRIC_LEVEL_OPTIONS.map((opt) => (
+          <FilterChip
+            key={`vel-${opt.value}`}
+            label={opt.label}
+            active={filters.velocityLevel === opt.value}
+            onClick={() => handleVelocityToggle(opt.value)}
+          />
+        ))}
+        <span className="ml-2" />
+        <FilterLabel>Impact:</FilterLabel>
+        {METRIC_LEVEL_OPTIONS.map((opt) => (
+          <FilterChip
+            key={`imp-${opt.value}`}
+            label={opt.label}
+            active={filters.impactLevel === opt.value}
+            onClick={() => handleImpactToggle(opt.value)}
+          />
+        ))}
+        <span className="ml-2" />
+        <FilterLabel>Effort:</FilterLabel>
+        {METRIC_LEVEL_OPTIONS.map((opt) => (
+          <FilterChip
+            key={`eff-${opt.value}`}
+            label={opt.label}
+            active={filters.effortLevel === opt.value}
+            onClick={() => handleEffortToggle(opt.value)}
+          />
+        ))}
+      </div>
+
+      {/* Row 4: Project + Search */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {!hideProjectFilter && (
           <div className="flex items-center gap-1">

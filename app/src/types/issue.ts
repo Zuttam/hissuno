@@ -60,6 +60,11 @@ export interface IssueRecord {
   effort_estimate: EffortEstimate | null
   effort_reasoning: string | null
   affected_files: string[]
+  // Analysis metrics
+  velocity_score: number | null
+  velocity_reasoning: string | null
+  effort_score: number | null
+  analysis_computed_at: string | null
   // Timestamps
   created_at: string
   updated_at: string
@@ -76,7 +81,7 @@ export interface IssueWithProject extends IssueRecord {
 }
 
 /**
- * Issue with linked sessions (includes contact/company data for customer impact)
+ * Issue with linked feedback (includes contact/company data for customer impact)
  */
 export interface IssueWithSessions extends IssueWithProject {
   sessions: {
@@ -201,6 +206,11 @@ export interface UpdateIssueInput {
 }
 
 /**
+ * Metric level for filtering (maps to score ranges: high=4-5, medium=2-3, low=1)
+ */
+export type MetricLevel = 'high' | 'medium' | 'low'
+
+/**
  * Filters for listing issues
  */
 export interface IssueFilters {
@@ -210,6 +220,9 @@ export interface IssueFilters {
   status?: IssueStatus
   search?: string
   showArchived?: boolean
+  velocityLevel?: MetricLevel
+  impactLevel?: MetricLevel
+  effortLevel?: MetricLevel
   limit?: number
   offset?: number
 }
@@ -319,4 +332,33 @@ export interface PMReviewSSEEvent {
   data?: Record<string, unknown>
   result?: PMReviewResult
   timestamp: string
+}
+
+/**
+ * Result of issue analysis workflow
+ */
+export interface IssueAnalysisResult {
+  velocityScore: number | null
+  velocityReasoning: string | null
+  impactScore: number | null
+  impactReasoning: string | null
+  effortScore: number | null
+  effortReasoning: string | null
+  priority: IssuePriority | null
+  analysisComputedAt: string
+}
+
+/**
+ * Issue analysis run record from database
+ */
+export interface IssueAnalysisRunRecord {
+  id: string
+  issue_id: string
+  project_id: string
+  run_id: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  started_at: string
+  completed_at: string | null
+  error_message: string | null
+  metadata: Record<string, unknown> | null
 }

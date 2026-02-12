@@ -22,7 +22,7 @@ export const preparePMContext = createStep({
       throw new Error('Input data not found')
     }
 
-    const { sessionId, projectId, tags, tagsApplied, reasoning, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
+    const { sessionId, projectId, tags, tagsApplied, reasoning } = inputData
     logger?.info('[prepare-pm-context] Starting', { sessionId, projectId })
     await writer?.write({ type: 'progress', message: 'Fetching session context...' })
 
@@ -93,10 +93,6 @@ export const preparePMContext = createStep({
         issueTrackingEnabled: settings?.issue_tracking_enabled ?? true,
         pmDedupIncludeClosed: settings?.pm_dedup_include_closed ?? false,
       },
-      // Pass through codebase lease fields
-      localCodePath,
-      codebaseLeaseId,
-      codebaseCommitSha,
     }
   },
 })

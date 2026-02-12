@@ -144,8 +144,17 @@ async function handleAppMention(params: {
 
   // Get channel with mode info
   let channel = await getSlackChannelWithMode(supabase, teamId, event.channel)
+  console.log('[slack.event-handlers] handleAppMention channel lookup', {
+    channelId: event.channel,
+    found: !!channel,
+    channelMode: channel?.channelMode,
+  })
 
   if (!channel) {
+    console.log('[slack.event-handlers] handleAppMention creating channel on-the-fly', {
+      channelId: event.channel,
+    })
+
     // Get workspace token ID first and create channel record
     const { data: workspaceToken } = await (supabase as any)
       .from('slack_workspace_tokens')
@@ -154,11 +163,22 @@ async function handleAppMention(params: {
       .single()
 
     if (!workspaceToken) {
-      console.error('[slack.event-handlers] No workspace token found')
+      console.error('[slack.event-handlers] handleAppMention no workspace token for team', { teamId })
       return
     }
 
+    console.log('[slack.event-handlers] handleAppMention workspace token found', {
+      tokenId: workspaceToken.id,
+      domain: workspaceToken.workspace_domain,
+    })
+
     const channelInfo = await slackClient.getChannelInfo(event.channel)
+    console.log('[slack.event-handlers] handleAppMention channel info from Slack API', {
+      channelId: event.channel,
+      name: channelInfo?.name,
+      isPrivate: channelInfo?.is_private,
+    })
+
     const newChannel = await getOrCreateSlackChannel(supabase, {
       workspaceTokenId: workspaceToken.id,
       channelId: event.channel,
@@ -168,14 +188,16 @@ async function handleAppMention(params: {
     })
 
     if (!newChannel) {
-      console.error('[slack.event-handlers] Failed to create channel record')
+      console.error('[slack.event-handlers] handleAppMention failed to create channel record')
       return
     }
+
+    console.log('[slack.event-handlers] handleAppMention channel created', { dbId: newChannel.id })
 
     // Re-fetch to get full channel info with mode
     channel = await getSlackChannelWithMode(supabase, teamId, event.channel)
     if (!channel) {
-      console.error('[slack.event-handlers] Failed to get channel after creation')
+      console.error('[slack.event-handlers] handleAppMention failed to get channel after creation')
       return
     }
   }
@@ -237,6 +259,13 @@ async function handleMessage(params: {
     return
   }
 
+  console.log('[slack.event-handlers] handleMessage', {
+    channelId: event.channel,
+    channelType: event.channel_type,
+    threadTs: event.thread_ts,
+    userId: event.user,
+  })
+
   // Check if this is a DM reply to a notification thread
   if (event.channel_type === 'im') {
     const dmSession = await getNotificationThreadSession(
@@ -264,9 +293,53 @@ async function handleMessage(params: {
   }
 
   // Get channel with mode info
-  const channel = await getSlackChannelWithMode(supabase, teamId, event.channel)
+  let channel = await getSlackChannelWithMode(supabase, teamId, event.channel)
+  console.log('[slack.event-handlers] handleMessage channel lookup', {
+    channelId: event.channel,
+    found: !!channel,
+  })
+
   if (!channel) {
-    return // Channel not tracked
+    // Channel not yet tracked - create on the fly (e.g. bot was added via Slack /invite)
+    console.log('[slack.event-handlers] handleMessage creating channel on-the-fly', {
+      channelId: event.channel,
+    })
+
+    const { data: workspaceToken } = await (supabase as any)
+      .from('slack_workspace_tokens')
+      .select('id, workspace_domain')
+      .eq('workspace_id', teamId)
+      .single()
+
+    if (!workspaceToken) {
+      console.warn('[slack.event-handlers] handleMessage no workspace token for team', { teamId })
+      return
+    }
+
+    const channelInfo = await slackClient.getChannelInfo(event.channel)
+    const newChannel = await getOrCreateSlackChannel(supabase, {
+      workspaceTokenId: workspaceToken.id,
+      channelId: event.channel,
+      channelName: channelInfo?.name || null,
+      channelType: channelInfo?.is_private ? 'private_channel' : 'channel',
+      workspacePrimaryDomain: workspaceToken.workspace_domain,
+    })
+
+    if (!newChannel) {
+      console.error('[slack.event-handlers] handleMessage failed to create channel record')
+      return
+    }
+
+    channel = await getSlackChannelWithMode(supabase, teamId, event.channel)
+    if (!channel) {
+      console.error('[slack.event-handlers] handleMessage failed to get channel after creation')
+      return
+    }
+
+    console.log('[slack.event-handlers] handleMessage channel created on-the-fly', {
+      dbId: channel.id,
+      mode: channel.channelMode,
+    })
   }
 
   // Handle based on channel mode
@@ -453,11 +526,17 @@ async function handleBotJoinedChannel(params: {
   const channelInfo = await slackClient.getChannelInfo(channelId)
 
   // Create or update channel record
-  await getOrCreateSlackChannel(supabase, {
+  const result = await getOrCreateSlackChannel(supabase, {
     workspaceTokenId: workspaceToken.id,
     channelId,
     channelName: channelInfo?.name || null,
     channelType: channelInfo?.is_private ? 'private_channel' : 'channel',
     workspacePrimaryDomain: workspaceToken.workspace_domain,
+  })
+
+  console.log('[slack.event-handlers] handleBotJoinedChannel complete', {
+    channelId,
+    channelName: channelInfo?.name,
+    dbId: result?.id,
   })
 }

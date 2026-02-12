@@ -131,7 +131,6 @@
 
 
 ### Platform
-[] Add dimension of analyzed issues 
 [x] Add coming soon of crm integrations (hubspot and salesforce)
 [x] Improve onboarding experience
 [x] Improve welcome email visualization
@@ -154,6 +153,7 @@
 [] Docs portal
 
 ### Platform
+[] Add dimension of analyzed issues 
 [] Project multi-users access and RBAC
 [] Delete project
 

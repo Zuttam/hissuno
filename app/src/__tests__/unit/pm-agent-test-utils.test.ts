@@ -247,6 +247,10 @@ describe('Utility Functions', () => {
         effort_estimate: null,
         effort_reasoning: null,
         affected_files: [],
+        velocity_score: null,
+        velocity_reasoning: null,
+        effort_score: null,
+        analysis_computed_at: null,
       }
 
       store.addIssue(issue)
@@ -276,6 +280,10 @@ describe('Utility Functions', () => {
         effort_estimate: null,
         effort_reasoning: null,
         affected_files: [],
+        velocity_score: null,
+        velocity_reasoning: null,
+        effort_score: null,
+        analysis_computed_at: null,
       }
 
       store.addIssue(issue)
@@ -305,6 +313,10 @@ describe('Utility Functions', () => {
         effort_estimate: null,
         effort_reasoning: null,
         affected_files: [],
+        velocity_score: null,
+        velocity_reasoning: null,
+        effort_score: null,
+        analysis_computed_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

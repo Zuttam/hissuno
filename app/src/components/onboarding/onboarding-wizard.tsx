@@ -393,12 +393,10 @@ export function OnboardingWizard() {
   const submitLabel = 'Get Started'
   const submittingLabel =
     phase === 'profile'
-      ? 'Saving profile...'
-      : phase === 'project'
-        ? 'Creating project...'
-        : phase === 'demo'
-          ? 'Creating demo project...'
-          : 'Redirecting...'
+      ? 'Saving...'
+      : phase === 'project' || phase === 'demo'
+        ? 'Creating...'
+        : 'Redirecting...'
 
   // Show loading skeleton while fetching profile (with overlay backdrop)
   if (isLoadingProfile) {

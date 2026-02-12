@@ -2,9 +2,10 @@
  * Step: Execute Decision
  *
  * Deterministic step that executes the PM decision:
- * - Creates new issue with embedding, impact, and effort data
- * - Upvotes existing issue and checks spec threshold
+ * - Creates new issue with embedding
+ * - Upvotes existing issue
  * - Marks session as reviewed
+ * - Triggers issue analysis workflow (fire-and-forget) on create/upvote
  *
  * Uses the shared issues-service layer for all operations.
  */
@@ -19,16 +20,12 @@ import {
 import {
   preparedPMContextSchema,
   similarIssueSchema,
-  impactAnalysisSchema,
-  effortEstimationSchema,
   pmDecisionSchema,
   executeDecisionOutputSchema,
 } from '../schemas'
 
 const executeDecisionInputSchema = preparedPMContextSchema.extend({
   similarIssues: z.array(similarIssueSchema),
-  impactAnalysis: impactAnalysisSchema.nullable(),
-  effortEstimation: effortEstimationSchema.nullable(),
   decision: pmDecisionSchema,
 })
 
@@ -50,11 +47,6 @@ export const executeDecision = createStep({
       tags,
       tagsApplied,
       decision,
-      impactAnalysis,
-      effortEstimation,
-      localCodePath,
-      codebaseLeaseId,
-      codebaseCommitSha,
     } = inputData
 
     logger?.info('[execute-decision] Starting', { sessionId, action: decision.action })
@@ -75,9 +67,6 @@ export const executeDecision = createStep({
         tagsApplied,
         action: 'skipped' as const,
         skipReason: decision.skipReason,
-        localCodePath,
-        codebaseLeaseId,
-        codebaseCommitSha,
       }
     }
 
@@ -99,6 +88,19 @@ export const executeDecision = createStep({
           newUpvoteCount: result.newUpvoteCount,
         })
 
+        // Trigger issue analysis workflow (fire-and-forget)
+        try {
+          const workflow = mastra?.getWorkflow('issueAnalysisWorkflow')
+          if (workflow && issueId) {
+            const analysisRunId = `analysis-${issueId}-${Date.now()}`
+            const run = await workflow.createRunAsync({ runId: analysisRunId })
+            void run.start({ inputData: { issueId, projectId, runId: analysisRunId } })
+            logger?.info('[execute-decision] Triggered issue analysis', { issueId })
+          }
+        } catch (err) {
+          logger?.warn('[execute-decision] Failed to trigger issue analysis', { error: err instanceof Error ? err.message : 'Unknown' })
+        }
+
         return {
           sessionId,
           projectId,
@@ -107,9 +109,6 @@ export const executeDecision = createStep({
           action: 'upvoted' as const,
           issueId,
           issueTitle: '', // Title not returned from upvote, but not critical
-          localCodePath,
-          codebaseLeaseId,
-          codebaseCommitSha,
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
@@ -122,9 +121,6 @@ export const executeDecision = createStep({
           tagsApplied,
           action: 'skipped' as const,
           skipReason: `Failed to upvote issue: ${message}`,
-          localCodePath,
-          codebaseLeaseId,
-          codebaseCommitSha,
         }
       }
     }
@@ -142,14 +138,6 @@ export const executeDecision = createStep({
           title,
           description,
           priority,
-          impactAnalysis,
-          effortEstimation: effortEstimation
-            ? {
-                estimate: effortEstimation.estimate,
-                reasoning: effortEstimation.reasoning,
-                affectedFiles: effortEstimation.affectedFiles,
-              }
-            : null,
         })
 
         await writer?.write({
@@ -160,9 +148,20 @@ export const executeDecision = createStep({
         logger?.info('[execute-decision] Created', {
           issueId: issue.id,
           type,
-          impactScore: impactAnalysis?.impactScore,
-          effort: effortEstimation?.estimate,
         })
+
+        // Trigger issue analysis workflow (fire-and-forget)
+        try {
+          const workflow = mastra?.getWorkflow('issueAnalysisWorkflow')
+          if (workflow && issue.id) {
+            const analysisRunId = `analysis-${issue.id}-${Date.now()}`
+            const run = await workflow.createRunAsync({ runId: analysisRunId })
+            void run.start({ inputData: { issueId: issue.id, projectId, runId: analysisRunId } })
+            logger?.info('[execute-decision] Triggered issue analysis', { issueId: issue.id })
+          }
+        } catch (err) {
+          logger?.warn('[execute-decision] Failed to trigger issue analysis', { error: err instanceof Error ? err.message : 'Unknown' })
+        }
 
         return {
           sessionId,
@@ -172,11 +171,6 @@ export const executeDecision = createStep({
           action: 'created' as const,
           issueId: issue.id,
           issueTitle: title,
-          impactScore: impactAnalysis?.impactScore,
-          effortEstimate: effortEstimation?.estimate,
-          localCodePath,
-          codebaseLeaseId,
-          codebaseCommitSha,
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
@@ -189,9 +183,6 @@ export const executeDecision = createStep({
           tagsApplied,
           action: 'skipped' as const,
           skipReason: `Failed to create issue: ${message}`,
-          localCodePath,
-          codebaseLeaseId,
-          codebaseCommitSha,
         }
       }
     }
@@ -207,9 +198,6 @@ export const executeDecision = createStep({
       tagsApplied,
       action: 'skipped' as const,
       skipReason: 'Invalid decision format',
-      localCodePath,
-      codebaseLeaseId,
-      codebaseCommitSha,
     }
   },
 })

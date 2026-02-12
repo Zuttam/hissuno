@@ -724,6 +724,57 @@ export type Database = {
         }
         Relationships: []
       }
+      issue_analysis_runs: {
+        Row: {
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          issue_id: string
+          metadata: Json | null
+          project_id: string
+          run_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          issue_id: string
+          metadata?: Json | null
+          project_id: string
+          run_id: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          issue_id?: string
+          metadata?: Json | null
+          project_id?: string
+          run_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_analysis_runs_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_analysis_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_embeddings: {
         Row: {
           created_at: string
@@ -860,10 +911,12 @@ export type Database = {
         Row: {
           affected_areas: string[] | null
           affected_files: string[] | null
+          analysis_computed_at: string | null
           created_at: string
           description: string
           effort_estimate: string | null
           effort_reasoning: string | null
+          effort_score: number | null
           id: string
           impact_analysis: Json | null
           impact_score: number | null
@@ -878,14 +931,18 @@ export type Database = {
           type: string
           updated_at: string
           upvote_count: number | null
+          velocity_reasoning: string | null
+          velocity_score: number | null
         }
         Insert: {
           affected_areas?: string[] | null
           affected_files?: string[] | null
+          analysis_computed_at?: string | null
           created_at?: string
           description: string
           effort_estimate?: string | null
           effort_reasoning?: string | null
+          effort_score?: number | null
           id?: string
           impact_analysis?: Json | null
           impact_score?: number | null
@@ -900,14 +957,18 @@ export type Database = {
           type: string
           updated_at?: string
           upvote_count?: number | null
+          velocity_reasoning?: string | null
+          velocity_score?: number | null
         }
         Update: {
           affected_areas?: string[] | null
           affected_files?: string[] | null
+          analysis_computed_at?: string | null
           created_at?: string
           description?: string
           effort_estimate?: string | null
           effort_reasoning?: string | null
+          effort_score?: number | null
           id?: string
           impact_analysis?: Json | null
           impact_score?: number | null
@@ -922,6 +983,8 @@ export type Database = {
           type?: string
           updated_at?: string
           upvote_count?: number | null
+          velocity_reasoning?: string | null
+          velocity_score?: number | null
         }
         Relationships: [
           {

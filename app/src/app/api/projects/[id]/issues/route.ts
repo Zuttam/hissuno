@@ -4,7 +4,7 @@ import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { listIssues } from '@/lib/supabase/issues'
 import { createIssue } from '@/lib/issues/issues-service'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import type { IssueType, IssuePriority, IssueStatus, CreateIssueInput } from '@/types/issue'
+import type { IssueType, IssuePriority, IssueStatus, MetricLevel, CreateIssueInput } from '@/types/issue'
 
 export const runtime = 'nodejs'
 
@@ -55,6 +55,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       status: (searchParams.get('status') as IssueStatus) ?? undefined,
       search: searchParams.get('search') ?? undefined,
       showArchived: searchParams.get('showArchived') === 'true',
+      velocityLevel: (searchParams.get('velocityLevel') as MetricLevel) ?? undefined,
+      impactLevel: (searchParams.get('impactLevel') as MetricLevel) ?? undefined,
+      effortLevel: (searchParams.get('effortLevel') as MetricLevel) ?? undefined,
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : undefined,
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined,
     }

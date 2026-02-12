@@ -13,42 +13,13 @@ interface ProjectPageLayoutProps {
 
 export function ProjectPageLayout({ children }: ProjectPageLayoutProps) {
   const { project, projectId } = useProject()
-  const { notifications, dismiss } = useNotifications({ projectId: projectId ?? undefined })
 
-  const alerts = useMemo(() => {
-    return notifications.map((n): HeaderAlert => {
-      const meta = n.metadata as Record<string, unknown> | null
-      const message = (meta?.message as string) ?? ''
-      const link = meta?.link as string | undefined
-      const priority = ((meta?.priority as string) ?? 'low') as HeaderAlert['priority']
-
-      return {
-        id: n.id,
-        priority,
-        message: link ? (
-          <>
-            {message.replace(/\.$/, '')}.{' '}
-            <Link
-              href={link}
-              className="underline underline-offset-2 hover:text-[var(--accent-warning)]"
-            >
-              Go to settings
-            </Link>
-          </>
-        ) : (
-          message
-        ),
-        onDismiss: () => dismiss(n.id),
-      }
-    })
-  }, [notifications, dismiss])
 
   return (
     <div className="flex flex-col h-full gap-6">
       <AppHeader
         title={project?.name || 'Untitled Project'}
         description={project?.description || undefined}
-        alerts={alerts}
         actions={<NotificationCenter projectId={projectId ?? undefined} />}
       />
 

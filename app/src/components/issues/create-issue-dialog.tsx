@@ -262,16 +262,16 @@ export function CreateIssueDialog({
         {/* Sessions Selection */}
         <div className="flex flex-col gap-2">
           <label className="text-xs font-medium text-[color:var(--text-secondary)]">
-            Linked Sessions
+            Linked feedback
           </label>
           {isLoadingSessions ? (
             <div className="flex items-center gap-2 text-xs text-[color:var(--text-tertiary)]">
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              Loading sessions...
+              Loading feedback...
             </div>
           ) : availableSessions.length === 0 ? (
             <p className="text-xs text-[color:var(--text-tertiary)]">
-              No sessions found for this project.
+              No feedback found for this project.
             </p>
           ) : (
             <div className="max-h-48 overflow-y-auto rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)]">

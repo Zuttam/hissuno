@@ -1,19 +1,21 @@
 /**
  * Step: Prepare Context
  *
- * Gathers all context needed for spec generation:
- * - Issue details (type, title, description)
- * - Linked sessions and their user messages
+ * Gathers all context needed for issue analysis:
+ * - Issue details (type, title, description, upvote count)
+ * - Linked sessions with customer/company data
+ * - Session timestamps for velocity computation
  * - Relevant knowledge from knowledge packages
  */
 
 import { createStep } from '@mastra/core/workflows'
 import { createAdminClient } from '@/lib/supabase/server'
+import { getIssueForAnalysisAdmin, getIssueSessionTimestamps } from '@/lib/supabase/issues'
 import { workflowContextWithCodebaseSchema, preparedContextSchema } from '../schemas'
 
 export const prepareContext = createStep({
   id: 'prepare-context',
-  description: 'Gather issue context, linked feedback sessions, and knowledge for spec generation',
+  description: 'Gather issue context, linked feedback sessions, and knowledge for analysis',
   inputSchema: workflowContextWithCodebaseSchema,
   outputSchema: preparedContextSchema,
   execute: async ({ inputData, mastra, writer }) => {
@@ -27,54 +29,28 @@ export const prepareContext = createStep({
     logger?.info('[prepare-context] Starting', { issueId, projectId })
     await writer?.write({ type: 'progress', message: 'Gathering issue context...' })
 
+    // Fetch issue with sessions
+    const issue = await getIssueForAnalysisAdmin(issueId)
+    if (!issue) {
+      throw new Error(`Issue not found: ${issueId}`)
+    }
+
+    // Get session timestamps for velocity computation
     const supabase = createAdminClient()
+    const timestamps = await getIssueSessionTimestamps(supabase, issueId)
 
-    // Fetch issue details
-    const { data: issue, error: issueError } = await supabase
-      .from('issues')
-      .select('id, type, title, description, priority, upvote_count, status')
-      .eq('id', issueId)
-      .single()
+    // Map sessions to flat structure
+    const sessions = issue.sessions.map((s) => ({
+      id: s.id,
+      createdAt: s.createdAt,
+      contactId: s.contactId,
+      companyId: s.contact?.company?.id ?? null,
+      companyArr: s.contact?.company?.arr ?? null,
+      companyStage: s.contact?.company?.stage ?? null,
+    }))
 
-    if (issueError || !issue) {
-      throw new Error(`Failed to fetch issue: ${issueError?.message ?? 'Not found'}`)
-    }
-
-    await writer?.write({ type: 'progress', message: 'Fetching linked sessions...' })
-
-    // Fetch sessions that upvoted this issue (contributing sessions)
-    const { data: contributingSessions } = await supabase
-      .from('issue_upvotes')
-      .select('session_id')
-      .eq('issue_id', issueId)
-
-    const sessionIds = contributingSessions?.map(s => s.session_id).filter(Boolean) ?? []
-
-    // Fetch user messages from linked feedback sessions
-    const linkedSessions: Array<{ id: string; userMessages: string[] }> = []
-
-    for (const sessionId of sessionIds.slice(0, 5)) { // Limit to 5 sessions for context
-      if (!sessionId) continue
-
-      const { data: messages } = await supabase
-        .from('session_messages')
-        .select('content')
-        .eq('session_id', sessionId)
-        .eq('role', 'user')
-        .order('created_at', { ascending: true })
-        .limit(10)
-
-      if (messages && messages.length > 0) {
-        linkedSessions.push({
-          id: sessionId,
-          userMessages: messages.map(m => m.content),
-        })
-      }
-    }
-
+    // Fetch knowledge context
     await writer?.write({ type: 'progress', message: 'Loading knowledge context...' })
-
-    // Fetch knowledge packages for context
     let knowledgeContext = ''
     const { data: packages } = await supabase
       .from('knowledge_packages')
@@ -82,7 +58,6 @@ export const prepareContext = createStep({
       .eq('project_id', projectId)
 
     if (packages && packages.length > 0) {
-      // Get relevant knowledge from the technical and product packages
       const relevantCategories = ['product', 'technical']
       for (const pkg of packages) {
         if (relevantCategories.includes(pkg.category)) {
@@ -93,7 +68,6 @@ export const prepareContext = createStep({
 
             if (content) {
               const text = await content.text()
-              // Take first 5000 chars from each relevant package
               knowledgeContext += `\n## ${pkg.category} Knowledge\n${text.slice(0, 5000)}\n`
             }
           } catch (error) {
@@ -108,11 +82,12 @@ export const prepareContext = createStep({
 
     await writer?.write({
       type: 'progress',
-      message: `Context prepared: ${linkedSessions.length} linked feedback`,
+      message: `Context prepared: ${sessions.length} sessions`,
     })
 
     logger?.info('[prepare-context] Completed', {
-      linkedSessionCount: linkedSessions.length,
+      sessionCount: sessions.length,
+      timestampCount: timestamps.length,
       hasKnowledge: knowledgeContext.length > 0,
     })
 
@@ -127,12 +102,14 @@ export const prepareContext = createStep({
         id: issue.id,
         type: issue.type,
         title: issue.title,
-        description: issue.description ?? '',
-        priority: issue.priority,
-        upvoteCount: issue.upvote_count,
-        status: issue.status,
+        description: issue.description,
+        upvoteCount: issue.upvoteCount,
+        impactScore: issue.impactScore,
+        effortEstimate: issue.effortEstimate,
+        priorityManualOverride: issue.priorityManualOverride,
       },
-      linkedSessions,
+      sessions,
+      sessionTimestamps: timestamps.map((t) => t.toISOString()),
       knowledgeContext,
     }
   },

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendWelcomeNotificationIfNeeded } from '@/lib/notifications/welcome-notifications'
 import { getSafeRedirectPath } from '@/lib/auth/server'
@@ -55,10 +55,12 @@ export async function GET(request: Request) {
         const fullName = user.user_metadata?.full_name ?? user.user_metadata?.name
 
         // Fire and forget - don't block redirect
-        setImmediate(() => {
-          sendWelcomeNotificationIfNeeded(user.id, user.email!, fullName).catch((err) => {
+        after(async () => {
+          try {
+            await sendWelcomeNotificationIfNeeded(user.id, user.email!, fullName)
+          } catch (err) {
             console.error('[auth.callback] Failed to send welcome email:', err)
-          })
+          }
         })
       }
     }

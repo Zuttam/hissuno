@@ -26,7 +26,7 @@ export async function createProjectSetupNotifications(
       channel: 'in_app',
       dedupKey: `setup_session_sources:${projectId}`,
       metadata: {
-        title: 'Connect a session source',
+        title: 'Connect a feedback source',
         message: 'Set up an integration to start collecting customer conversations.',
         link: `/projects/${projectId}/integrations`,
         priority: 'high',

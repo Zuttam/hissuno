@@ -1,8 +1,8 @@
 /**
- * Step: Prepare Codebase (Session Review Workflow)
+ * Step: Prepare Codebase (Issue Analysis Workflow)
  *
  * Workflow-specific step that acquires codebase access using the shared logic.
- * This step has schemas compatible with the session-review workflow.
+ * This step has schemas compatible with the issue-analysis workflow.
  */
 
 import { createStep } from '@mastra/core/workflows'
@@ -14,7 +14,7 @@ export const prepareCodebase = createStep({
   description: 'Acquire codebase lease and sync if needed',
   inputSchema: workflowInputSchema,
   outputSchema: workflowContextWithCodebaseSchema,
-  execute: async ({ inputData, mastra, writer, runId }) => {
+  execute: async ({ inputData, mastra, writer }) => {
     if (!inputData) {
       throw new Error('Input data not found')
     }
@@ -22,7 +22,7 @@ export const prepareCodebase = createStep({
     const logger = mastra?.getLogger()
     const result = await prepareCodebaseForWorkflow({
       projectId: inputData.projectId,
-      runId,
+      runId: inputData.runId,
       logger: logger ? {
         info: (msg, data) => logger.info(msg, data),
         warn: (msg, data) => logger.warn(msg, data),

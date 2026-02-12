@@ -44,18 +44,6 @@ export const workflowInputSchema = z.object({
 
 export type WorkflowInput = z.infer<typeof workflowInputSchema>
 
-/**
- * Internal context after prepare-codebase step.
- * Adds codebase lease fields for workflow-internal use.
- */
-export const workflowContextWithCodebaseSchema = workflowInputSchema.extend({
-  localCodePath: z.string().nullable(),
-  codebaseLeaseId: z.string(),
-  codebaseCommitSha: z.string().nullable(),
-})
-
-export type WorkflowContextWithCodebase = z.infer<typeof workflowContextWithCodebaseSchema>
-
 // ============================================================================
 // STEP OUTPUT SCHEMAS
 // ============================================================================
@@ -66,10 +54,6 @@ export const classifyOutputSchema = z.object({
   tags: z.array(sessionTagSchema),
   tagsApplied: z.boolean(),
   reasoning: z.string(),
-  // Codebase lease fields (passed through)
-  localCodePath: z.string().nullable(),
-  codebaseLeaseId: z.string(),
-  codebaseCommitSha: z.string().nullable(),
 })
 
 export type ClassifyOutput = z.infer<typeof classifyOutputSchema>
@@ -91,35 +75,6 @@ export const similarIssueSchema = z.object({
 })
 
 export type SimilarIssueType = z.infer<typeof similarIssueSchema>
-
-/**
- * Impact analysis result
- */
-export const impactAnalysisSchema = z.object({
-  affectedAreas: z.array(
-    z.object({
-      area: z.string(),
-      category: z.string(),
-      relevance: z.number(),
-    })
-  ),
-  impactScore: z.number().min(1).max(5),
-  reasoning: z.string(),
-})
-
-export type ImpactAnalysisType = z.infer<typeof impactAnalysisSchema>
-
-/**
- * Effort estimation result
- */
-export const effortEstimationSchema = z.object({
-  estimate: z.enum(['trivial', 'small', 'medium', 'large', 'xlarge']),
-  reasoning: z.string(),
-  affectedFiles: z.array(z.string()),
-  confidence: z.number().min(0).max(1),
-})
-
-export type EffortEstimationType = z.infer<typeof effortEstimationSchema>
 
 /**
  * Prepared PM context (output of prepare-pm-context step)
@@ -150,10 +105,6 @@ export const preparedPMContextSchema = z.object({
     issueTrackingEnabled: z.boolean(),
     pmDedupIncludeClosed: z.boolean(),
   }),
-  // Codebase lease fields (passed through)
-  localCodePath: z.string().nullable(),
-  codebaseLeaseId: z.string(),
-  codebaseCommitSha: z.string().nullable(),
 })
 
 export type PreparedPMContextType = z.infer<typeof preparedPMContextSchema>
@@ -185,8 +136,6 @@ export type PMDecisionType = z.infer<typeof pmDecisionSchema>
  */
 export const enrichedPMContextSchema = preparedPMContextSchema.extend({
   similarIssues: z.array(similarIssueSchema),
-  impactAnalysis: impactAnalysisSchema.nullable(),
-  effortEstimation: effortEstimationSchema.nullable(),
 })
 
 export type EnrichedPMContextType = z.infer<typeof enrichedPMContextSchema>
@@ -203,12 +152,6 @@ export const executeDecisionOutputSchema = z.object({
   issueId: z.string().optional(),
   issueTitle: z.string().optional(),
   skipReason: z.string().optional(),
-  impactScore: z.number().optional(),
-  effortEstimate: z.string().optional(),
-  // Codebase lease fields (passed through)
-  localCodePath: z.string().nullable().optional(),
-  codebaseLeaseId: z.string().optional(),
-  codebaseCommitSha: z.string().nullable().optional(),
 })
 
 export type ExecuteDecisionOutputType = z.infer<typeof executeDecisionOutputSchema>
@@ -226,12 +169,6 @@ export const workflowOutputSchema = z.object({
   issueId: z.string().optional(),
   issueTitle: z.string().optional(),
   skipReason: z.string().optional(),
-  // Enriched fields
-  impactScore: z.number().optional(),
-  effortEstimate: z.string().optional(),
-  // Codebase cleanup status
-  codebaseLeaseId: z.string().optional(),
-  codebaseCleanedUp: z.boolean().optional(),
 })
 
 export type WorkflowOutput = z.infer<typeof workflowOutputSchema>

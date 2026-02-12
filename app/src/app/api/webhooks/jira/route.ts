@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { handleJiraWebhookEvent } from '@/lib/integrations/jira/webhook'
 
@@ -38,9 +38,13 @@ export async function POST(request: Request) {
       return new Response('OK', { status: 200 })
     }
 
-    // Process asynchronously (immediate response pattern from Slack)
-    setImmediate(() => {
-      void handleJiraWebhookEvent(payload, sync.connection_id)
+    // Process asynchronously - after() keeps the serverless function alive
+    after(async () => {
+      try {
+        await handleJiraWebhookEvent(payload, sync.connection_id)
+      } catch (error) {
+        console.error('[webhook.jira] Event handler error:', error)
+      }
     })
 
     return new Response('OK', { status: 200 })
