@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { verifySlackRequest } from '@/lib/integrations/slack'
 import { handleSlackEvent } from '@/lib/integrations/slack/event-handlers'
 
@@ -43,17 +43,28 @@ export async function POST(request: NextRequest) {
     if (payload.type === 'event_callback') {
       const event = payload.event
 
+      console.log('[integrations.slack.events] event_callback', {
+        teamId: payload.team_id,
+        eventType: event?.type,
+        eventId: payload.event_id,
+        channel: event?.channel,
+        user: event?.user,
+      })
+
       // Respond immediately to Slack (must respond within 3 seconds)
-      // Process the event asynchronously
-      setImmediate(() => {
-        handleSlackEvent({
-          teamId: payload.team_id,
-          event,
-          eventId: payload.event_id,
-          eventTime: payload.event_time,
-        }).catch((error) => {
+      // Process the event asynchronously using after() which keeps the
+      // serverless function alive until completion (unlike setImmediate)
+      after(async () => {
+        try {
+          await handleSlackEvent({
+            teamId: payload.team_id,
+            event,
+            eventId: payload.event_id,
+            eventTime: payload.event_time,
+          })
+        } catch (error) {
           console.error('[integrations.slack.events] Event handler error:', error)
-        })
+        }
       })
 
       // Return 200 OK immediately

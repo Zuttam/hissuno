@@ -3,10 +3,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Spinner, MarkdownContent, Badge, CollapsibleSection } from '@/components/ui'
-import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType } from '@/types/issue'
+import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType, IssueCustomerImpact } from '@/types/issue'
 import type { JiraIssueSyncStatus } from '@/types/jira'
 import { useIssueDetail } from '@/hooks/use-issues'
-import { useSpecGeneration } from '@/hooks/use-spec-generation'
+import { useSpecGeneration, type SpecGenerationEvent } from '@/hooks/use-spec-generation'
+import { useIssueAnalysis } from '@/hooks/use-issue-analysis'
 import { useJiraSyncStatus } from '@/hooks/use-jira-sync'
 import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
@@ -111,6 +112,20 @@ export function IssueSidebar({
     },
   })
 
+  const {
+    isAnalyzing,
+    events: analysisEvents,
+    startAnalysis: handleRunAnalysis,
+    cancelAnalysis: handleCancelAnalysis,
+  } = useIssueAnalysis({
+    projectId,
+    issueId,
+    onComplete: () => {
+      refreshIssue()
+      onIssueUpdated?.()
+    },
+  })
+
   // Close dropdown on click outside or Escape
   useEffect(() => {
     if (!openDropdown) return
@@ -184,6 +199,7 @@ export function IssueSidebar({
   }, [updateIssue, onIssueUpdated])
 
   const hasSpec = Boolean(issue?.product_spec)
+  const hasAnalysis = Boolean(issue?.analysis_computed_at)
 
   return (
     <>
@@ -370,26 +386,33 @@ export function IssueSidebar({
                 )}
               </div>
 
-              {/* Archive (direct action) */}
+              {/* Analyze (direct action) */}
               <button
                 type="button"
-                onClick={() => void handleArchiveToggle()}
-                disabled={isArchiving}
+                onClick={() => void handleRunAnalysis()}
+                disabled={isAnalyzing}
                 className={`inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs transition hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 ${
-                  issue.is_archived
-                    ? 'text-[color:var(--accent-primary)]'
+                  hasAnalysis
+                    ? 'text-[color:var(--accent-success)]'
                     : 'text-[color:var(--text-secondary)]'
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="4" width="20" height="5" rx="2" />
-                  <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
-                  <path d="M10 13h4" />
-                </svg>
-                <span>{isArchiving ? 'Updating...' : issue.is_archived ? 'Unarchive' : 'Archive'}</span>
+                {hasAnalysis ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10" />
+                    <line x1="12" y1="20" x2="12" y2="4" />
+                    <line x1="6" y1="20" x2="6" y2="14" />
+                  </svg>
+                )}
+                <span>{isAnalyzing ? 'Analyzing...' : hasAnalysis ? 'Re-analyze' : 'Analyze'}</span>
               </button>
 
-              {/* Analyze / Generate Spec (direct action) */}
+              {/* Generate Spec (direct action) */}
               <button
                 type="button"
                 onClick={handleGenerateSpec}
@@ -412,6 +435,25 @@ export function IssueSidebar({
                 )}
                 <span>{isGeneratingSpec ? 'Generating...' : hasSpec ? 'Regenerate' : 'Generate Spec'}</span>
               </button>
+
+              {/* Archive (direct action) */}
+              <button
+                type="button"
+                onClick={() => void handleArchiveToggle()}
+                disabled={isArchiving}
+                className={`inline-flex items-center gap-1.5 rounded-[4px] px-2 py-1 text-xs transition hover:bg-[color:var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-50 ${
+                  issue.is_archived
+                    ? 'text-[color:var(--accent-primary)]'
+                    : 'text-[color:var(--text-secondary)]'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="5" rx="2" />
+                  <path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" />
+                  <path d="M10 13h4" />
+                </svg>
+                <span>{isArchiving ? 'Updating...' : issue.is_archived ? 'Unarchive' : 'Archive'}</span>
+              </button>
             </div>
           )}
         </div>
@@ -427,10 +469,59 @@ export function IssueSidebar({
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
               <CollapsibleSection title="Analysis" variant="flat" defaultExpanded>
                 <div className="flex flex-col gap-4">
+                  {/* Analysis Scores */}
+                  <div className="flex flex-col gap-2">
+                    <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                      Scores
+                    </span>
+                    {issue.velocity_score != null || issue.impact_score != null || issue.effort_score != null ? (
+                      <>
+                        <div className="grid grid-cols-3 gap-3 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
+                          <div className="text-center">
+                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.velocity_reasoning ?? undefined}>
+                              {issue.velocity_score != null ? `${issue.velocity_score}/5` : '-'}
+                            </p>
+                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Velocity</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.impact_analysis?.reasoning ?? undefined}>
+                              {issue.impact_score != null ? `${issue.impact_score}/5` : '-'}
+                            </p>
+                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Impact</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.effort_reasoning ?? undefined}>
+                              {issue.effort_score != null ? `${issue.effort_score}/5` : '-'}
+                            </p>
+                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Effort</p>
+                          </div>
+                        </div>
+                        {issue.analysis_computed_at && (
+                          <p className="text-xs text-[color:var(--text-tertiary)]">
+                            Last analyzed {formatRelativeDate(issue.analysis_computed_at)}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                        Not yet analyzed. Click &ldquo;Analyze&rdquo; above to calculate scores.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Analysis Progress */}
+                  {isAnalyzing && (
+                    <SpecGenerationProgress
+                      events={analysisEvents as unknown as SpecGenerationEvent[]}
+                      isProcessing={isAnalyzing}
+                      onCancel={handleCancelAnalysis}
+                    />
+                  )}
+
                   {/* Linked Sessions (lean list) */}
                   <div className="flex flex-col gap-1">
                     <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                      Linked Sessions ({issue.sessions?.length || 0})
+                      Linked Feedback ({issue.sessions?.length || 0})
                     </span>
                     {issue.sessions && issue.sessions.length > 0 ? (
                       <div className="flex flex-col gap-1 mt-1">
@@ -447,7 +538,7 @@ export function IssueSidebar({
                                 {sourceLabel}
                               </Badge>
                               <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)] hover:underline">
-                                {session.name || 'Unnamed Session'}
+                                {session.name || 'Unnamed Feedback'}
                               </span>
                               <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
                                 {formatRelativeDate(session.created_at)}
@@ -458,10 +549,13 @@ export function IssueSidebar({
                       </div>
                     ) : (
                       <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                        No linked sessions
+                        No linked feedback
                       </p>
                     )}
                   </div>
+
+                  {/* Customer Impact */}
+                  <CustomerImpactInline sessions={issue.sessions ?? []} projectId={projectId} />
 
                   {/* Product Spec */}
                   <div className="flex flex-col gap-2">
@@ -487,11 +581,9 @@ export function IssueSidebar({
                         issueTitle={issue.title}
                       />
                     ) : !isGeneratingSpec ? (
-                      <div className="rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-6 text-center">
-                        <p className="text-sm text-[color:var(--text-secondary)]">
-                          No product specification yet. Click &ldquo;Generate Spec&rdquo; above to create one.
-                        </p>
-                      </div>
+                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+                        No specification yet. Click &ldquo;Generate Spec&rdquo; above to generate one.
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -615,6 +707,119 @@ function formatRelativeDate(dateString: string): string {
 function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text
   return text.slice(0, maxLength).trimEnd() + '...'
+}
+
+// ============================================================================
+// Customer Impact Section
+// ============================================================================
+
+const STAGE_COLORS: Record<string, string> = {
+  prospect: 'var(--text-tertiary)',
+  onboarding: 'var(--accent-info)',
+  active: 'var(--accent-success)',
+  expansion: 'var(--accent-warning)',
+  churned: 'var(--accent-danger)',
+}
+
+function computeCustomerImpact(sessions: IssueWithSessions['sessions']): IssueCustomerImpact {
+  const contactMap = new Map<string, { companyId?: string }>()
+  const companyMap = new Map<string, { id: string; name: string; arr: number | null; stage: string; contacts: Set<string> }>()
+
+  for (const session of sessions) {
+    if (!session.contact) continue
+    contactMap.set(session.contact.id, { companyId: session.contact.company?.id })
+    if (session.contact.company) {
+      const existing = companyMap.get(session.contact.company.id)
+      if (existing) {
+        existing.contacts.add(session.contact.id)
+      } else {
+        companyMap.set(session.contact.company.id, {
+          id: session.contact.company.id,
+          name: session.contact.company.name,
+          arr: session.contact.company.arr,
+          stage: session.contact.company.stage,
+          contacts: new Set([session.contact.id]),
+        })
+      }
+    }
+  }
+
+  const companies = Array.from(companyMap.values()).map((c) => ({
+    id: c.id,
+    name: c.name,
+    arr: c.arr,
+    stage: c.stage,
+    contactCount: c.contacts.size,
+  }))
+
+  const totalARR = companies.reduce((sum, c) => sum + (c.arr ?? 0), 0)
+
+  return {
+    contactCount: contactMap.size,
+    companyCount: companyMap.size,
+    totalARR,
+    companies,
+  }
+}
+
+function formatARR(value: number): string {
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
+  return `$${value}`
+}
+
+function CustomerImpactInline({ sessions, projectId }: { sessions: IssueWithSessions['sessions']; projectId: string }) {
+  const impact = computeCustomerImpact(sessions ?? [])
+
+  const summaryParts: string[] = []
+  if (impact.contactCount > 0) {
+    summaryParts.push(`${impact.contactCount} contact${impact.contactCount !== 1 ? 's' : ''}`)
+  }
+  if (impact.companyCount > 0) {
+    summaryParts.push(`${impact.companyCount} compan${impact.companyCount !== 1 ? 'ies' : 'y'}`)
+  }
+  if (impact.totalARR > 0) {
+    summaryParts.push(`${formatARR(impact.totalARR)} ARR at risk`)
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+        Related Customers {impact.contactCount > 0 ? `(${summaryParts.join(' / ')})` : ''}
+      </span>
+      {impact.companies.length > 0 ? (
+        <div className="flex flex-col gap-1 mt-1">
+          {impact.companies.map((company) => (
+            <Link
+              key={company.id}
+              href={`/projects/${projectId}/customers/companies/${company.id}`}
+              className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+            >
+              <span
+                className="inline-block h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: STAGE_COLORS[company.stage] ?? 'var(--text-tertiary)' }}
+              />
+              <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
+                {company.name}
+              </span>
+              {company.arr != null && company.arr > 0 && (
+                <span className="shrink-0 text-xs font-medium text-[color:var(--text-secondary)]">
+                  {formatARR(company.arr)}
+                </span>
+              )}
+              <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
+                {company.contactCount} contact{company.contactCount !== 1 ? 's' : ''}
+              </span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
+          No identified customers
+        </p>
+      )}
+    </div>
+  )
 }
 
 // ============================================================================

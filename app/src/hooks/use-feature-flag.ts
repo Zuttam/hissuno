@@ -25,7 +25,7 @@ export function useFeatureFlag(key: string): UseFeatureFlagResult {
   }, [posthog, key])
 
   if (!flagsLoaded) {  
-    return { enabled: true, isLoading: true }
+    return { enabled: false, isLoading: true }
   }
 
   return { enabled: flagValue, isLoading: false }

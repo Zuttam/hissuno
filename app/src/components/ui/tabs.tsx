@@ -91,14 +91,21 @@ interface TabsPanelProps {
   value: string
   children: ReactNode
   className?: string
+  /** Keep the panel mounted when inactive (hidden via CSS). Useful for preserving form state. */
+  forceMount?: boolean
 }
 
-export function TabsPanel({ value, children, className }: TabsPanelProps) {
+export function TabsPanel({ value, children, className, forceMount }: TabsPanelProps) {
   const { value: selectedValue } = useTabsContext()
+  const isActive = selectedValue === value
 
-  if (selectedValue !== value) {
+  if (!isActive && !forceMount) {
     return null
   }
 
-  return <div className={cn('flex-1 overflow-y-auto px-6 py-4', className)}>{children}</div>
+  return (
+    <div className={cn('flex-1 overflow-y-auto px-6 py-4', className)} hidden={!isActive}>
+      {children}
+    </div>
+  )
 }

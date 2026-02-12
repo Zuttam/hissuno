@@ -139,6 +139,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const input: CreateSessionInput = {
       project_id: projectId,
       user_id: body.user_id || undefined,
+      user_metadata: body.user_metadata || undefined,
       page_url: body.page_url || undefined,
       page_title: body.page_title || undefined,
       tags,

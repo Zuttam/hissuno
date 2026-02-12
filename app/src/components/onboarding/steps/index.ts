@@ -8,20 +8,22 @@ export type {
   OnboardingFormData,
   ProfileFormData,
   BillingFormData,
-  UseCaseFormData,
+  AboutFormData,
   ProjectFormData,
   CompanySize,
-  UseCaseOption,
-  UseCaseOptionInfo,
+  CommunicationChannel,
+  CommunicationChannelInfo,
+  StepRevealConfig,
 } from './types'
 
 export {
   DEFAULT_ONBOARDING_DATA,
   DEFAULT_PROFILE_DATA,
   DEFAULT_BILLING_DATA,
-  DEFAULT_USE_CASE_DATA,
+  DEFAULT_ABOUT_DATA,
   DEFAULT_PROJECT_DATA,
-  USE_CASE_OPTIONS,
+  COMMUNICATION_CHANNELS,
+  STEP_REVEAL_MESSAGES,
 } from './types'
 
 // Registry
@@ -36,7 +38,8 @@ export {
 } from './registry'
 
 // Step components
-export { ProfileStep } from './profile-step'
-export { UseCaseStep } from './use-case-step'
+export { AccountStep } from './account-step'
+export { AboutStep } from './about-step'
 export { BillingStep } from './billing-step'
 export { ProjectStep } from './project-step'
+export { StepRevealWrapper } from './step-reveal-wrapper'

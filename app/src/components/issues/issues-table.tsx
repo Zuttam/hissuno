@@ -30,6 +30,9 @@ export function IssuesTable({
             <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Upvotes
             </th>
+            <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+              Velocity
+            </th>
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Priority
             </th>
@@ -108,14 +111,17 @@ function IssueRow({ issue, isSelected, onSelect, onArchive }: IssueRowProps) {
           {issue.upvote_count}
         </span>
       </td>
+      <td className="px-3 py-2 text-center">
+        <VelocityBadge score={issue.velocity_score} reasoning={issue.velocity_reasoning} />
+      </td>
       <td className="px-3 py-2">
         <PriorityBadge priority={issue.priority} isManual={issue.priority_manual_override} />
       </td>
       <td className="px-3 py-2 text-center">
-        <ImpactBadge score={issue.impact_score} />
+        <ImpactBadge score={issue.impact_score} reasoning={issue.impact_analysis?.reasoning} />
       </td>
       <td className="px-3 py-2">
-        <EffortBadge effort={issue.effort_estimate} />
+        <EffortBadge effort={issue.effort_estimate} effortScore={issue.effort_score} />
       </td>
       <td className="px-3 py-2">
         <StatusBadge status={issue.status} />
@@ -223,12 +229,11 @@ function PriorityBadge({ priority, isManual }: { priority: IssuePriority; isManu
   )
 }
 
-function ImpactBadge({ score }: { score: number | null }) {
+function VelocityBadge({ score, reasoning }: { score: number | null; reasoning: string | null }) {
   if (score === null) {
     return <span className="text-[color:var(--text-secondary)]">-</span>
   }
 
-  // Color based on impact level
   const getColor = (s: number) => {
     if (s >= 4) return 'text-[color:var(--accent-danger)]'
     if (s >= 3) return 'text-[color:var(--accent-warning)]'
@@ -236,17 +241,51 @@ function ImpactBadge({ score }: { score: number | null }) {
   }
 
   return (
-    <span className={`font-bold ${getColor(score)}`} title={`Impact score: ${score}/5`}>
+    <span className={`font-bold ${getColor(score)}`} title={reasoning ?? `Velocity score: ${score}/5`}>
       {score}/5
     </span>
   )
 }
 
-function EffortBadge({ effort }: { effort: EffortEstimate | null }) {
-  if (!effort) {
+function ImpactBadge({ score, reasoning }: { score: number | null; reasoning?: string | null }) {
+  if (score === null) {
     return <span className="text-[color:var(--text-secondary)]">-</span>
   }
 
+  const getColor = (s: number) => {
+    if (s >= 4) return 'text-[color:var(--accent-danger)]'
+    if (s >= 3) return 'text-[color:var(--accent-warning)]'
+    return 'text-[color:var(--text-secondary)]'
+  }
+
+  return (
+    <span className={`font-bold ${getColor(score)}`} title={reasoning ?? `Impact score: ${score}/5`}>
+      {score}/5
+    </span>
+  )
+}
+
+function EffortBadge({ effort, effortScore }: { effort: EffortEstimate | null; effortScore?: number | null }) {
+  if (!effort && effortScore == null) {
+    return <span className="text-[color:var(--text-secondary)]">-</span>
+  }
+
+  if (effortScore != null) {
+    const getColor = (s: number) => {
+      if (s >= 4) return 'text-[color:var(--accent-danger)]'
+      if (s >= 3) return 'text-[color:var(--accent-warning)]'
+      return 'text-[color:var(--text-secondary)]'
+    }
+
+    const effortLabel = effort ? `${effort} (${effortScore}/5)` : `Effort score: ${effortScore}/5`
+    return (
+      <span className={`font-bold ${getColor(effortScore)}`} title={effortLabel}>
+        {effortScore}/5
+      </span>
+    )
+  }
+
+  // Fall back to enum badge
   const labels: Record<EffortEstimate, string> = {
     trivial: 'XS',
     small: 'S',
@@ -272,8 +311,8 @@ function EffortBadge({ effort }: { effort: EffortEstimate | null }) {
   }
 
   return (
-    <Badge variant={variants[effort]} title={descriptions[effort]}>
-      {labels[effort]}
+    <Badge variant={variants[effort!]} title={descriptions[effort!]}>
+      {labels[effort!]}
     </Badge>
   )
 }

@@ -182,7 +182,7 @@ export function CustomTagsSection({
     (tagId: string) => {
       if (
         !confirm(
-          "Are you sure you want to delete this tag? Sessions with this tag will keep it, but it won't be available for new classifications."
+          "Are you sure you want to delete this tag? Feedback with this tag will keep it, but it won't be available for new classifications."
         )
       ) {
         return
@@ -516,7 +516,7 @@ export function SessionsSettingsDialog({
       open={open}
       onClose={onClose}
       onSave={handleSave}
-      title="Session Settings"
+      title="Feedback Settings"
       isSaving={isSaving}
       error={error}
       size="xl"

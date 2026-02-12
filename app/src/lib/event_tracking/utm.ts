@@ -1,7 +1,6 @@
 import type { UTMParams } from './types'
 
 const UTM_STORAGE_KEY = 'hissuno_utm'
-const PRESELECTED_USECASE_KEY = 'hissuno_preselected_usecase'
 const UTM_PARAM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'] as const
 
 /**
@@ -59,54 +58,6 @@ export function getStoredUTM(): UTMParams | null {
 export function clearStoredUTM(): void {
   if (typeof window === 'undefined') return
   sessionStorage.removeItem(UTM_STORAGE_KEY)
-}
-
-/**
- * Store pre-selected use case for onboarding
- */
-export function storePreselectedUseCase(useCase: string): void {
-  if (typeof window === 'undefined') return
-  sessionStorage.setItem(PRESELECTED_USECASE_KEY, useCase)
-}
-
-/**
- * Get pre-selected use case for onboarding
- */
-export function getPreselectedUseCase(): string | null {
-  if (typeof window === 'undefined') return null
-  return sessionStorage.getItem(PRESELECTED_USECASE_KEY)
-}
-
-/**
- * Clear pre-selected use case
- */
-export function clearPreselectedUseCase(): void {
-  if (typeof window === 'undefined') return
-  sessionStorage.removeItem(PRESELECTED_USECASE_KEY)
-}
-
-/**
- * Map utm_content value to a use case ID for pre-selection
- */
-export function utmContentToUseCase(utmContent: string | undefined): string | null {
-  if (!utmContent) return null
-
-  const mapping: Record<string, string> = {
-    // Knowledge / Support Agent
-    knowledge: 'knowledge',
-    'support-agent': 'knowledge',
-    // Slack / Customer Success
-    slack: 'slack',
-    'customer-success': 'slack',
-    // Triage
-    triage: 'triage',
-    'automated-triage': 'triage',
-    // Specs
-    specs: 'specs',
-    'product-specs': 'specs',
-  }
-
-  return mapping[utmContent.toLowerCase()] ?? null
 }
 
 /**

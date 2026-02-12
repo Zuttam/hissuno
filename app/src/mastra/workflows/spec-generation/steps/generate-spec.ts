@@ -30,6 +30,7 @@ export const generateSpec = createStep({
       localCodePath,
       codebaseLeaseId,
       codebaseCommitSha,
+      specGuidelines,
     } = inputData
 
     logger?.info('[generate-spec] Starting', { issueId, projectId })
@@ -66,9 +67,9 @@ export const generateSpec = createStep({
 - **Upvotes**: ${issue.upvoteCount}
 
 ## Customer Feedback
-The following are user messages from sessions that reported this issue:
+The following are user messages from feedback sessions that reported this issue:
 
-${sessionContext || 'No linked sessions available.'}
+${sessionContext || 'No linked feedback available.'}
 
 ## Knowledge Context
 ${knowledgeContext || 'No knowledge context available.'}
@@ -77,7 +78,7 @@ ${knowledgeContext || 'No knowledge context available.'}
 ${localCodePath ? `Available at: ${localCodePath}` : 'Codebase not available.'}
 
 ---
-
+${specGuidelines ? `\n## Spec Guidelines\n\n${specGuidelines}\n` : ''}
 Follow your process to:
 1. Research the codebase if available to understand the current implementation
 2. Gather any additional context needed

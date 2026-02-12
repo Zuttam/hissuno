@@ -120,9 +120,9 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       project,
       projectId,
       setProjectId,
-      isLoading,
+      isLoading: !isInitialized || isLoading,
     }),
-    [project, projectId, setProjectId, isLoading]
+    [project, projectId, setProjectId, isLoading, isInitialized]
   )
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>

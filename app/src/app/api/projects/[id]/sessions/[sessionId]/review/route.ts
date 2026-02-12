@@ -54,8 +54,6 @@ export interface SessionReviewResult {
   issueId?: string
   issueTitle?: string
   skipReason?: string
-  thresholdMet?: boolean
-  specGenerated?: boolean
 }
 
 /**

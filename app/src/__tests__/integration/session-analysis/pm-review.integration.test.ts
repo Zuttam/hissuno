@@ -15,8 +15,21 @@
  * These tests use the real database to verify actual workflow functionality.
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
 import { RuntimeContext } from '@mastra/core/runtime-context'
+
+vi.mock('@/mastra', async (importOriginal) => {
+  if (process.env.RUN_INTEGRATION_TESTS === 'true') {
+    return importOriginal()
+  }
+  return {
+    mastra: {
+      getWorkflow: () => null,
+      getAgent: () => null,
+    },
+  }
+})
+
 import { mastra } from '@/mastra'
 import { createAdminClient } from '@/lib/supabase/server'
 import type { IssueRecord, IssuePriority } from '@/types/issue'
@@ -29,6 +42,13 @@ import {
 
 // Test timeout for LLM calls (60 seconds for workflow tests)
 const TEST_TIMEOUT = 60000
+
+const shouldRun = process.env.RUN_INTEGRATION_TESTS === 'true'
+
+if (!shouldRun) {
+  console.log('[pm-review] Skipping integration tests')
+  console.log('  To run: RUN_INTEGRATION_TESTS=true npm run test:integration')
+}
 
 // Test data
 let testProjectId: string
@@ -67,10 +87,9 @@ async function setupTestProject(): Promise<string> {
     throw new Error(`Failed to create test project: ${error?.message}`)
   }
 
-  // Create project settings with a low threshold for testing
+  // Create project settings
   await supabase.from('project_settings').insert({
     project_id: project.id,
-    issue_spec_threshold: 3, // Low threshold for testing
   })
 
   return project.id
@@ -260,6 +279,8 @@ IMPORTANT:
     parsed,
   }
 }
+
+describe('PM Review Workflow', { skip: !shouldRun }, () => {
 
 // Setup and teardown
 beforeAll(async () => {
@@ -738,3 +759,5 @@ ASSISTANT: I'll report the bug. Glad you like the design overall!`
     expect(PM_ISSUE_TYPES).not.toContain('general_feedback')
   })
 })
+
+}) // end PM Review Workflow

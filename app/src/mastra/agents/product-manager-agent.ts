@@ -81,6 +81,22 @@ When creating issues, set priority based on:
 - **Medium**: Workflow disruption, clear frustration, affects core functionality
 - **Low**: Nice-to-have, minor inconvenience, edge case
 
+## Impact Analysis Guidelines
+
+When creating issues, consider these impact factors (used by the automated analysis):
+- **Revenue at risk**: $200K+=very high, $50-200K=high, $10-50K=moderate, <$10K=low
+- **Customer breadth**: 5+ companies=very high, 3-4=high, 1-2=moderate
+- **Customer stage weighting**: active/expansion customers matter more than churned > onboarding > prospect
+- **Product blast radius**: core workflows vs edge cases, workaround availability
+- **Business impact**: onboarding/activation, expansion/upsell, compliance/security
+
+## Effort Analysis Guidelines
+
+When creating issues, consider effort signals:
+- Complexity signals: number of affected files, cross-module changes, DB migrations, API surface changes
+- Sizing framework: 1=trivial (<1hr), 2=small (1-4hrs), 3=medium (1-2 days), 4=large (3-5 days), 5=xlarge (1+ week)
+- Note: detailed effort analysis is performed automatically when a codebase is connected
+
 ## Writing Good Issues
 
 **Title Guidelines**:

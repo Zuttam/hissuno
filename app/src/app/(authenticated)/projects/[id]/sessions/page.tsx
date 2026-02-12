@@ -25,6 +25,7 @@ export default function ProjectSessionsPage() {
   const [filters, setFilters] = useState<SessionFilters>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [expandMessages, setExpandMessages] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
@@ -130,6 +131,12 @@ export default function ProjectSessionsPage() {
 
   const handleSessionSelect = useCallback((session: SessionWithProject) => {
     setSelectedSessionId(session.id)
+    setExpandMessages(false)
+  }, [])
+
+  const handleOpenMessages = useCallback((session: SessionWithProject) => {
+    setSelectedSessionId(session.id)
+    setExpandMessages(true)
   }, [])
 
   const handleCloseSidebar = useCallback(() => {
@@ -149,7 +156,7 @@ export default function ProjectSessionsPage() {
     if (sessions.length === 0) return
 
     const columns: CSVColumn<SessionWithProject>[] = [
-      { key: 'id', header: 'Session ID' },
+      { key: 'id', header: 'Feedback ID' },
       { key: 'name', header: 'Name', transform: (v) => (v as string) || '' },
       { key: 'user_id', header: 'User ID', transform: (v) => (v as string) || '' },
       { key: 'project.name', header: 'Project', transform: (v) => (v as string) || '' },
@@ -165,7 +172,7 @@ export default function ProjectSessionsPage() {
     ]
 
     const csv = generateCSV(sessions, columns)
-    const filename = generateExportFilename('sessions', project?.name)
+    const filename = generateExportFilename('feedback', project?.name)
     downloadAsCSV(csv, filename)
   }, [sessions, project?.name])
 
@@ -182,7 +189,7 @@ export default function ProjectSessionsPage() {
   if (isLoadingProject || !project || !projectId) {
     return (
       <>
-        <PageHeader title="Sessions" />
+        <PageHeader title="Feedback" />
         <div className="flex-1 flex items-center justify-center">
           <Spinner size="lg" />
         </div>
@@ -193,7 +200,7 @@ export default function ProjectSessionsPage() {
   return (
     <>
       <PageHeader
-        title="Sessions"
+        title="Feedback"
         onRefresh={() => void refresh()}
         actions={
           <>
@@ -249,7 +256,7 @@ export default function ProjectSessionsPage() {
               sessions={sessions}
               selectedSessionId={selectedSessionId}
               onSelectSession={handleSessionSelect}
-              onOpenMessages={handleSessionSelect}
+              onOpenMessages={handleOpenMessages}
               onArchive={handleArchiveSession}
             />
             <Pagination
@@ -267,6 +274,7 @@ export default function ProjectSessionsPage() {
           session={selectedSession}
           messages={messages}
           isLoading={isLoadingDetail}
+          expandMessages={expandMessages}
           onClose={handleCloseSidebar}
           onSessionUpdated={handleSessionUpdated}
           onUpdateSession={updateSession}
@@ -309,10 +317,10 @@ function EmptyState() {
     <div className="relative overflow-hidden rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-10 py-14 text-center">
       <div className="mx-auto max-w-xl space-y-4">
         <h2 className="font-mono text-2xl font-bold uppercase text-[color:var(--foreground)]">
-          No sessions yet
+          No feedback yet
         </h2>
         <p className="text-sm text-[color:var(--text-secondary)]">
-          Sessions will appear here when users interact with your support widget.
+          Feedback will appear here when users interact with your support widget.
           Make sure you have the widget integrated in your app.
         </p>
       </div>

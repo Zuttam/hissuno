@@ -2,8 +2,8 @@
  * Step: PM Decision
  *
  * Agent step that makes the final decision about issue handling.
- * Receives pre-computed context (session, duplicates, impact, effort)
- * and decides: skip, create new issue, or upvote existing.
+ * Receives pre-computed context (session, duplicates) and decides:
+ * skip, create new issue, or upvote existing.
  */
 
 import { createStep } from '@mastra/core/workflows'
@@ -11,15 +11,11 @@ import { z } from 'zod'
 import {
   preparedPMContextSchema,
   similarIssueSchema,
-  impactAnalysisSchema,
-  effortEstimationSchema,
   pmDecisionSchema,
 } from '../schemas'
 
 const pmDecisionInputSchema = preparedPMContextSchema.extend({
   similarIssues: z.array(similarIssueSchema),
-  impactAnalysis: impactAnalysisSchema.nullable(),
-  effortEstimation: effortEstimationSchema.nullable(),
 })
 
 const pmDecisionOutputSchema = pmDecisionInputSchema.extend({
@@ -38,8 +34,7 @@ export const pmDecision = createStep({
       throw new Error('Input data not found')
     }
 
-    const { sessionId, projectId, tags, messages, settings, similarIssues, impactAnalysis, effortEstimation } =
-      inputData
+    const { sessionId, projectId, tags, messages, settings, similarIssues } = inputData
 
     logger?.info('[pm-decision] Starting', { sessionId, projectId })
     await writer?.write({ type: 'progress', message: 'Making PM decision...' })
@@ -97,14 +92,6 @@ export const pmDecision = createStep({
               .join('\n')
           : 'No similar issues found.'
 
-      const impactSummary = impactAnalysis
-        ? `Impact Score: ${impactAnalysis.impactScore}/5\n${impactAnalysis.reasoning}`
-        : 'Impact analysis not available.'
-
-      const effortSummary = effortEstimation
-        ? `Effort: ${effortEstimation.estimate} (${Math.round(effortEstimation.confidence * 100)}% confidence)\n${effortEstimation.reasoning}`
-        : 'Effort estimation not available.'
-
       const tagHints = buildTagHints(tags)
 
       const prompt = `You are a Product Manager analyzing a customer support session. Make a decision based on the context below.
@@ -118,12 +105,6 @@ ${conversationSummary}
 
 ## Similar Existing Issues
 ${similarIssuesSummary}
-
-## Impact Analysis
-${impactSummary}
-
-## Effort Estimation
-${effortSummary}
 
 ## Your Decision
 

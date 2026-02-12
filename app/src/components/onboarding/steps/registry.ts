@@ -1,5 +1,5 @@
-import { ProfileStep } from './profile-step'
-import { UseCaseStep } from './use-case-step'
+import { AccountStep } from './account-step'
+import { AboutStep } from './about-step'
 import { BillingStep } from './billing-step'
 import { ProjectStep } from './project-step'
 import type { OnboardingStepId, OnboardingFormData, StepDefinition } from './types'
@@ -8,12 +8,12 @@ import type { OnboardingStepId, OnboardingFormData, StepDefinition } from './typ
  * Step registry containing onboarding wizard steps
  */
 export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> = {
-  profile: {
-    id: 'profile',
+  account: {
+    id: 'account',
     title: 'Tell us about yourself',
-    shortTitle: 'Profile',
+    shortTitle: 'Account',
     description: 'Help us personalize your experience.',
-    component: ProfileStep,
+    component: AccountStep,
     validate: (data: OnboardingFormData) => {
       if (!data.profile?.fullName?.trim()) {
         return { isValid: false, error: 'Full name is required' }
@@ -22,13 +22,13 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
     },
   },
 
-  'use-case': {
-    id: 'use-case',
-    title: 'What is Hissuno for you?',
-    shortTitle: 'Use Case',
+  about: {
+    id: 'about',
+    title: 'How do you usually get your feedback?',
+    shortTitle: 'Feedback',
     description:
-      'Select the ways you plan to use Hissuno. This helps us customize your experience. You can skip this step if you prefer a quick setup.',
-    component: UseCaseStep,
+      'Select the communication channels you use. This helps us understand your stack.',
+    component: AboutStep,
     validate: () => ({ isValid: true }), // Optional step
     isOptional: true,
   },
@@ -49,19 +49,27 @@ export const ONBOARDING_STEP_REGISTRY: Record<OnboardingStepId, StepDefinition> 
 
   project: {
     id: 'project',
-    title: 'Create your first project',
+    title: 'Set up your first project',
     shortTitle: 'Project',
-    description: 'Set up a project to start collecting customer conversations. You can skip this and create one later.',
+    description: 'Choose how you want to get started.',
     component: ProjectStep,
-    validate: () => ({ isValid: true }),
-    isOptional: true,
+    validate: (data: OnboardingFormData) => {
+      if (data.project?.projectMode === 'demo') {
+        return { isValid: true }
+      }
+      if (!data.project?.name?.trim()) {
+        return { isValid: false, error: 'Project name is required' }
+      }
+      return { isValid: true }
+    },
+    isOptional: false,
   },
 }
 
 /**
  * Default step ordering for onboarding flow
  */
-export const ONBOARDING_FLOW_ORDER: OnboardingStepId[] = ['profile', 'use-case', 'billing', 'project']
+export const ONBOARDING_FLOW_ORDER: OnboardingStepId[] = ['account', 'about', 'billing', 'project']
 
 /**
  * Get step definitions for onboarding flow

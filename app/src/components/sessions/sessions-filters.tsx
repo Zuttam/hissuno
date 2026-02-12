@@ -1,11 +1,24 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import { Input, Select, CollapsibleSection, Button } from '@/components/ui'
+import Image from 'next/image'
+import { MessageSquare, Code2, PenLine } from 'lucide-react'
+import { Input, Select, CollapsibleSection, Button, FilterChip, FilterLabel } from '@/components/ui'
 import type { SessionFilters, SessionSource } from '@/types/session'
 import { SESSION_SOURCE_INFO, SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 import { useCustomTags } from '@/hooks/use-custom-tags'
+
+const ICON_SIZE = 8
+
+const SOURCE_ICONS: Record<SessionSource, React.ReactNode> = {
+  widget: <MessageSquare size={ICON_SIZE} />,
+  slack: <Image src="/logos/slack.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
+  intercom: <Image src="/logos/intercom.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
+  gong: <Image src="/logos/gong.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
+  api: <Code2 size={ICON_SIZE} />,
+  manual: <PenLine size={ICON_SIZE} />,
+}
 
 interface SessionsFiltersProps {
   projects: ProjectRecord[]
@@ -14,33 +27,6 @@ interface SessionsFiltersProps {
   hideProjectFilter?: boolean
 }
 
-interface FilterChipProps {
-  label: string
-  active: boolean
-  onClick: () => void
-}
-
-function FilterChip({ label, active, onClick }: FilterChipProps) {
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      selected={active}
-      onClick={onClick}
-      className="!rounded-full !px-2.5 !py-0.5 !text-[10px]"
-    >
-      {label}
-    </Button>
-  )
-}
-
-function FilterLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="mr-1 font-mono text-[10px] uppercase text-[color:var(--text-tertiary)]">
-      {children}
-    </span>
-  )
-}
 
 export function SessionsFilters({
   projects,
@@ -229,6 +215,7 @@ export function SessionsFilters({
           <FilterChip
             key={source}
             label={SESSION_SOURCE_INFO[source].label}
+            icon={SOURCE_ICONS[source]}
             active={filters.source === source}
             onClick={() => handleSourceToggle(source)}
           />

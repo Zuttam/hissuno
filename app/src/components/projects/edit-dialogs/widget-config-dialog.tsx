@@ -202,7 +202,7 @@ export function WidgetConfigDialog({
 
       if (!sessionResponse.ok) {
         const data = await sessionResponse.json()
-        throw new Error(data.error || 'Failed to save session settings')
+        throw new Error(data.error || 'Failed to save feedback settings')
       }
 
       onSaved?.()
@@ -388,7 +388,7 @@ import '@hissuno/widget/styles.css';
 
             <FormField
               label="Idle Timeout"
-              description="Minutes before session ends (1-60)"
+              description="Minutes before conversation ends (1-60)"
             >
               <Input
                 type="number"

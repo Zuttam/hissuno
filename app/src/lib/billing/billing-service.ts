@@ -86,11 +86,12 @@ export async function getUsageMetrics(
     periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
   }
 
-  // Get all project IDs owned by this user
+  // Get all non-demo project IDs owned by this user (demo projects are excluded from billing)
   const { data: userProjects, error: projectsListError } = await supabase
     .from('projects')
     .select('id')
     .eq('user_id', userId)
+    .eq('is_demo', false)
 
   if (projectsListError) {
     console.error('[billing-service] failed to list user projects', projectsListError)
@@ -114,11 +115,12 @@ export async function getUsageMetrics(
     analyzedSessionsCount = count ?? 0
   }
 
-  // Count projects
+  // Count projects (exclude demo projects from limit)
   const { count: projectsCount, error: projectsError } = await supabase
     .from('projects')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', userId)
+    .eq('is_demo', false)
 
   if (projectsError) {
     console.error('[billing-service] failed to count projects', projectsError)

@@ -271,8 +271,6 @@ export async function executeSessionReview(
       issueId: pmReviewOutput?.issueId,
       issueTitle: pmReviewOutput?.issueTitle,
       skipReason: pmReviewOutput?.skipReason ?? (pmReviewOutput?.action ? undefined : 'No result from workflow'),
-      thresholdMet: pmReviewOutput?.thresholdMet,
-      specGenerated: pmReviewOutput?.specGenerated,
     }
 
     await supabase

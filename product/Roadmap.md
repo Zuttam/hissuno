@@ -112,47 +112,81 @@
 
 ## Phase 8
 
-### Sessions
-[] Make each source badge and icon badge (also in filters)
+### Feedback
+[x] Make each source badge and icon badge (also in filters)
 [x] Check session lifecycle for closed sessions (from integrations)
 
-### Suport
-[] Email agent
-
-### Marketing
-[] Run SDR agent
-[] Docs portal
+### Customers 
+[x] Introduce new screen to manage contact and company data. 
 
 ### Issues
-[] Calculate issue upvotes over time and alert or change priority if there's an anomaly
-[] Lieaner Integration
-[] Jira Integration 
+[x] Issue review process:
+  - issue velocity - times mentioned in given sliding window
+  - issue impact - analysis based on customer and product area (+ guidelines)
+  - issue effort - grounded with codebase 
+[x] Add in PM Specialist the option for review guidelines (address specific fields) 
+[x] Keep Spec genration manual  
+[x] show customer data as part of the review 
 
-### Code
-[] Create initial implementation 
+
 
 ### Platform
-[] Improve onboarding experience
+[x] Add coming soon of crm integrations (hubspot and salesforce)
+[x] Improve onboarding experience
 [x] Improve welcome email visualization
 [x] Alerts and in app notifications (email, slack)
 
 
 ## Phase 9
 
-### Marketing
-[] Ad Campaign for AI FDE 
-[] Support promotions
+### Feedback (f.k.a sessions)
+[] match participants with customer information
+[] show additional details in a cleaner way (based on customer/user data)
+[] Add an option in each channel integration to automatically add customers from session information
 
-### Sessions
-[] Improve participants identification - show additional details in a cleaner way
-[] Facebook community channels
+### Issues 
+[] Add product area to the issue analysis - Classify on product area
+[] Draft email response to users
+
+### Marketing
+[] Docs portal
 
 ### Platform
-[] API Access - support api keys and move cron to rely on admin api key value (change env var)
+[] Add dimension of analyzed issues 
 [] Project multi-users access and RBAC
+[] Delete project
+
+### Analytics
+[] segmentation by customer / user 
+[] segmentation by product area / (maybe from code)
+
+
+## Phase 10
+
+### Marketing
+[] Support promotions
+[] Run SDR agent
+
+### Suport
+[] Email agent
+[] Add Hissuno MCP to Support agent  
+
+### Feedback (f.k.a sessions)
+[] Improve participants identification - show additional details in a cleaner way
+[] Add posthog sessions support
+
+
+### Code
+[] Create initial implementation 
+
+
+### Platform
+
+[] API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] MCP Access
 [] MCP Apps
+[] connect to customer data (crm or dw)
 
 ### Issues
-[] Support Actions items (not necessary code related)
-[] Draft response email to the user
+[] Lieaner Integration
+[] Jira Integration 

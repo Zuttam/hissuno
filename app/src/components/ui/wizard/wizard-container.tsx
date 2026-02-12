@@ -15,6 +15,8 @@ export type WizardContainerProps = {
   mode?: 'create' | 'edit' | 'onboarding'
   // When true, renders as a full-screen overlay with backdrop blur (like Dialog)
   overlay?: boolean
+  // When true, the step is showing a reveal message — Continue is the only action
+  isInRevealState?: boolean
   // Navigation props (create mode)
   onPrevious?: () => void
   onNext?: () => void
@@ -40,6 +42,7 @@ export function WizardContainer({
   children,
   mode = 'create',
   overlay = false,
+  isInRevealState = false,
   onPrevious,
   onNext,
   onSubmit,
@@ -76,11 +79,18 @@ export function WizardContainer({
     }
   }, [overlay, mounted])
 
+  const isOnboarding = mode === 'onboarding'
+
   const wizardContent = (
     <FloatingCard
       floating="none"
       variant="elevated"
-      className="min-h-[calc(100vh-4rem)] flex flex-col overflow-hidden bg-[var(--background)]"
+      className={cn(
+        'flex flex-col overflow-hidden bg-[var(--background)]',
+        isOnboarding
+          ? 'min-h-screen md:min-h-[680px] md:max-h-[95vh] md:w-6xl md:rounded-2xl'
+          : 'min-h-[calc(100vh-4rem)]'
+      )}
     >
       {/* Scrollable inner container */}
       <div className="flex-1 flex flex-col overflow-y-auto">
@@ -95,7 +105,10 @@ export function WizardContainer({
             'dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
           )}
         >
-          <div className="mx-auto max-w-6xl px-6 sm:px-12 py-4 flex items-center justify-between gap-4 sm:gap-6">
+          <div className={cn(
+            'px-6 py-4 flex items-center justify-between gap-4',
+            isOnboarding ? 'sm:px-8 sm:gap-4' : 'sm:px-12 sm:gap-6 mx-auto max-w-6xl'
+          )}>
             {/* Left Button: Close (edit mode) or Back/Cancel (create mode) */}
             <div className="flex-shrink-0 min-w-[100px]">
               {isEditMode ? (
@@ -221,6 +234,15 @@ export function WizardContainer({
                 >
                   {saveSuccess ? '✓ Saved' : isSubmitting ? savingLabel : saveLabel}
                 </Button>
+              ) : isInRevealState ? (
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={onNext}
+                  disabled={isSubmitting}
+                >
+                  Continue
+                </Button>
               ) : isLastStep ? (
                 <Button
                   type="button"
@@ -238,7 +260,7 @@ export function WizardContainer({
                   onClick={onNext}
                   disabled={isSubmitting}
                 >
-                  Next →
+                  {mode === 'onboarding' ? 'Continue' : 'Next →'}
                 </Button>
               )}
             </div>
@@ -248,15 +270,21 @@ export function WizardContainer({
         {/* Validation Error */}
         {validationError && (
           <div className="border-b border-[var(--accent-danger)] bg-[var(--accent-danger)]/10">
-            <div className="mx-auto max-w-6xl px-6 py-2 sm:px-12 text-sm font-mono text-[var(--accent-danger)]">
+            <div className={cn(
+              'px-6 py-2 text-sm font-mono text-[var(--accent-danger)]',
+              isOnboarding ? 'sm:px-8' : 'sm:px-12 mx-auto max-w-6xl'
+            )}>
               {validationError}
             </div>
           </div>
         )}
 
         {/* Content Area */}
-        <div className="flex-1 py-6 ">
-          <div className="mx-auto max-w-6xl px-6 sm:px-12">
+        <div className="flex-1 py-6">
+          <div className={cn(
+            'px-6',
+            isOnboarding ? 'sm:px-8' : 'sm:px-12 mx-auto max-w-6xl'
+          )}>
             {children}
           </div>
         </div>
@@ -271,7 +299,10 @@ export function WizardContainer({
         {/* Backdrop */}
         <div className="fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm" aria-hidden="true" />
         {/* Scrollable wizard container */}
-        <div className="fixed inset-0 z-[70] overflow-y-auto">
+        <div className={cn(
+          'fixed inset-0 z-[70] overflow-y-auto',
+          isOnboarding && 'md:flex md:items-center md:justify-center md:p-6'
+        )}>
           {wizardContent}
         </div>
       </>,

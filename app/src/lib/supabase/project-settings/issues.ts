@@ -37,7 +37,7 @@ export async function getIssueSettings(projectId: string): Promise<IssueSettings
 
     const { data, error } = await supabase
       .from('project_settings')
-      .select('issue_tracking_enabled, issue_spec_threshold, spec_guidelines, pm_dedup_include_closed')
+      .select('issue_tracking_enabled, pm_dedup_include_closed')
       .eq('project_id', projectId)
       .single()
 
@@ -104,7 +104,7 @@ export async function updateIssueSettings(
         },
         { onConflict: 'project_id' }
       )
-      .select('issue_tracking_enabled, issue_spec_threshold, spec_guidelines, pm_dedup_include_closed')
+      .select('issue_tracking_enabled, pm_dedup_include_closed')
       .single()
 
     if (error) {

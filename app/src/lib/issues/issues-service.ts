@@ -27,7 +27,6 @@ import {
   updateIssueArchiveStatusById,
   verifyProjectOwnership,
   getIssueProjectId,
-  getProjectSettings,
   type InsertIssueData,
 } from '@/lib/supabase/issues'
 import { upsertIssueEmbedding } from './embedding-service'
@@ -38,8 +37,6 @@ import type {
   CreateIssueInput,
   UpdateIssueInput,
   IssuePriority,
-  IssueImpactAnalysis,
-  EffortEstimate,
   UpvoteResult,
 } from '@/types/issue'
 
@@ -48,11 +45,45 @@ import type {
 // ============================================================================
 
 /**
- * Calculate priority based on upvote count
+ * Calculate priority based on upvote count (legacy fallback)
  */
 export function calculatePriority(upvoteCount: number): IssuePriority {
   if (upvoteCount >= 5) return 'high'
   if (upvoteCount >= 3) return 'medium'
+  return 'low'
+}
+
+/**
+ * Calculate multi-factor priority from velocity, impact, and effort scores.
+ *
+ * With effort: composite = velocity * 0.3 + impact * 0.5 + effortInverse * 0.2
+ * Without effort: composite = velocity * 0.35 + impact * 0.65
+ * Where effortInverse = 6 - effortScore (higher effort = lower priority boost)
+ *
+ * Mapping: >= 3.5 = high, >= 2.0 = medium, else low
+ */
+export function calculateMultiFactorPriority(
+  velocityScore: number | null,
+  impactScore: number | null,
+  effortScore: number | null
+): IssuePriority | null {
+  if (velocityScore == null && impactScore == null) {
+    return null // No scores available, cannot calculate
+  }
+
+  const velocity = velocityScore ?? 1
+  const impact = impactScore ?? 1
+
+  let composite: number
+  if (effortScore != null) {
+    const effortInverse = 6 - effortScore
+    composite = velocity * 0.3 + impact * 0.5 + effortInverse * 0.2
+  } else {
+    composite = velocity * 0.35 + impact * 0.65
+  }
+
+  if (composite >= 3.5) return 'high'
+  if (composite >= 2.0) return 'medium'
   return 'low'
 }
 
@@ -300,14 +331,6 @@ export interface CreateIssueAdminInput {
   title: string
   description: string
   priority?: IssuePriority
-  // Impact analysis
-  impactAnalysis?: IssueImpactAnalysis | null
-  // Effort estimation
-  effortEstimation?: {
-    estimate: EffortEstimate
-    reasoning: string
-    affectedFiles: string[]
-  } | null
 }
 
 /**
@@ -327,7 +350,7 @@ export async function createIssueAdmin(
 ): Promise<CreateIssueAdminResult> {
   const supabase = createAdminClient()
 
-  // Insert the issue with all metadata
+  // Insert the issue (analysis scores are computed later by the analysis workflow)
   const insertData: InsertIssueData = {
     projectId: input.projectId,
     type: input.type,
@@ -337,20 +360,6 @@ export async function createIssueAdmin(
     priorityManualOverride: false, // Agent-created issues use automatic priority
     upvoteCount: 1,
     status: 'open',
-  }
-
-  // Add impact analysis if provided
-  if (input.impactAnalysis) {
-    insertData.affectedAreas = input.impactAnalysis.affectedAreas.map((a) => a.area)
-    insertData.impactScore = input.impactAnalysis.impactScore
-    insertData.impactAnalysis = input.impactAnalysis
-  }
-
-  // Add effort estimation if provided
-  if (input.effortEstimation) {
-    insertData.effortEstimate = input.effortEstimation.estimate
-    insertData.effortReasoning = input.effortEstimation.reasoning
-    insertData.affectedFiles = input.effortEstimation.affectedFiles
   }
 
   const issue = await insertIssue(supabase, insertData)
@@ -407,20 +416,10 @@ export async function upvoteIssueAdmin(
   // Mark session as PM reviewed
   await markSessionPMReviewed(supabase, sessionId)
 
-  // Get project settings for threshold
-  const settings = await getProjectSettings(issue.projectId)
-  const threshold = settings?.issue_spec_threshold ?? 3
-
-  // Check if spec threshold met
-  const thresholdMet = newUpvoteCount >= threshold && !issue.productSpec
-  const shouldGenerateSpec = thresholdMet
-
   return {
     issueId,
     newUpvoteCount,
     newPriority,
-    thresholdMet,
-    shouldGenerateSpec,
   }
 }
 

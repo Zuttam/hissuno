@@ -70,8 +70,8 @@ export function trackSignupCompleted(userId: string, data: SignupEventData): voi
  */
 export function trackOnboardingCompleted(data: OnboardingCompletedEventData): void {
   const properties = {
-    selected_use_cases: data.selectedUseCases,
-    use_case_count: data.selectedUseCases.length,
+    selected_channels: data.selectedChannels,
+    channel_count: data.selectedChannels.length,
     ...data.utm,
   }
 

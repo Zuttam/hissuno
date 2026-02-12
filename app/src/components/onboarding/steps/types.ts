@@ -6,7 +6,7 @@
 /**
  * Onboarding step identifiers
  */
-export type OnboardingStepId = 'profile' | 'use-case' | 'billing' | 'project'
+export type OnboardingStepId = 'account' | 'about' | 'billing' | 'project'
 
 // ============================================
 // Validation
@@ -52,31 +52,34 @@ export interface BillingFormData {
  * Project form data for onboarding
  */
 export interface ProjectFormData {
+  projectMode: 'demo' | 'blank'
   name: string
   description: string
+  additionalDetails: string
   skipped: boolean
 }
 
 /**
- * Use case options for onboarding
+ * Communication channel options
  */
-export type UseCaseOption = 'knowledge' | 'slack' | 'triage' | 'specs'
+export type CommunicationChannel = 'intercom' | 'gong' | 'email' | 'slack' | 'other'
 
 /**
- * Use case option metadata
+ * Communication channel metadata
  */
-export interface UseCaseOptionInfo {
-  id: UseCaseOption
+export interface CommunicationChannelInfo {
+  id: CommunicationChannel
   emoji: string
   label: string
   description: string
 }
 
 /**
- * Use case form data for onboarding
+ * About step form data
  */
-export interface UseCaseFormData {
-  selectedUseCases: UseCaseOption[]
+export interface AboutFormData {
+  selectedChannels: CommunicationChannel[]
+  otherChannelText: string
 }
 
 // ============================================
@@ -88,7 +91,7 @@ export interface UseCaseFormData {
  */
 export interface OnboardingFormData {
   profile: ProfileFormData
-  useCase: UseCaseFormData
+  about: AboutFormData
   billing: BillingFormData
   project: ProjectFormData
 }
@@ -134,36 +137,72 @@ export interface StepDefinition {
 }
 
 // ============================================
-// Use Case Options
+// Reveal Config
 // ============================================
 
 /**
- * Available use case options with their metadata
+ * Configuration for step reveal messages
  */
-export const USE_CASE_OPTIONS: UseCaseOptionInfo[] = [
+export interface StepRevealConfig {
+  message: string
+  subtitle?: string
+}
+
+/**
+ * Reveal messages shown once per step before the form content
+ */
+export const STEP_REVEAL_MESSAGES: Record<OnboardingStepId, StepRevealConfig> = {
+  account: {
+    message: 'Welcome to Hissuno. Before we begin, we want to know you better.',
+  },
+  about: {
+    message: 'Hissuno turns customer feedback into ready-made engineering work. We do this by analyzing conversations and signals across your stack.',
+  },
+  billing: {
+    message: 'Before we let your new AI sidekicks roam, let us know how you want to pay for them.',
+  },
+  project: {
+    message: 'Almost there! Choose how you want to get started.',
+  },
+}
+
+// ============================================
+// Communication Channels
+// ============================================
+
+/**
+ * Available communication channel options with their metadata
+ */
+export const COMMUNICATION_CHANNELS: CommunicationChannelInfo[] = [
   {
-    id: 'knowledge',
-    emoji: '🧠',
-    label: 'Build support agent knowledge',
-    description: 'Build support agent knowledge from codebase and more'
+    id: 'intercom',
+    emoji: '💬',
+    label: 'Intercom',
+    description: 'Customer support conversations from Intercom',
+  },
+  {
+    id: 'gong',
+    emoji: '🎙️',
+    label: 'Gong',
+    description: 'Sales and success call recordings from Gong',
+  },
+  {
+    id: 'email',
+    emoji: '📧',
+    label: 'Email',
+    description: 'Customer emails and support tickets',
   },
   {
     id: 'slack',
-    emoji: '💬',
-    label: 'Customer success in Slack',
-    description: 'Integrate a customer success AI agent in Slack',
+    emoji: '⚡',
+    label: 'Slack',
+    description: 'Customer conversations in Slack channels',
   },
   {
-    id: 'triage',
-    emoji: '🔀',
-    label: 'Automated triage',
-    description: 'Automated triage of customer conversations',
-  },
-  {
-    id: 'specs',
-    emoji: '📋',
-    label: 'Product specs automation',
-    description: 'Automate product specs and code changes from customer requests',
+    id: 'other',
+    emoji: '🔗',
+    label: 'Other',
+    description: 'Other communication channels',
   },
 ]
 
@@ -190,18 +229,21 @@ export const DEFAULT_BILLING_DATA: BillingFormData = {
 }
 
 /**
- * Default use case form data
+ * Default about form data
  */
-export const DEFAULT_USE_CASE_DATA: UseCaseFormData = {
-  selectedUseCases: [],
+export const DEFAULT_ABOUT_DATA: AboutFormData = {
+  selectedChannels: [],
+  otherChannelText: '',
 }
 
 /**
  * Default project form data
  */
 export const DEFAULT_PROJECT_DATA: ProjectFormData = {
+  projectMode: 'demo',
   name: '',
   description: '',
+  additionalDetails: '',
   skipped: false,
 }
 
@@ -210,7 +252,7 @@ export const DEFAULT_PROJECT_DATA: ProjectFormData = {
  */
 export const DEFAULT_ONBOARDING_DATA: OnboardingFormData = {
   profile: DEFAULT_PROFILE_DATA,
-  useCase: DEFAULT_USE_CASE_DATA,
+  about: DEFAULT_ABOUT_DATA,
   billing: DEFAULT_BILLING_DATA,
   project: DEFAULT_PROJECT_DATA,
 }

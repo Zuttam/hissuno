@@ -236,15 +236,30 @@ export async function getOrCreateSlackChannel(
   }
 ): Promise<{ id: string } | null> {
   const client = supabase as AnySupabase
-  // Try to get existing channel
+  // Try to get existing channel (including soft-deleted ones)
   const { data: existing } = await client
     .from('slack_channels')
-    .select('id')
+    .select('id, is_active')
     .eq('workspace_token_id', params.workspaceTokenId)
     .eq('channel_id', params.channelId)
     .single()
 
   if (existing) {
+    if (existing.is_active === false) {
+      // Reactivate soft-deleted channel and refresh metadata
+      console.log('[slack.getOrCreateSlackChannel] Reactivating soft-deleted channel', {
+        channelId: params.channelId,
+        channelName: params.channelName,
+      })
+      await client
+        .from('slack_channels')
+        .update({
+          is_active: true,
+          channel_name: params.channelName,
+          workspace_primary_domain: params.workspacePrimaryDomain,
+        })
+        .eq('id', existing.id)
+    }
     return { id: existing.id }
   }
 
@@ -265,6 +280,12 @@ export async function getOrCreateSlackChannel(
     console.error('[slack.getOrCreateSlackChannel] Failed:', error)
     return null
   }
+
+  console.log('[slack.getOrCreateSlackChannel] Created new channel record', {
+    id: data.id,
+    channelId: params.channelId,
+    channelName: params.channelName,
+  })
 
   return { id: data.id }
 }
@@ -392,6 +413,7 @@ export const SLACK_OAUTH_SCOPES = [
   'chat:write',
   'groups:history',
   'groups:read',
+  'reactions:write',
   'users:read',
   'users:read.email',
 ]

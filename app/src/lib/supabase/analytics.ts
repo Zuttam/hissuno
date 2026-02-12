@@ -648,6 +648,62 @@ export const getIssuesStripAnalytics = cache(async (
 })
 
 /**
+ * Get issue velocity data for the dashboard (created vs resolved per day + cumulative open)
+ */
+export async function getIssueVelocityData(
+  projectId: string,
+  period: AnalyticsPeriod
+): Promise<{ created: TimeSeriesPoint[]; resolved: TimeSeriesPoint[]; cumulativeOpen: number }> {
+  if (!isSupabaseConfigured()) {
+    return { created: [], resolved: [], cumulativeOpen: 0 }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return { created: [], resolved: [], cumulativeOpen: 0 }
+  }
+
+  const periodStart = getPeriodStartDate(period)
+
+  let query = supabase
+    .from('issues')
+    .select('id, created_at, updated_at, status')
+    .eq('project_id', projectId)
+    .eq('is_archived', false)
+
+  if (periodStart) {
+    query = query.gte('created_at', periodStart.toISOString())
+  }
+
+  const { data: issues, error } = await query
+
+  if (error || !issues) {
+    return { created: [], resolved: [], cumulativeOpen: 0 }
+  }
+
+  // Build created time series
+  const created = buildTimeSeries(issues, period)
+
+  // Build resolved time series using updated_at as proxy for resolution date
+  const resolvedIssues = issues
+    .filter((i) => i.status === 'resolved' || i.status === 'closed')
+    .map((i) => ({ ...i, created_at: i.updated_at }))
+  const resolved = buildTimeSeries(resolvedIssues, period)
+
+  // Cumulative open: count issues that are not resolved/closed
+  const cumulativeOpen = issues.filter(
+    (i) => i.status !== 'resolved' && i.status !== 'closed'
+  ).length
+
+  return { created, resolved, cumulativeOpen }
+}
+
+/**
  * Build time series from records with created_at
  */
 function buildTimeSeries<T extends { created_at: string }>(

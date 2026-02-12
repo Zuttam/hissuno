@@ -81,6 +81,149 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          arr: number | null
+          country: string | null
+          created_at: string
+          custom_fields: Json | null
+          domain: string
+          employee_count: number | null
+          health_score: number | null
+          id: string
+          industry: string | null
+          is_archived: boolean | null
+          name: string
+          notes: string | null
+          plan_tier: string | null
+          product_used: string | null
+          project_id: string
+          renewal_date: string | null
+          stage: string | null
+          updated_at: string
+        }
+        Insert: {
+          arr?: number | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          domain: string
+          employee_count?: number | null
+          health_score?: number | null
+          id?: string
+          industry?: string | null
+          is_archived?: boolean | null
+          name: string
+          notes?: string | null
+          plan_tier?: string | null
+          product_used?: string | null
+          project_id: string
+          renewal_date?: string | null
+          stage?: string | null
+          updated_at?: string
+        }
+        Update: {
+          arr?: number | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          domain?: string
+          employee_count?: number | null
+          health_score?: number | null
+          id?: string
+          industry?: string | null
+          is_archived?: boolean | null
+          name?: string
+          notes?: string | null
+          plan_tier?: string | null
+          product_used?: string | null
+          project_id?: string
+          renewal_date?: string | null
+          stage?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "companies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          company_id: string | null
+          company_url: string | null
+          created_at: string
+          custom_fields: Json | null
+          email: string
+          id: string
+          is_archived: boolean | null
+          is_champion: boolean | null
+          last_contacted_at: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          project_id: string
+          role: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          company_url?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          email: string
+          id?: string
+          is_archived?: boolean | null
+          is_champion?: boolean | null
+          last_contacted_at?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          project_id: string
+          role?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          company_url?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          email?: string
+          id?: string
+          is_archived?: boolean | null
+          is_champion?: boolean | null
+          last_contacted_at?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          project_id?: string
+          role?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_tags: {
         Row: {
           color: string | null
@@ -118,6 +261,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "custom_tags_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_custom_field_definitions: {
+        Row: {
+          created_at: string
+          entity_type: string
+          field_key: string
+          field_label: string
+          field_type: string
+          id: string
+          is_required: boolean | null
+          position: number
+          project_id: string
+          select_options: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          field_key: string
+          field_label: string
+          field_type: string
+          id?: string
+          is_required?: boolean | null
+          position?: number
+          project_id: string
+          select_options?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          field_key?: string
+          field_label?: string
+          field_type?: string
+          id?: string
+          is_required?: boolean | null
+          position?: number
+          project_id?: string
+          select_options?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_custom_field_definitions_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -531,6 +724,57 @@ export type Database = {
         }
         Relationships: []
       }
+      issue_analysis_runs: {
+        Row: {
+          completed_at: string | null
+          error_message: string | null
+          id: string
+          issue_id: string
+          metadata: Json | null
+          project_id: string
+          run_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          issue_id: string
+          metadata?: Json | null
+          project_id: string
+          run_id: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          error_message?: string | null
+          id?: string
+          issue_id?: string
+          metadata?: Json | null
+          project_id?: string
+          run_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_analysis_runs_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_analysis_runs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issue_embeddings: {
         Row: {
           created_at: string
@@ -667,10 +911,12 @@ export type Database = {
         Row: {
           affected_areas: string[] | null
           affected_files: string[] | null
+          analysis_computed_at: string | null
           created_at: string
           description: string
           effort_estimate: string | null
           effort_reasoning: string | null
+          effort_score: number | null
           id: string
           impact_analysis: Json | null
           impact_score: number | null
@@ -685,14 +931,18 @@ export type Database = {
           type: string
           updated_at: string
           upvote_count: number | null
+          velocity_reasoning: string | null
+          velocity_score: number | null
         }
         Insert: {
           affected_areas?: string[] | null
           affected_files?: string[] | null
+          analysis_computed_at?: string | null
           created_at?: string
           description: string
           effort_estimate?: string | null
           effort_reasoning?: string | null
+          effort_score?: number | null
           id?: string
           impact_analysis?: Json | null
           impact_score?: number | null
@@ -707,14 +957,18 @@ export type Database = {
           type: string
           updated_at?: string
           upvote_count?: number | null
+          velocity_reasoning?: string | null
+          velocity_score?: number | null
         }
         Update: {
           affected_areas?: string[] | null
           affected_files?: string[] | null
+          analysis_computed_at?: string | null
           created_at?: string
           description?: string
           effort_estimate?: string | null
           effort_reasoning?: string | null
+          effort_score?: number | null
           id?: string
           impact_analysis?: Json | null
           impact_score?: number | null
@@ -729,6 +983,8 @@ export type Database = {
           type?: string
           updated_at?: string
           upvote_count?: number | null
+          velocity_reasoning?: string | null
+          velocity_score?: number | null
         }
         Relationships: [
           {
@@ -1192,14 +1448,12 @@ export type Database = {
         Row: {
           allowed_origins: string[] | null
           created_at: string
-          issue_spec_threshold: number | null
           issue_tracking_enabled: boolean | null
           pm_dedup_include_closed: boolean | null
           project_id: string
           session_goodbye_delay_seconds: number | null
           session_idle_response_timeout_seconds: number | null
           session_idle_timeout_minutes: number | null
-          spec_guidelines: string | null
           support_agent_package_id: string | null
           updated_at: string
           widget_display_type: string | null
@@ -1216,14 +1470,12 @@ export type Database = {
         Insert: {
           allowed_origins?: string[] | null
           created_at?: string
-          issue_spec_threshold?: number | null
           issue_tracking_enabled?: boolean | null
           pm_dedup_include_closed?: boolean | null
           project_id: string
           session_goodbye_delay_seconds?: number | null
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
-          spec_guidelines?: string | null
           support_agent_package_id?: string | null
           updated_at?: string
           widget_display_type?: string | null
@@ -1240,14 +1492,12 @@ export type Database = {
         Update: {
           allowed_origins?: string[] | null
           created_at?: string
-          issue_spec_threshold?: number | null
           issue_tracking_enabled?: boolean | null
           pm_dedup_include_closed?: boolean | null
           project_id?: string
           session_goodbye_delay_seconds?: number | null
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
-          spec_guidelines?: string | null
           support_agent_package_id?: string | null
           updated_at?: string
           widget_display_type?: string | null
@@ -1283,6 +1533,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_demo: boolean
           name: string
           secret_key: string | null
           updated_at: string
@@ -1292,6 +1543,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_demo?: boolean
           name: string
           secret_key?: string | null
           updated_at?: string
@@ -1301,6 +1553,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_demo?: boolean
           name?: string
           secret_key?: string | null
           updated_at?: string
@@ -1412,6 +1665,7 @@ export type Database = {
       }
       sessions: {
         Row: {
+          contact_id: string | null
           created_at: string
           first_message_at: string | null
           goodbye_detected_at: string | null
@@ -1438,6 +1692,7 @@ export type Database = {
           user_metadata: Json | null
         }
         Insert: {
+          contact_id?: string | null
           created_at?: string
           first_message_at?: string | null
           goodbye_detected_at?: string | null
@@ -1464,6 +1719,7 @@ export type Database = {
           user_metadata?: Json | null
         }
         Update: {
+          contact_id?: string | null
           created_at?: string
           first_message_at?: string | null
           goodbye_detected_at?: string | null
@@ -1490,6 +1746,13 @@ export type Database = {
           user_metadata?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "sessions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sessions_project_id_fkey"
             columns: ["project_id"]
@@ -1783,6 +2046,7 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          communication_channels: string[] | null
           company_name: string | null
           company_size: string | null
           created_at: string
@@ -1795,13 +2059,13 @@ export type Database = {
           onboarding_completed_at: string | null
           onboarding_current_step: string | null
           role: string | null
-          selected_use_cases: string[] | null
           slack_notification_channel: string | null
           slack_user_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          communication_channels?: string[] | null
           company_name?: string | null
           company_size?: string | null
           created_at?: string
@@ -1814,13 +2078,13 @@ export type Database = {
           onboarding_completed_at?: string | null
           onboarding_current_step?: string | null
           role?: string | null
-          selected_use_cases?: string[] | null
           slack_notification_channel?: string | null
           slack_user_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          communication_channels?: string[] | null
           company_name?: string | null
           company_size?: string | null
           created_at?: string
@@ -1833,7 +2097,6 @@ export type Database = {
           onboarding_completed_at?: string | null
           onboarding_current_step?: string | null
           role?: string | null
-          selected_use_cases?: string[] | null
           slack_notification_channel?: string | null
           slack_user_id?: string | null
           updated_at?: string

@@ -25,7 +25,7 @@ interface Integration {
   description: string
   status: IntegrationStatus
   icon: React.ReactNode
-  category: 'sessions' | 'issues' | 'development' | 'analytics'
+  category: 'sessions' | 'issues' | 'development' | 'analytics' | 'customer_data'
   comingSoon?: boolean
   requestAccess?: boolean
 }
@@ -84,6 +84,14 @@ function AmplitudeIcon() {
 
 function PostHogIcon() {
   return <Image src="/logos/posthog.svg" alt="PostHog" width={32} height={32} />
+}
+
+function HubSpotIcon() {
+  return <Image src="/logos/hubspot.svg" alt="HubSpot" width={32} height={32} />
+}
+
+function SalesforceIcon() {
+  return <Image src="/logos/salesforce.svg" alt="Salesforce" width={32} height={32} />
 }
 
 export default function IntegrationsPage() {
@@ -395,10 +403,28 @@ export default function IntegrationsPage() {
       {
         id: 'posthog',
         name: 'PostHog',
-        description: 'Sync user behavior data for deeper session context',
+        description: 'Sync user behavior data for deeper feedback context',
         status: 'not_connected',
         icon: <PostHogIcon />,
         category: 'analytics',
+        comingSoon: true,
+      },
+      {
+        id: 'hubspot',
+        name: 'HubSpot',
+        description: 'Sync companies and contacts from HubSpot CRM',
+        status: 'not_connected',
+        icon: <HubSpotIcon />,
+        category: 'customer_data',
+        comingSoon: true,
+      },
+      {
+        id: 'salesforce',
+        name: 'Salesforce',
+        description: 'Sync companies and contacts from Salesforce',
+        status: 'not_connected',
+        icon: <SalesforceIcon />,
+        category: 'customer_data',
         comingSoon: true,
       },
     ])
@@ -408,6 +434,7 @@ export default function IntegrationsPage() {
   const issueIntegrations = integrations.filter(i => i.category === 'issues')
   const developmentIntegrations = integrations.filter(i => i.category === 'development')
   const analyticsIntegrations = integrations.filter(i => i.category === 'analytics')
+  const customerDataIntegrations = integrations.filter(i => i.category === 'customer_data')
 
   // Handler for opening integration dialogs - updates URL for consistent tracking
   const handleConfigureIntegration = (integrationId: string) => {
@@ -452,7 +479,7 @@ export default function IntegrationsPage() {
       {/* Session Sources */}
       <div>
         <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] mb-4">
-          Session Sources
+          Feedback Sources
         </h3>
         <div className="grid gap-4 md:grid-cols-2">
           {sessionIntegrations.map((integration) => (
@@ -510,6 +537,22 @@ export default function IntegrationsPage() {
         </h3>
         <div className="grid gap-4 md:grid-cols-2">
           {analyticsIntegrations.map((integration) => (
+            <IntegrationCard
+              key={integration.id}
+              integration={integration}
+              onConfigure={() => handleConfigureIntegration(integration.id)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Customer Data */}
+      <div>
+        <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)] mb-4">
+          Customer Data
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2">
+          {customerDataIntegrations.map((integration) => (
             <IntegrationCard
               key={integration.id}
               integration={integration}

@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useState } from 'react'
+import { forwardRef, useEffect, useState } from 'react'
 
 type CollapsibleSectionVariant = 'default' | 'flat'
 
@@ -12,6 +12,8 @@ interface CollapsibleSectionProps {
   /** Content rendered on the right side of the header row (e.g., action buttons) */
   headerRight?: React.ReactNode
   defaultExpanded?: boolean
+  /** When set to true, forces the section to expand (one-way signal) */
+  expanded?: boolean
   variant?: CollapsibleSectionVariant
   children: React.ReactNode
   className?: string
@@ -29,9 +31,16 @@ const variantStyles: Record<CollapsibleSectionVariant, { container: string; cont
 }
 
 const CollapsibleSection = forwardRef<HTMLDivElement, CollapsibleSectionProps>(
-  ({ title, collapsedSummary, collapsedContent, headerRight, defaultExpanded = true, variant = 'default', children, className = '' }, ref) => {
+  ({ title, collapsedSummary, collapsedContent, headerRight, defaultExpanded = true, expanded, variant = 'default', children, className = '' }, ref) => {
     const [isExpanded, setIsExpanded] = useState(defaultExpanded)
     const styles = variantStyles[variant]
+
+    // Allow external force-expansion
+    useEffect(() => {
+      if (expanded) {
+        setIsExpanded(true)
+      }
+    }, [expanded])
 
     return (
       <div ref={ref} className={`${styles.container} ${className}`}>

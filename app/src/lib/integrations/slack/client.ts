@@ -247,6 +247,41 @@ export class SlackClient {
   }
 
   /**
+   * Add an emoji reaction to a message
+   * Non-throwing - returns result with ok/error
+   */
+  async addReaction(params: {
+    channel: string
+    timestamp: string
+    name: string
+  }): Promise<{ ok: boolean; error?: string }> {
+    try {
+      const result = await this.request<Record<string, never>>('reactions.add', {
+        channel: params.channel,
+        timestamp: params.timestamp,
+        name: params.name,
+      })
+
+      if (!result.ok) {
+        if (result.error === 'already_reacted') {
+          return { ok: true }
+        }
+        if (result.error === 'missing_scope' || result.error === 'not_allowed_token_type') {
+          console.warn('[SlackClient.addReaction] reactions:write scope not available - skipping reaction')
+          return { ok: false, error: result.error }
+        }
+        console.warn('[SlackClient.addReaction] Error:', result.error)
+        return { ok: false, error: result.error }
+      }
+
+      return { ok: true }
+    } catch (error) {
+      console.warn('[SlackClient.addReaction] Exception:', error)
+      return { ok: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  /**
    * Leave a channel
    */
   async leaveChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {

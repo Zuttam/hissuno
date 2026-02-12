@@ -22,7 +22,7 @@ export const preparePMContext = createStep({
       throw new Error('Input data not found')
     }
 
-    const { sessionId, projectId, tags, tagsApplied, reasoning, localCodePath, codebaseLeaseId, codebaseCommitSha } = inputData
+    const { sessionId, projectId, tags, tagsApplied, reasoning } = inputData
     logger?.info('[prepare-pm-context] Starting', { sessionId, projectId })
     await writer?.write({ type: 'progress', message: 'Fetching session context...' })
 
@@ -55,7 +55,7 @@ export const preparePMContext = createStep({
     // Fetch project settings
     const { data: settings } = await supabase
       .from('project_settings')
-      .select('issue_tracking_enabled, issue_spec_threshold, pm_dedup_include_closed')
+      .select('issue_tracking_enabled, pm_dedup_include_closed')
       .eq('project_id', projectId)
       .single()
 
@@ -91,13 +91,8 @@ export const preparePMContext = createStep({
       })),
       settings: {
         issueTrackingEnabled: settings?.issue_tracking_enabled ?? true,
-        issueSpecThreshold: settings?.issue_spec_threshold ?? 3,
         pmDedupIncludeClosed: settings?.pm_dedup_include_closed ?? false,
       },
-      // Pass through codebase lease fields
-      localCodePath,
-      codebaseLeaseId,
-      codebaseCommitSha,
     }
   },
 })

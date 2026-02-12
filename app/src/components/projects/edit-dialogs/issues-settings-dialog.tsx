@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, type ChangeEvent } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { EditDialog } from './edit-dialog'
 
 
@@ -42,67 +42,8 @@ export function TrackingToggle({
   )
 }
 
-
-interface ThresholdSettingsProps {
-  specThreshold: number
-  specGuidelines: string | null
-  onThresholdChange: (value: number) => void
-  onGuidelinesChange: (e: ChangeEvent<HTMLTextAreaElement>) => void
-}
-
-export function ThresholdSettings({
-  specThreshold,
-  specGuidelines,
-  onThresholdChange,
-  onGuidelinesChange,
-}: ThresholdSettingsProps) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <label className="font-mono text-sm font-medium text-[color:var(--foreground)]">
-          Spec Generation Threshold
-        </label>
-        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-          Generate product specs when an issue reaches this many upvotes
-        </p>
-        <div className="mt-2 flex items-center gap-3">
-          <input
-            type="range"
-            min={1}
-            max={20}
-            value={specThreshold}
-            onChange={(e) => onThresholdChange(Number(e.target.value))}
-            className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-[color:var(--border)]"
-          />
-          <span className="min-w-[2rem] text-center font-mono text-sm font-bold text-[color:var(--foreground)]">
-            {specThreshold}
-          </span>
-        </div>
-      </div>
-
-      <div>
-        <label className="font-mono text-sm font-medium text-[color:var(--foreground)]">
-          Spec Guidelines
-        </label>
-        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-          Custom instructions for generating product specifications
-        </p>
-        <textarea
-          value={specGuidelines ?? ''}
-          onChange={onGuidelinesChange}
-          placeholder="e.g., Include acceptance criteria, user stories, technical considerations..."
-          rows={4}
-          className="mt-2 w-full resize-none rounded-[4px] border border-[color:var(--border)] bg-[color:var(--surface)] px-3 py-2 font-mono text-sm text-[color:var(--foreground)] placeholder:text-[color:var(--text-tertiary)] focus:border-[color:var(--accent-primary)] focus:outline-none"
-        />
-      </div>
-    </div>
-  )
-}
-
 export interface IssuesSettings {
   issue_tracking_enabled: boolean
-  issue_spec_threshold: number
-  spec_guidelines: string | null
 }
 
 interface IssuesSettingsDialogProps {
@@ -120,8 +61,6 @@ export function IssuesSettingsDialog({
 }: IssuesSettingsDialogProps) {
   const [settings, setSettings] = useState<IssuesSettings>({
     issue_tracking_enabled: true,
-    issue_spec_threshold: 5,
-    spec_guidelines: null,
   })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -155,15 +94,6 @@ export function IssuesSettingsDialog({
 
   const handleTrackingEnabledChange = useCallback((checked: boolean) => {
     setSettings((prev) => ({ ...prev, issue_tracking_enabled: checked }))
-  }, [])
-
-  const handleThresholdChange = useCallback((value: number) => {
-    setSettings((prev) => ({ ...prev, issue_spec_threshold: value }))
-  }, [])
-
-  const handleGuidelinesChange = useCallback((e: ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value.trim() || null
-    setSettings((prev) => ({ ...prev, spec_guidelines: value }))
   }, [])
 
   const handleSave = async () => {
@@ -209,15 +139,6 @@ export function IssuesSettingsDialog({
             trackingEnabled={settings.issue_tracking_enabled}
             onTrackingEnabledChange={handleTrackingEnabledChange}
           />
-
-          {settings.issue_tracking_enabled && (
-            <ThresholdSettings
-              specThreshold={settings.issue_spec_threshold}
-              specGuidelines={settings.spec_guidelines}
-              onThresholdChange={handleThresholdChange}
-              onGuidelinesChange={handleGuidelinesChange}
-            />
-          )}
         </div>
       )}
     </EditDialog>

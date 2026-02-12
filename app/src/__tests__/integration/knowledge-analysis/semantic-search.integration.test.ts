@@ -16,6 +16,19 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
 import { RuntimeContext } from '@mastra/core/runtime-context'
+
+vi.mock('@/mastra', async (importOriginal) => {
+  if (process.env.RUN_INTEGRATION_TESTS === 'true') {
+    return importOriginal()
+  }
+  return {
+    mastra: {
+      getWorkflow: () => null,
+      getAgent: () => null,
+    },
+  }
+})
+
 import { mastra } from '@/mastra'
 import {
   setupTestProject,
@@ -31,6 +44,13 @@ import { mockOpenAIEmbeddings } from '@/__tests__/mocks/openai-embeddings'
 
 // Test timeout for integration tests
 const TEST_TIMEOUT = 120000
+
+const shouldRun = process.env.RUN_INTEGRATION_TESTS === 'true'
+
+if (!shouldRun) {
+  console.log('[semantic-search] Skipping integration tests')
+  console.log('  To run: RUN_INTEGRATION_TESTS=true npm run test:integration')
+}
 
 // Check if database is available
 let isDatabaseAvailable = false
@@ -146,6 +166,8 @@ let testContext: TestContext
 // ============================================================================
 // Setup & Teardown
 // ============================================================================
+
+describe('Semantic Search Integration', { skip: !shouldRun }, () => {
 
 beforeAll(async () => {
   // Mock OpenAI embeddings API for deterministic tests
@@ -804,3 +826,5 @@ describe('Search API', () => {
     TEST_TIMEOUT
   )
 })
+
+}) // end Semantic Search Integration

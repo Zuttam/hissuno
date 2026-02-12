@@ -9,23 +9,46 @@ import {
 } from '@/components/ui'
 import {
   DEFAULT_ONBOARDING_DATA,
+  STEP_REVEAL_MESSAGES,
   type OnboardingFormData,
   type OnboardingStepId,
   type StepDefinition,
   type OnboardingWizardContext,
   type CompanySize,
-  type UseCaseOption,
   getStepsForFlow,
 } from './steps'
+import { StepRevealWrapper } from './steps/step-reveal-wrapper'
 import {
   trackSignupCompleted,
   trackOnboardingCompleted,
   getStoredUTM,
-  getPreselectedUseCase,
-  utmContentToUseCase,
   clearStoredUTM,
-  clearPreselectedUseCase,
 } from '@/lib/event_tracking'
+
+const REVEALED_STEPS_KEY = 'hissuno_onboarding_revealed_steps'
+
+function loadRevealedSteps(): Set<OnboardingStepId> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const stored = localStorage.getItem(REVEALED_STEPS_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored) as string[]
+      // Filter out legacy 'personalize' step if present
+      const valid = parsed.filter((s): s is OnboardingStepId =>
+        ['account', 'about', 'billing', 'project'].includes(s)
+      )
+      return new Set(valid)
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return new Set()
+}
+
+function saveRevealedSteps(steps: Set<OnboardingStepId>): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(REVEALED_STEPS_KEY, JSON.stringify([...steps]))
+}
 
 export function OnboardingWizard() {
   const router = useRouter()
@@ -38,6 +61,9 @@ export function OnboardingWizard() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [hasTrackedSignup, setHasTrackedSignup] = useState(false)
 
+  // Reveal state — persisted to localStorage
+  const [revealedSteps, setRevealedSteps] = useState<Set<OnboardingStepId>>(() => loadRevealedSteps())
+
   // Get onboarding steps
   const steps: StepDefinition[] = useMemo(() => {
     return getStepsForFlow()
@@ -47,8 +73,21 @@ export function OnboardingWizard() {
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [phase, setPhase] = useState<'idle' | 'profile' | 'project' | 'redirecting'>('idle')
+  const [phase, setPhase] = useState<'idle' | 'profile' | 'project' | 'demo' | 'redirecting'>('idle')
   const [error, setError] = useState<string | null>(null)
+
+  // Derived: is current step in reveal mode?
+  const currentStepId = steps[currentStepIndex]?.id as OnboardingStepId
+  const isInReveal = currentStepId ? !revealedSteps.has(currentStepId) : false
+
+  const handleRevealComplete = useCallback((stepId: OnboardingStepId) => {
+    setRevealedSteps((prev) => {
+      const next = new Set(prev)
+      next.add(stepId)
+      saveRevealedSteps(next)
+      return next
+    })
+  }, [])
 
   // Track signup completion for OAuth users (signup_completed=true in URL)
   useEffect(() => {
@@ -68,21 +107,6 @@ export function OnboardingWizard() {
         const response = await fetch('/api/user/profile')
         const data = await response.json()
 
-        // Get pre-selected use case from UTM or sessionStorage
-        const storedUTM = getStoredUTM()
-        const utmUseCase = utmContentToUseCase(storedUTM?.utm_content)
-        const sessionUseCase = getPreselectedUseCase()
-        const preselectedUseCase = utmUseCase || sessionUseCase
-
-        // Merge with existing profile data
-        const existingUseCases = (data.profile?.selected_use_cases as UseCaseOption[]) ?? []
-
-        // Add pre-selected use case if not already in the list
-        let mergedUseCases = existingUseCases
-        if (preselectedUseCase && !existingUseCases.includes(preselectedUseCase as UseCaseOption)) {
-          mergedUseCases = [preselectedUseCase as UseCaseOption, ...existingUseCases]
-        }
-
         if (data.profile) {
           setFormData((prev) => ({
             ...prev,
@@ -92,14 +116,21 @@ export function OnboardingWizard() {
               role: data.profile.role ?? '',
               companySize: (data.profile.company_size as CompanySize) ?? '',
             },
-            useCase: {
-              selectedUseCases: mergedUseCases,
+            about: {
+              selectedChannels: data.profile.communication_channels ?? [],
+              otherChannelText: '',
             },
           }))
 
           // Restore saved step (only if not returning from checkout)
-          const savedStepId = data.profile.onboarding_current_step as OnboardingStepId | null
+          let savedStepId = data.profile.onboarding_current_step as string | null
           const isCheckoutReturn = searchParams.get('checkout') === 'success'
+
+          // Map legacy 'personalize' step to 'project'
+          if (savedStepId === 'personalize') {
+            savedStepId = 'project'
+          }
+
           if (savedStepId && !isCheckoutReturn) {
             const stepsForFlow = getStepsForFlow()
             const savedIndex = stepsForFlow.findIndex((s) => s.id === savedStepId)
@@ -114,14 +145,6 @@ export function OnboardingWizard() {
               setCurrentStepIndex(billingIndex)
             }
           }
-        } else if (preselectedUseCase) {
-          // No existing profile, but we have a pre-selected use case
-          setFormData((prev) => ({
-            ...prev,
-            useCase: {
-              selectedUseCases: [preselectedUseCase as UseCaseOption],
-            },
-          }))
         }
       } catch (err) {
         console.error('[onboarding] Failed to load profile:', err)
@@ -153,18 +176,23 @@ export function OnboardingWizard() {
           companyName: formData.profile.companyName,
           role: formData.profile.role,
           companySize: formData.profile.companySize || null,
-          selectedUseCases: formData.useCase?.selectedUseCases ?? [],
+          communicationChannels: formData.about?.selectedChannels ?? [],
           onboardingCurrentStep: nextStepId ?? steps[currentStepIndex]?.id ?? null,
-          // Don't mark as completed - that happens on final submit
         }),
       })
     } catch (err) {
       console.error('[onboarding] Failed to save profile:', err)
     }
-  }, [formData.profile, formData.useCase?.selectedUseCases, steps, currentStepIndex])
+  }, [formData.profile, formData.about?.selectedChannels, steps, currentStepIndex])
 
   // Navigation handlers
   const handleNext = useCallback(async () => {
+    // If we're in reveal state, just complete the reveal (no validation needed)
+    if (isInReveal) {
+      handleRevealComplete(currentStepId)
+      return
+    }
+
     const currentStep = steps[currentStepIndex]
     const validation = currentStep.validate(formData)
 
@@ -179,12 +207,10 @@ export function OnboardingWizard() {
       const nextIndex = currentStepIndex + 1
       const nextStepId = steps[nextIndex]?.id
       // Save profile data on each step transition, persisting the next step
-      // Await to ensure step is saved before user can interact with next step
-      // (prevents stale saved step if user opens external checkout immediately)
       await saveProfile(nextStepId)
       setCurrentStepIndex(nextIndex)
     }
-  }, [currentStepIndex, steps, formData, saveProfile])
+  }, [currentStepIndex, steps, formData, saveProfile, isInReveal, currentStepId, handleRevealComplete])
 
   const handlePrevious = useCallback(() => {
     setError(null)
@@ -235,8 +261,10 @@ export function OnboardingWizard() {
     setPhase('profile')
     setError(null)
 
+    const isDemoMode = formData.project.projectMode === 'demo'
+
     try {
-      // 1. Save profile with use cases, clear current step
+      // 1. Save profile with channels, clear current step
       const profileResponse = await fetch('/api/user/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -245,7 +273,7 @@ export function OnboardingWizard() {
           companyName: formData.profile.companyName,
           role: formData.profile.role,
           companySize: formData.profile.companySize || null,
-          selectedUseCases: formData.useCase?.selectedUseCases ?? [],
+          communicationChannels: formData.about?.selectedChannels ?? [],
           onboardingCompleted: true,
           onboardingCurrentStep: null,
         }),
@@ -258,45 +286,79 @@ export function OnboardingWizard() {
       // 2. Track onboarding completion
       const utm = getStoredUTM()
       trackOnboardingCompleted({
-        selectedUseCases: formData.useCase?.selectedUseCases ?? [],
+        selectedChannels: formData.about?.selectedChannels ?? [],
         utm: utm ?? undefined,
       })
 
-      // 3. Clear stored UTM and pre-selection after successful onboarding
+      // 3. Clear stored UTM after successful onboarding
       clearStoredUTM()
-      clearPreselectedUseCase()
 
-      // 4. Create project if name was provided
-      const projectName = formData.project?.name?.trim()
-      if (projectName) {
-        setPhase('project')
+      if (isDemoMode) {
+        // Demo flow: create demo project via dedicated endpoint
+        setPhase('demo')
         try {
-          const projectFormData = new FormData()
-          projectFormData.append('name', projectName)
-          if (formData.project.description?.trim()) {
-            projectFormData.append('description', formData.project.description.trim())
-          }
-
-          const projectResponse = await fetch('/api/projects', {
+          const demoResponse = await fetch('/api/projects/demo', {
             method: 'POST',
-            body: projectFormData,
           })
 
-          if (projectResponse.ok) {
-            const projectData = await projectResponse.json()
+          if (demoResponse.ok) {
+            const demoData = await demoResponse.json()
             setPhase('redirecting')
-            router.push(`/projects/${projectData.project.id}/dashboard`)
+            localStorage.removeItem(REVEALED_STEPS_KEY)
+            router.push(`/projects/${demoData.project.id}/dashboard`)
             return
           }
         } catch (err) {
-          console.error('[onboarding] Failed to create project:', err)
-          // Fall through to /projects/new
+          console.error('[onboarding] Failed to create demo project:', err)
         }
-      }
 
-      // 5. Redirect to project creation if no project was created
-      setPhase('redirecting')
-      router.push('/projects/new')
+        // Fallback if demo creation fails
+        setPhase('redirecting')
+        localStorage.removeItem(REVEALED_STEPS_KEY)
+        router.push('/projects/new')
+      } else {
+        // Blank flow: create user-configured project
+        const projectName = formData.project?.name?.trim()
+        if (projectName) {
+          setPhase('project')
+          try {
+            const projectFormData = new FormData()
+            projectFormData.append('name', projectName)
+            if (formData.project.description?.trim()) {
+              projectFormData.append('description', formData.project.description.trim())
+            }
+
+            // If additional details provided, pass as a knowledge source
+            const additionalDetails = formData.project.additionalDetails?.trim()
+            if (additionalDetails) {
+              projectFormData.append(
+                'knowledgeSources',
+                JSON.stringify([{ type: 'raw_text', content: additionalDetails }])
+              )
+            }
+
+            const projectResponse = await fetch('/api/projects', {
+              method: 'POST',
+              body: projectFormData,
+            })
+
+            if (projectResponse.ok) {
+              const projectData = await projectResponse.json()
+              setPhase('redirecting')
+              localStorage.removeItem(REVEALED_STEPS_KEY)
+              router.push(`/projects/${projectData.project.id}/dashboard`)
+              return
+            }
+          } catch (err) {
+            console.error('[onboarding] Failed to create project:', err)
+          }
+        }
+
+        // Fallback: redirect to project creation
+        setPhase('redirecting')
+        localStorage.removeItem(REVEALED_STEPS_KEY)
+        router.push('/projects/new')
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to complete onboarding'
       setError(message)
@@ -331,8 +393,8 @@ export function OnboardingWizard() {
   const submitLabel = 'Get Started'
   const submittingLabel =
     phase === 'profile'
-      ? 'Saving profile...'
-      : phase === 'project'
+      ? 'Saving...'
+      : phase === 'project' || phase === 'demo'
         ? 'Creating...'
         : 'Redirecting...'
 
@@ -363,6 +425,7 @@ export function OnboardingWizard() {
         steps={wizardSteps}
         mode="onboarding"
         overlay
+        isInRevealState={isInReveal}
         onPrevious={handlePrevious}
         onNext={handleNext}
         onSubmit={handleSubmit}
@@ -379,12 +442,19 @@ export function OnboardingWizard() {
             stepNumber={idx + 1}
             currentStep={currentStepIndex + 1}
           >
-            <step.component
-              context={context}
-              title={step.title}
-              description={step.description}
-              {...(step.id === 'billing' ? { onCheckoutComplete: handleNext } : {})}
-            />
+            <StepRevealWrapper
+              stepId={step.id}
+              revealConfig={STEP_REVEAL_MESSAGES[step.id]}
+              isRevealed={revealedSteps.has(step.id)}
+              onRevealComplete={handleRevealComplete}
+            >
+              <step.component
+                context={context}
+                title={step.title}
+                description={step.description}
+                {...(step.id === 'billing' ? { onCheckoutComplete: handleNext } : {})}
+              />
+            </StepRevealWrapper>
           </WizardStep>
         ))}
       </WizardContainer>

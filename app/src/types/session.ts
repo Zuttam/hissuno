@@ -20,7 +20,7 @@ export const SESSION_TYPE_INFO: Record<
   SessionType,
   { label: string; description: string; contentLabel: string; variant: 'info' | 'success' | 'warning' | 'default' }
 > = {
-  chat: { label: 'Chat', description: 'Conversational support session', contentLabel: 'Messages', variant: 'info' },
+  chat: { label: 'Chat', description: 'Live chat conversation', contentLabel: 'Messages', variant: 'info' },
   meeting: { label: 'Meeting', description: 'Call or meeting transcript', contentLabel: 'Transcript', variant: 'success' },
   behavioral: { label: 'Behavioral', description: 'User behavior events', contentLabel: 'Events', variant: 'warning' },
 }
@@ -94,6 +94,7 @@ export interface SessionRecord {
   project_id: string
   user_id: string | null
   user_metadata: Record<string, string> | null
+  contact_id: string | null
   page_url: string | null
   page_title: string | null
   name: string | null
@@ -131,6 +132,22 @@ export interface SessionLinkedIssue {
 }
 
 /**
+ * Contact info resolved from session email matching
+ */
+export interface SessionContact {
+  id: string
+  name: string
+  email: string
+  company: {
+    id: string
+    name: string
+    domain: string
+    arr: number | null
+    stage: string
+  } | null
+}
+
+/**
  * Session with project details for display
  */
 export interface SessionWithProject extends SessionRecord {
@@ -142,6 +159,8 @@ export interface SessionWithProject extends SessionRecord {
   linked_issues?: SessionLinkedIssue[]
   /** Matched Hissuno user profile (if user_id is a known platform user) */
   user_profile?: { full_name: string | null } | null
+  /** Resolved contact from email matching */
+  contact?: SessionContact | null
 }
 
 /**
@@ -211,6 +230,7 @@ export interface CreateMessageInput {
 export interface CreateSessionInput {
   project_id: string
   user_id?: string
+  user_metadata?: Record<string, string>
   page_url?: string
   page_title?: string
   name?: string
@@ -231,18 +251,30 @@ export interface UpdateSessionInput {
 
 /**
  * Resolved user display info from session data.
- * Priority: user_profile.full_name > metadata.name > metadata.email > user_id
+ * Priority: contact.name > user_profile.full_name > metadata.name > metadata.email > user_id
  */
 export function getSessionUserDisplay(session: SessionWithProject): {
   name: string | null
   isHissuno: boolean
+  contactId?: string
+  companyName?: string
 } {
-  // 1. Hissuno platform user
+  // 1. Linked contact (resolved from email matching)
+  if (session.contact) {
+    return {
+      name: session.contact.name,
+      isHissuno: false,
+      contactId: session.contact.id,
+      companyName: session.contact.company?.name ?? undefined,
+    }
+  }
+
+  // 2. Hissuno platform user
   if (session.user_profile?.full_name) {
     return { name: session.user_profile.full_name, isHissuno: true }
   }
 
-  // 2. External user with metadata
+  // 3. External user with metadata
   const metaName = session.user_metadata?.name as string | undefined
   const metaEmail = session.user_metadata?.email as string | undefined
   if (metaName) {
@@ -252,7 +284,7 @@ export function getSessionUserDisplay(session: SessionWithProject): {
     return { name: metaEmail, isHissuno: false }
   }
 
-  // 3. Raw user_id fallback
+  // 4. Raw user_id fallback
   if (session.user_id) {
     return { name: session.user_id, isHissuno: false }
   }

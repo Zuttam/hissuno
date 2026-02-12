@@ -117,7 +117,7 @@ export function useSessions({
     } catch {
       return false
     }
-  }, [])
+  }, [filters.projectId])
 
   useEffect(() => {
     void fetchSessions()

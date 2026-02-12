@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Dialog, Button, Input, Alert, Heading } from '@/components/ui'
+import { Dialog, Button, Alert } from '@/components/ui'
 
 interface PmAgentDialogProps {
   open: boolean
@@ -10,7 +10,7 @@ interface PmAgentDialogProps {
   initialSettings: {
     classificationGuidelines: string
     specGuidelines: string
-    autoSpecThreshold: number
+    analysisGuidelines: string
   }
   onSaved: () => void
 }
@@ -26,7 +26,7 @@ export function PmAgentDialog({
     initialSettings.classificationGuidelines
   )
   const [specGuidelines, setSpecGuidelines] = useState(initialSettings.specGuidelines)
-  const [autoSpecThreshold, setAutoSpecThreshold] = useState(initialSettings.autoSpecThreshold)
+  const [analysisGuidelines, setAnalysisGuidelines] = useState(initialSettings.analysisGuidelines)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -35,7 +35,7 @@ export function PmAgentDialog({
     if (open) {
       setClassificationGuidelines(initialSettings.classificationGuidelines)
       setSpecGuidelines(initialSettings.specGuidelines)
-      setAutoSpecThreshold(initialSettings.autoSpecThreshold)
+      setAnalysisGuidelines(initialSettings.analysisGuidelines)
       setError(null)
     }
   }, [open, initialSettings])
@@ -45,13 +45,13 @@ export function PmAgentDialog({
     setError(null)
 
     try {
-      const res = await fetch(`/api/projects/${projectId}/settings`, {
+      const res = await fetch(`/api/projects/${projectId}/settings/pm-agent`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          classification_guidelines: classificationGuidelines,
-          spec_guidelines: specGuidelines,
-          auto_spec_threshold: autoSpecThreshold,
+          classification_guidelines: classificationGuidelines || null,
+          spec_guidelines: specGuidelines || null,
+          analysis_guidelines: analysisGuidelines || null,
         }),
       })
 
@@ -69,17 +69,17 @@ export function PmAgentDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Product Specialist" size="lg">
+    <Dialog open={open} onClose={onClose} title="Product Specialist" size="xl">
       <div className="flex flex-col gap-6">
         {error && <Alert variant="warning">{error}</Alert>}
 
         <p className="text-sm text-[color:var(--text-secondary)]">
-          Configure how sessions are reviewed and specs are generated.
+          Configure how sessions are reviewed, issues are analyzed, and specs are generated.
         </p>
 
         <div>
           <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
-            Session Classification Guidelines
+            Feedback Classification Guidelines
           </label>
           <textarea
             value={classificationGuidelines}
@@ -90,6 +90,22 @@ export function PmAgentDialog({
           />
           <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
             Instructions for how the PM agent should classify and tag customer sessions
+          </p>
+        </div>
+
+        <div>
+          <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
+            Impact & Effort Guidelines
+          </label>
+          <textarea
+            value={analysisGuidelines}
+            onChange={(e) => setAnalysisGuidelines(e.target.value)}
+            placeholder="Enter guidelines for how issue impact and effort should be assessed (e.g., what factors determine high impact, how to weigh customer revenue)..."
+            rows={4}
+            className="w-full rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-3 py-2 font-mono text-sm text-[color:var(--foreground)] placeholder:text-[color:var(--text-tertiary)] focus:border-[color:var(--accent-selected)] focus:outline-none"
+          />
+          <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
+            Instructions for how the agent should score impact and estimate effort for issues
           </p>
         </div>
 
@@ -106,26 +122,6 @@ export function PmAgentDialog({
           />
           <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
             Instructions for how product specifications should be formatted and what to include
-          </p>
-        </div>
-
-        <div className="max-w-xs">
-          <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
-            Auto-Spec Threshold
-          </label>
-          <div className="flex items-center gap-3">
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              value={autoSpecThreshold}
-              onChange={(e) => setAutoSpecThreshold(parseInt(e.target.value) || 3)}
-              className="w-20"
-            />
-            <span className="text-sm text-[color:var(--text-secondary)]">upvotes</span>
-          </div>
-          <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-            Number of upvotes an issue needs before a spec is automatically generated
           </p>
         </div>
 

@@ -6,13 +6,21 @@ import { useProject } from '@/components/providers/project-provider'
 import { ProjectAnalytics } from '@/components/analytics/project-analytics'
 import { ProjectDetailsDialog } from '@/components/projects/edit-dialogs/project-details-dialog'
 import { FloatingCard } from '@/components/ui/floating-card'
+import { SectionHeader } from '@/components/ui/section-header'
 import { Button, PageHeader, Spinner } from '@/components/ui'
+import { useDashboardData } from '@/hooks/use-dashboard-data'
+import { IssuePipeline } from '@/components/dashboard/issue-pipeline'
+import { TopIssuesList } from '@/components/dashboard/top-issues-list'
+import { PendingReviews } from '@/components/dashboard/pending-reviews'
 
 export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { project, projectId, isLoading } = useProject()
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const { data: dashboardData, isLoading: dashboardLoading } = useDashboardData({
+    projectId: projectId ?? '',
+  })
 
   // Auto-open dialog based on URL param
   useEffect(() => {
@@ -31,11 +39,9 @@ export default function DashboardPage() {
   }
 
   const handleProjectSaved = () => {
-    // Refresh the page to get updated project data
     router.refresh()
   }
 
-  // Handler for opening dialog - updates URL for consistent tracking
   const handleOpenEditDialog = () => {
     router.push(`/projects/${projectId}/dashboard?dialog=edit`)
   }
@@ -66,9 +72,34 @@ export default function DashboardPage() {
           </Button>
         }
       />
-      
+
+      {/* Actionable Section */}
       <FloatingCard floating="gentle">
-        <ProjectAnalytics projectId={projectId} />
+        <SectionHeader title="In a Glance" titleAs="h3" />
+        {dashboardLoading ? (
+          <div className="flex min-h-[150px] items-center justify-center">
+            <Spinner size="md" />
+          </div>
+        ) : dashboardData ? (
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <IssuePipeline stats={dashboardData.pipeline} projectId={projectId} />
+            <TopIssuesList issues={dashboardData.topIssues} projectId={projectId} />
+            <PendingReviews
+              sessions={dashboardData.pendingReviews.sessions}
+              count={dashboardData.pendingReviews.count}
+              projectId={projectId}
+            />
+          </div>
+        ) : null}
+      </FloatingCard>
+
+      {/* Analytics Section */}
+      <FloatingCard floating="gentle" className="mt-6">
+        <SectionHeader title="Analytics" titleAs="h3" />
+        <ProjectAnalytics
+          projectId={projectId}
+          velocityData={dashboardData?.velocity}
+        />
       </FloatingCard>
 
       <ProjectDetailsDialog

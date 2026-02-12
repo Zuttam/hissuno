@@ -13,7 +13,7 @@ import { workflowContextWithCodebaseSchema, preparedContextSchema } from '../sch
 
 export const prepareContext = createStep({
   id: 'prepare-context',
-  description: 'Gather issue context, linked sessions, and knowledge for spec generation',
+  description: 'Gather issue context, linked feedback sessions, and knowledge for spec generation',
   inputSchema: workflowContextWithCodebaseSchema,
   outputSchema: preparedContextSchema,
   execute: async ({ inputData, mastra, writer }) => {
@@ -50,7 +50,7 @@ export const prepareContext = createStep({
 
     const sessionIds = contributingSessions?.map(s => s.session_id).filter(Boolean) ?? []
 
-    // Fetch user messages from linked sessions
+    // Fetch user messages from linked feedback sessions
     const linkedSessions: Array<{ id: string; userMessages: string[] }> = []
 
     for (const sessionId of sessionIds.slice(0, 5)) { // Limit to 5 sessions for context
@@ -108,7 +108,7 @@ export const prepareContext = createStep({
 
     await writer?.write({
       type: 'progress',
-      message: `Context prepared: ${linkedSessions.length} linked sessions`,
+      message: `Context prepared: ${linkedSessions.length} linked feedback`,
     })
 
     logger?.info('[prepare-context] Completed', {

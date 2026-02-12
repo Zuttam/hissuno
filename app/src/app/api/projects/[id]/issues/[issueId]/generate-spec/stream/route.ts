@@ -5,6 +5,7 @@ import { getIssueById } from '@/lib/supabase/issues'
 import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
 import { mastra } from '@/mastra'
+import { getPmAgentSettingsAdmin } from '@/lib/supabase/project-settings/pm-agent'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -153,11 +154,15 @@ export async function GET(_request: Request, context: RouteContext) {
           console.log(`${LOG_PREFIX} Creating workflow run with runId:`, runId)
           const run = await workflow.createRunAsync({ runId })
 
+          // Load PM agent settings for spec guidelines
+          const pmSettings = await getPmAgentSettingsAdmin(projectId)
+
           // Prepare workflow input
           const workflowInput = {
             issueId,
             projectId,
             runId,
+            specGuidelines: pmSettings.spec_guidelines ?? undefined,
           }
 
           // Send workflow-start event

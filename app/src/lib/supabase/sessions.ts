@@ -7,12 +7,17 @@ import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-no
 import type { SessionRecord, SessionWithProject, SessionFilters, SessionLinkedIssue, SessionTag, SessionSource, SessionType, CreateSessionInput, UpdateSessionInput } from '@/types/session'
 import { getDefaultSessionType } from '@/types/session'
 
+function sanitizeSearchInput(input: string): string {
+  return input.replace(/[%_.,()]/g, '\\$&')
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const selectSessionWithProject = '*, project:projects(id, name)'
+const selectSessionWithProject = '*, project:projects(id, name), contact:contacts(id, name, email, company:companies(id, name, domain, arr, stage))'
 const selectSessionWithLinkedIssues = `
   *,
   project:projects(id, name),
+  contact:contacts(id, name, email, company:companies(id, name, domain, arr, stage)),
   issue_sessions(
     issue:issues(id, title, type, status, upvote_count)
   )
@@ -211,13 +216,13 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
       query = query.eq('project_id', filters.projectId)
     }
     if (filters.userId) {
-      query = query.ilike('user_id', `%${filters.userId}%`)
+      query = query.ilike('user_id', `%${sanitizeSearchInput(filters.userId)}%`)
     }
     if (filters.sessionId) {
-      query = query.ilike('id', `%${filters.sessionId}%`)
+      query = query.ilike('id', `%${sanitizeSearchInput(filters.sessionId)}%`)
     }
     if (filters.name) {
-      query = query.ilike('name', `%${filters.name}%`)
+      query = query.ilike('name', `%${sanitizeSearchInput(filters.name)}%`)
     }
     if (filters.status) {
       query = query.eq('status', filters.status)
@@ -548,6 +553,7 @@ export async function createManualSession(input: CreateSessionInput): Promise<Se
         id: sessionId,
         project_id: input.project_id,
         user_id: input.user_id || null,
+        user_metadata: input.user_metadata || {},
         page_url: input.page_url || null,
         page_title: input.page_title || null,
         name: sessionName,
@@ -790,6 +796,54 @@ export async function setSessionHumanTakeover(
 /**
  * Checks if a session is in human takeover mode. Uses admin client for widget route use.
  */
+/**
+ * Gets closed sessions that haven't been PM reviewed yet (pending reviews).
+ * Returns limited results plus total count for the badge.
+ */
+export async function getPendingPMReviews(
+  projectId: string,
+  limit = 8
+): Promise<{ sessions: { id: string; name: string | null; user_id: string | null; user_metadata: Record<string, string> | null; source: SessionSource; message_count: number; created_at: string }[]; count: number }> {
+  if (!isSupabaseConfigured()) {
+    return { sessions: [], count: 0 }
+  }
+
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return { sessions: [], count: 0 }
+    }
+
+    const { data, count, error } = await supabase
+      .from('sessions')
+      .select('id, name, user_id, user_metadata, source, message_count, created_at', { count: 'exact' })
+      .eq('project_id', projectId)
+      .is('pm_reviewed_at', null)
+      .eq('status', 'closed')
+      .eq('is_archived', false)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('[supabase.sessions.getPendingPMReviews] Failed', projectId, error)
+      return { sessions: [], count: 0 }
+    }
+
+    return {
+      sessions: (data ?? []) as { id: string; name: string | null; user_id: string | null; user_metadata: Record<string, string> | null; source: SessionSource; message_count: number; created_at: string }[],
+      count: count ?? 0,
+    }
+  } catch (error) {
+    console.error('[supabase.sessions.getPendingPMReviews] Unexpected error', projectId, error)
+    return { sessions: [], count: 0 }
+  }
+}
+
 export async function isSessionInHumanTakeover(sessionId: string): Promise<boolean> {
   if (!isServiceRoleConfigured()) {
     return false

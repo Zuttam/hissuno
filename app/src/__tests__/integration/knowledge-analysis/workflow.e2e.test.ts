@@ -13,7 +13,20 @@
  * Run with: npx vitest run src/__tests__/integration/knowledge-analysis/workflow.e2e.test.ts
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
+
+vi.mock('@/mastra', async (importOriginal) => {
+  if (process.env.RUN_INTEGRATION_TESTS === 'true') {
+    return importOriginal()
+  }
+  return {
+    mastra: {
+      getWorkflow: () => null,
+      getAgent: () => null,
+    },
+  }
+})
+
 import { mastra } from '@/mastra'
 import { createAdminClient } from '@/lib/supabase/server'
 import { triggerKnowledgeAnalysis } from '@/lib/knowledge/analysis-service'
@@ -34,6 +47,13 @@ import {
 
 // E2E test timeout (2 minutes for real LLM calls)
 const E2E_TEST_TIMEOUT = 120000
+
+const shouldRun = process.env.RUN_INTEGRATION_TESTS === 'true'
+
+if (!shouldRun) {
+  console.log('[knowledge-analysis.e2e] Skipping integration tests')
+  console.log('  To run: RUN_INTEGRATION_TESTS=true npm run test:integration')
+}
 
 // ============================================================================
 // Test Data
@@ -98,6 +118,8 @@ A: We guarantee 99.9% uptime for all paid plans.
 // ============================================================================
 // Setup & Teardown
 // ============================================================================
+
+describe('Knowledge Analysis E2E', { skip: !shouldRun }, () => {
 
 beforeAll(async () => {
   // Clean up any orphaned test data from previous crashed runs
@@ -481,3 +503,5 @@ describe('E2E: Re-analysis', () => {
     E2E_TEST_TIMEOUT * 2 // Double timeout for two analyses
   )
 })
+
+}) // end Knowledge Analysis E2E

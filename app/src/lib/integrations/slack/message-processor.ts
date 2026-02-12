@@ -104,6 +104,9 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
 
   console.log(`${LOG_PREFIX} Processing mention`, { channelId, threadTs, userId })
 
+  // React with :eyes: to acknowledge receipt (fire-and-forget)
+  void slackClient.addReaction({ channel: channelId, timestamp: messageTs, name: 'eyes' })
+
   // Generate session ID
   const sessionId = generateSlackSessionId(teamId, channelId, threadTs)
 
@@ -131,6 +134,8 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
   if (userName) userMetadata.name = userName
   if (userDisplayName) userMetadata.display_name = userDisplayName
 
+  console.log(`${LOG_PREFIX} Session upsert`, { sessionId, userEmail, userName })
+
   // Upsert session (limits are enforced at analysis time, not session creation)
   await upsertSession({
     id: sessionId,
@@ -153,6 +158,7 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
 
   // Fetch thread history
   const threadMessages = await slackClient.getThreadMessages(channelId, threadTs)
+  console.log(`${LOG_PREFIX} Thread history fetched`, { count: threadMessages.length })
 
   // Convert to chat messages
   const chatMessages = convertSlackMessages(threadMessages, botUserId)
@@ -190,6 +196,7 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
   }
 
   // Execute the agent synchronously (different from widget's SSE streaming)
+  console.log(`${LOG_PREFIX} Agent execution starting`, { sessionId, chatRunId: chatRunResult.chatRunId })
   const response = await executeAgentSync({
     projectId,
     sessionId,
@@ -199,17 +206,26 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
     userMetadata,
     supabase,
   })
+  console.log(`${LOG_PREFIX} Agent execution complete`, {
+    sessionId,
+    hasResponse: !!response,
+    responseLength: response?.length ?? 0,
+  })
 
   // Post response to Slack
   if (response) {
     // Remove the [SESSION_GOODBYE] marker if present (internal use only)
     const cleanResponse = response.replace(/\[SESSION_GOODBYE\]/g, '').trim()
 
-    await slackClient.postMessage({
+    const postResult = await slackClient.postMessage({
       channel: channelId,
       text: cleanResponse,
       threadTs,
     })
+    console.log(`${LOG_PREFIX} Slack message posted`, { ok: postResult.ok, ts: postResult.ts })
+
+    // React with :white_check_mark: to indicate response posted
+    void slackClient.addReaction({ channel: channelId, timestamp: messageTs, name: 'white_check_mark' })
 
     // Update session activity
     await updateSessionActivity(sessionId)
@@ -568,6 +584,9 @@ export async function processSlackThreadResponse(
 
   console.log(`${LOG_PREFIX} Processing thread response`, { channelId, threadTs, userId, sessionId })
 
+  // React with :eyes: to acknowledge receipt (fire-and-forget)
+  void slackClient.addReaction({ channel: channelId, timestamp: messageTs, name: 'eyes' })
+
   // Get user info for metadata
   let userEmail: string | null = null
   let userName: string | null = null
@@ -593,6 +612,7 @@ export async function processSlackThreadResponse(
 
   // Fetch thread history
   const threadMessages = await slackClient.getThreadMessages(channelId, threadTs)
+  console.log(`${LOG_PREFIX} Thread response history fetched`, { count: threadMessages.length })
 
   // Convert to chat messages
   const chatMessages = convertSlackMessages(threadMessages, botUserId)
@@ -628,6 +648,7 @@ export async function processSlackThreadResponse(
   }
 
   // Execute the agent synchronously
+  console.log(`${LOG_PREFIX} Thread response agent execution starting`, { sessionId, chatRunId: chatRunResult.chatRunId })
   const response = await executeAgentSync({
     projectId,
     sessionId,
@@ -636,6 +657,11 @@ export async function processSlackThreadResponse(
     userId: userEmail || userId || null,
     userMetadata,
     supabase,
+  })
+  console.log(`${LOG_PREFIX} Thread response agent execution complete`, {
+    sessionId,
+    hasResponse: !!response,
+    responseLength: response?.length ?? 0,
   })
 
   // Post response to Slack
@@ -647,6 +673,10 @@ export async function processSlackThreadResponse(
       text: cleanResponse,
       threadTs,
     })
+    console.log(`${LOG_PREFIX} Thread response posted`, { ok: postResult.ok, ts: postResult.ts })
+
+    // React with :white_check_mark: to indicate response posted
+    void slackClient.addReaction({ channel: channelId, timestamp: messageTs, name: 'white_check_mark' })
 
     // Update session activity
     await updateSessionActivity(sessionId)

@@ -30,7 +30,7 @@ async function resolveUser() {
 
 /**
  * GET /api/projects/[id]/issues/[issueId]
- * Gets a specific issue with linked sessions.
+ * Gets a specific issue with linked feedback.
  */
 export async function GET(_request: NextRequest, context: RouteContext) {
   const { id: projectId, issueId } = await context.params

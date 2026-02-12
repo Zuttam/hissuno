@@ -6,7 +6,7 @@ import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { signUpAction, type AuthActionState } from '@/lib/auth/actions'
 import { GoogleSignInButton } from './google-sign-in-button'
-import { trackSignupStarted, getStoredUTM, storePreselectedUseCase } from '@/lib/event_tracking'
+import { trackSignupStarted, getStoredUTM } from '@/lib/event_tracking'
 import { Divider } from '@/components/ui/divider'
 import { storeInviteCode } from '@/lib/invites/session-storage'
 
@@ -28,23 +28,15 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 
 interface SignUpFormProps {
   invite?: string
-  preSelectedUseCase?: string
 }
 
-export function SignUpForm({ invite, preSelectedUseCase }: SignUpFormProps) {
+export function SignUpForm({ invite }: SignUpFormProps) {
   const [state, formAction] = useActionState(signUpAction, initialState)
 
   const [inviteCode, setInviteCode] = useState(invite ?? '')
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [isValidatingInvite, setIsValidatingInvite] = useState(false)
   const [inviteValidated, setInviteValidated] = useState(false)
-
-  // Store pre-selected use case for onboarding when component mounts
-  useEffect(() => {
-    if (preSelectedUseCase) {
-      storePreselectedUseCase(preSelectedUseCase)
-    }
-  }, [preSelectedUseCase])
 
   // Validate invite code from URL on mount
   useEffect(() => {

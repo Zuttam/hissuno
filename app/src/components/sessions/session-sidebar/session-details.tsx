@@ -132,21 +132,37 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
               User
             </label>
             {userDisplay.name ? (
-              <div className="flex items-center gap-2">
-                <span
-                  className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-                    userDisplay.isHissuno
-                      ? 'bg-[color:var(--accent-success)]'
-                      : 'bg-[color:var(--text-tertiary)]'
-                  }`}
-                />
-                <span className="text-sm text-[color:var(--foreground)]">{userDisplay.name}</span>
-                <Badge variant={userDisplay.isHissuno ? 'success' : 'default'}>
-                  {userDisplay.isHissuno ? 'Hissuno' : 'External'}
-                </Badge>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+                      userDisplay.contactId
+                        ? 'bg-[color:var(--accent-info)]'
+                        : userDisplay.isHissuno
+                          ? 'bg-[color:var(--accent-success)]'
+                          : 'bg-[color:var(--text-tertiary)]'
+                    }`}
+                  />
+                  {userDisplay.contactId ? (
+                    <Link
+                      href={`/projects/${session.project_id}/customers/contacts/${userDisplay.contactId}`}
+                      className="text-sm text-[color:var(--foreground)] hover:underline"
+                    >
+                      {userDisplay.name}
+                    </Link>
+                  ) : (
+                    <span className="text-sm text-[color:var(--foreground)]">{userDisplay.name}</span>
+                  )}
+                  <Badge variant={userDisplay.contactId ? 'info' : userDisplay.isHissuno ? 'success' : 'default'}>
+                    {userDisplay.contactId ? 'Contact' : userDisplay.isHissuno ? 'Hissuno' : 'External'}
+                  </Badge>
+                </div>
+                {userDisplay.companyName && (
+                  <span className="ml-4 text-xs text-[color:var(--text-secondary)]">{userDisplay.companyName}</span>
+                )}
               </div>
             ) : (
-              <p className="text-sm text-[color:var(--text-tertiary)]">Unknown</p>
+              <p className="text-sm text-[color:var(--text-tertiary)]">Anonymous</p>
             )}
           </div>
         )

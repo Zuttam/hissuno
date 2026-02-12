@@ -60,6 +60,11 @@ export interface IssueRecord {
   effort_estimate: EffortEstimate | null
   effort_reasoning: string | null
   affected_files: string[]
+  // Analysis metrics
+  velocity_score: number | null
+  velocity_reasoning: string | null
+  effort_score: number | null
+  analysis_computed_at: string | null
   // Timestamps
   created_at: string
   updated_at: string
@@ -76,7 +81,7 @@ export interface IssueWithProject extends IssueRecord {
 }
 
 /**
- * Issue with linked sessions
+ * Issue with linked feedback (includes contact/company data for customer impact)
  */
 export interface IssueWithSessions extends IssueWithProject {
   sessions: {
@@ -87,7 +92,35 @@ export interface IssueWithSessions extends IssueWithProject {
     created_at: string
     name: string | null
     source: 'widget' | 'slack' | 'intercom' | 'gong' | 'api' | 'manual'
+    contact_id: string | null
+    contact: {
+      id: string
+      name: string
+      email: string
+      company: {
+        id: string
+        name: string
+        arr: number | null
+        stage: string
+      } | null
+    } | null
   }[]
+}
+
+/**
+ * Computed customer impact summary for an issue
+ */
+export interface IssueCustomerImpact {
+  contactCount: number
+  companyCount: number
+  totalARR: number
+  companies: Array<{
+    id: string
+    name: string
+    arr: number | null
+    stage: string
+    contactCount: number
+  }>
 }
 
 /**
@@ -124,9 +157,7 @@ export type WidgetPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top
  */
 export interface ProjectSettingsRecord {
   project_id: string
-  issue_spec_threshold: number
   issue_tracking_enabled: boolean
-  spec_guidelines: string | null
   pm_dedup_include_closed: boolean
   // Widget settings (new trigger/display model)
   widget_trigger_type: WidgetTrigger
@@ -175,6 +206,11 @@ export interface UpdateIssueInput {
 }
 
 /**
+ * Metric level for filtering (maps to score ranges: high=4-5, medium=2-3, low=1)
+ */
+export type MetricLevel = 'high' | 'medium' | 'low'
+
+/**
  * Filters for listing issues
  */
 export interface IssueFilters {
@@ -184,6 +220,9 @@ export interface IssueFilters {
   status?: IssueStatus
   search?: string
   showArchived?: boolean
+  velocityLevel?: MetricLevel
+  impactLevel?: MetricLevel
+  effortLevel?: MetricLevel
   limit?: number
   offset?: number
 }
@@ -219,8 +258,6 @@ export interface UpvoteResult {
   issueId: string
   newUpvoteCount: number
   newPriority: IssuePriority
-  thresholdMet: boolean
-  shouldGenerateSpec: boolean
 }
 
 /**
@@ -231,8 +268,6 @@ export interface PMReviewResult {
   issueId?: string
   issueTitle?: string
   skipReason?: string
-  thresholdMet?: boolean
-  specGenerated?: boolean
   // Enriched fields from multi-step workflow
   impactScore?: number
   effortEstimate?: EffortEstimate
@@ -297,4 +332,33 @@ export interface PMReviewSSEEvent {
   data?: Record<string, unknown>
   result?: PMReviewResult
   timestamp: string
+}
+
+/**
+ * Result of issue analysis workflow
+ */
+export interface IssueAnalysisResult {
+  velocityScore: number | null
+  velocityReasoning: string | null
+  impactScore: number | null
+  impactReasoning: string | null
+  effortScore: number | null
+  effortReasoning: string | null
+  priority: IssuePriority | null
+  analysisComputedAt: string
+}
+
+/**
+ * Issue analysis run record from database
+ */
+export interface IssueAnalysisRunRecord {
+  id: string
+  issue_id: string
+  project_id: string
+  run_id: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  started_at: string
+  completed_at: string | null
+  error_message: string | null
+  metadata: Record<string, unknown> | null
 }

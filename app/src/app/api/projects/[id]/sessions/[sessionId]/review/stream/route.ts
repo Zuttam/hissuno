@@ -5,6 +5,7 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { getSessionById } from '@/lib/supabase/sessions'
 import { createSSEStreamWithExecutor, createSSEEvent, BaseSSEEvent } from '@/lib/sse'
 import { mastra } from '@/mastra'
+import { getPmAgentSettingsAdmin } from '@/lib/supabase/project-settings/pm-agent'
 import type { SessionTag } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -89,8 +90,6 @@ export interface SessionReviewResult {
   issueId?: string
   issueTitle?: string
   skipReason?: string
-  thresholdMet?: boolean
-  specGenerated?: boolean
 }
 
 /**
@@ -166,11 +165,15 @@ export async function GET(_request: Request, context: RouteContext) {
           console.log(`${LOG_PREFIX} Creating run with runId:`, runId)
           const run = await workflow.createRunAsync({ runId })
 
+          // Load PM agent settings for classification guidelines
+          const pmSettings = await getPmAgentSettingsAdmin(projectId)
+
           console.log(`${LOG_PREFIX} Calling stream to execute workflow...`)
           const workflowStream = run.stream({
             inputData: {
               sessionId,
               projectId,
+              classificationGuidelines: pmSettings.classification_guidelines ?? undefined,
             },
           })
 
