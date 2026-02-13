@@ -90,26 +90,25 @@ export async function getUsageMetrics(
     periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
   }
 
-  // Get all non-demo project IDs owned by this user (demo projects are excluded from billing)
-  const { data: userProjects, error: projectsListError } = await supabase
+  // All projects (for session counting - demo sessions count towards quota)
+  const { data: allProjects, error: allProjectsError } = await supabase
     .from('projects')
     .select('id')
     .eq('user_id', userId)
-    .eq('is_demo', false)
 
-  if (projectsListError) {
-    console.error('[billing-service] failed to list user projects', projectsListError)
+  if (allProjectsError) {
+    console.error('[billing-service] failed to list all user projects', allProjectsError)
   }
 
-  const projectIds = userProjects?.map((p) => p.id) ?? []
+  const allProjectIds = allProjects?.map((p) => p.id) ?? []
 
-  // Count analyzed sessions (pm_reviewed_at IS NOT NULL) in the current period for user's projects
+  // Count analyzed sessions (pm_reviewed_at IS NOT NULL) in the current period for ALL user's projects
   let analyzedSessionsCount = 0
-  if (projectIds.length > 0) {
+  if (allProjectIds.length > 0) {
     const { count, error: sessionsError } = await supabase
       .from('sessions')
       .select('*', { count: 'exact', head: true })
-      .in('project_id', projectIds)
+      .in('project_id', allProjectIds)
       .not('pm_reviewed_at', 'is', null)
       .gte('pm_reviewed_at', periodStart.toISOString())
 

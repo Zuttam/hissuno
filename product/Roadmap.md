@@ -129,7 +129,6 @@
 [x] show customer data as part of the review 
 
 
-
 ### Platform
 [x] Add coming soon of crm integrations (hubspot and salesforce)
 [x] Improve onboarding experience
@@ -140,9 +139,9 @@
 ## Phase 9
 
 ### Feedback (f.k.a sessions)
-[] match participants with customer information
-[] show additional details in a cleaner way (based on customer/user data)
-[] Add an option in each channel integration to automatically add customers from session information
+[] Improve customer view inside a feedabck
+[] Decide if we want to make the auto customer createion configurable
+[] support batch operation (analyze)
 
 ### Issues 
 [] Add product area to the issue analysis - Classify on product area
@@ -150,11 +149,14 @@
 
 ### Marketing
 [] Docs portal
+[] Improve landing pages  
 
 ### Platform
+[] Move from cron to webhook to handle session analysis as events. 
+[] create a solution for skipeed sessions when user upgrades/limit increased
 [] Add dimension of analyzed issues 
 [] Project multi-users access and RBAC
-[] Delete project
+
 
 ### Analytics
 [] segmentation by customer / user 
@@ -181,12 +183,15 @@
 
 
 ### Platform
-
+ 
 [] API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] MCP Access
 [] MCP Apps
-[] connect to customer data (crm or dw)
+[] Delete project
 
 ### Issues
 [] Lieaner Integration
 [] Jira Integration 
+
+### Customers
+[] Implement CRM integration
