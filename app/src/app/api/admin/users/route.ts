@@ -129,3 +129,66 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
   }
 }
+
+interface UpdateUserBody {
+  user_id: string
+  name?: string
+  password?: string
+}
+
+export async function PATCH(request: Request) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
+  }
+
+  try {
+    verifyAdminApiSecret(request)
+
+    const body = (await request.json()) as UpdateUserBody
+    const { user_id, name, password } = body
+
+    if (!user_id || typeof user_id !== 'string') {
+      return NextResponse.json({ error: 'user_id is required.' }, { status: 400 })
+    }
+
+    if (!name && !password) {
+      return NextResponse.json({ error: 'At least one field to update is required (name, password).' }, { status: 400 })
+    }
+
+    const supabase = createAdminClient()
+
+    // Update auth user
+    const authUpdate: { password?: string; user_metadata?: { full_name: string } } = {}
+    if (password) authUpdate.password = password
+    if (name) authUpdate.user_metadata = { full_name: name }
+
+    const { error: authError } = await supabase.auth.admin.updateUserById(user_id, authUpdate)
+
+    if (authError) {
+      console.error('[admin.users.PATCH] Failed to update auth user', authError)
+      return NextResponse.json({ error: 'Failed to update user.' }, { status: 500 })
+    }
+
+    // Update user profile if name changed
+    if (name) {
+      const { error: profileError } = await supabase
+        .from('user_profiles')
+        .update({ full_name: name })
+        .eq('user_id', user_id)
+
+      if (profileError) {
+        console.error('[admin.users.PATCH] Failed to update user profile', profileError)
+      }
+    }
+
+    console.log(`[admin.users.PATCH] Updated user ${user_id}`)
+
+    return NextResponse.json({ user: { id: user_id, updated: Object.keys(authUpdate) } })
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    console.error('[admin.users.PATCH] unexpected error', error)
+    return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
+  }
+}
