@@ -140,27 +140,25 @@
 
 ### Feedback (f.k.a sessions)
 [] Improve customer view inside a feedabck
-[] Decide if we want to make the auto customer createion configurable
 [] support batch operation (analyze)
 
 ### Issues 
-[] Add product area to the issue analysis - Classify on product area
+[] Lieaner Integration
 [] Draft email response to users
 
 ### Marketing
-[] Docs portal
 [] Improve landing pages  
+[] Docs portal
 
 ### Platform
-[] Move from cron to webhook to handle session analysis as events. 
-[] create a solution for skipeed sessions when user upgrades/limit increased
-[] Add dimension of analyzed issues 
+[] API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] Project multi-users access and RBAC
-
+[] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
+[] Add dimension of analyzed issues 
 
 ### Analytics
-[] segmentation by customer / user 
-[] segmentation by product area / (maybe from code)
+[] segmentation by customer (contact and company)
+
 
 
 ## Phase 10
@@ -174,24 +172,24 @@
 [] Add Hissuno MCP to Support agent  
 
 ### Feedback (f.k.a sessions)
+[] Decide if we want to make the auto customer creation configurable
 [] Improve participants identification - show additional details in a cleaner way
 [] Add posthog sessions support
-
 
 ### Code
 [] Create initial implementation 
 
-
 ### Platform
- 
-[] API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] MCP Access
 [] MCP Apps
 [] Delete project
 
 ### Issues
-[] Lieaner Integration
+[] Add product area to the issue analysis - Classify on product area
 [] Jira Integration 
+
+### Analytics 
+[] segmentation by product area
 
 ### Customers
 [] Implement CRM integration
