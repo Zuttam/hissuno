@@ -1,0 +1,31 @@
+name,domain,arr,stage,industry,employee_count,plan_tier,country,notes
+Acme Corp,acme.com,120000,active,SaaS,250,enterprise,US,Key strategic account
+"Smith, Jones & Partners",smithjones.io,45000,onboarding,Legal Tech,30,pro,UK,"Recently signed, needs onboarding support"
+Beta Industries,beta.dev,0,prospect,Developer Tools,12,free,DE,
+Globex Corporation,globex.co,300000,expansion,Manufacturing,1500,enterprise,US,"Expanding to APAC region, upsell opportunity"
+Initech,initech.com,18000,active,HR Tech,80,pro,CA,
+"Umbrella, Inc.",umbrella.org,75000,churned,Biotech,500,enterprise,JP,Churned due to budget cuts — re-engage Q3
+Nova Startups,nova.io,9600,active,FinTech,15,starter,US,Fast-growing seed-stage company
+Pinnacle Systems,pinnacle.dev,210000,expansion,Cloud Infrastructure,400,enterprise,AU,"Multi-year deal, champion is CTO"
+Hooli,hooli.xyz,500000,active,Big Data,3000,enterprise,US,Largest account by ARR
+Piedmont Analytics,piedmont.ai,32000,onboarding,Data Analytics,45,pro,US,Migrating from competitor
+Vance Refrigeration,vancerefrig.com,8500,prospect,HVAC,20,starter,US,Inbound lead from trade show
+"Dunder Mifflin, Inc.",dundermifflin.com,22000,active,Paper & Office Supplies,120,pro,US,
+Stark Industries,stark.tech,1000000,expansion,Defense & Energy,10000,enterprise,US,Multi-division rollout planned
+Wayne Enterprises,wayne.co,750000,active,Conglomerate,8500,enterprise,US,Renewed for 3 years
+Cyberdyne Systems,cyberdyne.io,60000,onboarding,AI & Robotics,200,pro,JP,"New customer, high technical requirements"
+Soylent Corp,soylent.co,15000,churned,Food Tech,90,pro,US,Switched to in-house solution
+Tyrell Corporation,tyrell.dev,180000,active,Bioengineering,600,enterprise,UK,
+Massive Dynamic,massivedynamic.com,420000,expansion,R&D Conglomerate,2200,enterprise,US,Expanding into 3 new product lines
+Weyland-Yutani,weyland.corp,95000,active,Aerospace,1800,enterprise,US,"Remote teams, needs async support tooling"
+Oscorp Industries,oscorp.bio,55000,prospect,Pharmaceuticals,350,pro,US,Evaluating alongside 2 competitors
+Pied Piper,piedpiper.com,28000,active,Compression Tech,35,starter,US,Small team but very technical users
+"Wonka Industries, Ltd.",wonka.co.uk,40000,onboarding,Food & Beverage,150,pro,UK,Complex onboarding with multiple stakeholders
+Aperture Science,aperture.io,0,prospect,Research,70,free,US,Signed up for free tier last week
+InGen Technologies,ingen.bio,130000,churned,Genetics,400,enterprise,CR,Contract dispute — legal reviewing
+Rekall,rekall.co,12000,active,Entertainment Tech,25,starter,AU,
+Nakatomi Trading,nakatomi.jp,88000,active,Finance,700,enterprise,JP,Strong champion in VP of Engineering
+Prestige Worldwide,prestigeww.com,0,prospect,Entertainment,5,free,US,Very early stage startup
+Vandelay Industries,vandelay.com,36000,onboarding,Import/Export,60,pro,US,"Just closed, pending kickoff call"
+Bluth Company,bluth.co,7500,churned,Real Estate,18,starter,US,Downgraded then cancelled
+Oceanic Airlines,oceanic.aero,200000,active,Aviation,4000,enterprise,AU,Mission-critical usage

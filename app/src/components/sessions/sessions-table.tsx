@@ -1,7 +1,7 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Badge } from '@/components/ui'
+import { useMemo, useRef, useEffect } from 'react'
+import { Badge, Checkbox } from '@/components/ui'
 import { ResizableTable, useColumnStyle, type ColumnConfig } from '@/components/ui/resizable-table'
 import type { SessionWithProject } from '@/types/session'
 import { SESSION_SOURCE_INFO, type SessionSource, getSessionUserDisplay } from '@/types/session'
@@ -13,9 +13,38 @@ interface SessionsTableProps {
   onSelectSession: (session: SessionWithProject) => void
   onOpenMessages: (session: SessionWithProject) => void
   onArchive: (session: SessionWithProject) => void
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string) => void
+  onToggleAll?: () => void
+  isAllSelected?: boolean
+  isIndeterminate?: boolean
 }
 
 const STORAGE_KEY = 'sessions-table-column-widths'
+
+function HeaderCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  checked: boolean
+  indeterminate: boolean
+  onChange: () => void
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = indeterminate
+    }
+  }, [indeterminate])
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <Checkbox ref={ref} checked={checked} onChange={onChange} />
+    </div>
+  )
+}
 
 export function SessionsTable({
   sessions,
@@ -23,11 +52,35 @@ export function SessionsTable({
   onSelectSession,
   onOpenMessages,
   onArchive,
+  selectedIds,
+  onToggleSelect,
+  onToggleAll,
+  isAllSelected = false,
+  isIndeterminate = false,
 }: SessionsTableProps) {
+  const hasSelection = Boolean(selectedIds && onToggleSelect && onToggleAll)
+
   const columns: ColumnConfig[] = useMemo(
     () => [
+      ...(hasSelection
+        ? [
+            {
+              id: 'select',
+              header: (
+                <HeaderCheckbox
+                  checked={isAllSelected}
+                  indeterminate={isIndeterminate}
+                  onChange={onToggleAll!}
+                />
+              ),
+              defaultWidth: 36,
+              minWidth: 36,
+              maxWidth: 36,
+            } as ColumnConfig,
+          ]
+        : []),
       { id: 'session', header: 'Feedback', defaultWidth: 140, minWidth: 80 },
-      { id: 'user', header: 'User', defaultWidth: 60, minWidth: 50 },
+      { id: 'customer', header: 'Customer', defaultWidth: 140, minWidth: 80 },
       { id: 'messages', header: 'Messages', defaultWidth: 90, minWidth: 70, align: 'center' },
       { id: 'tags', header: 'Tags', defaultWidth: 150, minWidth: 80 },
       { id: 'source', header: 'Source', defaultWidth: 90, minWidth: 70 },
@@ -36,7 +89,7 @@ export function SessionsTable({
       { id: 'lastActivity', header: 'Last Activity', defaultWidth: 120, minWidth: 80 },
       { id: 'actions', header: <span className="sr-only">Actions</span>, defaultWidth: 80, minWidth: 60 },
     ],
-    []
+    [hasSelection, isAllSelected, isIndeterminate, onToggleAll]
   )
 
   return (
@@ -52,6 +105,8 @@ export function SessionsTable({
             onArchive={() => onArchive(session)}
             columnWidths={columnWidths}
             columns={columns}
+            isChecked={selectedIds?.has(session.id) ?? false}
+            onToggleCheck={onToggleSelect ? () => onToggleSelect(session.id) : undefined}
           />
         ))
       }
@@ -67,6 +122,8 @@ interface SessionRowProps {
   onArchive: () => void
   columnWidths: Record<string, number>
   columns: ColumnConfig[]
+  isChecked: boolean
+  onToggleCheck?: () => void
 }
 
 function SessionRow({
@@ -77,6 +134,8 @@ function SessionRow({
   onArchive,
   columnWidths,
   columns,
+  isChecked,
+  onToggleCheck,
 }: SessionRowProps) {
   const truncatedId = session.id.length > 12 ? `${session.id.slice(0, 12)}...` : session.id
   const displayName = session.name || truncatedId
@@ -91,6 +150,7 @@ function SessionRow({
     variant: 'default' as const,
   }
   const userDisplay = getSessionUserDisplay(session)
+  const selectColumnStyle = useColumnStyle(columnWidths, 'select', columns)
 
   return (
     <tr
@@ -101,6 +161,18 @@ function SessionRow({
           : 'hover:bg-[color:var(--surface-hover)]'
       } ${session.is_archived ? 'opacity-60' : ''}`}
     >
+      {onToggleCheck && (
+        <td
+          className="px-3 py-2"
+          style={selectColumnStyle}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleCheck()
+          }}
+        >
+          <Checkbox checked={isChecked} onChange={onToggleCheck} />
+        </td>
+      )}
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'session', columns)}>
         <div className="flex flex-col">
           <span className="text-[color:var(--foreground)]" title={session.name || session.id}>
@@ -113,18 +185,15 @@ function SessionRow({
           )}
         </div>
       </td>
-      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'user', columns)}>
+      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'customer', columns)}>
         {userDisplay.name ? (
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
-                userDisplay.isHissuno
-                  ? 'bg-[color:var(--accent-success)]'
-                  : 'bg-[color:var(--text-tertiary)]'
-              }`}
-              title={userDisplay.isHissuno ? 'Hissuno user' : 'External user'}
-            />
-            <span className="truncate text-[color:var(--text-secondary)]">{userDisplay.name}</span>
+          <div className="flex flex-col">
+            <span className="truncate text-[color:var(--foreground)]">{userDisplay.name}</span>
+            {userDisplay.companyName && (
+              <span className="truncate text-[10px] text-[color:var(--text-tertiary)]">
+                {userDisplay.companyName}
+              </span>
+            )}
           </div>
         ) : (
           <span className="text-[color:var(--text-tertiary)]">-</span>

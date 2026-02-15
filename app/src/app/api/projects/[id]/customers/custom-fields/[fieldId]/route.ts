@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { updateCustomFieldDefinition, deleteCustomFieldDefinition } from '@/lib/supabase/customer-custom-fields'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import type { UpdateCustomFieldInput } from '@/types/customer'
@@ -9,20 +10,6 @@ export const runtime = 'nodejs'
 
 type RouteParams = { id: string; fieldId: string }
 type RouteContext = { params: Promise<RouteParams> }
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
 
 /**
  * PATCH /api/projects/[id]/customers/custom-fields/[fieldId]
@@ -35,8 +22,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     const body = (await request.json()) as UpdateCustomFieldInput
     const field = await updateCustomFieldDefinition(supabase, fieldId, body, projectId)
@@ -45,6 +33,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[custom-fields.update] unexpected error', error)
     return NextResponse.json({ error: 'Unable to update custom field.' }, { status: 500 })
@@ -62,14 +53,18 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     await deleteCustomFieldDefinition(supabase, fieldId, projectId)
     return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[custom-fields.delete] unexpected error', error)
     return NextResponse.json({ error: 'Unable to delete custom field.' }, { status: 500 })

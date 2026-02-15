@@ -442,7 +442,7 @@ export function SessionSidebar({
             {/* Session Metadata (closed by default) */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
               <CollapsibleSection title="Feedback Metadata" variant="flat" defaultExpanded={false}>
-                <SessionDetails session={session} onUpdateSession={onUpdateSession} />
+                <SessionDetails session={session} onUpdateSession={onUpdateSession} onSessionUpdated={onSessionUpdated} />
               </CollapsibleSection>
             </div>
 

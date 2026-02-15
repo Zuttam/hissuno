@@ -1,0 +1,41 @@
+name,email,title,role,phone,company_name,company_domain,is_champion,notes
+Sarah Chen,sarah@acme.com,VP of Engineering,Engineering,+1 415-555-0101,Acme Corp,acme.com,true,Primary technical decision maker
+Jake Torres,jake@acme.com,Senior PM,Product,,Acme Corp,acme.com,false,Owns the integration roadmap
+Emily Watson,emily@smithjones.io,Managing Partner,Leadership,+44 20-7946-0958,"Smith, Jones & Partners",smithjones.io,true,Signs off on all vendor decisions
+Lars Mueller,lars@beta.dev,CTO,Engineering,,Beta Industries,beta.dev,true,Evaluating us for their dev workflow
+Raj Patel,raj@globex.co,Director of Operations,Operations,+1 312-555-0142,Globex Corporation,globex.co,false,Day-to-day point of contact
+Maria Gonzalez,maria@globex.co,VP of Supply Chain,Operations,,Globex Corporation,globex.co,true,Executive sponsor for APAC expansion
+Bill Lumbergh,bill@initech.com,VP of Engineering,Engineering,+1 416-555-0177,Initech,initech.com,false,"Likes status reports, prefers email"
+Milton Waddams,milton@initech.com,Staff Engineer,Engineering,,Initech,initech.com,false,
+Yuki Tanaka,yuki@umbrella.org,Head of R&D,Research,+81 3-5555-0199,"Umbrella, Inc.",umbrella.org,true,Was our champion before churn — still friendly
+Alex Rivera,alex@nova.io,Co-founder & CEO,Leadership,,Nova Startups,nova.io,true,Very hands-on with product decisions
+Priya Sharma,priya@pinnacle.dev,CTO,Engineering,+61 2-5555-0211,Pinnacle Systems,pinnacle.dev,true,Drove the multi-year deal
+Tom Bradley,tom@pinnacle.dev,DevOps Lead,Engineering,,Pinnacle Systems,pinnacle.dev,false,Handles day-to-day implementation
+Gavin Belson,gavin@hooli.xyz,CEO,Leadership,+1 650-555-0234,Hooli,hooli.xyz,false,Executive stakeholder
+Nelson Bighetti,bighead@hooli.xyz,VP of Engineering,Engineering,,Hooli,hooli.xyz,true,Technical champion internally
+Dinesh Chugtai,dinesh@piedpiper.com,Senior Engineer,Engineering,,Pied Piper,piedpiper.com,false,Power user
+Richard Hendricks,richard@piedpiper.com,CEO,Leadership,+1 650-555-0256,Pied Piper,piedpiper.com,true,Founder and key decision maker
+Angela Martin,angela@dundermifflin.com,CFO,Finance,+1 570-555-0278,"Dunder Mifflin, Inc.",dundermifflin.com,false,Controls budget approval
+Jim Halpert,jim@dundermifflin.com,VP of Sales,Sales,,"Dunder Mifflin, Inc.",dundermifflin.com,true,Internal advocate for our platform
+Tony Stark,tony@stark.tech,CTO,Engineering,+1 212-555-0301,Stark Industries,stark.tech,true,Drives all technology decisions
+Pepper Potts,pepper@stark.tech,COO,Operations,,Stark Industries,stark.tech,false,Manages vendor relationships
+Bruce Wayne,bruce@wayne.co,CEO,Leadership,+1 212-555-0323,Wayne Enterprises,wayne.co,true,Renewed our 3-year contract
+Lucius Fox,lucius@wayne.co,VP of Technology,Engineering,,Wayne Enterprises,wayne.co,false,Technical evaluator
+Kenji Sato,kenji@cyberdyne.io,Lead ML Engineer,Engineering,+81 6-5555-0345,Cyberdyne Systems,cyberdyne.io,true,Needs custom integration support
+Rachel Green,rachel@soylent.co,Head of Product,Product,,Soylent Corp,soylent.co,false,Left the company after churn
+Eldon Tyrell,eldon@tyrell.dev,Founder & CEO,Leadership,+44 20-7946-1001,Tyrell Corporation,tyrell.dev,true,Long-term strategic partner
+Roy Batty,roy@tyrell.dev,VP of Engineering,Engineering,,Tyrell Corporation,tyrell.dev,false,Runs day-to-day engineering
+Nina Sharp,nina@massivedynamic.com,COO,Operations,+1 617-555-0389,Massive Dynamic,massivedynamic.com,true,Executive sponsor for expansion
+Walter Bishop,walter@massivedynamic.com,Chief Scientist,Research,,Massive Dynamic,massivedynamic.com,false,Unique technical requirements
+Ellen Ripley,ripley@weyland.corp,Director of Engineering,Engineering,+1 713-555-0412,Weyland-Yutani,weyland.corp,true,Champions async tooling adoption
+Norman Osborn,norman@oscorp.bio,CEO,Leadership,,Oscorp Industries,oscorp.bio,false,Final decision maker on vendor selection
+Willy Wonka,willy@wonka.co.uk,Founder,Leadership,+44 117-555-0434,"Wonka Industries, Ltd.",wonka.co.uk,true,Very particular about onboarding experience
+Cave Johnson,cave@aperture.io,CEO,Leadership,,Aperture Science,aperture.io,false,Exploring free tier
+John Hammond,john@ingen.bio,Founder & Chairman,Leadership,+506 2555-0456,InGen Technologies,ingen.bio,true,Wants to re-engage after legal resolution
+Douglas Quaid,doug@rekall.co,Head of Product,Product,+61 3-5555-0478,Rekall,rekall.co,true,Drives product feedback loop
+Takagi,takagi@nakatomi.jp,EVP of Finance,Finance,+81 3-5555-0490,Nakatomi Trading,nakatomi.jp,true,Key executive stakeholder
+Dale Doback,dale@prestigeww.com,Co-founder,Leadership,,Prestige Worldwide,prestigeww.com,false,Early stage — just exploring
+Art Vandelay,art@vandelay.com,CEO,Leadership,+1 212-555-0512,Vandelay Industries,vandelay.com,true,Very engaged during onboarding
+Michael Bluth,michael@bluth.co,CEO,Leadership,,Bluth Company,bluth.co,false,Churned — might revisit next quarter
+Hugo Reyes,hugo@oceanic.aero,VP of IT,Engineering,+61 2-5555-0534,Oceanic Airlines,oceanic.aero,true,Owns the infrastructure modernization initiative
+Kate Austen,kate@oceanic.aero,Director of Product,Product,,Oceanic Airlines,oceanic.aero,false,Collaborates closely with Hugo

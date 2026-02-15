@@ -89,6 +89,64 @@ export interface ProjectAnalytics {
 }
 
 /**
+ * Customer segmentation data point (extends distribution with entity ID and ARR)
+ */
+export interface CustomerSegmentationDataPoint extends DistributionDataPoint {
+  entityId: string
+  arr?: number | null
+}
+
+/**
+ * ARR at risk grouped by company stage
+ */
+export interface ArrAtRiskDataPoint {
+  stage: string
+  totalArr: number
+  openIssueCount: number
+  companyCount: number
+}
+
+/**
+ * Company data for the company impact flow Sankey
+ */
+export interface FlowGraphCompany {
+  id: string
+  name: string
+  sessionCount: number
+  issueCount: number
+  arr: number | null
+  stage: string
+}
+
+/**
+ * Customer segmentation analytics
+ */
+export interface CustomerSegmentationAnalytics {
+  summary: {
+    companiesWithFeedback: number
+    contactsWithFeedback: number
+    totalArrAtRisk: number
+    championFeedbackPercentage: number
+  }
+  companies: {
+    bySessionCount: CustomerSegmentationDataPoint[]
+    byIssueCount: CustomerSegmentationDataPoint[]
+    arrAtRiskByStage: ArrAtRiskDataPoint[]
+  }
+  contacts: {
+    bySessionCount: CustomerSegmentationDataPoint[]
+    championVsNonChampion: DistributionDataPoint[]
+  }
+  companyImpactFlow: {
+    nodes: FlowGraphNode[]
+    links: FlowGraphLink[]
+    companies: FlowGraphCompany[]
+    remainingCompaniesCount: number
+    totals: { sessions: number; issues: number; conversionRate: number }
+  }
+}
+
+/**
  * Sessions strip analytics (lightweight)
  */
 export interface SessionsStripAnalytics {
@@ -1072,7 +1130,7 @@ export const getImpactFlowAnalytics = cache(async (
   const sessionsNodeIndex = nodes.length
   nodes.push({
     id: 'sessions',
-    name: 'Sessions',
+    name: 'Feedback',
     category: 'session',
     color: 'var(--accent-primary)',
   })
@@ -1127,7 +1185,7 @@ export const getImpactFlowAnalytics = cache(async (
   const sessionsIdx = nodes.length
   nodes.push({
     id: 'sessions',
-    name: `Sessions (${sessionList.length})`,
+    name: `Feedback (${sessionList.length})`,
     category: 'session',
     color: 'var(--accent-primary)',
   })
@@ -1252,6 +1310,384 @@ export const getImpactFlowAnalytics = cache(async (
       sessionsBySource,
       issuesByStatus,
       userDetails,
+    },
+  }
+})
+
+/**
+ * Get customer segmentation analytics for a project
+ */
+export const getCustomerSegmentationAnalytics = cache(async (
+  projectId: string,
+  period: AnalyticsPeriod
+): Promise<CustomerSegmentationAnalytics> => {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase must be configured.')
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    throw new UnauthorizedError('Unable to resolve user context.')
+  }
+
+  // Verify user owns this project
+  const { data: project } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('id', projectId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!project) {
+    throw new UnauthorizedError('You do not have access to this project.')
+  }
+
+  const periodStart = getPeriodStartDate(period)
+
+  // Build sessions query with contact_id
+  let sessionsQuery = supabase
+    .from('sessions')
+    .select('id, contact_id, created_at, source')
+    .eq('project_id', projectId)
+    .eq('is_archived', false)
+
+  if (periodStart) {
+    sessionsQuery = sessionsQuery.gte('created_at', periodStart.toISOString())
+  }
+
+  const { data: sessions } = await sessionsQuery
+  const sessionList = sessions ?? []
+  const sessionIds = sessionList.map(s => s.id)
+
+  // Get unique contact IDs (non-null)
+  const contactIds = [...new Set(sessionList.map(s => s.contact_id).filter((id): id is string => id !== null))]
+
+  const emptyResult: CustomerSegmentationAnalytics = {
+    summary: { companiesWithFeedback: 0, contactsWithFeedback: 0, totalArrAtRisk: 0, championFeedbackPercentage: 0 },
+    companies: { bySessionCount: [], byIssueCount: [], arrAtRiskByStage: [] },
+    contacts: { bySessionCount: [], championVsNonChampion: [] },
+    companyImpactFlow: { nodes: [], links: [], companies: [], remainingCompaniesCount: 0, totals: { sessions: 0, issues: 0, conversionRate: 0 } },
+  }
+
+  if (contactIds.length === 0) {
+    return emptyResult
+  }
+
+  // Fetch contacts, issue_sessions in parallel
+  const [contactsResult, issueLinksResult] = await Promise.all([
+    supabase
+      .from('contacts')
+      .select('id, name, company_id, is_champion')
+      .in('id', contactIds),
+    sessionIds.length > 0
+      ? supabase.from('issue_sessions').select('issue_id, session_id').in('session_id', sessionIds)
+      : Promise.resolve({ data: [] as { issue_id: string; session_id: string }[] }),
+  ])
+
+  const contacts = contactsResult.data ?? []
+  const issueLinks = issueLinksResult.data ?? []
+
+  // Build contact lookup
+  const contactMap = new Map(contacts.map(c => [c.id, c]))
+
+  // Get unique company IDs
+  const companyIds = [...new Set(contacts.map(c => c.company_id).filter((id): id is string => id !== null))]
+
+  // Fetch companies and issues in parallel
+  const [companiesResult, issuesResult] = await Promise.all([
+    companyIds.length > 0
+      ? supabase.from('companies').select('id, name, arr, stage').in('id', companyIds)
+      : Promise.resolve({ data: [] as { id: string; name: string; arr: number | null; stage: string | null }[] }),
+    issueLinks.length > 0
+      ? supabase.from('issues').select('id, status').in('id', [...new Set(issueLinks.map(l => l.issue_id))]).eq('is_archived', false)
+      : Promise.resolve({ data: [] as { id: string; status: string }[] }),
+  ])
+
+  const companies = companiesResult.data ?? []
+  const issues = issuesResult.data ?? []
+
+  const companyMap = new Map(companies.map(c => [c.id, c]))
+  const issueMap = new Map(issues.map(i => [i.id, i]))
+
+  // Map session -> issue IDs
+  const sessionIssueMap = new Map<string, Set<string>>()
+  issueLinks.forEach(l => {
+    if (!sessionIssueMap.has(l.session_id)) {
+      sessionIssueMap.set(l.session_id, new Set())
+    }
+    sessionIssueMap.get(l.session_id)!.add(l.issue_id)
+  })
+
+  // --- Company aggregation ---
+  const companySessionCounts = new Map<string, number>()
+  const companyIssueSets = new Map<string, Set<string>>()
+
+  sessionList.forEach(s => {
+    const contact = s.contact_id ? contactMap.get(s.contact_id) : null
+    const companyId = contact?.company_id
+    if (!companyId) return
+
+    companySessionCounts.set(companyId, (companySessionCounts.get(companyId) ?? 0) + 1)
+
+    const issueIdsForSession = sessionIssueMap.get(s.id)
+    if (issueIdsForSession) {
+      if (!companyIssueSets.has(companyId)) {
+        companyIssueSets.set(companyId, new Set())
+      }
+      issueIdsForSession.forEach(id => companyIssueSets.get(companyId)!.add(id))
+    }
+  })
+
+  // Total sessions linked to contacts
+  const totalLinkedSessions = sessionList.filter(s => s.contact_id && contactMap.has(s.contact_id)).length
+
+  // Top 10 companies by session count
+  const sortedCompanies = Array.from(companySessionCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+
+  const top10Companies = sortedCompanies.slice(0, 10)
+
+  const companiesBySessionCount: CustomerSegmentationDataPoint[] = top10Companies.map(([companyId, count]) => {
+    const company = companyMap.get(companyId)
+    return {
+      entityId: companyId,
+      label: company?.name ?? 'Unknown',
+      value: count,
+      percentage: totalLinkedSessions > 0 ? Math.round((count / totalLinkedSessions) * 100) : 0,
+      arr: company?.arr,
+    }
+  })
+
+  // Top 10 companies by issue count
+  const companiesByIssueArr = Array.from(companyIssueSets.entries())
+    .map(([companyId, issueIds]) => ({ companyId, issueCount: issueIds.size }))
+    .sort((a, b) => b.issueCount - a.issueCount)
+    .slice(0, 10)
+
+  const totalLinkedIssues = new Set(issueLinks.map(l => l.issue_id)).size
+  const companiesByIssueCount: CustomerSegmentationDataPoint[] = companiesByIssueArr.map(({ companyId, issueCount }) => {
+    const company = companyMap.get(companyId)
+    return {
+      entityId: companyId,
+      label: company?.name ?? 'Unknown',
+      value: issueCount,
+      percentage: totalLinkedIssues > 0 ? Math.round((issueCount / totalLinkedIssues) * 100) : 0,
+      arr: company?.arr,
+    }
+  })
+
+  // --- ARR at risk ---
+  const arrByStage = new Map<string, { totalArr: number; openIssueCount: number; companyIds: Set<string> }>()
+  const openStatuses = new Set(['open', 'ready', 'in_progress'])
+
+  companyIssueSets.forEach((issueIds, companyId) => {
+    const openIssueCount = Array.from(issueIds).filter(id => {
+      const issue = issueMap.get(id)
+      return issue && openStatuses.has(issue.status)
+    }).length
+
+    if (openIssueCount === 0) return
+
+    const company = companyMap.get(companyId)
+    if (!company) return
+
+    const stage = company.stage ?? 'Unknown'
+    if (!arrByStage.has(stage)) {
+      arrByStage.set(stage, { totalArr: 0, openIssueCount: 0, companyIds: new Set() })
+    }
+    const bucket = arrByStage.get(stage)!
+    bucket.totalArr += company.arr ?? 0
+    bucket.openIssueCount += openIssueCount
+    bucket.companyIds.add(companyId)
+  })
+
+  const arrAtRiskByStage: ArrAtRiskDataPoint[] = Array.from(arrByStage.entries())
+    .map(([stage, data]) => ({
+      stage,
+      totalArr: data.totalArr,
+      openIssueCount: data.openIssueCount,
+      companyCount: data.companyIds.size,
+    }))
+    .sort((a, b) => b.totalArr - a.totalArr)
+
+  const totalArrAtRisk = arrAtRiskByStage.reduce((sum, d) => sum + d.totalArr, 0)
+
+  // --- Contact aggregation ---
+  const contactSessionCounts = new Map<string, number>()
+  let championSessions = 0
+  let nonChampionSessions = 0
+
+  sessionList.forEach(s => {
+    if (!s.contact_id) return
+    const contact = contactMap.get(s.contact_id)
+    if (!contact) return
+
+    contactSessionCounts.set(s.contact_id, (contactSessionCounts.get(s.contact_id) ?? 0) + 1)
+
+    if (contact.is_champion) {
+      championSessions++
+    } else {
+      nonChampionSessions++
+    }
+  })
+
+  const totalContactSessions = championSessions + nonChampionSessions
+  const contactsBySessionCount: CustomerSegmentationDataPoint[] = Array.from(contactSessionCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([contactId, count]) => {
+      const contact = contactMap.get(contactId)
+      return {
+        entityId: contactId,
+        label: contact?.name ?? 'Unknown',
+        value: count,
+        percentage: totalContactSessions > 0 ? Math.round((count / totalContactSessions) * 100) : 0,
+      }
+    })
+
+  const championVsNonChampion: DistributionDataPoint[] = [
+    {
+      label: 'Champion',
+      value: championSessions,
+      percentage: totalContactSessions > 0 ? Math.round((championSessions / totalContactSessions) * 100) : 0,
+    },
+    {
+      label: 'Non-Champion',
+      value: nonChampionSessions,
+      percentage: totalContactSessions > 0 ? Math.round((nonChampionSessions / totalContactSessions) * 100) : 0,
+    },
+  ]
+
+  const championFeedbackPercentage = totalContactSessions > 0
+    ? Math.round((championSessions / totalContactSessions) * 100)
+    : 0
+
+  // --- Company Impact Flow (Sankey) ---
+  const flowNodes: FlowGraphNode[] = []
+  const flowLinks: FlowGraphLink[] = []
+
+  // Layer 0: Company nodes (top 10 + Other)
+  const remainingCompaniesCount = Math.max(0, sortedCompanies.length - 10)
+  const remainingSessionCount = sortedCompanies.slice(10).reduce((sum, [_, count]) => sum + count, 0)
+
+  top10Companies.forEach(([companyId]) => {
+    const company = companyMap.get(companyId)
+    flowNodes.push({
+      id: `company-${companyId}`,
+      name: company?.name ?? 'Unknown',
+      category: 'source',
+      color: 'var(--accent-info)',
+    })
+  })
+
+  if (remainingCompaniesCount > 0 && remainingSessionCount > 0) {
+    flowNodes.push({
+      id: 'company-other',
+      name: `+${remainingCompaniesCount} others`,
+      category: 'source',
+      color: 'var(--accent-primary)',
+    })
+  }
+
+  // Layer 1: Sessions node
+  const sessionsNodeIdx = flowNodes.length
+  flowNodes.push({
+    id: 'sessions',
+    name: `Feedback (${totalLinkedSessions})`,
+    category: 'session',
+    color: 'var(--accent-primary)',
+  })
+
+  // Layer 2: Issue status nodes
+  const companyIssueStatusCounts = new Map<string, number>()
+  companyIssueSets.forEach((issueIds) => {
+    issueIds.forEach(id => {
+      const issue = issueMap.get(id)
+      if (issue) {
+        companyIssueStatusCounts.set(issue.status, (companyIssueStatusCounts.get(issue.status) ?? 0) + 1)
+      }
+    })
+  })
+
+  const issueStatuses = ['open', 'ready', 'in_progress', 'resolved', 'closed']
+  issueStatuses.forEach(status => {
+    const count = companyIssueStatusCounts.get(status) ?? 0
+    if (count > 0) {
+      flowNodes.push({
+        id: `issue-${status}`,
+        name: `${status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} (${count})`,
+        category: 'issue',
+        color: ISSUE_STATUS_COLORS[status],
+      })
+    }
+  })
+
+  // Links: Companies → Sessions
+  top10Companies.forEach(([_, count], index) => {
+    flowLinks.push({ source: index, target: sessionsNodeIdx, value: count })
+  })
+  if (remainingCompaniesCount > 0 && remainingSessionCount > 0) {
+    flowLinks.push({ source: top10Companies.length, target: sessionsNodeIdx, value: remainingSessionCount })
+  }
+
+  // Links: Sessions → Issue statuses
+  let issueNodeIdx = sessionsNodeIdx + 1
+  issueStatuses.forEach(status => {
+    const count = companyIssueStatusCounts.get(status) ?? 0
+    if (count > 0) {
+      flowLinks.push({ source: sessionsNodeIdx, target: issueNodeIdx, value: count })
+      issueNodeIdx++
+    }
+  })
+
+  const linkedSessionCount = new Set(issueLinks.map(l => l.session_id)).size
+  const flowConversionRate = totalLinkedSessions > 0
+    ? Math.round((linkedSessionCount / totalLinkedSessions) * 100)
+    : 0
+
+  const flowCompanies: FlowGraphCompany[] = top10Companies.map(([companyId, sessionCount]) => {
+    const company = companyMap.get(companyId)
+    return {
+      id: companyId,
+      name: company?.name ?? 'Unknown',
+      sessionCount,
+      issueCount: companyIssueSets.get(companyId)?.size ?? 0,
+      arr: company?.arr ?? null,
+      stage: company?.stage ?? 'Unknown',
+    }
+  })
+
+  return {
+    summary: {
+      companiesWithFeedback: companySessionCounts.size,
+      contactsWithFeedback: contactSessionCounts.size,
+      totalArrAtRisk,
+      championFeedbackPercentage,
+    },
+    companies: {
+      bySessionCount: companiesBySessionCount,
+      byIssueCount: companiesByIssueCount,
+      arrAtRiskByStage,
+    },
+    contacts: {
+      bySessionCount: contactsBySessionCount,
+      championVsNonChampion,
+    },
+    companyImpactFlow: {
+      nodes: flowNodes,
+      links: flowLinks,
+      companies: flowCompanies,
+      remainingCompaniesCount,
+      totals: {
+        sessions: totalLinkedSessions,
+        issues: totalLinkedIssues,
+        conversionRate: flowConversionRate,
+      },
     },
   }
 })

@@ -11,6 +11,8 @@ interface UseSessionsState {
   refresh: () => Promise<void>
   createSession: (input: CreateSessionInput) => Promise<SessionWithProject | null>
   archiveSession: (sessionId: string, isArchived: boolean) => Promise<boolean>
+  batchArchive: (sessionIds: string[], isArchived: boolean) => Promise<boolean>
+  batchSetCustomer: (sessionIds: string[], contactId: string | null) => Promise<{ success: boolean; error?: string }>
 }
 
 interface UseSessionsOptions {
@@ -48,6 +50,8 @@ export function useSessions({
       if (filters.dateTo) params.set('dateTo', filters.dateTo)
       if (filters.showArchived) params.set('showArchived', 'true')
       if (filters.isHumanTakeover) params.set('isHumanTakeover', 'true')
+      if (filters.companyId) params.set('companyId', filters.companyId)
+      if (filters.contactId) params.set('contactId', filters.contactId)
       if (filters.limit) params.set('limit', String(filters.limit))
       if (filters.offset) params.set('offset', String(filters.offset))
 
@@ -69,7 +73,7 @@ export function useSessions({
     } finally {
       setIsLoading(false)
     }
-  }, [filters.projectId, filters.userId, filters.sessionId, filters.name, filters.status, filters.source, filters.tags, filters.dateFrom, filters.dateTo, filters.showArchived, filters.isHumanTakeover, filters.limit, filters.offset])
+  }, [filters.projectId, filters.userId, filters.sessionId, filters.name, filters.status, filters.source, filters.tags, filters.dateFrom, filters.dateTo, filters.showArchived, filters.isHumanTakeover, filters.companyId, filters.contactId, filters.limit, filters.offset])
 
   const createSession = useCallback(async (input: CreateSessionInput): Promise<SessionWithProject | null> => {
     if (!filters.projectId) return null
@@ -119,6 +123,59 @@ export function useSessions({
     }
   }, [filters.projectId])
 
+  const batchArchive = useCallback(async (sessionIds: string[], isArchived: boolean): Promise<boolean> => {
+    if (!filters.projectId) return false
+
+    // Optimistic update
+    const prevSessions = sessions
+    setSessions((prev) =>
+      prev.map((s) => (sessionIds.includes(s.id) ? { ...s, is_archived: isArchived } : s))
+    )
+
+    try {
+      const response = await fetch(`/api/projects/${filters.projectId}/sessions/batch/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionIds, is_archived: isArchived }),
+      })
+
+      if (!response.ok) {
+        setSessions(prevSessions)
+        return false
+      }
+
+      return true
+    } catch {
+      setSessions(prevSessions)
+      return false
+    }
+  }, [filters.projectId, sessions])
+
+  const batchSetCustomer = useCallback(async (sessionIds: string[], contactId: string | null): Promise<{ success: boolean; error?: string }> => {
+    if (!filters.projectId) return { success: false, error: 'No project selected.' }
+
+    try {
+      const response = await fetch(`/api/projects/${filters.projectId}/sessions/batch/set-customer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionIds, contactId }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const message = typeof payload?.error === 'string' ? payload.error : 'Failed to set customer.'
+        console.error('[batchSetCustomer] failed', { status: response.status, error: message, sessionIds, contactId })
+        return { success: false, error: message }
+      }
+
+      // Refresh to get updated contact data
+      void fetchSessions()
+      return { success: true }
+    } catch {
+      return { success: false, error: 'Unexpected error setting customer.' }
+    }
+  }, [filters.projectId, fetchSessions])
+
   useEffect(() => {
     void fetchSessions()
   }, [fetchSessions])
@@ -132,8 +189,10 @@ export function useSessions({
       refresh: fetchSessions,
       createSession,
       archiveSession,
+      batchArchive,
+      batchSetCustomer,
     }),
-    [sessions, total, isLoading, error, fetchSessions, createSession, archiveSession]
+    [sessions, total, isLoading, error, fetchSessions, createSession, archiveSession, batchArchive, batchSetCustomer]
   )
 }
 

@@ -21,7 +21,7 @@ export function KnowledgeDetailDialog({
   hasResources,
 }: KnowledgeDetailDialogProps) {
   return (
-    <Dialog open={open} onClose={onClose} title="Knowledge Management" size="2xl">
+    <Dialog open={open} onClose={onClose} title="Knowledge Management" size="xxl">
       <div className="flex flex-col gap-4">
         <PackageList
           projectId={projectId}

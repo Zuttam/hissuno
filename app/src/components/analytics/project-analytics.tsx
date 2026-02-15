@@ -1,10 +1,10 @@
 'use client'
 
-import { useProjectAnalytics, useImpactFlowAnalytics } from '@/hooks/use-analytics'
+import { useProjectAnalytics, useImpactFlowAnalytics, useCustomerSegmentationAnalytics } from '@/hooks/use-analytics'
 import { PeriodSelector } from './period-selector'
 import { StatCard, StatCardGrid } from './stat-card'
 import { LineChart, BarChart } from './charts'
-import { ImpactFlowGraph } from './impact-flow-graph'
+import { CustomerSegmentation } from './customer-segmentation'
 import { Spinner } from '@/components/ui/spinner'
 import { VelocityChart } from '@/components/dashboard/velocity-chart'
 import type { IssueVelocityData } from '@/types/dashboard'
@@ -30,13 +30,11 @@ const PRIORITY_LABEL_MAP: Record<string, string> = {
   high: 'High',
 }
 
-const SOURCE_LABEL_MAP: Record<string, string> = {
-  widget: 'Widget',
-  slack: 'Slack',
-  intercom: 'Intercom',
-  gong: 'Gong',
-  api: 'API',
-  manual: 'Manual',
+const ALL_PRIORITIES = ['low', 'medium', 'high'] as const
+
+function ensureAllPriorities(data: { label: string; value: number; percentage: number }[]) {
+  const existing = new Map(data.map((d) => [d.label, d]))
+  return ALL_PRIORITIES.map((p) => existing.get(p) ?? { label: p, value: 0, percentage: 0 })
 }
 
 interface ProjectAnalyticsProps {
@@ -55,6 +53,14 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
   } = useImpactFlowAnalytics({
     period,
     projectId,
+  })
+  const {
+    data: customerSegData,
+    isLoading: customerSegLoading,
+    error: customerSegError,
+  } = useCustomerSegmentationAnalytics({
+    projectId,
+    period,
   })
 
   if (isLoading) {
@@ -147,18 +153,6 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Feedback by Source">
-          {data.distributions.sessionsBySource.length > 0 ? (
-            <BarChart
-              data={data.distributions.sessionsBySource}
-              labelFormatter={(label) => SOURCE_LABEL_MAP[label] ?? label}
-              height={180}
-            />
-          ) : (
-            <EmptyChartState />
-          )}
-        </ChartCard>
-
         <ChartCard title="Issues by Type">
           {data.distributions.issuesByType.length > 0 ? (
             <BarChart
@@ -170,12 +164,10 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
             <EmptyChartState />
           )}
         </ChartCard>
-      </div>
 
-      <ChartCard title="Issues by Priority">
-        {data.distributions.issuesByPriority.length > 0 ? (
+        <ChartCard title="Issues by Priority">
           <BarChart
-            data={data.distributions.issuesByPriority}
+            data={ensureAllPriorities(data.distributions.issuesByPriority)}
             labelFormatter={(label) => PRIORITY_LABEL_MAP[label] ?? label}
             height={180}
             colorMap={{
@@ -184,20 +176,22 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
               high: 'var(--accent-danger)',
             }}
           />
-        ) : (
-          <EmptyChartState />
-        )}
-      </ChartCard>
+        </ChartCard>
+      </div>
 
-      {/* Impact Flow Graph */}
-      <ChartCard title="Customer Impact Flow">
-        <ImpactFlowGraph
-          data={impactFlowData}
-          isLoading={impactFlowLoading}
-          error={impactFlowError}
-          projectId={projectId}
-        />
-      </ChartCard>
+      {/* Customer Impact */}
+      <h3 className="font-mono text-sm font-semibold uppercase text-[color:var(--text-secondary)]">
+        Customer Impact
+      </h3>
+      <CustomerSegmentation
+        data={customerSegData}
+        isLoading={customerSegLoading}
+        error={customerSegError}
+        impactFlowData={impactFlowData}
+        impactFlowLoading={impactFlowLoading}
+        impactFlowError={impactFlowError}
+        projectId={projectId}
+      />
     </div>
   )
 }

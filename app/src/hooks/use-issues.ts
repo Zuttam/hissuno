@@ -11,6 +11,7 @@ interface UseIssuesState {
   refresh: () => Promise<void>
   createIssue: (input: CreateIssueInput) => Promise<IssueWithProject | null>
   archiveIssue: (issueId: string, isArchived: boolean) => Promise<boolean>
+  batchArchive: (issueIds: string[], isArchived: boolean) => Promise<boolean>
 }
 
 interface UseIssuesOptions {
@@ -117,6 +118,34 @@ export function useIssues({
     }
   }, [])
 
+  const batchArchive = useCallback(async (issueIds: string[], isArchived: boolean): Promise<boolean> => {
+    if (!filters.projectId) return false
+
+    // Optimistic update
+    const prevIssues = issues
+    setIssues((prev) =>
+      prev.map((i) => (issueIds.includes(i.id) ? { ...i, is_archived: isArchived } : i))
+    )
+
+    try {
+      const response = await fetch(`/api/projects/${filters.projectId}/issues/batch/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueIds, is_archived: isArchived }),
+      })
+
+      if (!response.ok) {
+        setIssues(prevIssues)
+        return false
+      }
+
+      return true
+    } catch {
+      setIssues(prevIssues)
+      return false
+    }
+  }, [filters.projectId, issues])
+
   useEffect(() => {
     void fetchIssues()
   }, [fetchIssues])
@@ -130,8 +159,9 @@ export function useIssues({
       refresh: fetchIssues,
       createIssue,
       archiveIssue,
+      batchArchive,
     }),
-    [issues, total, isLoading, error, fetchIssues, createIssue, archiveIssue]
+    [issues, total, isLoading, error, fetchIssues, createIssue, archiveIssue, batchArchive]
   )
 }
 

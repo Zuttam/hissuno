@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getSessionById } from '@/lib/supabase/sessions'
 import { enforceLimit, LimitExceededError } from '@/lib/billing/enforcement-service'
+import { getProjectOwnerUserId } from '@/lib/auth/project-members'
 import type { SessionTag } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -12,20 +14,6 @@ type RouteParams = { id: string; sessionId: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -69,9 +57,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Verify the session belongs to this project
     const existingSession = await getSessionById(sessionId)
@@ -111,6 +98,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
 
     console.error('[sessions.review.status] unexpected error', error)
     return NextResponse.json({ error: 'Failed to fetch review status.' }, { status: 500 })
@@ -132,9 +122,8 @@ export async function POST(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Verify the session belongs to this project
     const existingSession = await getSessionById(sessionId)
@@ -142,10 +131,11 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
     }
 
-    // Enforce analyzed sessions limit for project owner
+    // Enforce analyzed sessions limit against the project owner's subscription
+    const enforcementUserId = await getProjectOwnerUserId(projectId)
     try {
       await enforceLimit({
-        userId: user.id,
+        userId: enforcementUserId,
         dimension: 'analyzed_sessions',
       })
     } catch (error) {
@@ -224,6 +214,9 @@ export async function POST(_request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[sessions.review] unexpected error', error)

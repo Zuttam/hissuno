@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { listIssues } from '@/lib/supabase/issues'
 import { createIssue } from '@/lib/issues/issues-service'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import type { IssueType, IssuePriority, IssueStatus, MetricLevel, CreateIssueInput } from '@/types/issue'
 
 export const runtime = 'nodejs'
@@ -12,20 +13,6 @@ type RouteParams = { id: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -42,9 +29,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const { searchParams } = new URL(request.url)
 
@@ -69,6 +55,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
 
     console.error('[issues.list] unexpected error', error)
     return NextResponse.json({ error: 'Unable to load issues.' }, { status: 500 })
@@ -88,9 +77,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
 
@@ -125,6 +113,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[issues.post] unexpected error', error)

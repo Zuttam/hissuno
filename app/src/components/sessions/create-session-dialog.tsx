@@ -184,7 +184,7 @@ export function CreateSessionDialog({
   )
 
   return (
-    <Dialog open={open} onClose={onClose} title="Create Feedback" size="2xl">
+    <Dialog open={open} onClose={onClose} title="Create Feedback" size="xxl">
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {error && (
           <div className="rounded-[4px] bg-red-500/10 px-3 py-2 text-xs text-red-600">

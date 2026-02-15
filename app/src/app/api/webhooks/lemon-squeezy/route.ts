@@ -82,7 +82,7 @@ export async function POST(request: Request) {
         // Get plan details from cache to copy limits
         const plan = await getPlanById(planId)
         const sessionsLimit = plan?.limits.sessions_limit ?? null
-        const projectsLimit = plan?.limits.projects_limit ?? null
+        const issuesLimit = plan?.limits.issues_limit ?? null
         const resolvedPlanName = planName ?? plan?.name ?? null
 
         // Create subscription record with plan limits
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
             plan_id: planId,
             plan_name: resolvedPlanName,
             sessions_limit: sessionsLimit,
-            projects_limit: projectsLimit,
+            issues_limit: issuesLimit,
             lemon_squeezy_subscription_id: payload.data.id,
             lemon_squeezy_customer_id: String(payload.data.attributes.customer_id),
             status: mapStatus(payload.data.attributes.status),
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
               updateData.plan_id = newPlanId
               updateData.plan_name = newPlan.name
               updateData.sessions_limit = newPlan.limits.sessions_limit
-              updateData.projects_limit = newPlan.limits.projects_limit
+              updateData.issues_limit = newPlan.limits.issues_limit
               console.log(`[webhook.lemon-squeezy] Plan changed to ${newPlan.name}`)
             }
           }

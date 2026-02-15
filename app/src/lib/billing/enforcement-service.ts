@@ -70,11 +70,8 @@ function getLimitForDimension(
   switch (dimension) {
     case 'analyzed_sessions':
       return subscription!.sessions_limit
-    case 'projects':
-      return subscription!.projects_limit
-    // Add new dimensions here:
-    // case 'issues':
-    //   return subscription!.issues_limit
+    case 'analyzed_issues':
+      return subscription!.issues_limit
     default:
       return null
   }
@@ -91,11 +88,8 @@ function getUsageForDimension(usage: UsageMetrics, dimension: LimitDimension): n
   switch (dimension) {
     case 'analyzed_sessions':
       return usage.analyzedSessionsUsed
-    case 'projects':
-      return usage.projectsUsed
-    // Add new dimensions here:
-    // case 'issues':
-    //   return usage.issuesUsed
+    case 'analyzed_issues':
+      return usage.analyzedIssuesUsed
     default:
       return 0
   }

@@ -241,6 +241,25 @@ export function IssueSidebar({
             </div>
           )}
 
+          {/* Row 2.5: Inline metadata */}
+          {issue && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-[color:var(--text-tertiary)]">
+              <span>{issue.upvote_count} upvote{issue.upvote_count !== 1 ? 's' : ''}</span>
+              <span>&middot;</span>
+              <span>{issue.sessions?.length || 0} session{(issue.sessions?.length || 0) !== 1 ? 's' : ''}</span>
+              <span>&middot;</span>
+              <span>Created {formatRelativeDate(issue.created_at)}</span>
+              <span>&middot;</span>
+              <span>Updated {formatRelativeDate(issue.updated_at)}</span>
+              {jiraStatus.synced && (
+                <>
+                  <span>&middot;</span>
+                  <JiraSyncBadgeInline status={jiraStatus} isRetrying={isJiraRetrying} onRetry={retryJiraSync} />
+                </>
+              )}
+            </div>
+          )}
+
           {/* Row 3: Action buttons */}
           {issue && (
             <div className="mt-3 flex flex-wrap items-center gap-1.5" ref={dropdownContainerRef}>
@@ -590,63 +609,6 @@ export function IssueSidebar({
               </CollapsibleSection>
             </div>
 
-            {/* Metadata (collapsed by default) */}
-            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <CollapsibleSection title="Metadata" variant="flat" defaultExpanded={false}>
-                <div className="flex flex-col gap-4">
-                  {/* Stats */}
-                  <div className="flex items-center gap-4 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
-                    <div className="flex-1 text-center">
-                      <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
-                        {issue.upvote_count}
-                      </p>
-                      <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">
-                        Upvotes
-                      </p>
-                    </div>
-                    <div className="h-8 w-px bg-[color:var(--border-subtle)]" />
-                    <div className="flex-1 text-center">
-                      <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
-                        {issue.sessions?.length || 0}
-                      </p>
-                      <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">
-                        Sessions
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Timestamps */}
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="flex flex-col gap-1">
-                      <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
-                        Created
-                      </label>
-                      <p className="text-[color:var(--foreground)]">
-                        {formatDateTime(issue.created_at)}
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
-                        Updated
-                      </label>
-                      <p className="text-[color:var(--foreground)]">
-                        {formatDateTime(issue.updated_at)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Jira Sync Status */}
-                  {jiraStatus.synced && (
-                    <JiraSyncBadge
-                      status={jiraStatus}
-                      isRetrying={isJiraRetrying}
-                      onRetry={retryJiraSync}
-                    />
-                  )}
-                </div>
-              </CollapsibleSection>
-            </div>
-
             {/* Description (collapsed by default) */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
               <CollapsibleSection
@@ -675,14 +637,6 @@ export function IssueSidebar({
 // ============================================================================
 // Helpers
 // ============================================================================
-
-function formatDateTime(dateString: string): string {
-  const date = new Date(dateString)
-  return date.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
-}
 
 function formatRelativeDate(dateString: string): string {
   const date = new Date(dateString)
@@ -890,5 +844,34 @@ function JiraSyncBadge({ status, isRetrying, onRetry }: JiraSyncBadgeProps) {
         </button>
       )}
     </div>
+  )
+}
+
+function JiraSyncBadgeInline({ status, isRetrying, onRetry }: JiraSyncBadgeProps) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {status.jiraIssueUrl ? (
+        <a
+          href={status.jiraIssueUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[color:var(--accent-selected)] hover:underline"
+        >
+          {status.jiraIssueKey}
+        </a>
+      ) : (
+        <span>{status.jiraIssueKey || 'Jira'}</span>
+      )}
+      {status.lastSyncStatus === 'failed' && (
+        <button
+          type="button"
+          onClick={onRetry}
+          disabled={isRetrying}
+          className="text-[color:var(--accent-danger)] hover:underline disabled:opacity-50"
+        >
+          {isRetrying ? '...' : '(retry)'}
+        </button>
+      )}
+    </span>
   )
 }

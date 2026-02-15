@@ -57,14 +57,14 @@ export function VelocityChart({ velocity }: VelocityChartProps) {
                 dataKey="date"
                 tickFormatter={formatDate}
                 stroke="var(--text-secondary)"
-                fontSize={12}
+                fontSize={10}
                 tickLine={false}
                 axisLine={{ stroke: 'var(--border-subtle)' }}
                 tick={{ fill: 'var(--text-secondary)' }}
               />
               <YAxis
                 stroke="var(--text-secondary)"
-                fontSize={12}
+                fontSize={10}
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: 'var(--text-secondary)' }}
@@ -79,7 +79,7 @@ export function VelocityChart({ velocity }: VelocityChartProps) {
                 }}
                 labelFormatter={formatDate}
               />
-              <Legend />
+              <Legend wrapperStyle={{ fontSize: '12px' }} />
               <Line
                 type="monotone"
                 dataKey="created"
@@ -101,14 +101,6 @@ export function VelocityChart({ velocity }: VelocityChartProps) {
             </RechartsLineChart>
           </ResponsiveContainer>
         )}
-      </div>
-      <div className="flex flex-col items-center justify-center rounded-[4px] border border-[color:var(--border-subtle)] px-4 py-2">
-        <span className="font-mono text-2xl font-bold text-[color:var(--foreground)]">
-          {velocity.cumulativeOpen}
-        </span>
-        <span className="font-mono text-[10px] uppercase text-[color:var(--text-secondary)]">
-          Open
-        </span>
       </div>
     </div>
   )

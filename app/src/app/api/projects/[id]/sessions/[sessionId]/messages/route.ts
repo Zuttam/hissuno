@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getSessionById } from '@/lib/supabase/sessions'
 import type { ChatMessage } from '@/types/session'
@@ -11,20 +12,6 @@ type RouteParams = { id: string; sessionId: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -47,9 +34,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
     const { content } = body
@@ -71,6 +57,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const now = new Date().toISOString()
     const messageId = crypto.randomUUID()
+    const senderUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
     // Insert message into session_messages table
     const adminClient = createAdminClient()
@@ -81,7 +68,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         session_id: sessionId,
         project_id: projectId,
         sender_type: 'human_agent',
-        sender_user_id: user.id,
+        sender_user_id: senderUserId,
         content: content.trim(),
         created_at: now,
       })
@@ -95,19 +82,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
     await adminClient.from('sessions').update({ last_activity_at: now }).eq('id', sessionId)
 
     // Return the message in ChatMessage format
+    const senderName = identity.type === 'user' ? (identity.email || 'Support Agent') : 'Support Agent'
     const chatMessage: ChatMessage = {
       id: messageId,
       role: 'assistant',
       content: content.trim(),
       createdAt: now,
       senderType: 'human_agent',
-      senderName: user.email || 'Support Agent',
+      senderName,
     }
 
     return NextResponse.json({ message: chatMessage })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[sessions.messages] unexpected error', error)

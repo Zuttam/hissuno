@@ -245,6 +245,21 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     if (filters.dateTo) {
       query = query.lte('created_at', filters.dateTo)
     }
+    if (filters.contactId) {
+      query = query.eq('contact_id', filters.contactId)
+    }
+    if (filters.companyId) {
+      const { data: companyContacts } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('company_id', filters.companyId)
+        .eq('project_id', filters.projectId ?? '')
+      const contactIds = companyContacts?.map(c => c.id) ?? []
+      if (contactIds.length === 0) {
+        return { sessions: [], total: 0 }
+      }
+      query = query.in('contact_id', contactIds)
+    }
 
     // Apply pagination via .range() (handles both limit and offset in one call)
     const limit = filters.limit ?? 50
@@ -716,6 +731,7 @@ export async function updateSession(
     if (input.status !== undefined) updates.status = input.status
     if (input.user_id !== undefined) updates.user_id = input.user_id
     if (input.user_metadata !== undefined) updates.user_metadata = input.user_metadata
+    if (input.contact_id !== undefined) updates.contact_id = input.contact_id
     if (input.is_human_takeover !== undefined) {
       updates.is_human_takeover = input.is_human_takeover
       updates.human_takeover_at = input.is_human_takeover ? new Date().toISOString() : null

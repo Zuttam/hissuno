@@ -5,6 +5,7 @@
  * and importing rows with upsert behavior.
  */
 
+import Papa from 'papaparse'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { COMPANY_STAGES } from '@/types/customer'
 import type {
@@ -22,63 +23,28 @@ import type {
  * Parse raw CSV text into headers and row objects.
  */
 export function parseCSVContent(text: string): { headers: string[]; rows: Record<string, string>[] } {
-  const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0)
+  const result = Papa.parse<Record<string, string>>(text, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (h) => h.trim(),
+    transform: (value) => value.trim(),
+  })
 
-  if (lines.length === 0) {
+  const headers = result.meta.fields ?? []
+  if (headers.length === 0) {
     return { headers: [], rows: [] }
   }
 
-  const headers = parseCSVLine(lines[0])
-  const rows: Record<string, string>[] = []
-
-  for (let i = 1; i < lines.length; i++) {
-    const values = parseCSVLine(lines[i])
-    const row: Record<string, string> = {}
-    for (let j = 0; j < headers.length; j++) {
-      row[headers[j]] = values[j] ?? ''
+  // Ensure every row has all header keys (PapaParse omits missing trailing columns)
+  const rows = result.data.map((row) => {
+    const filled: Record<string, string> = {}
+    for (const h of headers) {
+      filled[h] = row[h] ?? ''
     }
-    rows.push(row)
-  }
+    return filled
+  })
 
   return { headers, rows }
-}
-
-/**
- * Parse a single CSV line, handling quoted fields with commas.
- */
-function parseCSVLine(line: string): string[] {
-  const result: string[] = []
-  let current = ''
-  let inQuotes = false
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i]
-
-    if (inQuotes) {
-      if (char === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') {
-          current += '"'
-          i++ // skip escaped quote
-        } else {
-          inQuotes = false
-        }
-      } else {
-        current += char
-      }
-    } else {
-      if (char === '"') {
-        inQuotes = true
-      } else if (char === ',') {
-        result.push(current.trim())
-        current = ''
-      } else {
-        current += char
-      }
-    }
-  }
-
-  result.push(current.trim())
-  return result
 }
 
 // ============================================================================

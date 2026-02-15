@@ -1,6 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { USER_EMAIL_HEADER, USER_ID_HEADER, USER_NAME_HEADER } from '@/lib/auth/server'
+import {
+  API_KEY_ID_HEADER,
+  API_KEY_PROJECT_ID_HEADER,
+  API_KEY_CREATED_BY_HEADER,
+} from '@/lib/auth/identity'
+import { resolveApiKey } from '@/lib/auth/api-keys'
 
 const PUBLIC_PATH_PREFIXES = [
   '/login',
@@ -110,12 +116,20 @@ export async function proxy(request: NextRequest) {
       supabaseResponse.headers.delete(USER_NAME_HEADER)
     }
   } else {
+    // SECURITY: Strip all identity headers when no JWT session exists.
+    // This prevents client-supplied headers from being trusted.
     requestHeaders.delete(USER_ID_HEADER)
     requestHeaders.delete(USER_EMAIL_HEADER)
     requestHeaders.delete(USER_NAME_HEADER)
+    requestHeaders.delete(API_KEY_ID_HEADER)
+    requestHeaders.delete(API_KEY_PROJECT_ID_HEADER)
+    requestHeaders.delete(API_KEY_CREATED_BY_HEADER)
     supabaseResponse.headers.delete(USER_ID_HEADER)
     supabaseResponse.headers.delete(USER_EMAIL_HEADER)
     supabaseResponse.headers.delete(USER_NAME_HEADER)
+    supabaseResponse.headers.delete(API_KEY_ID_HEADER)
+    supabaseResponse.headers.delete(API_KEY_PROJECT_ID_HEADER)
+    supabaseResponse.headers.delete(API_KEY_CREATED_BY_HEADER)
   }
 
   const pathname = request.nextUrl.pathname
@@ -130,6 +144,44 @@ export async function proxy(request: NextRequest) {
 
   if (!user && requiresAuth) {
     if (isApiRoute) {
+      // Check for API key authentication (Bearer hiss_*)
+      const authHeader = request.headers.get('authorization')
+      if (authHeader?.startsWith('Bearer hiss_')) {
+        const resolved = await resolveApiKey(authHeader.slice(7))
+        if (!resolved) {
+          const invalidKey = NextResponse.json({ error: 'Invalid API key' }, { status: 401 })
+          forwardCookies(invalidKey)
+          return invalidKey
+        }
+
+        // SECURITY: Defensive re-strip of all identity headers (C4 fix)
+        // The block above already stripped them, but we re-strip here to
+        // document the invariant that no client-supplied identity headers
+        // survive past this point.
+        requestHeaders.delete(USER_ID_HEADER)
+        requestHeaders.delete(USER_EMAIL_HEADER)
+        requestHeaders.delete(USER_NAME_HEADER)
+        requestHeaders.delete(API_KEY_ID_HEADER)
+        requestHeaders.delete(API_KEY_PROJECT_ID_HEADER)
+        requestHeaders.delete(API_KEY_CREATED_BY_HEADER)
+
+        // Inject API key identity headers
+        requestHeaders.set(API_KEY_ID_HEADER, resolved.keyId)
+        requestHeaders.set(API_KEY_PROJECT_ID_HEADER, resolved.projectId)
+        requestHeaders.set(API_KEY_CREATED_BY_HEADER, resolved.createdByUserId)
+
+        // Project-scoped route guard: verify project ID matches
+        const projectMatch = pathname.match(/^\/api\/projects\/([^/]+)/)
+        if (projectMatch && projectMatch[1] !== resolved.projectId) {
+          const forbidden = NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+          forwardCookies(forbidden)
+          return forbidden
+        }
+
+        // Let request through to route handler
+        return NextResponse.next({ request: { headers: requestHeaders } })
+      }
+
       const unauthorized = NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       forwardCookies(unauthorized)
       return unauthorized

@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
 type RouteParams = { id: string }
 type RouteContext = { params: Promise<RouteParams> }
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
 
 /**
  * GET /api/projects/[id]/customers/analytics
@@ -34,8 +21,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     // Fetch companies
     const { data: companies, error: companiesError } = await supabase
@@ -96,6 +84,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[customers.analytics] unexpected error', error)
     return NextResponse.json({ error: 'Unable to load customer analytics.' }, { status: 500 })

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import JSZip from 'jszip'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { downloadKnowledgePackage } from '@/lib/knowledge/storage'
@@ -22,14 +23,9 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   try {
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      throw new UnauthorizedError('User not authenticated')
-    }
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
 
     // Fetch project name for ZIP naming
     const { data: project } = await supabase
@@ -104,6 +100,9 @@ export async function GET(request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[knowledge.export] Unexpected error:', error)

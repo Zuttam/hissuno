@@ -448,7 +448,7 @@ function CompanyActivitySection({ companyId, projectId }: { companyId: string; p
   return (
     <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
       <CollapsibleSection
-        title={`Feedback Activity${!isLoading ? ` (${sessionCount} sessions, ${issueCount} issues)` : ''}`}
+        title={`Feedback Activity${!isLoading ? ` (${sessionCount} feedbacks, ${issueCount} issues)` : ''}`}
         variant="flat"
         defaultExpanded
       >
@@ -460,7 +460,7 @@ function CompanyActivitySection({ companyId, projectId }: { companyId: string; p
             {sessionCount > 0 && (
               <div className="flex flex-col gap-1">
                 <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                  Sessions
+                  Feedback
                 </span>
                 {activity!.sessions.map((session) => (
                   <Link

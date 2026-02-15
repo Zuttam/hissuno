@@ -8,6 +8,7 @@ import type {
   SessionsStripAnalytics,
   IssuesStripAnalytics,
   ImpactFlowGraphData,
+  CustomerSegmentationAnalytics,
 } from '@/lib/supabase/analytics'
 
 interface UseAnalyticsOptions {
@@ -335,5 +336,69 @@ export function useImpactFlowAnalytics({
       refresh: fetchAnalytics,
     }),
     [data, isLoading, error, period, fetchAnalytics]
+  )
+}
+
+interface UseCustomerSegmentationAnalyticsOptions {
+  projectId: string
+  period: AnalyticsPeriod
+}
+
+interface UseCustomerSegmentationAnalyticsState {
+  data: CustomerSegmentationAnalytics | null
+  isLoading: boolean
+  error: string | null
+  refresh: () => Promise<void>
+}
+
+export function useCustomerSegmentationAnalytics({
+  projectId,
+  period,
+}: UseCustomerSegmentationAnalyticsOptions): UseCustomerSegmentationAnalyticsState {
+  const [data, setData] = useState<CustomerSegmentationAnalytics | null>(null)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchAnalytics = useCallback(async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const params = new URLSearchParams()
+      params.set('type', 'customer-segmentation')
+      params.set('projectId', projectId)
+      params.set('period', period)
+
+      const response = await fetch(`/api/analytics?${params.toString()}`, {
+        cache: 'no-store',
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const message = typeof payload?.error === 'string' ? payload.error : 'Failed to load customer segmentation analytics.'
+        throw new Error(message)
+      }
+
+      const payload = await response.json()
+      setData(payload.data ?? null)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unexpected error loading customer segmentation analytics.'
+      setError(message)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [projectId, period])
+
+  useEffect(() => {
+    void fetchAnalytics()
+  }, [fetchAnalytics])
+
+  return useMemo(
+    () => ({
+      data,
+      isLoading,
+      error,
+      refresh: fetchAnalytics,
+    }),
+    [data, isLoading, error, fetchAnalytics]
   )
 }

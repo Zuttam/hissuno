@@ -22,7 +22,7 @@ interface LimitReachedEmailProps {
 
 const dimensionLabels: Record<string, string> = {
   sessions: 'session',
-  projects: 'project',
+  analyzed_issues: 'analyzed issue',
 }
 
 export function LimitReachedEmail({
@@ -59,9 +59,15 @@ export function LimitReachedEmail({
                 <strong>PM review and issue creation will be paused</strong> until you
                 upgrade or your limit resets next billing period.
               </>
+            ) : dimension === 'analyzed_issues' ? (
+              <>
+                Issues will still be created from feedback, but{' '}
+                <strong>issue analysis will be paused</strong> until you
+                upgrade or your limit resets next billing period.
+              </>
             ) : (
               <>
-                You won&apos;t be able to create new {pluralLabel} until you upgrade your
+                You won&apos;t be able to use more {pluralLabel} until you upgrade your
                 plan.
               </>
             )}

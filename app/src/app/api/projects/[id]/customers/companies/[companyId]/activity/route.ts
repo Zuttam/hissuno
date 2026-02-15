@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
@@ -19,17 +20,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
   try {
     const { id: projectId, companyId } = await context.params
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
     const supabase = await createClient()
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
-
-    if (error || !user) {
-      throw new UnauthorizedError('User not authenticated')
-    }
-
-    await assertUserOwnsProject(supabase, projectId, user.id)
 
     // Get all contacts for this company
     const { data: contacts } = await supabase
@@ -81,6 +74,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[api.companies.activity.GET] unexpected error', error)
     return NextResponse.json({ error: 'Failed to fetch company activity.' }, { status: 500 })

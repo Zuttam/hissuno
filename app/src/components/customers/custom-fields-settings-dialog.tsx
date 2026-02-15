@@ -29,7 +29,7 @@ export function CustomFieldsSettingsDialog({
   const [entityTab, setEntityTab] = useState<CustomerEntityType>('company')
 
   return (
-    <Dialog open={open} onClose={onClose} title="Custom Fields Settings" size="2xl">
+    <Dialog open={open} onClose={onClose} title="Custom Fields Settings" size="xxl">
       <Tabs value={entityTab} onChange={(v) => setEntityTab(v as CustomerEntityType)}>
         <TabsList className="px-0 py-0 mb-4">
           <Tab value="company">Company Fields</Tab>

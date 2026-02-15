@@ -212,6 +212,8 @@ export interface SessionFilters {
   dateTo?: string
   showArchived?: boolean
   isHumanTakeover?: boolean
+  companyId?: string
+  contactId?: string
   limit?: number
   offset?: number
 }
@@ -247,6 +249,7 @@ export interface UpdateSessionInput {
   user_id?: string | null
   user_metadata?: Record<string, string> | null
   is_human_takeover?: boolean
+  contact_id?: string | null
 }
 
 /**

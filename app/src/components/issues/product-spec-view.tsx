@@ -171,7 +171,7 @@ function SpecDialog({ open, onClose, spec, issueTitle }: SpecDialogProps) {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Product Specification" size="2xl">
+    <Dialog open={open} onClose={onClose} title="Product Specification" size="xxl">
       <div className="flex justify-end gap-2 border-b border-[color:var(--border-subtle)] pb-3 mb-4">
         <button
           type="button"

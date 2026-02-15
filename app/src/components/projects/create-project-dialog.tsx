@@ -113,7 +113,7 @@ export function CreateProjectDialog({
         current={limitError.current}
         limit={limitError.limit}
         upgradeUrl={limitError.upgradeUrl}
-        dimension="projects"
+        dimension="analyzed_sessions"
       />
     )
   }

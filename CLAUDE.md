@@ -252,6 +252,43 @@ Button.displayName = 'Button'
 export { Button }
 ```
 
+### Inline Edit Pattern (sidebar detail fields)
+
+For editable fields in sidebar detail views, use the hover-to-reveal edit icon pattern from `contact-sidebar.tsx`:
+
+- **Read mode**: `group` wrapper, value on left, edit pencil icon button with `opacity-0 group-hover:opacity-100`
+- **Edit mode**: Input or `Combobox` with save (checkmark) + cancel (X) icon buttons
+- Both modes share `flex flex-col gap-1` layout with a `label` on top
+
+```tsx
+// Read mode
+<div className="group flex flex-col gap-1">
+  <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">{label}</label>
+  <div className="flex items-center gap-1">
+    <p className="flex-1 text-[color:var(--foreground)]">{value || '-'}</p>
+    <button
+      onClick={handleStartEdit}
+      className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+      aria-label={`Edit ${label}`}
+    >
+      {/* pencil icon 12x12 */}
+    </button>
+  </div>
+</div>
+
+// Edit mode
+<div className="flex flex-col gap-1">
+  <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">{label}</label>
+  <div className="flex items-center gap-1">
+    <input className="flex-1 rounded-[4px] border ..." autoFocus />
+    <button className="... text-[color:var(--accent-success)]">{/* checkmark */}</button>
+    <button className="... text-[color:var(--accent-danger)]">{/* X icon */}</button>
+  </div>
+</div>
+```
+
+For relation fields (company, contact), use `Combobox` instead of `<input>` in edit mode. See `EditableCompanyField` in `contact-sidebar.tsx` and the Customer field in `session-details.tsx` for reference.
+
 ## Naming Conventions
 
 | Category | Pattern | Example |

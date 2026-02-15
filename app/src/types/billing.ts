@@ -19,8 +19,8 @@ export type SubscriptionStatus =
 export interface PlanLimits {
   /** Maximum sessions per billing period. null = unlimited */
   sessions_limit: number | null
-  /** Maximum projects. null = unlimited */
-  projects_limit: number | null
+  /** Maximum analyzed issues per billing period. null = unlimited */
+  issues_limit: number | null
 }
 
 /**
@@ -55,8 +55,8 @@ export interface Subscription {
   plan_name: string
   /** Per-user session limit (from plan, can be overridden). null = unlimited */
   sessions_limit: number | null
-  /** Per-user project limit (from plan, can be overridden). null = unlimited */
-  projects_limit: number | null
+  /** Per-user analyzed issues limit (from plan, can be overridden). null = unlimited */
+  issues_limit: number | null
   /** Subscription status */
   status: SubscriptionStatus
   /** When the current period ends (next billing date) */
@@ -77,10 +77,10 @@ export interface UsageMetrics {
   analyzedSessionsUsed: number
   /** Analyzed session limit for this user (from subscription). null = unlimited */
   analyzedSessionsLimit: number | null
-  /** Number of projects created */
-  projectsUsed: number
-  /** Project limit for this user (from subscription). null = unlimited */
-  projectsLimit: number | null
+  /** Number of analyzed issues this period (issues with analysis_computed_at set) */
+  analyzedIssuesUsed: number
+  /** Analyzed issues limit for this user (from subscription). null = unlimited */
+  analyzedIssuesLimit: number | null
   /** Start of current billing period */
   periodStart: string
   /** End of current billing period (next billing date) */

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getSessionById, updateSessionTags } from '@/lib/supabase/sessions'
 import { getProjectCustomTags } from '@/lib/supabase/custom-tags'
@@ -12,20 +13,6 @@ type RouteParams = { id: string; sessionId: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -43,9 +30,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
 
@@ -88,6 +74,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
 
     console.error('[sessions.tags] unexpected error', error)
     return NextResponse.json({ error: 'Failed to update tags.' }, { status: 500 })
@@ -107,11 +96,11 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Get session with tags
+    const supabase = await createClient()
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select('id, tags, tags_auto_applied_at, project_id')
@@ -134,6 +123,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[sessions.tags] unexpected error', error)

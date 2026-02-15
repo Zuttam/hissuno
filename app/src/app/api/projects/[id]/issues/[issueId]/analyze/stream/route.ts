@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getIssueById } from '@/lib/supabase/issues'
 import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
@@ -38,20 +39,6 @@ interface AnalysisSSEEvent extends BaseSSEEvent {
   type: AnalysisSSEEventType
 }
 
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
-
 /**
  * Map step IDs to human-readable names
  */
@@ -87,15 +74,16 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Verify the issue belongs to this project
     const existingIssue = await getIssueById(issueId)
     if (!existingIssue || existingIssue.project_id !== projectId) {
       return NextResponse.json({ error: 'Issue not found.' }, { status: 404 })
     }
+
+    const supabase = await createClient()
 
     // Fetch the specific analysis run by runId (exact match, not "latest")
     const { data: analysisRun, error: runError } = await supabase
@@ -294,6 +282,9 @@ export async function GET(_request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error(`${LOG_PREFIX} unexpected error`, error)

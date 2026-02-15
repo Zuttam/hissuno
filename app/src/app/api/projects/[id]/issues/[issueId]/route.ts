@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { getIssueById } from '@/lib/supabase/issues'
 import { updateIssue, deleteIssue } from '@/lib/issues/issues-service'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import type { UpdateIssueInput } from '@/types/issue'
 
 export const runtime = 'nodejs'
@@ -12,20 +13,6 @@ type RouteParams = { id: string; issueId: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -41,9 +28,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const issue = await getIssueById(issueId)
 
@@ -60,6 +46,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[issues.get] unexpected error', error)
@@ -80,9 +69,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // First verify the issue belongs to this project
     const existingIssue = await getIssueById(issueId)
@@ -103,6 +91,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
 
     console.error('[issues.update] unexpected error', error)
     return NextResponse.json({ error: 'Unable to update issue.' }, { status: 500 })
@@ -122,9 +113,8 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // First verify the issue belongs to this project
     const existingIssue = await getIssueById(issueId)
@@ -142,6 +132,9 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[issues.delete] unexpected error', error)

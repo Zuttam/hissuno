@@ -32,7 +32,7 @@ export async function getBillingInfo(userId: string, supabaseClient?: BillingSup
         plan_id: subscriptionData.plan_id,
         plan_name: subscriptionData.plan_name ?? '',
         sessions_limit: subscriptionData.sessions_limit,
-        projects_limit: subscriptionData.projects_limit,
+        issues_limit: subscriptionData.issues_limit,
         status: subscriptionData.status,
         current_period_end: subscriptionData.current_period_end,
         lemon_squeezy_subscription_id: subscriptionData.lemon_squeezy_subscription_id,
@@ -118,26 +118,31 @@ export async function getUsageMetrics(
     analyzedSessionsCount = count ?? 0
   }
 
-  // Count projects (exclude demo projects from limit)
-  const { count: projectsCount, error: projectsError } = await supabase
-    .from('projects')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('is_demo', false)
+  // Count analyzed issues (analysis_computed_at IS NOT NULL) in the current period for ALL user's projects
+  let analyzedIssuesCount = 0
+  if (allProjectIds.length > 0) {
+    const { count: issuesCount, error: issuesError } = await supabase
+      .from('issues')
+      .select('*', { count: 'exact', head: true })
+      .in('project_id', allProjectIds)
+      .not('analysis_computed_at', 'is', null)
+      .gte('analysis_computed_at', periodStart.toISOString())
 
-  if (projectsError) {
-    console.error('[billing-service] failed to count projects', projectsError)
+    if (issuesError) {
+      console.error('[billing-service] failed to count analyzed issues', issuesError)
+    }
+    analyzedIssuesCount = issuesCount ?? 0
   }
 
   // Get limits from subscription (null = unlimited if no subscription)
   const analyzedSessionsLimit = subscription?.sessions_limit ?? null
-  const projectsLimit = subscription?.projects_limit ?? null
+  const analyzedIssuesLimit = subscription?.issues_limit ?? null
 
   return {
     analyzedSessionsUsed: analyzedSessionsCount,
     analyzedSessionsLimit,
-    projectsUsed: projectsCount ?? 0,
-    projectsLimit,
+    analyzedIssuesUsed: analyzedIssuesCount,
+    analyzedIssuesLimit,
     periodStart: periodStart.toISOString(),
     periodEnd,
   }
@@ -186,7 +191,7 @@ export async function syncSubscriptionLimitsFromPlan(
     .update({
       plan_name: plan.name,
       sessions_limit: plan.limits.sessions_limit,
-      projects_limit: plan.limits.projects_limit,
+      issues_limit: plan.limits.issues_limit,
     })
     .eq('id', subscriptionId)
 

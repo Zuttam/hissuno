@@ -62,8 +62,6 @@ export function AddDataDialog({
 
   // CSV state
   const [csvStep, setCsvStep] = useState<CSVStep>('upload')
-  const [file, setFile] = useState<File | null>(null)
-  const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<Record<string, string>[]>([])
   const [mappings, setMappings] = useState<CSVImportMapping[]>([])
   const [isImporting, setIsImporting] = useState(false)
@@ -130,8 +128,6 @@ export function AddDataDialog({
   const resetAll = useCallback(() => {
     setError(null)
     setCsvStep('upload')
-    setFile(null)
-    setHeaders([])
     setRows([])
     setMappings([])
     setCsvResult(null)
@@ -174,8 +170,13 @@ export function AddDataDialog({
 
   const handleFileSelect = useCallback(
     async (selectedFile: File) => {
-      setFile(selectedFile)
       setError(null)
+
+      const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+      if (selectedFile.size > MAX_FILE_SIZE) {
+        setError(`File too large. Maximum size is 5MB (got ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB).`)
+        return
+      }
 
       try {
         const text = await selectedFile.text()
@@ -186,7 +187,12 @@ export function AddDataDialog({
           return
         }
 
-        setHeaders(parsed.headers)
+        const MAX_ROW_COUNT = 500
+        if (parsed.rows.length > MAX_ROW_COUNT) {
+          setError(`Too many rows. Maximum is ${MAX_ROW_COUNT.toLocaleString()} rows (got ${parsed.rows.length.toLocaleString()}).`)
+          return
+        }
+
         setRows(parsed.rows)
 
         const suggested = suggestMappings(parsed.headers, entityType)
@@ -209,23 +215,21 @@ export function AddDataDialog({
   }, [])
 
   const handleImport = useCallback(async () => {
-    if (!file) return
+    if (rows.length === 0) return
 
     setIsImporting(true)
     setError(null)
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('entity_type', entityType)
-      formData.append('mappings', JSON.stringify(mappings))
-      if (createMissingCompanies) {
-        formData.append('create_missing_companies', 'true')
-      }
-
       const response = await fetch(`/api/projects/${projectId}/customers/import`, {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entity_type: entityType,
+          rows,
+          mappings,
+          create_missing_companies: createMissingCompanies,
+        }),
       })
 
       if (!response.ok) {
@@ -242,7 +246,7 @@ export function AddDataDialog({
     } finally {
       setIsImporting(false)
     }
-  }, [file, entityType, mappings, projectId, onDataAdded, createMissingCompanies])
+  }, [rows, entityType, mappings, projectId, onDataAdded, createMissingCompanies])
 
   // ── Manual form handlers ──
 
@@ -342,7 +346,7 @@ export function AddDataDialog({
       : { required: 'name, email', optional: 'role, title, phone, company_url, is_champion, notes' }
 
   return (
-    <Dialog open={open} onClose={handleClose} title="Add Data" size="2xl">
+    <Dialog open={open} onClose={handleClose} title="Add Customers" size="xl">
       <div className="flex flex-col gap-4">
         {/* Entity type selector */}
         <div className="flex flex-col gap-1">
@@ -382,12 +386,17 @@ export function AddDataDialog({
 
               {/* Step: Upload */}
               {csvStep === 'upload' && (
-                <FileDropZone
-                  accept=".csv"
-                  onFileSelect={handleFileSelect}
-                  label="Select a CSV file"
-                  description="or drag and drop here"
-                />
+                <>
+                  <FileDropZone
+                    accept=".csv"
+                    onFileSelect={handleFileSelect}
+                    label="Select a CSV file"
+                    description="or drag and drop here"
+                  />
+                  <p className="text-xs text-[color:var(--text-tertiary)]">
+                    Maximum 500 rows, 5MB file size.
+                  </p>
+                </>
               )}
 
               {/* Step: Map columns */}
@@ -446,7 +455,7 @@ export function AddDataDialog({
                   )}
 
                   <div className="flex justify-end gap-2">
-                    <Button variant="ghost" onClick={() => { setCsvStep('upload'); setFile(null); setHeaders([]); setRows([]); setMappings([]); }}>
+                    <Button variant="ghost" onClick={() => { setCsvStep('upload'); setRows([]); setMappings([]); }}>
                       Back
                     </Button>
                     <Button onClick={() => setCsvStep('preview')}>Preview</Button>

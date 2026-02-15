@@ -160,7 +160,6 @@
 [] segmentation by customer (contact and company)
 
 
-
 ## Phase 10
 
 ### Marketing
