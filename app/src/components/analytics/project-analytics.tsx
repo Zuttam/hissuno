@@ -180,9 +180,9 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
       </div>
 
       {/* Customer Impact */}
-      <h3 className="font-mono text-sm font-semibold uppercase text-[color:var(--text-secondary)]">
+      <h2 className="font-mono text-sm font-semibold uppercase text-[color:var(--text-secondary)]">
         Customer Impact
-      </h3>
+      </h2>
       <CustomerSegmentation
         data={customerSegData}
         isLoading={customerSegLoading}

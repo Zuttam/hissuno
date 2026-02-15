@@ -847,7 +847,7 @@ function buildTagDistribution<T extends { tags: string[] | null }>(
 /**
  * Flow graph node categories
  */
-export type FlowNodeCategory = 'source' | 'participant' | 'session' | 'issue'
+export type FlowNodeCategory = 'source' | 'participant' | 'feedback' | 'issue'
 
 /**
  * Node in the impact flow graph
@@ -1131,7 +1131,7 @@ export const getImpactFlowAnalytics = cache(async (
   nodes.push({
     id: 'sessions',
     name: 'Feedback',
-    category: 'session',
+    category: 'feedback',
     color: 'var(--accent-primary)',
   })
 
@@ -1186,7 +1186,7 @@ export const getImpactFlowAnalytics = cache(async (
   nodes.push({
     id: 'sessions',
     name: `Feedback (${sessionList.length})`,
-    category: 'session',
+    category: 'feedback',
     color: 'var(--accent-primary)',
   })
 
@@ -1599,7 +1599,7 @@ export const getCustomerSegmentationAnalytics = cache(async (
   flowNodes.push({
     id: 'sessions',
     name: `Feedback (${totalLinkedSessions})`,
-    category: 'session',
+    category: 'feedback',
     color: 'var(--accent-primary)',
   })
 
