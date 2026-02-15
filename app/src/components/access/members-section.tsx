@@ -11,6 +11,7 @@ interface MembersSectionProps {
   members: ProjectMemberWithProfile[]
   isLoading: boolean
   onRefresh: () => Promise<void>
+  isOwner: boolean
 }
 
 function RoleBadge({ role }: { role: string }) {
@@ -29,7 +30,7 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-export function MembersSection({ projectId, members, isLoading, onRefresh }: MembersSectionProps) {
+export function MembersSection({ projectId, members, isLoading, onRefresh, isOwner }: MembersSectionProps) {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [removingId, setRemovingId] = useState<string | null>(null)
 
@@ -63,9 +64,11 @@ export function MembersSection({ projectId, members, isLoading, onRefresh }: Mem
         <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
           Members
         </h3>
-        <Button variant="secondary" size="sm" onClick={() => setShowAddDialog(true)}>
-          Add Member
-        </Button>
+        {isOwner && (
+          <Button variant="secondary" size="sm" onClick={() => setShowAddDialog(true)}>
+            Add Member
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -126,7 +129,7 @@ export function MembersSection({ projectId, members, isLoading, onRefresh }: Mem
                       {addedDate}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {member.role !== 'owner' && (
+                      {isOwner && member.role !== 'owner' && (
                         <Button
                           variant="ghost"
                           size="sm"

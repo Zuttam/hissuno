@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       communicationChannels,
       onboardingCompleted,
       onboardingCurrentStep,
+      billingSkipped,
     } = body
 
     // Fetch existing profile to preserve fields not being updated
@@ -88,6 +89,11 @@ export async function POST(request: Request) {
     // Onboarding step tracking
     if (onboardingCurrentStep !== undefined) {
       updateData.onboarding_current_step = onboardingCurrentStep
+    }
+
+    // Billing skipped flag
+    if (billingSkipped !== undefined) {
+      updateData.billing_skipped = billingSkipped
     }
 
     // Onboarding flags - only update if explicitly provided

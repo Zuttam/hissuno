@@ -131,6 +131,26 @@ export async function claimInvite(code: string, userId: string): Promise<void> {
     console.error('[invite-service.claimInvite] Failed to activate user profile:', activateError)
   }
 
+  // Activate any pending project memberships linked to this invite
+  const { data: activatedMembers, error: membersError } = await supabase
+    .from('project_members')
+    .update({
+      user_id: userId,
+      status: 'active',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('signup_invite_id', invite.id)
+    .eq('status', 'pending')
+    .select('project_id')
+
+  if (membersError) {
+    console.error('[invite-service.claimInvite] Failed to activate project memberships:', membersError)
+  } else if (activatedMembers && activatedMembers.length > 0) {
+    console.log(
+      `[invite-service.claimInvite] Activated ${activatedMembers.length} project membership(s) for user ${userId}`
+    )
+  }
+
   console.log(`[invite-service.claimInvite] Invite ${normalizedCode} claimed by user ${userId}`)
 }
 

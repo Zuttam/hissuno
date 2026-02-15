@@ -12,9 +12,10 @@ interface ApiKeysSectionProps {
   apiKeys: ApiKeyRecord[]
   isLoading: boolean
   onRefresh: () => Promise<void>
+  isOwner: boolean
 }
 
-export function ApiKeysSection({ projectId, apiKeys, isLoading, onRefresh }: ApiKeysSectionProps) {
+export function ApiKeysSection({ projectId, apiKeys, isLoading, onRefresh, isOwner }: ApiKeysSectionProps) {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [revokingId, setRevokingId] = useState<string | null>(null)
 
@@ -49,9 +50,11 @@ export function ApiKeysSection({ projectId, apiKeys, isLoading, onRefresh }: Api
         <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
           API Keys
         </h3>
-        <Button variant="secondary" size="sm" onClick={() => setShowCreateDialog(true)}>
-          Create API Key
-        </Button>
+        {isOwner && (
+          <Button variant="secondary" size="sm" onClick={() => setShowCreateDialog(true)}>
+            Create API Key
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -112,14 +115,16 @@ export function ApiKeysSection({ projectId, apiKeys, isLoading, onRefresh }: Api
                       {lastUsed}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void handleRevoke(key.id)}
-                        loading={revokingId === key.id}
-                      >
-                        Revoke
-                      </Button>
+                      {isOwner && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void handleRevoke(key.id)}
+                          loading={revokingId === key.id}
+                        >
+                          Revoke
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 )

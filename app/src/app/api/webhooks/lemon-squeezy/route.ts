@@ -106,6 +106,16 @@ export async function POST(request: Request) {
           return NextResponse.json({ error: 'Failed to create subscription.' }, { status: 500 })
         }
 
+        // Clear billing_skipped flag so the user can create projects
+        const { error: profileError } = await supabase
+          .from('user_profiles')
+          .update({ billing_skipped: false })
+          .eq('user_id', userId)
+
+        if (profileError) {
+          console.error('[webhook.lemon-squeezy] Failed to clear billing_skipped', profileError)
+        }
+
         console.log(`[webhook.lemon-squeezy] Created subscription for user ${userId} with plan ${resolvedPlanName}`)
         break
       }

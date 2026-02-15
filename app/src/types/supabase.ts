@@ -1444,9 +1444,112 @@ export type Database = {
           },
         ]
       }
+      project_api_keys: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          expires_at: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          project_id: string
+          revoked_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          expires_at?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          project_id: string
+          revoked_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          expires_at?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          project_id?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_api_keys_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_members: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by_user_id: string | null
+          invited_email: string | null
+          project_id: string
+          role: string
+          signup_invite_id: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by_user_id?: string | null
+          invited_email?: string | null
+          project_id: string
+          role?: string
+          signup_invite_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by_user_id?: string | null
+          invited_email?: string | null
+          project_id?: string
+          role?: string
+          signup_invite_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_members_signup_invite_id_fkey"
+            columns: ["signup_invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_settings: {
         Row: {
           allowed_origins: string[] | null
+          analysis_guidelines: string | null
+          classification_guidelines: string | null
           created_at: string
           issue_tracking_enabled: boolean | null
           pm_dedup_include_closed: boolean | null
@@ -1454,6 +1557,7 @@ export type Database = {
           session_goodbye_delay_seconds: number | null
           session_idle_response_timeout_seconds: number | null
           session_idle_timeout_minutes: number | null
+          spec_guidelines: string | null
           support_agent_package_id: string | null
           updated_at: string
           widget_display_type: string | null
@@ -1469,6 +1573,8 @@ export type Database = {
         }
         Insert: {
           allowed_origins?: string[] | null
+          analysis_guidelines?: string | null
+          classification_guidelines?: string | null
           created_at?: string
           issue_tracking_enabled?: boolean | null
           pm_dedup_include_closed?: boolean | null
@@ -1476,6 +1582,7 @@ export type Database = {
           session_goodbye_delay_seconds?: number | null
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
+          spec_guidelines?: string | null
           support_agent_package_id?: string | null
           updated_at?: string
           widget_display_type?: string | null
@@ -1491,6 +1598,8 @@ export type Database = {
         }
         Update: {
           allowed_origins?: string[] | null
+          analysis_guidelines?: string | null
+          classification_guidelines?: string | null
           created_at?: string
           issue_tracking_enabled?: boolean | null
           pm_dedup_include_closed?: boolean | null
@@ -1498,6 +1607,7 @@ export type Database = {
           session_goodbye_delay_seconds?: number | null
           session_idle_response_timeout_seconds?: number | null
           session_idle_timeout_minutes?: number | null
+          spec_guidelines?: string | null
           support_agent_package_id?: string | null
           updated_at?: string
           widget_display_type?: string | null
@@ -1960,11 +2070,11 @@ export type Database = {
           created_at: string
           current_period_end: string | null
           id: string
+          issues_limit: number | null
           lemon_squeezy_customer_id: string | null
           lemon_squeezy_subscription_id: string | null
           plan_id: string
           plan_name: string | null
-          projects_limit: number | null
           sessions_limit: number | null
           status: string
           updated_at: string
@@ -1974,11 +2084,11 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           id?: string
+          issues_limit?: number | null
           lemon_squeezy_customer_id?: string | null
           lemon_squeezy_subscription_id?: string | null
           plan_id: string
           plan_name?: string | null
-          projects_limit?: number | null
           sessions_limit?: number | null
           status?: string
           updated_at?: string
@@ -1988,11 +2098,11 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           id?: string
+          issues_limit?: number | null
           lemon_squeezy_customer_id?: string | null
           lemon_squeezy_subscription_id?: string | null
           plan_id?: string
           plan_name?: string | null
-          projects_limit?: number | null
           sessions_limit?: number | null
           status?: string
           updated_at?: string
@@ -2046,6 +2156,7 @@ export type Database = {
       }
       user_profiles: {
         Row: {
+          billing_skipped: boolean
           communication_channels: string[] | null
           company_name: string | null
           company_size: string | null
@@ -2065,6 +2176,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          billing_skipped?: boolean
           communication_channels?: string[] | null
           company_name?: string | null
           company_size?: string | null
@@ -2084,6 +2196,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          billing_skipped?: boolean
           communication_channels?: string[] | null
           company_name?: string | null
           company_size?: string | null
@@ -2181,6 +2294,14 @@ export type Database = {
           type: string
           upvote_count: number
         }[]
+      }
+      user_has_project_access: {
+        Args: { p_project_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      user_has_project_role: {
+        Args: { p_project_id: string; p_role: string; p_user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
