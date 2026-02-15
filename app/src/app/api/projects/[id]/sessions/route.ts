@@ -54,6 +54,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       dateTo: searchParams.get('dateTo') || undefined,
       showArchived: searchParams.get('showArchived') === 'true',
       isHumanTakeover: searchParams.get('isHumanTakeover') === 'true' || undefined,
+      isAnalyzed: searchParams.get('isAnalyzed') === 'true' || undefined,
       companyId: searchParams.get('companyId') || undefined,
       contactId: searchParams.get('contactId') || undefined,
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 50,

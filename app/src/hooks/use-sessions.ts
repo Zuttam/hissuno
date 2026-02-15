@@ -50,6 +50,7 @@ export function useSessions({
       if (filters.dateTo) params.set('dateTo', filters.dateTo)
       if (filters.showArchived) params.set('showArchived', 'true')
       if (filters.isHumanTakeover) params.set('isHumanTakeover', 'true')
+      if (filters.isAnalyzed) params.set('isAnalyzed', 'true')
       if (filters.companyId) params.set('companyId', filters.companyId)
       if (filters.contactId) params.set('contactId', filters.contactId)
       if (filters.limit) params.set('limit', String(filters.limit))
@@ -73,7 +74,7 @@ export function useSessions({
     } finally {
       setIsLoading(false)
     }
-  }, [filters.projectId, filters.userId, filters.sessionId, filters.name, filters.status, filters.source, filters.tags, filters.dateFrom, filters.dateTo, filters.showArchived, filters.isHumanTakeover, filters.companyId, filters.contactId, filters.limit, filters.offset])
+  }, [filters.projectId, filters.userId, filters.sessionId, filters.name, filters.status, filters.source, filters.tags, filters.dateFrom, filters.dateTo, filters.showArchived, filters.isHumanTakeover, filters.isAnalyzed, filters.companyId, filters.contactId, filters.limit, filters.offset])
 
   const createSession = useCallback(async (input: CreateSessionInput): Promise<SessionWithProject | null> => {
     if (!filters.projectId) return null

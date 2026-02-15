@@ -391,7 +391,7 @@ export function SessionDetails({ session, onUpdateSession, onSessionUpdated }: S
       {(session.page_title || session.page_url) && (
         <div className="flex flex-col gap-1">
           <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Page
+            Location
           </label>
           {session.page_title && (
             <p className="text-sm text-[color:var(--foreground)]">
@@ -411,25 +411,6 @@ export function SessionDetails({ session, onUpdateSession, onSessionUpdated }: S
         </div>
       )}
 
-      {/* Timestamps */}
-      <div className="grid grid-cols-2 gap-4 text-xs">
-        <div className="flex flex-col gap-1">
-          <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Created
-          </label>
-          <p className="text-[color:var(--foreground)]">
-            {formatDateTime(session.created_at)}
-          </p>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Last Activity
-          </label>
-          <p className="text-[color:var(--foreground)]">
-            {formatDateTime(session.last_activity_at)}
-          </p>
-        </div>
-      </div>
     </div>
   )
 }

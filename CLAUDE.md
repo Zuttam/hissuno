@@ -413,6 +413,7 @@ export const listProjects = cache(async (): Promise<ProjectWithCodebase[]> => {
 6. **Void promises**: Use `void` prefix for fire-and-forget: `void fetchData()`.
 7. **No relative imports**: always use absolute import paths starting with the '@' to reference the root
 8. **Use existing UI components**: Before creating any UI element (buttons, headers, text, cards, dialogs, etc.), ALWAYS check `@/components/ui` for existing components. Never create elements from scratch when a reusable component exists.
+9. **User-facing text**: Use "Feedback" instead of "Session" in all user-facing text. "Session" is an internal/code term only.
 
 ## Environment Variables
 

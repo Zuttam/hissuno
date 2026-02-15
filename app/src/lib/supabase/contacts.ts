@@ -331,34 +331,25 @@ export const getContactLinkedIssues = cache(async (contactId: string, limit = 20
   try {
     const supabase = await createClient()
 
-    // Get session IDs for this contact
-    const { data: sessions } = await supabase
+    // Single query: sessions -> issue_sessions -> issues (replaces 2 sequential queries)
+    const { data } = await supabase
       .from('sessions')
-      .select('id')
+      .select('issue_sessions(issue:issues(id, title, type, status, upvote_count, created_at))')
       .eq('contact_id', contactId)
 
-    if (!sessions || sessions.length === 0) {
-      return []
-    }
-
-    const sessionIds = sessions.map((s) => s.id)
-
-    // Get issues linked to those sessions
-    const { data: issueSessionLinks } = await supabase
-      .from('issue_sessions')
-      .select('issue:issues(id, title, type, status, upvote_count, created_at)')
-      .in('session_id', sessionIds)
-
-    if (!issueSessionLinks) {
+    if (!data) {
       return []
     }
 
     // Deduplicate issues (one issue can be linked to multiple sessions from same contact)
     const issueMap = new Map<string, ContactLinkedIssue>()
-    for (const link of issueSessionLinks) {
-      const issue = Array.isArray(link.issue) ? link.issue[0] : link.issue
-      if (issue && !issueMap.has(issue.id)) {
-        issueMap.set(issue.id, issue as ContactLinkedIssue)
+    for (const session of data) {
+      const issueSessionLinks = (session as unknown as { issue_sessions: Array<{ issue: unknown }> }).issue_sessions ?? []
+      for (const link of issueSessionLinks) {
+        const issue = Array.isArray(link.issue) ? link.issue[0] : link.issue
+        if (issue && typeof issue === 'object' && 'id' in issue && !issueMap.has((issue as ContactLinkedIssue).id)) {
+          issueMap.set((issue as ContactLinkedIssue).id, issue as ContactLinkedIssue)
+        }
       }
     }
 

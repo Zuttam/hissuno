@@ -84,6 +84,11 @@ export function SessionsFilters({
     onFilterChange({ ...filters, isHumanTakeover: !filters.isHumanTakeover || undefined })
   }, [filters, onFilterChange])
 
+  // Analyzed handler
+  const handleAnalyzedToggle = useCallback(() => {
+    onFilterChange({ ...filters, isAnalyzed: !filters.isAnalyzed || undefined })
+  }, [filters, onFilterChange])
+
   // Project handler
   const handleProjectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -151,6 +156,7 @@ export function SessionsFilters({
     if (filters.dateTo) count++
     if (filters.showArchived) count++
     if (filters.isHumanTakeover) count++
+    if (filters.isAnalyzed) count++
     if (filters.tags && filters.tags.length > 0) count++
     if (filters.companyId) count++
     if (filters.contactId) count++
@@ -183,6 +189,7 @@ export function SessionsFilters({
       <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
       <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
       <FilterChip label="Needs Human" active={filters.isHumanTakeover ?? false} onClick={handleHumanTakeoverToggle} />
+      <FilterChip label="Analyzed" active={filters.isAnalyzed ?? false} onClick={handleAnalyzedToggle} />
       <span className="ml-2" />
       <FilterLabel>Type:</FilterLabel>
       {SESSION_TAGS.map((tag) => (
@@ -205,6 +212,7 @@ export function SessionsFilters({
         <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
         <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
         <FilterChip label="Needs Human" active={filters.isHumanTakeover ?? false} onClick={handleHumanTakeoverToggle} />
+        <FilterChip label="Analyzed" active={filters.isAnalyzed ?? false} onClick={handleAnalyzedToggle} />
         <span className="ml-2" />
         <FilterLabel>Type:</FilterLabel>
         {SESSION_TAGS.map((tag) => (
@@ -315,7 +323,7 @@ export function SessionsFilters({
           </div>
         )}
         <div className="flex items-center gap-1">
-          <FilterLabel>Session:</FilterLabel>
+          <FilterLabel>Feedback:</FilterLabel>
           <Input
             type="text"
             placeholder="ID..."

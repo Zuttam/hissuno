@@ -109,12 +109,6 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
           change={data.avgMessages.change}
           size="sm"
         />
-        <StatCard
-          label="Top Tag"
-          value={data.topTag ? TAG_LABEL_MAP[data.topTag] ?? data.topTag : 'None'}
-          trend="neutral"
-          size="sm"
-        />
       </StatCardGrid>
 
       {/* Issue Velocity */}

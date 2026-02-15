@@ -601,24 +601,31 @@ export const getProjectIssueStats = cache(async (projectId: string): Promise<{
       throw new UnauthorizedError('Unable to resolve user context.')
     }
 
-    const { data, error } = await supabase
-      .from('issues')
-      .select('status')
-      .eq('project_id', projectId)
+    const statuses = ['open', 'ready', 'in_progress', 'resolved', 'closed'] as const
+    const results = await Promise.all(
+      statuses.map(status =>
+        supabase
+          .from('issues')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', projectId)
+          .eq('status', status)
+      )
+    )
 
-    if (error) {
-      console.error('[supabase.issues] failed to get issue stats', projectId, error)
+    const failed = results.find(r => r.error)
+    if (failed?.error) {
+      console.error('[supabase.issues] failed to get issue stats', projectId, failed.error)
       throw new Error('Unable to load issue stats.')
     }
 
-    const issues = data ?? []
+    const [open, ready, inProgress, resolved, closed] = results.map(r => r.count ?? 0)
     return {
-      total: issues.length,
-      open: issues.filter(i => i.status === 'open').length,
-      ready: issues.filter(i => i.status === 'ready').length,
-      inProgress: issues.filter(i => i.status === 'in_progress').length,
-      resolved: issues.filter(i => i.status === 'resolved').length,
-      closed: issues.filter(i => i.status === 'closed').length,
+      total: open + ready + inProgress + resolved + closed,
+      open,
+      ready,
+      inProgress,
+      resolved,
+      closed,
     }
   } catch (error) {
     console.error('[supabase.issues] unexpected error getting issue stats', projectId, error)
@@ -858,7 +865,8 @@ export async function getTopRankedIssues(
     .eq('project_id', projectId)
     .eq('is_archived', false)
     .not('status', 'in', '("closed")')
-    .order('updated_at', { ascending: false })
+    .order('upvote_count', { ascending: false })
+    .limit(50)
 
   if (error || !data) {
     console.error('[supabase.issues.getTopRankedIssues] Failed', projectId, error)

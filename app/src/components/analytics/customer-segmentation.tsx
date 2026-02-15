@@ -1,21 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { StatCard, StatCardGrid } from './stat-card'
 import { BarChart } from './charts'
 import { ImpactFlowGraph } from './impact-flow-graph'
 import { ChartCard } from './project-analytics'
 import { Spinner } from '@/components/ui/spinner'
 import type { CustomerSegmentationAnalytics, ImpactFlowGraphData } from '@/lib/supabase/analytics'
-
-const STAGE_COLORS: Record<string, string> = {
-  prospect: 'var(--accent-info)',
-  trial: 'var(--accent-warning)',
-  active: 'var(--accent-success)',
-  churned: 'var(--accent-danger)',
-  expansion: 'var(--accent-selected)',
-  Unknown: 'var(--accent-primary)',
-}
 
 interface CustomerSegmentationProps {
   data: CustomerSegmentationAnalytics | null
@@ -67,46 +57,8 @@ export function CustomerSegmentation({
     )
   }
 
-  const formatArr = (value: number) => {
-    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
-    if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
-    return `$${value.toLocaleString()}`
-  }
-
-  const arrAtRiskData = data.companies.arrAtRiskByStage.map((d) => ({
-    label: d.stage,
-    value: d.totalArr,
-    percentage: data.summary.totalArrAtRisk > 0
-      ? Math.round((d.totalArr / data.summary.totalArrAtRisk) * 100)
-      : 0,
-  }))
-
   return (
     <div className="space-y-4">
-      {/* Summary Cards */}
-      <StatCardGrid columns={4}>
-        <StatCard
-          label="Companies"
-          value={data.summary.companiesWithFeedback}
-          size="sm"
-        />
-        <StatCard
-          label="Contacts"
-          value={data.summary.contactsWithFeedback}
-          size="sm"
-        />
-        <StatCard
-          label="ARR at Risk"
-          value={formatArr(data.summary.totalArrAtRisk)}
-          size="sm"
-        />
-        <StatCard
-          label="Champion %"
-          value={`${data.summary.championFeedbackPercentage}%`}
-          size="sm"
-        />
-      </StatCardGrid>
-
       {/* Company Charts */}
       <div className="grid gap-4 lg:grid-cols-2">
         <ChartCard title="Feedback by Company">
@@ -133,18 +85,6 @@ export function CustomerSegmentation({
           )}
         </ChartCard>
       </div>
-
-      {/* ARR at Risk by Stage */}
-      {arrAtRiskData.length > 0 && (
-        <ChartCard title="ARR at Risk by Stage">
-          <BarChart
-            data={arrAtRiskData}
-            height={180}
-            colorMap={STAGE_COLORS}
-            labelFormatter={(label) => label.charAt(0).toUpperCase() + label.slice(1)}
-          />
-        </ChartCard>
-      )}
 
       {/* Impact Flow */}
       <ChartCard title="Impact Flow">

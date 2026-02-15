@@ -13,7 +13,7 @@ function sanitizeSearchInput(input: string): string {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const selectSessionWithProject = '*, project:projects(id, name), contact:contacts(id, name, email, company:companies(id, name, domain, arr, stage))'
+const selectSessionWithProject = '*, project:projects(id, name), contact:contacts(id, name, email, company:companies(id, name, domain, arr, stage)), issue_sessions(count)'
 const selectSessionWithLinkedIssues = `
   *,
   project:projects(id, name),
@@ -247,6 +247,9 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
     }
     if (filters.contactId) {
       query = query.eq('contact_id', filters.contactId)
+    }
+    if (filters.isAnalyzed) {
+      query = query.not('pm_reviewed_at', 'is', null)
     }
     if (filters.companyId) {
       const { data: companyContacts } = await supabase

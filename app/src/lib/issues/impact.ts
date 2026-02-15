@@ -75,7 +75,7 @@ function computeCustomerScore(sessions: CustomerSession[]): { score: number; rea
   const score = Math.min(5, Math.max(1, Math.round(rawScore)))
 
   const reasons: string[] = []
-  if (totalArr > 0) reasons.push(`$${formatCompact(totalArr)} ARR at risk`)
+  if (totalArr > 0) reasons.push(`$${formatCompact(totalArr)} ARR affected`)
   reasons.push(`${uniqueContacts.size} contact(s), ${uniqueCompanies.size} compan${uniqueCompanies.size !== 1 ? 'ies' : 'y'}`)
   if (maxWeight > 1) reasons.push(`includes ${stages.find((s) => stageWeights[s] === maxWeight)} customer`)
 

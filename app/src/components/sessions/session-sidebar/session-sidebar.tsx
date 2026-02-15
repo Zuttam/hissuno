@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { Spinner, Badge, CollapsibleSection } from '@/components/ui'
 import { LimitReachedDialog } from '@/components/billing'
 import type { SessionWithProject, ChatMessage, UpdateSessionInput, SessionStatus, SessionType, SessionSource } from '@/types/session'
-import { SESSION_TYPE_INFO, SESSION_SOURCE_INFO } from '@/types/session'
+import { SESSION_TYPE_INFO, SESSION_SOURCE_INFO, getSessionUserDisplay } from '@/types/session'
 import { useSessionReview } from '@/hooks/use-session-review'
 import { SessionDetails } from './session-details'
 import { SessionContentView } from './session-content-view'
@@ -33,6 +34,21 @@ function formatDateTime(dateString: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
+}
+
+function formatRelativeDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60_000)
+  const diffHours = Math.floor(diffMs / 3_600_000)
+  const diffDays = Math.floor(diffMs / 86_400_000)
+
+  if (diffMins < 1) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 interface SessionSidebarProps {
@@ -274,6 +290,34 @@ export function SessionSidebar({
                   </button>
                 )}
               </div>
+
+              {/* Lean details: customer, created, last activity */}
+              {(() => {
+                const userDisplay = getSessionUserDisplay(session)
+                const customerName = userDisplay.name
+                  ? userDisplay.companyName
+                    ? `${userDisplay.name} (${userDisplay.companyName})`
+                    : `${userDisplay.name} (External)`
+                  : 'Anonymous'
+                return (
+                  <p className="mt-1 truncate text-xs text-[color:var(--text-secondary)]">
+                    {userDisplay.contactId ? (
+                      <Link
+                        href={`/projects/${session.project_id}/customers/contacts/${userDisplay.contactId}`}
+                        className="text-[color:var(--text-secondary)] hover:text-[color:var(--foreground)] hover:underline"
+                      >
+                        {customerName}
+                      </Link>
+                    ) : (
+                      customerName
+                    )}
+                    <span className="mx-1.5">&middot;</span>
+                    Created {formatRelativeDate(session.created_at)}
+                    <span className="mx-1.5">&middot;</span>
+                    Updated {formatRelativeDate(session.last_activity_at)}
+                  </p>
+                )
+              })()}
             </div>
           )}
 

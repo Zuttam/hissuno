@@ -4,6 +4,8 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { isSupabaseConfigured, createAdminClient } from '@/lib/supabase/server'
 import { listProjectMembers, addProjectMember } from '@/lib/auth/project-members'
+import { createInviteForEmail } from '@/lib/invites/invite-service'
+import { sendProjectInviteEmailIfNeeded } from '@/lib/notifications/project-invite-notifications'
 
 export const runtime = 'nodejs'
 
@@ -79,6 +81,12 @@ export async function POST(request: Request, context: RouteContext) {
       (u) => u.email?.toLowerCase() === body.email!.toLowerCase()
     )
 
+    // Fetch project name and inviter name for the email
+    const [{ data: project }, { data: inviterProfile }] = await Promise.all([
+      supabase.from('projects').select('name').eq('id', projectId).single(),
+      supabase.from('user_profiles').select('display_name').eq('user_id', actingUserId).single(),
+    ])
+
     if (existingUser) {
       // User exists - create pending membership directly
       const member = await addProjectMember({
@@ -90,45 +98,21 @@ export async function POST(request: Request, context: RouteContext) {
         invitedByUserId: actingUserId,
       })
 
+      void sendProjectInviteEmailIfNeeded({
+        inviterUserId: actingUserId,
+        inviterName: inviterProfile?.display_name ?? null,
+        memberId: member.id,
+        projectName: project?.name ?? 'Untitled Project',
+        recipientEmail: body.email,
+        isNewUser: false,
+      })
+
       return NextResponse.json({ member, userExists: true }, { status: 201 })
     }
 
-    // User does not exist - need an invite code
-    const { data: availableInvites, error: inviteError } = await supabase
-      .from('invites')
-      .select('id')
-      .eq('owner_user_id', actingUserId)
-      .is('claimed_by_user_id', null)
-      .or('expires_at.is.null,expires_at.gt.now()')
-      .limit(1)
+    // User does not exist - generate invite code on demand
+    const { code: inviteCode, inviteId } = await createInviteForEmail(actingUserId, body.email)
 
-    if (inviteError) {
-      console.error('[members.post] failed to query invites', inviteError)
-      return NextResponse.json({ error: 'Failed to check invite availability.' }, { status: 500 })
-    }
-
-    if (!availableInvites || availableInvites.length === 0) {
-      return NextResponse.json({ error: 'No invites available.' }, { status: 400 })
-    }
-
-    const inviteId = availableInvites[0].id
-
-    // Claim the invite
-    const { error: claimError } = await supabase
-      .from('invites')
-      .update({
-        claimed_at: new Date().toISOString(),
-        target_email: body.email,
-      })
-      .eq('id', inviteId)
-      .is('claimed_by_user_id', null)
-
-    if (claimError) {
-      console.error('[members.post] failed to claim invite', claimError)
-      return NextResponse.json({ error: 'Failed to claim invite.' }, { status: 500 })
-    }
-
-    // Create pending membership with no user_id
     const member = await addProjectMember({
       projectId,
       userId: null,
@@ -137,6 +121,16 @@ export async function POST(request: Request, context: RouteContext) {
       invitedEmail: body.email,
       invitedByUserId: actingUserId,
       signupInviteId: inviteId,
+    })
+
+    void sendProjectInviteEmailIfNeeded({
+      inviterUserId: actingUserId,
+      inviterName: inviterProfile?.display_name ?? null,
+      memberId: member.id,
+      projectName: project?.name ?? 'Untitled Project',
+      recipientEmail: body.email,
+      isNewUser: true,
+      inviteCode,
     })
 
     return NextResponse.json({ member, userExists: false }, { status: 201 })

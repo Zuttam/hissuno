@@ -137,6 +137,17 @@ export async function resolveContactForSession(
 ): Promise<ContactResolutionResult> {
   const { projectId, sessionId, userMetadata } = params
 
+  // 0. If session already has a contact, skip resolution (preserve manual edits)
+  const { data: currentSession } = await supabase
+    .from('sessions')
+    .select('contact_id')
+    .eq('id', sessionId)
+    .single()
+
+  if (currentSession?.contact_id) {
+    return { contactId: currentSession.contact_id, created: false, companyId: null }
+  }
+
   // 1. Extract and validate email
   const email = extractEmail(userMetadata)
   if (!email || !isValidEmail(email)) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, type JSX } from 'react'
 import Link from 'next/link'
 import { Spinner, MarkdownContent, Badge, CollapsibleSection } from '@/components/ui'
 import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType, IssueCustomerImpact } from '@/types/issue'
@@ -486,41 +486,23 @@ export function IssueSidebar({
           <div className="flex-1 overflow-y-auto">
             {/* Analysis (expanded by default) */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <CollapsibleSection title="Analysis" variant="flat" defaultExpanded>
+              <CollapsibleSection
+                title={<>Analysis{issue.analysis_computed_at && <span className="ml-1 text-[10px] normal-case tracking-normal text-[color:var(--text-tertiary)]"> {formatRelativeDate(issue.analysis_computed_at)}</span>}</>}
+                variant="flat"
+                defaultExpanded
+              >
                 <div className="flex flex-col gap-4">
                   {/* Analysis Scores */}
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
                     <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
                       Scores
                     </span>
                     {issue.velocity_score != null || issue.impact_score != null || issue.effort_score != null ? (
-                      <>
-                        <div className="grid grid-cols-3 gap-3 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
-                          <div className="text-center">
-                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.velocity_reasoning ?? undefined}>
-                              {issue.velocity_score != null ? `${issue.velocity_score}/5` : '-'}
-                            </p>
-                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Velocity</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.impact_analysis?.reasoning ?? undefined}>
-                              {issue.impact_score != null ? `${issue.impact_score}/5` : '-'}
-                            </p>
-                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Impact</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="font-mono text-2xl font-bold text-[color:var(--foreground)]" title={issue.effort_reasoning ?? undefined}>
-                              {issue.effort_score != null ? `${issue.effort_score}/5` : '-'}
-                            </p>
-                            <p className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">Effort</p>
-                          </div>
-                        </div>
-                        {issue.analysis_computed_at && (
-                          <p className="text-xs text-[color:var(--text-tertiary)]">
-                            Last analyzed {formatRelativeDate(issue.analysis_computed_at)}
-                          </p>
-                        )}
-                      </>
+                      <div className="flex flex-col gap-0.5 mt-1">
+                        <ScoreRow icon="velocity" label="Velocity" score={issue.velocity_score} reasoning={issue.velocity_reasoning} />
+                        <ScoreRow icon="impact" label="Impact" score={issue.impact_score} reasoning={issue.impact_analysis?.reasoning} />
+                        <ScoreRow icon="effort" label="Effort" score={issue.effort_score} reasoning={issue.effort_reasoning} />
+                      </div>
                     ) : (
                       <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
                         Not yet analyzed. Click &ldquo;Analyze&rdquo; above to calculate scores.
@@ -580,6 +562,11 @@ export function IssueSidebar({
                   <div className="flex flex-col gap-2">
                     <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
                       Product Specification
+                      {issue.product_spec_generated_at && (
+                        <span className="ml-2 text-[10px] normal-case tracking-normal text-[color:var(--text-tertiary)]">
+                            {formatRelativeDate(issue.product_spec_generated_at)}
+                        </span>
+                      )}
                     </span>
 
                     {/* Progress indicator when generating */}
@@ -596,7 +583,6 @@ export function IssueSidebar({
                     {issue.product_spec ? (
                       <ProductSpecView
                         spec={issue.product_spec}
-                        generatedAt={issue.product_spec_generated_at}
                         issueTitle={issue.title}
                       />
                     ) : !isGeneratingSpec ? (
@@ -664,6 +650,54 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 // ============================================================================
+// Score Row
+// ============================================================================
+
+const SCORE_ICONS: Record<string, JSX.Element> = {
+  velocity: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    </svg>
+  ),
+  impact: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" />
+    </svg>
+  ),
+  effort: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2v4" /><path d="M12 18v4" /><path d="m4.93 4.93 2.83 2.83" /><path d="m16.24 16.24 2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="m4.93 19.07 2.83-2.83" /><path d="m16.24 7.76 2.83-2.83" />
+    </svg>
+  ),
+}
+
+function ScoreRow({ icon, label, score, reasoning }: { icon: string; label: string; score: number | null; reasoning?: string | null }) {
+  return (
+    <div className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
+      <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS[icon]}</span>
+      <span className="w-16 text-[color:var(--text-secondary)]">{label}</span>
+      <span className="font-mono font-medium text-[color:var(--foreground)]">
+        {score != null ? `${score}/5` : '-'}
+      </span>
+      {reasoning && (
+        <span
+          title={reasoning}
+          className="cursor-help text-[color:var(--text-tertiary)] hover:text-[color:var(--text-secondary)]"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 16v-4" />
+            <path d="M12 8h.01" />
+          </svg>
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
 // Customer Impact Section
 // ============================================================================
 
@@ -725,6 +759,19 @@ function formatARR(value: number): string {
 function CustomerImpactInline({ sessions, projectId }: { sessions: IssueWithSessions['sessions']; projectId: string }) {
   const impact = computeCustomerImpact(sessions ?? [])
 
+  // Deduplicate contacts across sessions
+  const contactMap = new Map<string, { id: string; name: string; company: { id: string; name: string; arr: number | null } | null }>()
+  for (const session of sessions ?? []) {
+    if (session.contact && !contactMap.has(session.contact.id)) {
+      contactMap.set(session.contact.id, {
+        id: session.contact.id,
+        name: session.contact.name,
+        company: session.contact.company ? { id: session.contact.company.id, name: session.contact.company.name, arr: session.contact.company.arr } : null,
+      })
+    }
+  }
+  const contacts = Array.from(contactMap.values())
+
   const summaryParts: string[] = []
   if (impact.contactCount > 0) {
     summaryParts.push(`${impact.contactCount} contact${impact.contactCount !== 1 ? 's' : ''}`)
@@ -733,38 +780,46 @@ function CustomerImpactInline({ sessions, projectId }: { sessions: IssueWithSess
     summaryParts.push(`${impact.companyCount} compan${impact.companyCount !== 1 ? 'ies' : 'y'}`)
   }
   if (impact.totalARR > 0) {
-    summaryParts.push(`${formatARR(impact.totalARR)} ARR at risk`)
+    summaryParts.push(`${formatARR(impact.totalARR)} ARR affected`)
   }
 
   return (
     <div className="flex flex-col gap-1">
       <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-        Related Customers {impact.contactCount > 0 ? `(${summaryParts.join(' / ')})` : ''}
+        Related Customers
+        {impact.contactCount > 0 && (
+          <span className="ml-1 text-[10px] normal-case tracking-normal text-[color:var(--text-tertiary)]">
+            ({summaryParts.join(' / ')})
+          </span>
+        )}
       </span>
-      {impact.companies.length > 0 ? (
+      {contacts.length > 0 ? (
         <div className="flex flex-col gap-1 mt-1">
-          {impact.companies.map((company) => (
-            <Link
-              key={company.id}
-              href={`/projects/${projectId}/customers/companies/${company.id}`}
-              className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
+          {contacts.map((contact) => (
+            <div
+              key={contact.id}
+              className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm"
             >
-              <span
-                className="inline-block h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: STAGE_COLORS[company.stage] ?? 'var(--text-tertiary)' }}
-              />
-              <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
-                {company.name}
-              </span>
-              {company.arr != null && company.arr > 0 && (
-                <span className="shrink-0 text-xs font-medium text-[color:var(--text-secondary)]">
-                  {formatARR(company.arr)}
-                </span>
+              {/* <span className="text-[color:var(--text-secondary)]">Contact:</span> */}
+              <Link
+                href={`/projects/${projectId}/customers/contacts/${contact.id}`}
+                className="truncate text-[color:var(--foreground)] hover:underline"
+              >
+                {contact.name}
+              </Link>
+              <span className="text-[color:var(--text-tertiary)]">&middot;</span>
+              {/* <span className="text-[color:var(--text-secondary)]">Company:</span> */}
+              {contact.company ? (
+                <Link
+                  href={`/projects/${projectId}/customers/companies/${contact.company.id}`}
+                  className="truncate text-[color:var(--foreground)] hover:underline"
+                >
+                  {contact.company.name}{contact.company.arr != null && contact.company.arr > 0 ? ` (${formatARR(contact.company.arr)})` : ''}
+                </Link>
+              ) : (
+                <span className="text-[color:var(--text-tertiary)]">External</span>
               )}
-              <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
-                {company.contactCount} contact{company.contactCount !== 1 ? 's' : ''}
-              </span>
-            </Link>
+            </div>
           ))}
         </div>
       ) : (

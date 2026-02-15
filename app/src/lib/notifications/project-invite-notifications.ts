@@ -63,7 +63,7 @@ export async function sendProjectInviteEmailIfNeeded(
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://hissuno.com'
     const acceptUrl = `${appUrl}/projects?acceptInvite=${memberId}`
     const signupUrl = isNewUser && inviteCode
-      ? `${appUrl}/sign-up?code=${inviteCode}&acceptInvite=${memberId}`
+      ? `${appUrl}/sign-up?invite_code=${inviteCode}&acceptInvite=${memberId}`
       : acceptUrl
 
     const resend = getResendClient()

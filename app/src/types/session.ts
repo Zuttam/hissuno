@@ -157,6 +157,8 @@ export interface SessionWithProject extends SessionRecord {
   } | null
   /** Issues linked to this session from PM review */
   linked_issues?: SessionLinkedIssue[]
+  /** Issue count from list query aggregation */
+  issue_sessions?: [{ count: number }]
   /** Matched Hissuno user profile (if user_id is a known platform user) */
   user_profile?: { full_name: string | null } | null
   /** Resolved contact from email matching */
@@ -212,6 +214,7 @@ export interface SessionFilters {
   dateTo?: string
   showArchived?: boolean
   isHumanTakeover?: boolean
+  isAnalyzed?: boolean
   companyId?: string
   contactId?: string
   limit?: number

@@ -85,7 +85,8 @@ export function SessionsTable({
       { id: 'tags', header: 'Tags', defaultWidth: 150, minWidth: 80 },
       { id: 'source', header: 'Source', defaultWidth: 90, minWidth: 70 },
       { id: 'status', header: 'Status', defaultWidth: 120, minWidth: 80 },
-      { id: 'page', header: 'Page', defaultWidth: 180, minWidth: 80 },
+      { id: 'analyzed', header: 'Analyzed', defaultWidth: 80, minWidth: 60, align: 'center' },
+      { id: 'issues', header: 'Issues', defaultWidth: 70, minWidth: 50, align: 'center' },
       { id: 'lastActivity', header: 'Last Activity', defaultWidth: 120, minWidth: 80 },
       { id: 'actions', header: <span className="sr-only">Actions</span>, defaultWidth: 80, minWidth: 60 },
     ],
@@ -139,12 +140,6 @@ function SessionRow({
 }: SessionRowProps) {
   const truncatedId = session.id.length > 12 ? `${session.id.slice(0, 12)}...` : session.id
   const displayName = session.name || truncatedId
-  const truncatedPage = session.page_title
-    ? session.page_title.length > 30
-      ? `${session.page_title.slice(0, 30)}...`
-      : session.page_title
-    : getPathFromUrl(session.page_url)
-
   const sourceInfo = SESSION_SOURCE_INFO[session.source as SessionSource] || {
     label: session.source,
     variant: 'default' as const,
@@ -224,12 +219,35 @@ function SessionRow({
           {session.is_archived && <Badge variant="default">Archived</Badge>}
         </span>
       </td>
-      <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'page', columns)}>
-        <span
-          className="text-[color:var(--text-secondary)]"
-          title={session.page_url || undefined}
-        >
-          {truncatedPage || '-'}
+      <td
+        className="px-3 py-2 text-center"
+        style={useColumnStyle(columnWidths, 'analyzed', columns)}
+      >
+        {session.pm_reviewed_at ? (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="inline-block text-[color:var(--accent-success)]"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : (
+          <span className="text-[color:var(--text-tertiary)]">-</span>
+        )}
+      </td>
+      <td
+        className="px-3 py-2 text-center"
+        style={useColumnStyle(columnWidths, 'issues', columns)}
+      >
+        <span className="text-[color:var(--foreground)]">
+          {session.issue_sessions?.[0]?.count ?? 0}
         </span>
       </td>
       <td className="px-3 py-2" style={useColumnStyle(columnWidths, 'lastActivity', columns)}>
@@ -312,18 +330,6 @@ function SessionRow({
       </td>
     </tr>
   )
-}
-
-function getPathFromUrl(url: string | null): string {
-  if (!url) return ''
-  try {
-    const parsedUrl = new URL(url)
-    return parsedUrl.pathname.length > 30
-      ? `${parsedUrl.pathname.slice(0, 30)}...`
-      : parsedUrl.pathname
-  } catch {
-    return url.length > 30 ? `${url.slice(0, 30)}...` : url
-  }
 }
 
 function formatRelativeTime(dateString: string): string {
