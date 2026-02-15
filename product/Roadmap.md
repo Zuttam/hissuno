@@ -148,13 +148,15 @@
 
 
 ### Platform
-[x] API Access - support api keys and move cron to rely on admin api key value (change env var)
 [x] Project multi-users access and RBAC
 [x] Add dimension of analyzed issues 
 
+[] Fix API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] MCP Access
 [] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
 
+### Integrations
+[] Decide on integrations access for members
 
 ### Analytics
 [x] segmentation by customer (contact and company)

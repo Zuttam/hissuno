@@ -25,7 +25,7 @@ import {
   getIssueForUpvote,
   getIssueForEmbedding,
   updateIssueArchiveStatusById,
-  verifyProjectOwnership,
+  verifyProjectAccess,
   getIssueProjectId,
   type InsertIssueData,
 } from '@/lib/supabase/issues'
@@ -155,7 +155,7 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
   }
 
   // Verify user owns the project
-  const project = await verifyProjectOwnership(supabase, input.project_id, user.id)
+  const project = await verifyProjectAccess(supabase, input.project_id)
   if (!project) {
     throw new UnauthorizedError('You do not have permission to create issues for this project.')
   }
@@ -221,7 +221,7 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
     throw new Error('Issue not found.')
   }
 
-  const project = await verifyProjectOwnership(supabase, projectId, user.id)
+  const project = await verifyProjectAccess(supabase, projectId)
   if (!project) {
     throw new UnauthorizedError('You do not have permission to update this issue.')
   }
@@ -273,7 +273,7 @@ export async function deleteIssue(issueId: string): Promise<boolean> {
     return false // Issue not found
   }
 
-  const project = await verifyProjectOwnership(supabase, projectId, user.id)
+  const project = await verifyProjectAccess(supabase, projectId)
   if (!project) {
     throw new UnauthorizedError('You do not have permission to delete this issue.')
   }
@@ -309,7 +309,7 @@ export async function updateIssueArchiveStatus(
     throw new Error('Issue not found.')
   }
 
-  const project = await verifyProjectOwnership(supabase, projectId, user.id)
+  const project = await verifyProjectAccess(supabase, projectId)
   if (!project) {
     throw new UnauthorizedError('You do not have permission to update this issue.')
   }

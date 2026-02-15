@@ -30,7 +30,7 @@ export const getSessionsStripAnalytics = cache(async (
     throw new UnauthorizedError('Unable to resolve user context.')
   }
 
-  const projectIds = projectId ? [projectId] : await getUserProjectIds(supabase, user.id)
+  const projectIds = projectId ? [projectId] : await getUserProjectIds(supabase)
 
   if (projectIds.length === 0) {
     return { total: 0, active: 0, closed: 0, topTags: [], avgMessages: 0, bySource: [] }
@@ -93,7 +93,7 @@ export const getIssuesStripAnalytics = cache(async (
     throw new UnauthorizedError('Unable to resolve user context.')
   }
 
-  const projectIds = projectId ? [projectId] : await getUserProjectIds(supabase, user.id)
+  const projectIds = projectId ? [projectId] : await getUserProjectIds(supabase)
 
   if (projectIds.length === 0) {
     return { total: 0, byStatus: [], topTypes: [], byPriority: [], conversionRate: 0 }

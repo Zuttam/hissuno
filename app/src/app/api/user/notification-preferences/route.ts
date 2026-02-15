@@ -33,10 +33,9 @@ export async function GET() {
 
     // Check if user has any projects with Slack tokens and fetch available channels
     const adminClient = createAdminClient()
-    const { data: projects } = await adminClient
+    const { data: projects } = await supabase
       .from('projects')
       .select('id')
-      .eq('user_id', user.id)
 
     let slackAvailable = false
     const availableSlackChannels: { id: string; name: string }[] = []

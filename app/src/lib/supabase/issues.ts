@@ -347,11 +347,10 @@ export const listIssues = cache(async (filters: IssueFilters = {}): Promise<{ is
       throw new UnauthorizedError()
     }
 
-    // Get projects owned by this user
+    // Get projects accessible by this user (RLS handles membership)
     const { data: userProjects } = await supabase
       .from('projects')
       .select('id')
-      .eq('user_id', user.id)
 
     const projectIds = userProjects?.map(p => p.id) ?? []
 
@@ -460,16 +459,15 @@ export const getIssueById = cache(async (issueId: string): Promise<IssueWithSess
       throw new Error('Unable to load issue from Supabase.')
     }
 
-    // Verify the issue belongs to a project owned by this user
+    // Verify the user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', issue.project_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
-      // Issue exists but user doesn't own the project
+      // Issue exists but user doesn't have access to the project
       return null
     }
 
@@ -511,12 +509,11 @@ export const getProjectIssues = cache(async (projectId: string, limit = 20): Pro
       throw new UnauthorizedError('Unable to resolve user context.')
     }
 
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -804,18 +801,17 @@ export async function updateIssueAnalysis(
 // ============================================================================
 
 /**
- * Verify user owns a project. Returns project info if owned, null otherwise.
+ * Verify user has access to a project. Returns project info if accessible, null otherwise.
+ * RLS handles membership-based access control.
  */
-export async function verifyProjectOwnership(
+export async function verifyProjectAccess(
   supabase: SupabaseClient,
   projectId: string,
-  userId: string
 ): Promise<{ id: string; name: string } | null> {
   const { data } = await supabase
     .from('projects')
     .select('id, name')
     .eq('id', projectId)
-    .eq('user_id', userId)
     .single()
 
   return data ?? null

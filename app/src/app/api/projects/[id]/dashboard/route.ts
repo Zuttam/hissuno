@@ -1,26 +1,14 @@
 import { NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { getProjectIssueStats, getTopRankedIssues } from '@/lib/supabase/issues'
 import { getPendingPMReviews } from '@/lib/supabase/sessions'
 import { getIssueVelocityData } from '@/lib/supabase/analytics'
 import type { AnalyticsPeriod } from '@/lib/supabase/analytics'
 
 export const runtime = 'nodejs'
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
 
 export async function GET(
   request: Request,
@@ -31,20 +19,9 @@ export async function GET(
   }
 
   try {
-    const { supabase, user } = await resolveUser()
+    const identity = await requireRequestIdentity()
     const { id: projectId } = await params
-
-    // Verify user owns the project
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id')
-      .eq('id', projectId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
-    }
+    await assertProjectAccess(identity, projectId)
 
     const url = new URL(request.url)
     const period = (url.searchParams.get('period') || '30d') as AnalyticsPeriod
@@ -65,6 +42,9 @@ export async function GET(
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[dashboard.get] unexpected error', error)
     return NextResponse.json({ error: 'Failed to load dashboard data.' }, { status: 500 })

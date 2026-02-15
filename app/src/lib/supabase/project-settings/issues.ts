@@ -23,12 +23,11 @@ export async function getIssueSettings(projectId: string): Promise<IssueSettings
       throw new UnauthorizedError('Unable to resolve user context.')
     }
 
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -82,12 +81,11 @@ export async function updateIssueSettings(
       throw new UnauthorizedError('Unable to resolve user context.')
     }
 
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {

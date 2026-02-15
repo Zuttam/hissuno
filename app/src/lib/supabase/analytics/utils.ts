@@ -74,25 +74,23 @@ export function calculateChange(current: number, previous: number): number | und
 }
 
 /**
- * Get user's project IDs for filtering
+ * Get accessible project IDs for filtering (RLS handles membership)
  */
-export async function getUserProjectIds(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<string[]> {
+export async function getUserProjectIds(supabase: Awaited<ReturnType<typeof createClient>>): Promise<string[]> {
   const { data: userProjects } = await supabase
     .from('projects')
     .select('id')
-    .eq('user_id', userId)
 
   return userProjects?.map(p => p.id) ?? []
 }
 
 /**
- * Get user's projects with IDs and names
+ * Get accessible projects with IDs and names (RLS handles membership)
  */
-export async function getUserProjects(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<Array<{ id: string; name: string }>> {
+export async function getUserProjects(supabase: Awaited<ReturnType<typeof createClient>>): Promise<Array<{ id: string; name: string }>> {
   const { data: userProjects } = await supabase
     .from('projects')
     .select('id, name')
-    .eq('user_id', userId)
 
   return (userProjects ?? []) as Array<{ id: string; name: string }>
 }

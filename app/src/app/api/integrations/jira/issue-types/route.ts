@@ -36,12 +36,11 @@ export async function GET(request: NextRequest) {
       throw new UnauthorizedError('User not authenticated')
     }
 
-    // Verify project ownership
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
-      .select('id, user_id')
+      .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {

@@ -22,6 +22,10 @@ export function useDashboardData({
   const [error, setError] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
+    if (!projectId) {
+      setIsLoading(false)
+      return
+    }
     setIsLoading(true)
     setError(null)
     try {

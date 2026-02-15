@@ -54,7 +54,7 @@ export const getImpactFlowAnalytics = cache(async (
     throw new UnauthorizedError('Unable to resolve user context.')
   }
 
-  const projectIds = projectId ? [projectId] : await getUserProjectIds(supabase, user.id)
+  const projectIds = projectId ? [projectId] : await getUserProjectIds(supabase)
 
   if (projectIds.length === 0) {
     return {

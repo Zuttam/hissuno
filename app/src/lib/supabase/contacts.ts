@@ -249,12 +249,11 @@ export const getContactById = cache(async (contactId: string): Promise<ContactWi
       throw new Error('Unable to load contact.')
     }
 
-    // Verify ownership
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', contact.project_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {

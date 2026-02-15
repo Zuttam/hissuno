@@ -185,18 +185,16 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
       throw new UnauthorizedError()
     }
 
-    // Build query - join with projects to filter by user ownership
+    // Build query - join with projects to filter by user access
     let query = supabase
       .from('sessions')
       .select(selectSessionWithProject, { count: 'exact' })
       .order('last_activity_at', { ascending: false })
 
-    // Filter to only projects owned by this user
-    // We need to use a subquery approach via inner join
+    // Filter to only projects accessible by this user (RLS handles membership)
     const { data: userProjects } = await supabase
       .from('projects')
       .select('id')
-      .eq('user_id', user.id)
 
     const projectIds = userProjects?.map(p => p.id) ?? []
 
@@ -325,16 +323,15 @@ export const getSessionById = cache(async (sessionId: string): Promise<SessionWi
       throw new Error('Unable to load session from Supabase.')
     }
 
-    // Verify the session belongs to a project owned by this user
+    // Verify the user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', session.project_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
-      // Session exists but user doesn't own the project
+      // Session exists but user doesn't have access to the project
       return null
     }
 
@@ -380,12 +377,11 @@ export const getProjectSessions = cache(async (projectId: string, limit = 5): Pr
       throw new UnauthorizedError('Unable to resolve user context.')
     }
 
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -479,12 +475,11 @@ export const getProjectIntegrationStats = cache(async (projectId: string): Promi
       return { lastActivityAt: null, isActive: false, hasAnySessions: false }
     }
 
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -539,12 +534,11 @@ export async function createManualSession(input: CreateSessionInput): Promise<Se
       throw new UnauthorizedError('Unable to resolve user context.')
     }
 
-    // Verify user owns the project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id, name')
       .eq('id', input.project_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -652,7 +646,6 @@ export async function updateSessionArchiveStatus(
       .from('projects')
       .select('id')
       .eq('id', session.project_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -718,7 +711,6 @@ export async function updateSession(
       .from('projects')
       .select('id')
       .eq('id', session.project_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {

@@ -261,12 +261,11 @@ export const getCompanyById = cache(async (companyId: string): Promise<CompanyWi
       throw new Error('Unable to load company.')
     }
 
-    // Verify ownership via RLS (already enforced, but double-check)
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', company.project_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {

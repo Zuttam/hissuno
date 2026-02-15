@@ -37,7 +37,7 @@ export const getOverallAnalytics = cache(async (
   // Fetch projects with names upfront (eliminates separate project names query later)
   const userProjects = projectId
     ? [{ id: projectId, name: '' }]
-    : await getUserProjects(supabase, user.id)
+    : await getUserProjects(supabase)
   const projectIds = userProjects.map(p => p.id)
 
   if (projectIds.length === 0) {

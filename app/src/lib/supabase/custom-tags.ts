@@ -30,12 +30,11 @@ export const listProjectCustomTags = cache(async (projectId: string): Promise<Cu
       throw new UnauthorizedError()
     }
 
-    // Verify project ownership
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -140,12 +139,11 @@ export async function syncCustomTags(
       throw new UnauthorizedError()
     }
 
-    // Verify project ownership
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
