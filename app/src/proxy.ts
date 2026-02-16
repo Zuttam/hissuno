@@ -72,15 +72,19 @@ const PUBLIC_PATHS = [
   '/unauthorized',
   '/legal',
   '/landing',
+  
   '/auth/callback',
   '/api/invites/validate',
+  '/api/waitlist',
+  
   '/api/integrations/github/callback',
   '/api/integrations/slack/callback',
+  '/api/integrations/intercom/callback',
   '/api/integrations/widget',
-  '/api/waitlist',
   '/api/webhooks/lemon-squeezy',
   '/api/webhooks/slack',
   '/api/webhooks/jira',
+  '/api/healthz',
 ]
 
 // Bearer-token paths — proxy verifies static env var secret
@@ -282,7 +286,7 @@ export async function proxy(request: NextRequest) {
       return redirectResponse(new URL('/unauthorized', request.url), supabaseResponse)
     }
 
-    if (!isOnboardingPath && !userProfile.onboarding_completed) {
+    if (!isOnboardingPath && !userProfile.onboarding_completed && !pathname.startsWith('/logout')) {
       return redirectResponse(new URL('/onboarding', request.url), supabaseResponse)
     }
   }

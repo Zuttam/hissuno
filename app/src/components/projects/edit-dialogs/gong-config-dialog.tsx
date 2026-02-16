@@ -368,7 +368,7 @@ export function GongConfigDialog({
                   className="font-medium underline hover:text-[color:var(--foreground)]"
                   onClick={onClose}
                 >
-                  View synced sessions
+                  View synced feedbacks
                 </Link>
               </>
             )}

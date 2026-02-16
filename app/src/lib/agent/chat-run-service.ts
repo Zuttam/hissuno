@@ -21,6 +21,8 @@ export type TriggerChatRunParams = {
   userMetadata?: Record<string, string> | null
   /** Override the knowledge package used for this chat (for testing specific packages) */
   packageId?: string | null
+  /** Resolved contact ID for data tool scoping (null = user mode) */
+  contactId?: string | null
   supabase: AnySupabaseClient
 }
 
@@ -54,7 +56,7 @@ export type GetChatRunStatusResult = {
 export async function triggerChatRun(
   params: TriggerChatRunParams
 ): Promise<TriggerChatRunResult> {
-  const { projectId, sessionId, messages, userId, userMetadata, packageId, supabase } = params
+  const { projectId, sessionId, messages, userId, userMetadata, packageId, contactId, supabase } = params
 
   // Check if a chat run is already running for this session
   const { data: runningChat } = await supabase
@@ -93,6 +95,7 @@ export async function triggerChatRun(
         userId,
         userMetadata,
         packageId,
+        contactId: contactId ?? null,
         messageCount: messages.length,
         lastUserMessage: messages[messages.length - 1]?.content?.slice(0, 100),
       },

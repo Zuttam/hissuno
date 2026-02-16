@@ -4,6 +4,7 @@ import { upsertSession, isSessionInHumanTakeover } from '@/lib/supabase/sessions
 import { triggerChatRun, getChatRunStatus } from '@/lib/agent/chat-run-service'
 import { createAdminClient } from '@/lib/supabase/server'
 import { saveSessionMessage } from '@/lib/supabase/session-messages'
+import { resolveContactForSession } from '@/lib/customers/contact-resolution'
 import { isOriginAllowed, verifyWidgetJWT } from '@/lib/utils/widget-auth'
 
 export const runtime = 'nodejs'
@@ -247,6 +248,13 @@ export async function POST(request: NextRequest) {
     // Use admin client since this is public-facing (no user auth)
     const supabase = createAdminClient()
 
+    // Eagerly resolve contact for data tool scoping
+    const contactResult = await resolveContactForSession(supabase, {
+      projectId,
+      sessionId,
+      userMetadata: userMetadata ?? null,
+    })
+
     // Trigger chat run (creates record, returns runId)
     const result = await triggerChatRun({
       projectId,
@@ -255,6 +263,7 @@ export async function POST(request: NextRequest) {
       userId,
       userMetadata,
       packageId,
+      contactId: contactResult.contactId,
       supabase,
     })
 

@@ -27,6 +27,12 @@ export function MarketingNav() {
           <ThemeLogo width={56} height={16} priority />
         </Link>
         <div className="flex items-center gap-4">
+          <Link
+            href="/docs"
+            className="text-sm text-[color:var(--text-secondary)] transition hover:text-[color:var(--accent-teal)]"
+          >
+            Docs
+          </Link>
           <ThemeToggle />
           <Button
             size="sm"

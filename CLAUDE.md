@@ -406,7 +406,7 @@ export const listProjects = cache(async (): Promise<ProjectWithCodebase[]> => {
 ## Important Notes
 
 1. **No internal HTTP calls**: Never fetch from one API route to another. Use service functions.
-2. **Auth everywhere**: All API routes should authenticate via `resolveUser()`.
+2. **Auth everywhere**: All API routes should authenticate via `resolveUser()`. Public routes must be added to the `PUBLIC_PATHS` array in `src/proxy.ts`.
 3. **RLS context**: Always filter queries by `user_id` to work with Supabase RLS.
 4. **Runtime**: Use `export const runtime = 'nodejs'` for routes requiring Node.js APIs.
 5. **FormData**: Prefer FormData over JSON for POST requests with optional file uploads.

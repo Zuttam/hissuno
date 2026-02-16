@@ -1,12 +1,14 @@
 /**
  * Intercom connect API route.
- * POST - Validate and save API credentials
+ * GET  - Initiate OAuth flow (redirect to Intercom)
+ * POST - Validate and save API credentials (token flow)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { IntercomClient, IntercomApiError } from '@/lib/integrations/intercom/client'
+import { getIntercomOAuthUrl } from '@/lib/integrations/intercom/oauth'
 import {
   storeIntercomCredentials,
   type IntercomSyncFrequency,
@@ -45,8 +47,65 @@ async function resolveUserAndProject(projectId: string) {
 }
 
 /**
+ * GET /api/integrations/intercom/connect?projectId=xxx
+ * Initiates Intercom OAuth flow
+ */
+export async function GET(request: NextRequest) {
+  if (!isSupabaseConfigured()) {
+    console.error('[integrations.intercom.connect] Supabase must be configured')
+    return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
+  }
+
+  const clientId = process.env.INTERCOM_CLIENT_ID
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const redirectUri = `${appUrl}/api/integrations/intercom/callback`
+
+  if (!clientId) {
+    console.error('[integrations.intercom.connect] Missing INTERCOM_CLIENT_ID')
+    return NextResponse.json({ error: 'Intercom OAuth not configured.' }, { status: 500 })
+  }
+
+  try {
+    const projectId = request.nextUrl.searchParams.get('projectId')
+
+    if (!projectId) {
+      return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+    }
+
+    const { user } = await resolveUserAndProject(projectId)
+
+    const nonce = crypto.randomUUID()
+    const redirectUrl = `${appUrl}/projects/${projectId}/integrations?intercom=connected`
+
+    const state = Buffer.from(
+      JSON.stringify({
+        projectId,
+        userId: user.id,
+        nonce,
+        redirectUrl,
+      })
+    ).toString('base64url')
+
+    const oauthUrl = getIntercomOAuthUrl({
+      clientId,
+      redirectUri,
+      state,
+    })
+
+    return NextResponse.redirect(oauthUrl)
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+
+    console.error('[integrations.intercom.connect] OAuth initiation error', error)
+    return NextResponse.json({ error: 'Failed to initiate Intercom connection.' }, { status: 500 })
+  }
+}
+
+/**
  * POST /api/integrations/intercom/connect
- * Validate and save Intercom API credentials
+ * Validate and save Intercom API credentials (token flow)
  */
 export async function POST(request: NextRequest) {
   if (!isSupabaseConfigured()) {

@@ -9,8 +9,10 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { upsertSession, updateSessionActivity } from '@/lib/supabase/sessions'
 import { saveSessionMessage } from '@/lib/supabase/session-messages'
 import { triggerChatRun, updateChatRunStatus, type ChatMessage } from '@/lib/agent/chat-run-service'
+import { generateWidgetJWT } from '@/lib/utils/widget-auth'
 import { mastra } from '@/mastra'
 import type { SupportAgentContext } from '@/types/agent'
+import { buildDataToolset } from '@/mastra/tools/data-tools'
 import { SlackClient, type SlackMessage } from './client'
 import {
   getOrCreateThreadSession,
@@ -276,15 +278,36 @@ async function executeAgentSync(params: {
     runtimeContext.set('userMetadata', userMetadata)
     runtimeContext.set('sessionId', sessionId)
 
+    // Generate contact JWT for MCP contact-mode auth (if we have an email)
+    let contactToken: string | null = null
+    const email = userMetadata?.email ?? userId
+    if (email && email.includes('@')) {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('secret_key')
+        .eq('id', projectId)
+        .single()
+
+      if (project?.secret_key) {
+        contactToken = generateWidgetJWT(
+          { userId: email, userMetadata: userMetadata ?? undefined },
+          project.secret_key
+        )
+      }
+    }
+    runtimeContext.set('contactToken', contactToken)
+    runtimeContext.set('contactId', null) // Slack is always user mode
+
     // Convert messages to CoreMessage format
     const mastraMessages: CoreMessage[] = messages.map((msg) => ({
       role: msg.role as 'user' | 'assistant',
       content: msg.content,
     }))
 
-    // Generate response (non-streaming)
+    // Generate response (non-streaming) — Slack is always user mode
     const result = await agent.generate(mastraMessages, {
       runtimeContext,
+      toolsets: { dataTools: buildDataToolset(null) },
       memory: {
         thread: sessionId,
         resource: userId || 'anonymous',

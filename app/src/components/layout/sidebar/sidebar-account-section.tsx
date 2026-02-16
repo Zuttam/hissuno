@@ -65,7 +65,7 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
   const { theme, setThemePreference } = useThemePreference()
 
   const isSettingsActive = pathname.startsWith('/account/settings')
-  const isInvitesActive = pathname.startsWith('/account/promotions')
+  const isInvitesActive = pathname.startsWith('/account/referrals')
   const isBillingActive = pathname.startsWith('/account/billing')
 
   useEffect(() => {
@@ -116,7 +116,7 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
           <SettingsIcon className="h-4 w-4" />
         </Link>
         <Link
-          href="/account/promotions"
+          href="/account/referrals"
           onClick={onNavigate}
           className={`flex h-8 w-8 items-center justify-center rounded-[4px] transition ${
             isInvitesActive
@@ -202,7 +202,7 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
         <span>Settings</span>
       </Link>
       <Link
-        href="/account/promotions"
+        href="/account/referrals"
         onClick={onNavigate}
         className={`flex items-center gap-2 rounded-[4px] px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide transition ${
           isInvitesActive

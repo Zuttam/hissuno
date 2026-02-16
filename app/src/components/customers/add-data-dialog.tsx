@@ -13,7 +13,6 @@ import {
   TabsPanel,
   FileDropZone,
 } from '@/components/ui'
-import { parseCSVContent, suggestMappings } from '@/lib/customers/csv-import'
 import type {
   CustomerEntityType,
   CSVImportMapping,
@@ -62,7 +61,9 @@ export function AddDataDialog({
 
   // CSV state
   const [csvStep, setCsvStep] = useState<CSVStep>('upload')
-  const [rows, setRows] = useState<Record<string, string>[]>([])
+  const [storagePath, setStoragePath] = useState<string | null>(null)
+  const [rowCount, setRowCount] = useState(0)
+  const [sampleRows, setSampleRows] = useState<Record<string, string>[]>([])
   const [mappings, setMappings] = useState<CSVImportMapping[]>([])
   const [isImporting, setIsImporting] = useState(false)
   const [csvResult, setCsvResult] = useState<CSVImportResult | null>(null)
@@ -128,7 +129,9 @@ export function AddDataDialog({
   const resetAll = useCallback(() => {
     setError(null)
     setCsvStep('upload')
-    setRows([])
+    setStoragePath(null)
+    setRowCount(0)
+    setSampleRows([])
     setMappings([])
     setCsvResult(null)
     setIsImporting(false)
@@ -172,40 +175,68 @@ export function AddDataDialog({
     async (selectedFile: File) => {
       setError(null)
 
+      // Quick client-side checks before upload
       const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
       if (selectedFile.size > MAX_FILE_SIZE) {
         setError(`File too large. Maximum size is 5MB (got ${(selectedFile.size / 1024 / 1024).toFixed(1)}MB).`)
         return
       }
 
+      if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
+        setError('File must have a .csv extension.')
+        return
+      }
+
       try {
-        const text = await selectedFile.text()
-        const parsed = parseCSVContent(text)
+        // Step 1: Get presigned upload URL
+        const uploadRes = await fetch(`/api/projects/${projectId}/customers/import/upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: selectedFile.name, fileSize: selectedFile.size }),
+        })
 
-        if (parsed.headers.length === 0) {
-          setError('Could not parse CSV headers.')
-          return
+        if (!uploadRes.ok) {
+          const payload = await uploadRes.json().catch(() => null)
+          throw new Error(typeof payload?.error === 'string' ? payload.error : 'Failed to prepare upload.')
         }
 
-        const MAX_ROW_COUNT = 500
-        if (parsed.rows.length > MAX_ROW_COUNT) {
-          setError(`Too many rows. Maximum is ${MAX_ROW_COUNT.toLocaleString()} rows (got ${parsed.rows.length.toLocaleString()}).`)
-          return
+        const { uploadUrl, storagePath: path } = await uploadRes.json()
+
+        // Step 2: Upload file directly to Supabase Storage
+        const putRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'text/csv' },
+          body: selectedFile,
+        })
+
+        if (!putRes.ok) {
+          throw new Error('Failed to upload file.')
         }
 
-        setRows(parsed.rows)
+        // Step 3: Parse on server
+        const parseRes = await fetch(`/api/projects/${projectId}/customers/import/parse`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storagePath: path, entityType }),
+        })
 
-        const suggested = suggestMappings(parsed.headers, entityType)
-        for (const mapping of suggested) {
-          mapping.sampleValues = parsed.rows.slice(0, 3).map((r) => r[mapping.csvColumn] ?? '')
+        if (!parseRes.ok) {
+          const payload = await parseRes.json().catch(() => null)
+          throw new Error(typeof payload?.error === 'string' ? payload.error : 'Failed to parse CSV.')
         }
-        setMappings(suggested)
+
+        const parseData = await parseRes.json()
+
+        setStoragePath(path)
+        setRowCount(parseData.rowCount)
+        setSampleRows(parseData.sampleRows ?? [])
+        setMappings(parseData.suggestedMappings)
         setCsvStep('map')
-      } catch {
-        setError('Failed to parse CSV file.')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to upload CSV file.')
       }
     },
-    [entityType]
+    [entityType, projectId]
   )
 
   const handleMappingChange = useCallback((csvColumn: string, targetField: string | null) => {
@@ -215,7 +246,7 @@ export function AddDataDialog({
   }, [])
 
   const handleImport = useCallback(async () => {
-    if (rows.length === 0) return
+    if (!storagePath || rowCount === 0) return
 
     setIsImporting(true)
     setError(null)
@@ -225,10 +256,10 @@ export function AddDataDialog({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          entity_type: entityType,
-          rows,
+          storagePath,
+          entityType,
           mappings,
-          create_missing_companies: createMissingCompanies,
+          createMissingCompanies,
         }),
       })
 
@@ -246,7 +277,7 @@ export function AddDataDialog({
     } finally {
       setIsImporting(false)
     }
-  }, [rows, entityType, mappings, projectId, onDataAdded, createMissingCompanies])
+  }, [storagePath, rowCount, entityType, mappings, projectId, onDataAdded, createMissingCompanies])
 
   // ── Manual form handlers ──
 
@@ -403,7 +434,7 @@ export function AddDataDialog({
               {csvStep === 'map' && (
                 <div className="flex flex-col gap-4">
                   <p className="text-xs text-[color:var(--text-secondary)]">
-                    Map CSV columns to {entityType} fields. {rows.length} rows found.
+                    Map CSV columns to {entityType} fields. {rowCount} rows found.
                   </p>
                   <div className="max-h-80 overflow-y-auto rounded-[4px] border border-[color:var(--border-subtle)]">
                     <table className="w-full font-mono text-xs">
@@ -455,7 +486,7 @@ export function AddDataDialog({
                   )}
 
                   <div className="flex justify-end gap-2">
-                    <Button variant="ghost" onClick={() => { setCsvStep('upload'); setRows([]); setMappings([]); }}>
+                    <Button variant="ghost" onClick={() => { setCsvStep('upload'); setStoragePath(null); setRowCount(0); setSampleRows([]); setMappings([]); }}>
                       Back
                     </Button>
                     <Button onClick={() => setCsvStep('preview')}>Preview</Button>
@@ -467,7 +498,7 @@ export function AddDataDialog({
               {csvStep === 'preview' && (
                 <div className="flex flex-col gap-4">
                   <p className="text-xs text-[color:var(--text-secondary)]">
-                    Preview: {rows.length} rows will be imported. Existing records (by{' '}
+                    Preview: {rowCount} rows will be imported. Existing records (by{' '}
                     {entityType === 'company' ? 'domain' : 'email'}) will be updated.
                   </p>
                   <div className="max-h-60 overflow-auto rounded-[4px] border border-[color:var(--border-subtle)]">
@@ -485,7 +516,7 @@ export function AddDataDialog({
                         </tr>
                       </thead>
                       <tbody>
-                        {rows.slice(0, 10).map((row, i) => (
+                        {sampleRows.map((row, i) => (
                           <tr key={i} className="border-b border-[color:var(--border-subtle)]">
                             <td className="px-2 py-1 text-[color:var(--text-tertiary)]">{i + 1}</td>
                             {mappings
@@ -504,7 +535,7 @@ export function AddDataDialog({
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => setCsvStep('map')}>Back</Button>
                     <Button onClick={handleImport} loading={isImporting}>
-                      Import {rows.length} rows
+                      Import {rowCount} rows
                     </Button>
                   </div>
                 </div>

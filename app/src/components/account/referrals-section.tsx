@@ -310,7 +310,7 @@ function FilterLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function PromotionsSection() {
+export function ReferralsSection() {
   const { invites, isLoading, refresh } = useInvites()
   const [showClaimed, setShowClaimed] = useState(false)
   const [showAvailable, setShowAvailable] = useState(true)

@@ -141,54 +141,67 @@
 ### Feedback (f.k.a sessions)
 [x] Improve customer view inside a feedabck
 [x] support batch operation
+[x] Intercom oauth
 
+### Marketing
+[x] Docs portal
 
 ### Support
-[] Add Hissuno MCP to Support agent  
+[x] Add Hissuno toolset to Support agent  
 
 ### Platform
 [x] Project multi-users access and RBAC
 [x] Add dimension of analyzed issues 
 [x] Fix API Access - support api keys
-
-[] MCP Access
-[] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
-
-### Integrations
-[] Decide on integrations access for members
+[x] MCP Access
 
 ### Analytics
 [x] segmentation by customer (contact and company)
 
-
 ## Phase 10
 
 ### Marketing
-[] Support promotions
 [] Run SDR agent
-[] Improve landing pages  
-[] Docs portal
-
-### Suport
-[] Email agent
-
+[] Improve landing pages | remove ai support and fde | focus on pm | add pricing
 
 ### Feedback (f.k.a sessions)
-[] Decide if we want to make the auto customer creation configurable
-[] Add posthog sessions support
+[] Support Zendesk in early access
 
-### Code
-[] Create initial implementation 
 
 ### Platform
-[] MCP Apps
 [] Delete project
 
 ### Issues
 [] Draft email response to users
 [] Lieaner Integration
-[] Add product area to the issue analysis - Classify on product area
+
+
+## Phase 11
+
+### Marketing 
+[] Support promotions
+
+### Integrations
+[] Decide on RBAC integrations access for members
+
+### Feedback (f.k.a sessions)
+[] Add posthog sessions support
+
+### Suport
+[] Email agent
+
+### Code
+[] Create initial implementation 
+
+### Platform
+[] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
+[] MCP Apps
+
+
+### Issues 
 [] Jira Integration 
+[] Add product area to the issue analysis - Classify on product area
+
 
 ### Analytics 
 [] segmentation by product area

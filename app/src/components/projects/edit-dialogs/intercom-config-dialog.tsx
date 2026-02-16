@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import { ToggleGroup } from '@/components/ui/toggle-group'
 
 interface IntercomConfigDialogProps {
   open: boolean
@@ -67,6 +68,9 @@ export function IntercomConfigDialog({
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [showSessionsLink, setShowSessionsLink] = useState(false)
+
+  // Connection method toggle
+  const [connectionMethod, setConnectionMethod] = useState<'oauth' | 'token'>('oauth')
 
   // Connect form state
   const [accessToken, setAccessToken] = useState('')
@@ -360,7 +364,7 @@ export function IntercomConfigDialog({
                   className="font-medium underline hover:text-[color:var(--foreground)]"
                   onClick={onClose}
                 >
-                  View synced sessions
+                  View synced feedbacks
                 </Link>
               </>
             )}
@@ -574,113 +578,146 @@ export function IntercomConfigDialog({
           <div className="space-y-6">
             <Alert variant="info">
               Connect your Intercom workspace to sync conversations into Hissuno.
-              You&apos;ll need an{' '}
-              <a
-                href="https://developers.intercom.com/docs/build-an-integration/getting-started/create-an-app"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-[color:var(--foreground)]"
-              >
-                Intercom access token
-              </a>{' '}
-              with read permissions.
             </Alert>
 
-            {/* Connect Form */}
-            <div className="space-y-4">
-              {/* Access Token */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-[color:var(--foreground)]">
-                  Access Token
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={accessToken}
-                    onChange={(e) => {
-                      setAccessToken(e.target.value)
-                      setTestResult(null)
-                    }}
-                    placeholder="Enter your Intercom access token"
-                    className="flex-1 rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                  />
-                  <Button
-                    variant="secondary"
-                    onClick={handleTestConnection}
-                    loading={isTesting}
-                    disabled={isTesting}
-                  >
-                    Test
-                  </Button>
-                </div>
-                {testResult && (
-                  <p
-                    className={`text-xs ${
-                      testResult.success
-                        ? 'text-[color:var(--accent-success)]'
-                        : 'text-[color:var(--accent-danger)]'
-                    }`}
-                  >
-                    {testResult.message}
-                  </p>
-                )}
-                <p className="text-xs text-[color:var(--text-tertiary)]">
-                  Find this in your Intercom Developer Hub under your app&apos;s Authentication settings.
-                </p>
-              </div>
-
-              {/* Sync Frequency */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-[color:var(--foreground)]">
-                  Sync Frequency
-                </label>
-                <select
-                  value={syncFrequency}
-                  onChange={(e) => setSyncFrequency(e.target.value as SyncFrequency)}
-                  className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                >
-                  {FREQUENCY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date Range (optional) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-[color:var(--foreground)]">
-                  Date Range (optional)
-                </label>
-                <p className="text-xs text-[color:var(--text-tertiary)]">
-                  Only sync conversations within this date range. Leave empty to sync all.
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs text-[color:var(--text-secondary)]">From</label>
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-[color:var(--text-secondary)]">To</label>
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Button variant="primary" onClick={handleConnect} loading={isConnecting}>
-                Connect Intercom
-              </Button>
+            {/* Connection Method Toggle */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[color:var(--foreground)]">
+                Connection Method
+              </label>
+              <ToggleGroup
+                value={connectionMethod}
+                onChange={setConnectionMethod}
+                options={[
+                  { value: 'oauth' as const, label: 'OAuth' },
+                  { value: 'token' as const, label: 'Access Token' },
+                ]}
+              />
             </div>
+
+            {connectionMethod === 'oauth' ? (
+              <div className="space-y-4">
+                <p className="text-sm text-[color:var(--text-secondary)]">
+                  Connect with one click using your Intercom account. You&apos;ll be redirected to Intercom to authorize access.
+                </p>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    window.location.href = `/api/integrations/intercom/connect?projectId=${projectId}`
+                  }}
+                >
+                  Connect with Intercom
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-xs text-[color:var(--text-tertiary)]">
+                  For developers with private Intercom apps. You&apos;ll need an{' '}
+                  <a
+                    href="https://developers.intercom.com/docs/build-an-integration/getting-started/create-an-app"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-[color:var(--foreground)]"
+                  >
+                    Intercom access token
+                  </a>{' '}
+                  with read permissions.
+                </p>
+
+                {/* Access Token */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-[color:var(--foreground)]">
+                    Access Token
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={accessToken}
+                      onChange={(e) => {
+                        setAccessToken(e.target.value)
+                        setTestResult(null)
+                      }}
+                      placeholder="Enter your Intercom access token"
+                      className="flex-1 rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={handleTestConnection}
+                      loading={isTesting}
+                      disabled={isTesting}
+                    >
+                      Test
+                    </Button>
+                  </div>
+                  {testResult && (
+                    <p
+                      className={`text-xs ${
+                        testResult.success
+                          ? 'text-[color:var(--accent-success)]'
+                          : 'text-[color:var(--accent-danger)]'
+                      }`}
+                    >
+                      {testResult.message}
+                    </p>
+                  )}
+                  <p className="text-xs text-[color:var(--text-tertiary)]">
+                    Find this in your Intercom Developer Hub under your app&apos;s Authentication settings.
+                  </p>
+                </div>
+
+                {/* Sync Frequency */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-[color:var(--foreground)]">
+                    Sync Frequency
+                  </label>
+                  <select
+                    value={syncFrequency}
+                    onChange={(e) => setSyncFrequency(e.target.value as SyncFrequency)}
+                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                  >
+                    {FREQUENCY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date Range (optional) */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-[color:var(--foreground)]">
+                    Date Range (optional)
+                  </label>
+                  <p className="text-xs text-[color:var(--text-tertiary)]">
+                    Only sync conversations within this date range. Leave empty to sync all.
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs text-[color:var(--text-secondary)]">From</label>
+                      <input
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-[color:var(--text-secondary)]">To</label>
+                      <input
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Button variant="primary" onClick={handleConnect} loading={isConnecting}>
+                  Connect Intercom
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

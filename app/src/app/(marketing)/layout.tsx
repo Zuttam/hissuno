@@ -62,6 +62,12 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
                     Roadmap
                   </Link>
                   <Link
+                    href="/docs"
+                    className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
+                  >
+                    Docs
+                  </Link>
+                  <Link
                     href="/legal/terms"
                     className="text-xs text-[var(--text-secondary)] transition hover:text-[var(--accent-teal)]"
                   >

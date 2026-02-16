@@ -217,8 +217,12 @@ export default function IntegrationsPage() {
 
     // Handle OAuth return - clean up URL and refresh status
     const jiraJustConnected = searchParams.get('jira') === 'connected'
-    if ((githubJustConnected || slackJustConnected || jiraJustConnected) && projectId) {
+    const intercomJustConnected = searchParams.get('intercom') === 'connected'
+    if ((githubJustConnected || slackJustConnected || jiraJustConnected || intercomJustConnected) && projectId) {
       void refreshStatuses()
+      if (intercomJustConnected) {
+        setShowIntercomDialog(true)
+      }
       router.replace(`/projects/${projectId}/integrations`)
     }
   }, [searchParams, projectId, router, refreshStatuses, gongEnabled, jiraEnabled])

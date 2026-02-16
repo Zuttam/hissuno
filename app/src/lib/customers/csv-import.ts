@@ -14,6 +14,19 @@ import type {
   CSVImportMapping,
   CSVImportResult,
 } from '@/types/customer'
+import { isValidEmail } from '@/lib/customers/contact-resolution'
+
+// Characters that spreadsheet apps interpret as formula/command prefixes (OWASP)
+const FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r']
+
+/** Neutralize CSV formula injection by prefixing dangerous values with a single quote. */
+function sanitizeCSVValue(value: string): string {
+  const trimmed = value.trim()
+  if (trimmed.length > 0 && FORMULA_PREFIXES.includes(trimmed[0])) {
+    return `'${trimmed}`
+  }
+  return trimmed
+}
 
 // ============================================================================
 // CSV Parsing
@@ -27,7 +40,7 @@ export function parseCSVContent(text: string): { headers: string[]; rows: Record
     header: true,
     skipEmptyLines: true,
     transformHeader: (h) => h.trim(),
-    transform: (value) => value.trim(),
+    transform: (value) => sanitizeCSVValue(value),
   })
 
   const headers = result.meta.fields ?? []
@@ -139,12 +152,24 @@ export async function validateAndImportRows(
     total: rows.length,
   }
 
-  // Build field mapping: targetField -> csvColumn
+  // Allowed target fields per entity type
+  const ALLOWED_COMPANY_FIELDS = new Set(Object.keys(COMPANY_FIELD_ALIASES))
+  const ALLOWED_CONTACT_FIELDS = new Set(Object.keys(CONTACT_FIELD_ALIASES))
+  const allowedFields = entityType === 'company' ? ALLOWED_COMPANY_FIELDS : ALLOWED_CONTACT_FIELDS
+  // Custom field keys must be alphanumeric with underscores only
+  const CUSTOM_FIELD_KEY_PATTERN = /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/
+
+  // Build field mapping: targetField -> csvColumn (with server-side validation)
   const fieldMap = new Map<string, string>()
   for (const mapping of mappings) {
-    if (mapping.targetField) {
-      fieldMap.set(mapping.targetField, mapping.csvColumn)
+    if (!mapping.targetField) continue
+    if (mapping.targetField.startsWith('custom:')) {
+      const key = mapping.targetField.slice(7)
+      if (!CUSTOM_FIELD_KEY_PATTERN.test(key)) continue // reject invalid custom keys
+    } else if (!allowedFields.has(mapping.targetField)) {
+      continue // reject unknown target fields
     }
+    fieldMap.set(mapping.targetField, mapping.csvColumn)
   }
 
   // Batch-fetch existing records to avoid per-row SELECT queries
@@ -326,6 +351,10 @@ async function importContactRow(
   const email = getValue('email')
   if (!email) {
     result.errors.push({ row: rowIndex + 2, message: 'Missing required field: email' })
+    return
+  }
+  if (!isValidEmail(email)) {
+    result.errors.push({ row: rowIndex + 2, message: `Invalid email format: "${email}"` })
     return
   }
 

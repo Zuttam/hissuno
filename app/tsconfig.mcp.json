@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/mcp/**/*.ts", "src/lib/**/*.ts", "src/types/**/*.ts", "src/mastra/**/*.ts"]
+}

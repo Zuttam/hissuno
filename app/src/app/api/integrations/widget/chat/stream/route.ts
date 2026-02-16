@@ -14,6 +14,7 @@ import {
   createCorsHeaders,
 } from '@/lib/sse'
 import { mastra } from '@/mastra'
+import { buildDataToolset } from '@/mastra/tools/data-tools'
 import { isOriginAllowed } from '@/lib/utils/widget-auth'
 import type { SupportAgentContext } from '@/types/agent'
 
@@ -152,6 +153,8 @@ export async function GET(request: NextRequest) {
         runtimeContext.set('userMetadata', chatRun.metadata?.userMetadata || null)
         runtimeContext.set('sessionId', sessionId)
         runtimeContext.set('namedPackageId', namedPackageId)
+        runtimeContext.set('contactToken', null)
+        runtimeContext.set('contactId', (chatRun.metadata?.contactId as string) ?? null)
 
         // Convert messages to ModelMessage format
         const mastraMessages: ModelMessage[] = messages.map((msg) => ({
@@ -172,9 +175,11 @@ export async function GET(request: NextRequest) {
           return data?.status === 'cancelled'
         }
 
-        // Stream the response
+        // Stream the response with data tools scoped by contact mode
+        const widgetContactId = (chatRun.metadata?.contactId as string) ?? null
         const agentStream = await agent.stream(mastraMessages, {
           runtimeContext,
+          toolsets: { dataTools: buildDataToolset(widgetContactId) },
           memory: {
             thread: sessionId,
             resource: chatRun.metadata?.userId || 'anonymous',

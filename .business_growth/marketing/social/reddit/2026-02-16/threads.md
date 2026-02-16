@@ -99,6 +99,26 @@
 - **Why**: Core - the hype-driven adoption pattern is real. The best way to cut through the AI hype is to ground decisions in what customers actually need. Replace "CTO wants AI everywhere" with "customers need X - does AI help us deliver X faster/better?"
 - **Status**: POST
 
+### Thread 7 - r/CustomerSuccess - CORE (escalation_queen)
+- **Title**: How do you catch customer frustration before churn shows up?
+- **Author**: u/ruchi_panda
+- **URL**: https://www.reddit.com/r/CustomerSuccess/comments/1r4lhxy/how_do_you_catch_customer_frustration_before/
+- **Age**: ~2d at time of scan
+- **Engagement**: 5 upvotes, 7 comments (steady discussion, still active)
+- **Summary**: CS person asking about early warning signs for churn beyond health scores and usage metrics. Tried feedback prompts during onboarding. Wants to know what signals others use to catch quiet frustration before it escalates.
+- **Why**: PERFECT core thread for CX lead persona. Directly about catching customer frustration signals that live in support conversations, not dashboards. Our thesis: the best churn signals are in the words customers use, not the graphs. Support teams see this first but the signal never reaches product.
+- **Status**: POST
+
+### Thread 8 - r/SaaS - CORE (shipping_solo_26)
+- **Title**: Created an app and now can't even get feedback
+- **Author**: u/9mx113
+- **URL**: https://www.reddit.com/r/SaaS/comments/1r64i9y/created_an_app_and_now_cant_even_get_feedback/
+- **Age**: ~4h at time of scan
+- **Engagement**: 5 upvotes, 13 comments (active, growing)
+- **Summary**: Partner built a SaaS (recordings to slides). Can't get feedback - people sign up, try once, disappear without saying what was confusing or useful. Trying to figure out who the product is for. Reaching out in communities feels like shouting into the void.
+- **Why**: PERFECT core thread for solopreneur persona. The silent churn problem from a builder's perspective. When you're doing everything yourself, you can't chase every trial user for a call. But the behavioral signal is already there - where they dropped off, what they never touched. You don't need more outreach, you need to listen to what users are already telling you through their actions.
+- **Status**: POST
+
 ---
 
 ## SKIP
@@ -133,6 +153,8 @@
 - **frustrated_pm26**: Can't post in r/productivity (removed by AutoMod - account too new)
 - **eng_lead_ftw**: Can't post in r/startups (blocked - account too new, no karma)
 - **MindVegetable9898**: No known restrictions. r/Entrepreneur has AI content detection filter (must write in raw/casual style).
+- **escalation_queen**: New account - no known restrictions yet. r/CustomerSuccess has "NO AI SLOP" rule (Rule 6) - must write in authentic, human voice.
+- **shipping_solo_26**: New account - no known restrictions yet. May face AutoMod blocks in some subs due to new account age.
 
 ---
 
@@ -146,7 +168,9 @@
 | MindVegetable9898 | r/SaaS | Would you quit if you were me? | Brand building - understanding conversion |
 | MindVegetable9898 | r/Entrepreneur | Built a B2C Ferrari Engine, struggling to find PMF | Peripheral trust - broken feedback loop |
 | eng_lead_ftw | r/ExperiencedDevs | Surviving as an AI pragmatist in an AI-radical company? | Core - customer needs vs AI hype |
+| escalation_queen | r/CustomerSuccess | How do you catch customer frustration before churn shows up? | Core - churn signals in support conversations |
+| shipping_solo_26 | r/SaaS | Created an app and now can't even get feedback | Core - silent churn, user signal from behavior |
 
-### Subreddit Spread: 4 subreddits (ProductManagement x2, ExperiencedDevs x2, SaaS x1, Entrepreneur x1)
-### Profile Balance: 2/2/2 (frustrated_pm26 / eng_lead_ftw / MindVegetable9898)
-### Mix: 2 core, 2 adjacent, 1 brand-building, 1 peripheral trust
+### Subreddit Spread: 5 subreddits (ProductManagement x2, ExperiencedDevs x2, SaaS x2, Entrepreneur x1, CustomerSuccess x1)
+### Profile Balance: 2/2/2/1/1 (frustrated_pm26 / eng_lead_ftw / MindVegetable9898 / escalation_queen / shipping_solo_26)
+### Mix: 4 core, 2 adjacent, 1 brand-building, 1 peripheral trust

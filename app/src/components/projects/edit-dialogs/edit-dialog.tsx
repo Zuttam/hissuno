@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
-import { Dialog, Button, type DialogSize } from '@/components/ui'
+import { Dialog, Button, Alert, type DialogSize } from '@/components/ui'
 
 export interface EditDialogProps {
   open: boolean
@@ -14,6 +14,7 @@ export interface EditDialogProps {
   cancelLabel?: string
   size?: DialogSize
   error?: string | null
+  saved?: boolean
 }
 
 export function EditDialog({
@@ -27,6 +28,7 @@ export function EditDialog({
   cancelLabel = 'Cancel',
   size = 'xxl',
   error,
+  saved = false,
 }: EditDialogProps) {
   const handleSave = async () => {
     await onSave()
@@ -37,9 +39,7 @@ export function EditDialog({
       <div className="flex flex-col gap-6">
         {/* Error display */}
         {error && (
-          <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-3 font-mono text-sm text-[color:var(--accent-danger)]">
-            {error}
-          </div>
+          <Alert variant="danger">{error}</Alert>
         )}
 
         {/* Content */}
@@ -48,7 +48,11 @@ export function EditDialog({
         </div>
 
         {/* Footer with Save/Cancel */}
-        <div className="flex items-center justify-end gap-3 border-t border-[color:var(--border-subtle)] pt-4">
+        <div className="flex items-center gap-3 border-t border-[color:var(--border-subtle)] pt-4">
+          {saved && (
+            <Alert variant="success" className="py-2 px-3 text-xs">✅ Settings saved</Alert>
+          )}
+          <div className="flex-1" />
           <Button
             variant="secondary"
             onClick={onClose}

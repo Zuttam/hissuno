@@ -3,12 +3,35 @@ import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { uploadDocument } from '@/lib/knowledge/storage'
+import { uploadDocument, validateUploadedFile } from '@/lib/knowledge/storage'
 import { createGitHubCodebase, syncGitHubCodebase, deleteCodebase, updateGitHubCodebase } from '@/lib/codebase'
 import { hasGitHubInstallation } from '@/lib/integrations/github'
 import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
 
 export const runtime = 'nodejs'
+
+/**
+ * Simple in-memory per-user upload rate limiter.
+ * Max 20 uploads per 60-second window.
+ */
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX_UPLOADS = 20
+const uploadTimestamps = new Map<string, number[]>()
+
+function checkUploadRateLimit(userId: string): boolean {
+  const now = Date.now()
+  const timestamps = uploadTimestamps.get(userId) ?? []
+  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
+
+  if (recent.length >= RATE_LIMIT_MAX_UPLOADS) {
+    uploadTimestamps.set(userId, recent)
+    return false
+  }
+
+  recent.push(now)
+  uploadTimestamps.set(userId, recent)
+  return true
+}
 
 type RouteParams = { id: string }
 
@@ -260,6 +283,20 @@ export async function POST(request: Request, context: RouteContext) {
       if (type === 'uploaded_doc') {
         if (!file) {
           return NextResponse.json({ error: 'File is required for uploaded_doc type.' }, { status: 400 })
+        }
+
+        // Rate limit: max 20 uploads per minute per user
+        if (!checkUploadRateLimit(actingUserId)) {
+          return NextResponse.json(
+            { error: 'Upload rate limit exceeded. Please wait before uploading more files.' },
+            { status: 429 }
+          )
+        }
+
+        // Validate file: extension, MIME type, magic bytes, and size
+        const validationError = await validateUploadedFile(file)
+        if (validationError) {
+          return NextResponse.json({ error: validationError }, { status: 400 })
         }
 
         const { path, error: uploadError } = await uploadDocument(projectId, file, supabase)

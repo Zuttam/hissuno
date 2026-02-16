@@ -81,6 +81,7 @@ export function WidgetConfigDialog({
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
 
   // Fetch current settings when dialog opens
   useEffect(() => {
@@ -206,6 +207,8 @@ export function WidgetConfigDialog({
       }
 
       onSaved?.()
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save settings')
     } finally {
@@ -235,6 +238,7 @@ import '@hissuno/widget/styles.css';
       title="Widget Configuration"
       isSaving={isSaving}
       error={error}
+      saved={saved}
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-8">

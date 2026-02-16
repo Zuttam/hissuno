@@ -52,6 +52,40 @@ deep blue isn't about losing your job. it's about losing the place you hid from 
 
 ---
 
+### Reply 4 — @jasonlk "AI Agent Churn / Prompts Are Portable" (Jason Lemkin, SaaStr)
+
+**Post URL:** https://x.com/jasonlk/status/2023231470689808566
+**Pillar:** Industry Commentary + Product Thinking
+**Status:** POSTED
+
+```
+prompts are portable but context isn't.
+
+the SaaS moat was always the data — years of workflows, integrations, institutional knowledge. with agents, the equivalent isn't the prompt. it's the accumulated understanding of your customers, your product, your edge cases.
+
+the agents that churn-proof themselves won't be the ones with better models. they'll be the ones that became the memory layer for their customers' operations.
+```
+
+**Why this works:** Jason's article argues AI agent switching costs are low because prompts are portable. Our reply agrees with the premise but adds a deeper insight: what's NOT portable is accumulated context — customer data, workflow patterns, institutional knowledge. The closer reframes the moat as becoming the "memory layer." 230K followers, 9.3K views at time of reply.
+
+---
+
+### Reply 5 — @prukalpa "Knowledge Economy > SaaS" (Prukalpa, Cofounder AtlanHQ)
+
+**Post URL:** https://x.com/prukalpa/status/2023242966907965537
+**Pillar:** Industry Commentary + Product Thinking
+**Status:** POSTED
+
+```
+the 1% vs 50% framing is the right way to look at this.
+
+SaaS companies that survive won't be the ones building faster — they'll be the ones that figured out what to build. when AI handles the how, the companies with the best customer signal win. and most don't have it.
+```
+
+**Why this works:** Prukalpa reframes "SaaS is dead" with GDP data — software is 1% of GDP, knowledge work is 50%+. Our reply validates her framing, then adds a sharper insight: when AI commoditizes the "how" of building, the differentiator becomes the "what" — knowing what to build from customer signal. The closer ("and most don't have it") lands with a sting. Connects to our thesis without mentioning any product. 18K views, 136 likes at time of reply. Cofounder of Atlan (data catalog company) — adjacent audience.
+
+---
+
 ## Execution Summary
 
 | # | Target | Pillar | Reach | Status |
@@ -59,16 +93,44 @@ deep blue isn't about losing your job. it's about losing the place you hid from 
 | 1 | @swyx (143K followers) | AI/Eng + Product | 819 views (fresh, first reply) | POSTED |
 | 2 | @lennysan (301K followers) | Industry + Product | 35K views (trending topic) | POSTED |
 | 3 | @simonw (146K followers) | AI/Eng | 14.6K views, 83 bookmarks | POSTED |
+| 4 | @jasonlk (230K followers) | Industry + Product | 9.3K views, 17 bookmarks | POSTED |
+| 5 | @prukalpa (AtlanHQ cofounder) | Industry + Product | 18K views, 52 bookmarks | POSTED |
 
-**Total replies today: 3**
-**Pillars covered: AI/Eng (2), Product Thinking (2), Industry Commentary (1)**
-**Theme of the day: OpenClaw / Peter Steinberger joining OpenAI — engaged from multiple angles (product insight, corporate critique, developer psychology)**
+**Total replies today: 5**
+**Original posts today: 1**
+**Pillars covered: AI/Eng (2), Product Thinking (4), Industry Commentary (3)**
+**Theme of the day: Replies 1-3 covered OpenClaw/Steinberger from multiple angles. Replies 4-5 shift to the "SaaS is dead" debate — one on switching costs/churn, one on market expansion. Original post extends the theme with a concrete hook: Agent Skills standard = skills are the new moat, not the model. Unified thread: the future of software is about knowing what to build, not building faster.**
+
+---
+
+## Original Posts
+
+### Original Post 1 — Agent Skills Standard as the New Differentiator
+
+**Post URL:** https://x.com/matanzutta/status/2023364704572211580
+**Pillar:** AI/Eng + Product Thinking
+**Status:** POSTED
+
+```
+agent skills are a huge deal. to anyone who missed — this is an open standard adopted by claude code, cursor, github, vs code, openai codex, and 20+ others. same format, portable across tools.
+
+this is the shift most people will miss. while everybody's focused on which model is best, the real differentiator is the skills you build on top — the domain knowledge, the workflows, the patterns you teach your agents.
+
+one team's agent understands their customers, their product, their edge cases. another is prompting from scratch every time. same model underneath. wildly different results.
+
+the model war is about to be over. the skill war is just starting.
+```
+
+**Why this works:** Concrete hook (Agent Skills open standard, 27+ tools). Contrarian reframe — while everyone debates models, the real differentiator is skills/domain knowledge. Concrete contrast (one team vs another). Punchy closer. Extends today's reply theme ("the future of software is knowing what to build") into original content. No emojis, no hashtags, no self-promotion.
 
 ---
 
 ## Notes
 
-- Today's engagement was thematically cohesive — all 3 replies connected to the OpenClaw/AI agents narrative from different angles.
+- Today's engagement was thematically cohesive — all 3 posted replies connected to the OpenClaw/AI agents narrative from different angles.
+- Replies 4-5 form a thematic pair around the "SaaS is dead" debate, adding nuance from the customer signal angle.
 - @shreyas, @alexalbert__, @bcherny were all quiet today (no fresh original posts).
-- Consistent "customer signal" / "product instinct" / "understanding what to build" theme maintained across all replies.
+- Consistent "customer signal" / "product instinct" / "understanding what to build" theme maintained across all 5 replies.
 - Replied to @simonw on consecutive days (yesterday: "cognitive debt", today: "Deep Blue") — both genuinely different topics with unique angles.
+- @paulg has blocked @matanzutta — remove from target rotation.
+- @aaborensteinx account no longer exists — remove from engagement-targets.md.

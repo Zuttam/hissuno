@@ -1,7 +1,7 @@
 import { PageHeader } from '@/components/ui'
-import { PromotionsSection } from '@/components/account/promotions-section'
+import { ReferralsSection } from '@/components/account/referrals-section'
 
-export default function AccountPromotionsPage() {
+export default function AccountReferralsPage() {
   return (
     <div className="mx-auto w-full max-w-6xl">
       <div className="my-8">
@@ -9,7 +9,7 @@ export default function AccountPromotionsPage() {
       </div>
 
       <div className="flex flex-col gap-8">
-        <PromotionsSection />
+        <ReferralsSection />
       </div>
     </div>
   )

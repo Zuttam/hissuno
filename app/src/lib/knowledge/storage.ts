@@ -17,6 +17,84 @@ const KNOWLEDGE_BUCKET = 'knowledge'
 // Storage bucket for uploaded documents
 const DOCUMENTS_BUCKET = 'documents'
 
+/** Maximum file size for uploaded documents (10MB) */
+const MAX_DOCUMENT_SIZE = 10 * 1024 * 1024
+
+/** Allowed file extensions and their expected MIME types */
+const ALLOWED_FILE_TYPES: Record<string, string[]> = {
+  '.pdf': ['application/pdf'],
+  '.txt': ['text/plain'],
+  '.md': ['text/markdown', 'text/plain'],
+  '.doc': ['application/msword'],
+  '.docx': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+}
+
+/** Magic byte signatures for file type verification */
+const FILE_SIGNATURES: { ext: string; bytes: number[] }[] = [
+  { ext: '.pdf', bytes: [0x25, 0x50, 0x44, 0x46] }, // %PDF
+  { ext: '.docx', bytes: [0x50, 0x4b, 0x03, 0x04] }, // PK (ZIP)
+  { ext: '.doc', bytes: [0xd0, 0xcf, 0x11, 0xe0] }, // OLE compound
+]
+
+/**
+ * Validates an uploaded file for security:
+ * - Extension allowlist
+ * - MIME type validation
+ * - Magic byte (file signature) verification
+ * - File size check
+ *
+ * Returns null if valid, or an error message string if invalid.
+ */
+export async function validateUploadedFile(file: File): Promise<string | null> {
+  // 1. Check file size
+  if (file.size > MAX_DOCUMENT_SIZE) {
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
+    return `File size (${sizeMB}MB) exceeds the 10MB limit.`
+  }
+
+  if (file.size === 0) {
+    return 'File is empty.'
+  }
+
+  // 2. Check file extension
+  const name = file.name.toLowerCase()
+  const ext = name.includes('.') ? `.${name.split('.').pop()}` : ''
+  const allowedMimes = ALLOWED_FILE_TYPES[ext]
+
+  if (!allowedMimes) {
+    const allowed = Object.keys(ALLOWED_FILE_TYPES).join(', ')
+    return `File type "${ext || 'unknown'}" is not allowed. Allowed types: ${allowed}`
+  }
+
+  // 3. Check MIME type against allowlist for the extension
+  if (file.type && !allowedMimes.includes(file.type)) {
+    return `MIME type "${file.type}" does not match expected types for ${ext} files.`
+  }
+
+  // 4. Validate magic bytes (file signature)
+  const header = new Uint8Array(await file.slice(0, 8).arrayBuffer())
+  const expectedSig = FILE_SIGNATURES.find((s) => s.ext === ext)
+
+  if (expectedSig) {
+    // Binary file: magic bytes must match
+    const matches = expectedSig.bytes.every((b, i) => header[i] === b)
+    if (!matches) {
+      return `File content does not match its ${ext} extension (invalid file signature).`
+    }
+  } else {
+    // Text file (.txt, .md): should not contain binary bytes in the first chunk
+    const chunk = new Uint8Array(await file.slice(0, 1024).arrayBuffer())
+    for (const byte of chunk) {
+      // Allow common text control characters: tab, newline, carriage return
+      if (byte < 0x09 || (byte > 0x0d && byte < 0x20 && byte !== 0x1b)) {
+        return `File appears to contain binary content but has a text extension (${ext}).`
+      }
+    }
+  }
+
+  return null
+}
+
 /**
  * Generates a storage path for a knowledge package markdown file
  */
@@ -251,6 +329,7 @@ export async function ensureStorageBuckets(): Promise<{ error: Error | null }> {
         'application/pdf',
         'text/markdown',
         'text/plain',
+        'text/csv',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       ],

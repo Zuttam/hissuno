@@ -452,16 +452,17 @@ export const getProjectIntegrationStats = cache(async (projectId: string): Promi
       return { lastActivityAt: null, isActive: false, hasAnySessions: false }
     }
 
-    // Get most recent session
+    // Get most recent widget session (only widget-originated sessions count)
     const { data: latest } = await supabase
       .from('sessions')
       .select('last_activity_at')
       .eq('project_id', projectId)
+      .eq('source', 'widget')
       .order('last_activity_at', { ascending: false })
       .limit(1)
       .single()
 
-    // Check for activity in last 7 days
+    // Check for widget activity in last 7 days
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
@@ -469,6 +470,7 @@ export const getProjectIntegrationStats = cache(async (projectId: string): Promi
       .from('sessions')
       .select('*', { count: 'exact', head: true })
       .eq('project_id', projectId)
+      .eq('source', 'widget')
       .gte('last_activity_at', sevenDaysAgo.toISOString())
 
     return {

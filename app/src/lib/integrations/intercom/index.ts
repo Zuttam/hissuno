@@ -48,10 +48,13 @@ export interface IntercomConnection {
 /**
  * Intercom integration status
  */
+export type IntercomAuthMethod = 'token' | 'oauth'
+
 export interface IntercomIntegrationStatus {
   connected: boolean
   workspaceId: string | null
   workspaceName: string | null
+  authMethod: IntercomAuthMethod | null
   syncFrequency: IntercomSyncFrequency | null
   syncEnabled: boolean
   lastSyncAt: string | null
@@ -74,6 +77,7 @@ export async function hasIntercomConnection(
     .select(`
       workspace_id,
       workspace_name,
+      auth_method,
       sync_frequency,
       sync_enabled,
       filter_config,
@@ -90,6 +94,7 @@ export async function hasIntercomConnection(
       connected: false,
       workspaceId: null,
       workspaceName: null,
+      authMethod: null,
       syncFrequency: null,
       syncEnabled: false,
       lastSyncAt: null,
@@ -104,6 +109,7 @@ export async function hasIntercomConnection(
     connected: true,
     workspaceId: data.workspace_id,
     workspaceName: data.workspace_name,
+    authMethod: (data.auth_method as IntercomAuthMethod) || 'token',
     syncFrequency: data.sync_frequency as IntercomSyncFrequency,
     syncEnabled: data.sync_enabled,
     lastSyncAt: data.last_sync_at,
@@ -152,6 +158,7 @@ export async function storeIntercomCredentials(
     workspaceName: string | null
     syncFrequency: IntercomSyncFrequency
     filterConfig?: IntercomFilterConfig
+    authMethod?: IntercomAuthMethod
   }
 ): Promise<{ success: boolean; connectionId?: string; error?: string }> {
   const client = supabase as AnySupabase
@@ -165,6 +172,7 @@ export async function storeIntercomCredentials(
         access_token: params.accessToken,
         workspace_id: params.workspaceId,
         workspace_name: params.workspaceName,
+        auth_method: params.authMethod || 'token',
         sync_frequency: params.syncFrequency,
         sync_enabled: params.syncFrequency !== 'manual',
         filter_config: params.filterConfig || {},
