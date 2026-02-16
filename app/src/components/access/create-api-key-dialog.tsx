@@ -81,9 +81,9 @@ export function CreateApiKeyDialog({ open, onClose, projectId, onCreated }: Crea
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} title="Create API Key">
+    <Dialog open={open} onClose={handleClose} title="Create API Key" size={'lg'}>
       {createdKey ? (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <div className="rounded-[4px] border-2 border-[color:var(--accent-warning)] bg-[color:var(--surface)] p-4">
             <p className="text-sm font-semibold text-[color:var(--accent-warning)] mb-3">
               Copy this key now. You won&apos;t be able to see it again.
@@ -99,7 +99,7 @@ export function CreateApiKeyDialog({ open, onClose, projectId, onCreated }: Crea
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-4">
           <div>
             <label className="block text-xs font-mono uppercase tracking-wide text-[color:var(--text-secondary)] mb-1.5">
               Key Name

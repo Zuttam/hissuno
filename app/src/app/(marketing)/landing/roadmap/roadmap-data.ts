@@ -91,8 +91,8 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
     ],
   },
   {
-    status: 'in-development',
-    title: 'Enhanced Integrations',
+    status: 'done',
+    title: 'Integrations & Onboarding',
     subtitle: 'Connecting to your existing tools',
     items: [
       {
@@ -119,27 +119,51 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
       },
       {
         id: 'onboarding',
-        title: 'Improved Onboarding',
-        description: 'Streamlined setup experience to get you up and running faster.',
+        title: 'Streamlined Onboarding',
+        description: 'Get up and running faster with a simplified setup flow, especially for invited team members.',
       },
     ],
   },
   {
-    status: 'planned',
+    status: 'done',
     title: 'Team Collaboration',
     subtitle: 'Built for teams',
     items: [
       {
         id: 'multi-user',
-        title: 'Multi-User Access & RBAC',
+        title: 'Multi-User Access & Roles',
         description:
-          'Invite team members with role-based permissions and granular access controls.',
+          'Invite team members with owner and member roles for granular access control.',
       },
       {
         id: 'invite-links',
-        title: 'Team Invite Links',
-        description: 'Generate shareable links for easy team onboarding.',
+        title: 'Team Invites',
+        description: 'Generate invite links and batch-invite your team for easy onboarding.',
       },
+      {
+        id: 'api-access',
+        title: 'API Keys',
+        description:
+          'Generate API keys for programmatic access to your project data and custom integrations.',
+      },
+      {
+        id: 'customer-segmentation',
+        title: 'Customer Segmentation',
+        description: 'Segment customers and surface key insights across your feedback data.',
+      },
+      {
+        id: 'feedback-analytics',
+        title: 'Feedback Analytics',
+        description:
+          'Track analyzed vs. unreviewed feedback with new filters and enhanced analytics dashboards.',
+      },
+    ],
+  },
+  {
+    status: 'in-development',
+    title: 'Automation & Intelligence',
+    subtitle: 'Smarter workflows',
+    items: [
       {
         id: 'alerts',
         title: 'Alerts & Weekly Reports',
@@ -165,16 +189,10 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
     ],
   },
   {
-    status: 'future',
+    status: 'planned',
     title: 'Developer Platform',
     subtitle: 'Extend and integrate',
     items: [
-      {
-        id: 'api-access',
-        title: 'API Access',
-        description:
-          'Programmatic access to Hissuno via API keys for custom integrations.',
-      },
       {
         id: 'code-implementation',
         title: 'AI Code Implementation',
@@ -191,6 +209,11 @@ export const ROADMAP_PHASES: RoadmapPhase[] = [
         id: 'docs-portal',
         title: 'Documentation Portal',
         description: 'A dedicated docs site to help you get the most out of Hissuno.',
+      },
+      {
+        id: 'webhooks',
+        title: 'Webhooks',
+        description: 'Receive real-time notifications when new feedback or issues are created.',
       },
     ],
   },

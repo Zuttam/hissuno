@@ -1,6 +1,6 @@
 # Reddit Comments - 2026-02-16
 
-## Status: 0/6 POSTED | 0 SKIPPED | 6 PENDING
+## Status: 3/6 POSTED | 0 SKIPPED | 3 PENDING
 
 ---
 
@@ -14,7 +14,7 @@
 
 this is the thing i've been wrestling with for years honestly. tried RICE, tried impact/effort matrices, tried weighted scoring - they all break down the same way because the inputs are usually vibes disguised as data. 'how many customers want this' ends up being whoever talked to sales last week or whoever screamed loudest in the support queue. the real problem isn't the framework, it's that most teams don't have a systematic way to capture and aggregate customer signals in the first place. like you're trying to prioritize based on 'themes' but the themes themselves are probably someone's interpretation of a handful of conversations. what actually worked for me was getting way more rigorous about tagging and categorizing every customer touchpoint - support tickets, session feedback, feature requests, complaints - and then letting the volume speak for itself. when you can literally say 'here are the top 10 things customers struggled with this month, ranked by frequency' the prioritization kind of does itself. the signals don't get lost when you have a system that captures them before anyone has a chance to filter or reinterpret them. most of the 'should we build X or Y' debates i've seen would've been answered instantly if both sides had access to the same customer data instead of arguing from memory.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
@@ -28,7 +28,7 @@ this is the thing i've been wrestling with for years honestly. tried RICE, tried
 
 been through this exact situation. the problem isn't that they're making product decisions - it's that they're making them based on their own assumptions instead of actual customer data. when i dealt with this i stopped trying to win debates about 'who gets to decide' and instead just made customer evidence impossible to ignore. i started bringing actual support tickets and user feedback into every planning discussion. not summaries, not my interpretation - the actual raw feedback. 'here's what 15 users said about this exact workflow this month.' once the devs could see the real customer pain they mostly stopped pitching random ideas because their ideas couldn't compete with documented user frustration. the ambitious ones actually got really into it because now they felt like they were solving real problems instead of guessing. the key shift was from 'i'm the PM trust me' to 'here's what customers are telling us, let's solve this together.' also worth noting - some of their ideas might actually be good. the issue is they skip the validation step. channel that energy into lightweight user research instead of squashing it entirely.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
@@ -42,7 +42,7 @@ been through this exact situation. the problem isn't that they're making product
 
 been at a place like this. 100k lines/month with no system design is basically a factory producing inventory nobody ordered. the scariest part isn't the code quality - it's that nobody is asking 'should we be building this at all.' i've seen teams ship features at insane velocity and then wonder why their churn rate doesn't move. turns out they were building what the loudest stakeholder wanted, not what users were actually struggling with. the no-system thing makes it worse because even if someone does identify the right thing to build, there's no architecture to support it cleanly so you end up with 100k lines that need to be rewritten in 6 months anyway. my advice: don't try to fix the process first. start by asking one simple question in every sprint - 'what customer problem does this solve and how do we know?' if people can't answer that, the velocity is meaningless. once the team starts connecting code output to actual user outcomes the system design conversations happen naturally because people start caring about maintainability when they know the feature actually matters.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
@@ -92,15 +92,15 @@ lived this exact dynamic at my last company. CTO was obsessed with being 'AI-fir
 ## Posting Schedule
 
 ### Session 1 (frustrated_pm26)
-1. Comment 1: r/ProductManagement "How do you prioritize customer needs?" - PENDING
-2. Comment 2: r/ProductManagement "Junior devs acting as PM" - PENDING
+1. Comment 1: r/ProductManagement "How do you prioritize customer needs?" - POSTED
+2. Comment 2: r/ProductManagement "Junior devs acting as PM" - POSTED
 
 ### Session 2 (MindVegetable9898)
 4. Comment 4: r/SaaS "Would you quit if you were me?" - PENDING
 5. Comment 5: r/Entrepreneur "B2C Ferrari Engine, struggling to find PMF" - PENDING
 
 ### Session 3 (eng_lead_ftw)
-3. Comment 3: r/ExperiencedDevs "100k Lines and No System" - PENDING
+3. Comment 3: r/ExperiencedDevs "100k Lines and No System" - POSTED
 6. Comment 6: r/ExperiencedDevs "Surviving as an AI pragmatist" - PENDING
 
 ## Posting Notes
