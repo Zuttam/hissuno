@@ -1,5 +1,5 @@
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '../server'
+import { createRequestScopedClient, isSupabaseConfigured } from '../server'
 import type { WidgetSettings, WidgetSettingsInput } from './types'
 import { DEFAULT_WIDGET_SETTINGS } from './types'
 
@@ -13,15 +13,7 @@ export async function getWidgetSettings(projectId: string): Promise<WidgetSettin
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
@@ -71,15 +63,7 @@ export async function updateWidgetSettings(
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase

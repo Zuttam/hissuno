@@ -13,8 +13,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 function sanitizeSearchInput(input: string): string {
   return input.replace(/[%_.,()]/g, '\\$&')
 }
-import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
+import { createAdminClient, createRequestScopedClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -332,27 +331,16 @@ export const listIssues = cache(async (filters: IssueFilters = {}): Promise<{ is
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const { supabase, apiKeyProjectId } = await createRequestScopedClient()
 
-    if (userError) {
-      console.error('[supabase.issues] failed to resolve user for listIssues', userError)
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    if (!user) {
-      throw new UnauthorizedError()
+    if (apiKeyProjectId && !filters.projectId) {
+      throw new Error('API key requests must include a projectId filter.')
     }
 
     // Get projects accessible by this user (RLS handles membership)
-    const { data: userProjects } = await supabase
-      .from('projects')
-      .select('id')
-
-    const projectIds = userProjects?.map(p => p.id) ?? []
+    const projectIds = apiKeyProjectId
+      ? [apiKeyProjectId]
+      : (await supabase.from('projects').select('id')).data?.map(p => p.id) ?? []
 
     if (projectIds.length === 0) {
       return { issues: [], total: 0 }
@@ -429,20 +417,7 @@ export const getIssueById = cache(async (issueId: string): Promise<IssueWithSess
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError) {
-      console.error('[supabase.issues] failed to resolve user for getIssueById', issueId, userError)
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    if (!user) {
-      throw new UnauthorizedError()
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Get issue with project and sessions
     const { data: issue, error: issueError } = await supabase
@@ -499,15 +474,7 @@ export const getProjectIssues = cache(async (projectId: string, limit = 20): Pro
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
@@ -588,15 +555,7 @@ export const getProjectIssueStats = cache(async (projectId: string): Promise<{
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     const statuses = ['open', 'ready', 'in_progress', 'resolved', 'closed'] as const
     const results = await Promise.all(
@@ -845,13 +804,10 @@ export async function getTopRankedIssues(
     return []
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
+  let supabase
+  try {
+    ({ supabase } = await createRequestScopedClient())
+  } catch {
     return []
   }
 

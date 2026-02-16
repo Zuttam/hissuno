@@ -1,7 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { verifyCronSecret } from '@/lib/auth/admin-api'
-import { UnauthorizedError } from '@/lib/auth/server'
 import { checkEnforcement } from '@/lib/billing/enforcement-service'
 import { ensureSessionName } from '@/lib/sessions/name-generator'
 import { mastra } from '@/mastra'
@@ -452,17 +450,7 @@ export async function triggerPendingReviews(supabase: AdminClient): Promise<Phas
  *
  * Should be run every minute via Vercel cron.
  */
-export async function GET(request: NextRequest) {
-  try {
-    verifyCronSecret(request)
-  } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      console.error(`${LOG_PREFIX} Invalid cron secret`)
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
-    throw error
-  }
-
+export async function GET() {
   if (!isSupabaseConfigured()) {
     console.error(`${LOG_PREFIX} Supabase must be configured`)
     return NextResponse.json({ error: 'Supabase must be configured' }, { status: 500 })

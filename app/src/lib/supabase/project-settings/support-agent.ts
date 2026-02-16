@@ -1,5 +1,5 @@
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, createAdminClient, isSupabaseConfigured } from '../server'
+import { createRequestScopedClient, createAdminClient, isSupabaseConfigured } from '../server'
 import type { SupportAgentSettings, SupportAgentSettingsInput } from './types'
 import { DEFAULT_SUPPORT_AGENT_SETTINGS } from './types'
 
@@ -13,15 +13,7 @@ export async function getSupportAgentSettings(projectId: string): Promise<Suppor
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
@@ -109,15 +101,7 @@ export async function updateSupportAgentSettings(
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase

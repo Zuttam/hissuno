@@ -1,6 +1,5 @@
 import { cache } from 'react'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '../server'
+import { createRequestScopedClient, isSupabaseConfigured } from '../server'
 import type { AnalyticsPeriod, OverallAnalytics } from './types'
 import {
   batchedIn,
@@ -24,20 +23,18 @@ export const getOverallAnalytics = cache(async (
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
+  const { supabase, apiKeyProjectId } = await createRequestScopedClient()
 
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
+  if (apiKeyProjectId && !projectId) {
+    throw new Error('API key requests must include a projectId filter.')
   }
 
   // Fetch projects with names upfront (eliminates separate project names query later)
-  const userProjects = projectId
-    ? [{ id: projectId, name: '' }]
-    : await getUserProjects(supabase)
+  const userProjects = apiKeyProjectId
+    ? [{ id: apiKeyProjectId, name: '' }]
+    : projectId
+      ? [{ id: projectId, name: '' }]
+      : await getUserProjects(supabase)
   const projectIds = userProjects.map(p => p.id)
 
   if (projectIds.length === 0) {

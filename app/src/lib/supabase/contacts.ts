@@ -6,8 +6,7 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from './server'
+import { createClient, createRequestScopedClient, isSupabaseConfigured } from './server'
 import type {
   ContactRecord,
   ContactWithCompany,
@@ -158,15 +157,7 @@ export const listContacts = cache(async (filters: ContactFilters = {}): Promise<
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Build query
     let query = supabase
@@ -225,15 +216,7 @@ export const getContactById = cache(async (contactId: string): Promise<ContactWi
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     const { data: contact, error } = await supabase
       .from('contacts')

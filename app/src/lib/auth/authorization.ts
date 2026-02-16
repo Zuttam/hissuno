@@ -4,7 +4,7 @@ import type { RequestIdentity } from './identity'
 import type { ProjectRole } from '@/types/project-members'
 import { hasProjectAccess, hasProjectRole } from './project-members'
 import { UnauthorizedError } from './server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 type DbClient = SupabaseClient<Database>
 
@@ -61,26 +61,18 @@ export async function assertProjectAccess(
 }
 
 /**
- * Get a user-scoped Supabase client for the given identity.
+ * Get a Supabase client for the given identity.
  *
  * For JWT users: returns the standard cookie-based client (RLS uses auth.uid()).
- * For API keys: returns the standard client as well — the proxy has already
- * verified the key and the route handler uses assertProjectAccess for authz.
- * Database queries go through RLS which will use the service_role policies
- * when operating with the admin client, or the user context for user clients.
- *
- * C2 fix: We never use createAdminClient() for API key requests in route handlers.
- * Instead, we use the service role only in the auth layer (api-keys.ts, project-members.ts).
+ * For API keys: returns the admin client — the proxy has already verified the key
+ * and the route handler uses assertProjectAccess for authz. API key requests have
+ * no JWT session, so the cookie-based client would fail auth checks.
  */
 export async function getClientForIdentity(identity: RequestIdentity): Promise<DbClient> {
   if (identity.type === 'user') {
     return createClient()
   }
 
-  // For API key requests, we create a standard server client.
-  // The RLS policies now use project_members, and the proxy + assertProjectAccess
-  // ensure the request is authorized. Route handlers should use the admin client
-  // from their service functions (which already do) for data operations.
-  return createClient()
+  return createAdminClient()
 }
 

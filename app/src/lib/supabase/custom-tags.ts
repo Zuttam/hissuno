@@ -1,6 +1,6 @@
 import { cache } from 'react'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
+import { createAdminClient, createRequestScopedClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
 import type { CustomTagRecord } from '@/types/session'
 
 const MAX_TAGS_PER_PROJECT = 10
@@ -15,20 +15,7 @@ export const listProjectCustomTags = cache(async (projectId: string): Promise<Cu
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError) {
-      console.error('[supabase.custom-tags] failed to resolve user for listProjectCustomTags', userError)
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    if (!user) {
-      throw new UnauthorizedError()
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
@@ -129,15 +116,7 @@ export async function syncCustomTags(
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError()
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase

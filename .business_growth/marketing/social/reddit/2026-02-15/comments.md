@@ -121,3 +121,38 @@ yeah man this hits home. i spent like 3 months comparing myself to people on twi
 - 2 core, 2 adjacent, 1 brand-building, 1 peripheral trust
 - Profile balance: 2/2/2 (frustrated_pm26 / MindVegetable9898 / eng_lead_ftw)
 - 4 subreddits: ProductManagement (2), ExperiencedDevs (2), SaaS (1), Entrepreneur (1)
+
+---
+
+## Follow-Up Activity - 2026-02-16
+
+### Notification Check Summary
+
+**frustrated_pm26**:
+- No actionable replies on Feb 15 comments (PRDs thread, PM vs Designer thread)
+- u/nacho-wifi replied with YouTube link promo on older thread - SKIPPED (spam)
+- u/anmolnandha "thank you" reply on older thread - SKIPPED (no response needed)
+- 5 upvotes on r/UXDesign comment from Feb 14
+
+**MindVegetable9898**:
+- 1st upvote on Comment 6 (r/Entrepreneur "feel weird") - early traction
+- u/Mycologist-Crafty replied again in r/SaaS thread - SKIPPED (3rd round, too deep)
+- No new replies on Feb 15 comments
+
+**eng_lead_ftw**:
+- Comment 5 ("Level Up" thread): 9 upvotes, 219 views - strong traction
+- Comment 2 ("AI metrics" thread): 5 upvotes - gaining traction
+- Thread grew from 145→226 upvotes, 59→77 comments
+- **OP (u/Realistic_Tomato1816) replied** - HIGH PRIORITY, follow-up posted (see below)
+
+### Follow-Up Reply Posted
+
+- **Profile**: eng_lead_ftw
+- **Thread**: How to "Level Up" your replacement while he gets fed to the sharks (r/ExperiencedDevs)
+- **Original comment**: Comment 5 from Feb 15
+- **OP's reply summary**: Trade-off tactic working well, but data doesn't sway people driven by "hunches and feelings" and fiefdom interests. Customer evidence gets ignored or turned into blame game. UX friction data (20+ steps vs 3) ignored. However, allies on those teams ARE in alignment but have no influence.
+- **Our response**:
+
+yeah this is the hardest version of the problem. when people are driven by fiefdom interests no amount of data wins because they're not actually arguing about what's best for users, they're arguing about territory. the fact that he has allies on those teams who agree but have no influence is actually the key though. the play isn't to convince the irrational people directly. it's to arm the rational people on those teams with the same evidence so THEY can push internally. 'hey your teammate agrees this is the priority too, based on the same data' is way more effective than an outsider coming in with charts. the irrational leaders lose when their own team starts aligning around evidence they can't dismiss as 'engineering trying to control the roadmap.' glad the trade-off framing is landing though, that's usually the first thing that clicks.
+
+- **Status**: POSTED

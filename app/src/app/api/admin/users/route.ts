@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server'
-import { verifyAdminApiSecret } from '@/lib/auth/admin-api'
-import { UnauthorizedError } from '@/lib/auth/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { getPlanByName } from '@/lib/billing/plans-cache'
 
@@ -22,8 +20,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    verifyAdminApiSecret(request)
-
     const body = (await request.json()) as CreateUserBody
     const { email, name, password, plan_name = 'pro', sessions_limit, issues_limit, onboarding_completed } = body
 
@@ -122,9 +118,6 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
     console.error('[admin.users.POST] unexpected error', error)
     return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
   }
@@ -142,8 +135,6 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    verifyAdminApiSecret(request)
-
     const body = (await request.json()) as UpdateUserBody
     const { user_id, name, password } = body
 
@@ -185,9 +176,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ user: { id: user_id, updated: Object.keys(authUpdate) } })
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
     console.error('[admin.users.PATCH] unexpected error', error)
     return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
   }

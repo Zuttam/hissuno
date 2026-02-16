@@ -6,9 +6,7 @@
  */
 
 import { createStep } from '@mastra/core/workflows'
-import { z } from 'zod'
 import {
-  sourceInputSchema,
   analyzeCodebaseOutputSchema,
   analyzeSourcesOutputSchema,
   type AnalysisResult,

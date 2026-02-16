@@ -1,6 +1,6 @@
 import { cache } from 'react'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, createAdminClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
+import { createClient, createAdminClient, createRequestScopedClient, isSupabaseConfigured, isServiceRoleConfigured } from './server'
 import { saveSessionMessage } from './session-messages'
 import { ensureSessionName, generateDefaultName } from '@/lib/sessions/name-generator'
 import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-notifications'
@@ -28,7 +28,8 @@ const selectSessionWithLinkedIssues = `
  * Looks up user_profiles by user_id for any session whose user_id is a valid UUID.
  */
 async function enrichSessionsWithUserProfiles(
-  sessions: SessionWithProject[]
+  sessions: SessionWithProject[],
+  supabaseClient?: Awaited<ReturnType<typeof createClient>>
 ): Promise<SessionWithProject[]> {
   if (sessions.length === 0) return sessions
 
@@ -41,7 +42,7 @@ async function enrichSessionsWithUserProfiles(
   if (uuidUserIds.length === 0) return sessions
 
   try {
-    const supabase = await createClient()
+    const supabase = supabaseClient ?? await createClient()
     const { data: profiles } = await supabase
       .from('user_profiles')
       .select('user_id, full_name')
@@ -170,19 +171,10 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const { supabase, apiKeyProjectId } = await createRequestScopedClient()
 
-    if (userError) {
-      console.error('[supabase.sessions] failed to resolve user for listSessions', userError)
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    if (!user) {
-      throw new UnauthorizedError()
+    if (apiKeyProjectId && !filters.projectId) {
+      throw new Error('API key requests must include a projectId filter.')
     }
 
     // Build query - join with projects to filter by user access
@@ -192,11 +184,9 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
       .order('last_activity_at', { ascending: false })
 
     // Filter to only projects accessible by this user (RLS handles membership)
-    const { data: userProjects } = await supabase
-      .from('projects')
-      .select('id')
-
-    const projectIds = userProjects?.map(p => p.id) ?? []
+    const projectIds = apiKeyProjectId
+      ? [apiKeyProjectId]
+      : (await supabase.from('projects').select('id')).data?.map(p => p.id) ?? []
 
     if (projectIds.length === 0) {
       return { sessions: [], total: 0 }
@@ -274,7 +264,7 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
       throw new Error('Unable to load sessions from Supabase.')
     }
 
-    const sessions = await enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[])
+    const sessions = await enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[], supabase)
     return { sessions, total: count ?? 0 }
   } catch (error) {
     console.error('[supabase.sessions] unexpected error listing sessions', error)
@@ -293,20 +283,7 @@ export const getSessionById = cache(async (sessionId: string): Promise<SessionWi
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError) {
-      console.error('[supabase.sessions] failed to resolve user for getSessionById', sessionId, userError)
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    if (!user) {
-      throw new UnauthorizedError()
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Get session with project info and linked issues
     const { data: session, error: sessionError } = await supabase
@@ -350,7 +327,7 @@ export const getSessionById = cache(async (sessionId: string): Promise<SessionWi
       issue_sessions: undefined,
     } as unknown as SessionWithProject
 
-    const [enriched] = await enrichSessionsWithUserProfiles([result])
+    const [enriched] = await enrichSessionsWithUserProfiles([result], supabase)
     return enriched
   } catch (error) {
     console.error('[supabase.sessions] unexpected error getting session', sessionId, error)
@@ -367,15 +344,7 @@ export const getProjectSessions = cache(async (projectId: string, limit = 5): Pr
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
@@ -400,7 +369,7 @@ export const getProjectSessions = cache(async (projectId: string, limit = 5): Pr
       throw new Error('Unable to load project sessions.')
     }
 
-    return enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[])
+    return enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[], supabase)
   } catch (error) {
     console.error('[supabase.sessions] unexpected error getting project sessions', projectId, error)
     throw error
@@ -464,17 +433,14 @@ export const getProjectIntegrationStats = cache(async (projectId: string): Promi
     return { lastActivityAt: null, isActive: false, hasAnySessions: false }
   }
 
+  let supabase, apiKeyProjectId
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    ({ supabase, apiKeyProjectId } = await createRequestScopedClient())
+  } catch {
+    return { lastActivityAt: null, isActive: false, hasAnySessions: false }
+  }
 
-    if (userError || !user) {
-      return { lastActivityAt: null, isActive: false, hasAnySessions: false }
-    }
-
+  try {
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
@@ -524,15 +490,7 @@ export async function createManualSession(input: CreateSessionInput): Promise<Se
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
@@ -621,15 +579,7 @@ export async function updateSessionArchiveStatus(
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Get session and verify ownership
     const { data: session } = await supabase
@@ -686,15 +636,7 @@ export async function updateSession(
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Get session and verify ownership
     const { data: session } = await supabase
@@ -819,17 +761,14 @@ export async function getPendingPMReviews(
     return { sessions: [], count: 0 }
   }
 
+  let supabase
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    ({ supabase } = await createRequestScopedClient())
+  } catch {
+    return { sessions: [], count: 0 }
+  }
 
-    if (userError || !user) {
-      return { sessions: [], count: 0 }
-    }
-
+  try {
     const { data, count, error } = await supabase
       .from('sessions')
       .select('id, name, user_id, user_metadata, source, message_count, created_at', { count: 'exact' })

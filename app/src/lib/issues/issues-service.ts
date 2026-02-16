@@ -14,7 +14,7 @@
  */
 
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { createRequestScopedClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import {
   insertIssue,
   updateIssueById,
@@ -144,15 +144,7 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
-  }
+  const { supabase } = await createRequestScopedClient()
 
   // Verify user owns the project
   const project = await verifyProjectAccess(supabase, input.project_id)
@@ -205,15 +197,7 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
-  }
+  const { supabase } = await createRequestScopedClient()
 
   // Verify user owns the project this issue belongs to
   const projectId = await getIssueProjectId(supabase, issueId)
@@ -257,15 +241,7 @@ export async function deleteIssue(issueId: string): Promise<boolean> {
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
-  }
+  const { supabase } = await createRequestScopedClient()
 
   // Verify user owns the project this issue belongs to
   const projectId = await getIssueProjectId(supabase, issueId)
@@ -293,15 +269,7 @@ export async function updateIssueArchiveStatus(
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
-  }
+  const { supabase } = await createRequestScopedClient()
 
   // Verify user owns the project this issue belongs to
   const projectId = await getIssueProjectId(supabase, issueId)

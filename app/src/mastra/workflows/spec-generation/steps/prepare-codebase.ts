@@ -14,7 +14,7 @@ export const prepareCodebase = createStep({
   description: 'Acquire codebase lease and sync if needed',
   inputSchema: workflowInputSchema,
   outputSchema: workflowContextWithCodebaseSchema,
-  execute: async ({ inputData, mastra, writer, runId }) => {
+  execute: async ({ inputData, mastra, writer }) => {
     if (!inputData) {
       throw new Error('Input data not found')
     }
