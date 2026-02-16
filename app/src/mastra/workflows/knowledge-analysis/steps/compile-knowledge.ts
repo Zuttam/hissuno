@@ -10,7 +10,7 @@
  */
 
 import { createStep } from '@mastra/core/workflows'
-import { analyzeSourcesOutputSchema, compiledKnowledgeSchema } from '../schemas'
+import { analyzeSourcesOutputSchema, compiledKnowledgeSchema, compiledKnowledgeContentSchema } from '../schemas'
 
 export const compileKnowledge = createStep({
   id: 'compile-knowledge',
@@ -104,7 +104,7 @@ For each category, provide a complete markdown document. Return the result as a 
           })
         },
         structuredOutput: {
-          schema: compiledKnowledgeSchema,
+          schema: compiledKnowledgeContentSchema,
         },
       })
 

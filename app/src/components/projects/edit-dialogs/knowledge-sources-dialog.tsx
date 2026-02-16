@@ -62,6 +62,7 @@ export function KnowledgeSourcesDialog({
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   // GitHub state
   const [githubStatus, setGithubStatus] = useState<GitHubStatus>({ connected: false })
@@ -196,6 +197,7 @@ export function KnowledgeSourcesDialog({
 
     setIsSaving(true)
     setError(null)
+    setSuccess(null)
 
     try {
       if (addingType === 'codebase') {
@@ -219,6 +221,7 @@ export function KnowledgeSourcesDialog({
 
         const data = await res.json()
         setSources(prev => [...prev.filter(s => s.type !== 'codebase'), data.source])
+        setSuccess('Codebase connected successfully.')
         cancelAdding()
         return
       }
@@ -253,6 +256,7 @@ export function KnowledgeSourcesDialog({
 
       const data = await res.json()
       setSources(prev => [...prev, data.source])
+      setSuccess('Knowledge source added successfully.')
       cancelAdding()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add source')
@@ -447,6 +451,7 @@ export function KnowledgeSourcesDialog({
     // Close edit mode if open
     cancelEditing()
     setAddingType(type)
+    setSuccess(null)
   }
 
   const isAddDisabled = () => {
@@ -595,6 +600,12 @@ export function KnowledgeSourcesDialog({
       error={error}
       size="xl"
     >
+      {success && (
+        <Alert variant="success" className="mb-4">
+          {success}
+        </Alert>
+      )}
+
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
           <span className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--foreground)] border-t-transparent" />

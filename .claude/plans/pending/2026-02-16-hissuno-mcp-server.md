@@ -15,10 +15,10 @@ V1 is read-only tools. V2 will add write operations (update issue status, create
 
 ## Two-Tier Auth -> Two Toolsets
 
-The server loads **different tools** based on the auth context. This is enforced at the server level — there is no parameter an agent can omit or spoof to escalate access.
+The server loads **different tools** based on the auth context. This is enforced at the server level — there is no parameter an agent can omit or spoof to escalate access. API keys are always project-scoped (no cross-tenant access).
 
-### Admin mode (Hissuno users)
-- **Auth**: `Authorization: Bearer hiss_*` (API key only)
+### User mode (Hissuno users)
+- **Auth**: `Authorization: Bearer hiss_*` (API key only — scoped to one project)
 - **Tools**: Full project access — `list_issues`, `get_issue`, `list_feedback`, `get_feedback`, `list_contacts`, `get_contact`, `search_knowledge`
 
 ### Contact mode (end users)
@@ -34,17 +34,17 @@ Request -> Extract API key -> resolveApiKey() -> get projectId
        -> Check X-Contact-Token header
        -> If present: verify JWT with project.secret_key -> resolve contact from email
            -> Register CONTACT tools (scoped to contact_id)
-       -> If absent: Register ADMIN tools (full project access)
+       -> If absent: Register USER tools (full project access)
 ```
 
 The Hissuno customer's backend generates the contact JWT (same as widget tokens) and passes it to whatever agent framework they use. This means:
-- Hissuno user in Claude Desktop: just API key -> admin tools
-- Hissuno support agent on Slack/widget: admin API key -> admin tools (agent handles data scoping server-side, filtering by contact)
+- Hissuno user in Claude Desktop: just API key -> user tools (scoped to their project)
+- Hissuno support agent on Slack/widget: API key -> user tools (agent handles data scoping server-side, filtering by contact)
 - End user via third-party agent: API key + contact JWT -> contact tools only
 
-### Why admin mode for Slack
+### Why user mode for Slack
 
-The Slack support agent is trusted server-side code. It knows the end user's identity from Slack (resolved to email). It uses admin tools with contact filtering (e.g., `list_feedback` with `contact_id` param) and controls what data reaches the end user. No JWT needed because the agent — not the end user — is the MCP consumer.
+The Slack support agent is trusted server-side code. It knows the end user's identity from Slack (resolved to email). It uses user tools with contact filtering (e.g., `list_feedback` with `contact_id` param) and controls what data reaches the end user. No JWT needed because the agent — not the end user — is the MCP consumer.
 
 ## Architecture
 
@@ -71,7 +71,7 @@ The existing query functions (`listIssues`, `listSessions`, etc.) use React's `c
 ### Context passing via AsyncLocalStorage
 
 Auth context is passed to tool handlers via Node.js `AsyncLocalStorage`:
-- Admin mode: `{ mode: 'admin', projectId, keyId, createdByUserId }`
+- User mode: `{ mode: 'user', projectId, keyId, createdByUserId }`
 - Contact mode: `{ mode: 'contact', projectId, keyId, createdByUserId, contactId, contactEmail }`
 
 ## File Structure
@@ -82,8 +82,8 @@ app/src/mcp/
   auth.ts                # API key + JWT verification, mode resolution
   context.ts             # AsyncLocalStorage for McpContext
   tools/
-    index.ts             # registerAdminTools() + registerContactTools()
-    admin/
+    index.ts             # registerUserTools() + registerContactTools()
+    user/
       list-issues.ts
       get-issue.ts
       list-feedback.ts
@@ -106,7 +106,7 @@ app/tsconfig.mcp.json    # Extends base tsconfig for tsx path aliases
 
 ## V1 Tools
 
-### Admin tools (7)
+### User tools (7)
 
 | Tool | Params | Description |
 |------|--------|-------------|
@@ -165,7 +165,7 @@ Default port: `3100` (configurable via `MCP_PORT` env var).
 - Verify `tsx` resolves `@/*` path aliases
 
 ### Step 2: Core infrastructure
-- `app/src/mcp/context.ts` — `McpContext` union type (admin | contact) + `AsyncLocalStorage` helpers
+- `app/src/mcp/context.ts` — `McpContext` union type (user | contact) + `AsyncLocalStorage` helpers
 - `app/src/mcp/auth.ts` — `authenticateRequest(req)` resolves API key + optional JWT -> returns `McpContext`
   - Fetches `project.secret_key` to verify JWT
   - Resolves contact from `userMetadata.email` in the JWT payload
@@ -177,13 +177,13 @@ Default port: `3100` (configurable via `MCP_PORT` env var).
 - `app/src/mcp/data/contacts.ts` — contact queries
 
 ### Step 4: Tool definitions
-- `app/src/mcp/tools/admin/*.ts` — 7 admin tools
+- `app/src/mcp/tools/user/*.ts` — 7 user tools
 - `app/src/mcp/tools/contact/*.ts` — 4 contact tools
-- `app/src/mcp/tools/index.ts` — `registerAdminTools(server)` + `registerContactTools(server)`
+- `app/src/mcp/tools/index.ts` — `registerUserTools(server)` + `registerContactTools(server)`
 
 ### Step 5: Server entry point
 - `app/src/mcp/server.ts` — HTTP server with:
-  - Auth middleware that determines mode (admin vs contact)
+  - Auth middleware that determines mode (user vs contact)
   - Creates the appropriate McpServer with the correct toolset
   - Body parsing, MCP transport wiring
   - Health check at `GET /health`
@@ -200,9 +200,9 @@ Default port: `3100` (configurable via `MCP_PORT` env var).
 1. **Start server**: `cd app && npm run mcp:dev`
 2. **Health check**: `curl http://localhost:3100/health` -> `{"status":"ok"}`
 3. **Auth rejection**: `curl -X POST http://localhost:3100/mcp` -> 401
-4. **Admin tools**: API key only -> `tools/list` returns 7 admin tools
+4. **User tools**: API key only -> `tools/list` returns 7 user tools
 5. **Contact tools**: API key + contact JWT -> `tools/list` returns 4 contact tools
-6. **Admin execution**: `list_issues` returns all project issues
+6. **User execution**: `list_issues` returns all project issues
 7. **Contact execution**: `my_issues` returns only the contact's issues
 8. **Contact isolation**: Contact mode has no way to access other contacts' data (no tools for it)
 9. **Claude Desktop**: Configure MCP client, verify tool discovery and execution

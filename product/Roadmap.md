@@ -146,12 +146,11 @@
 ### Support
 [] Add Hissuno MCP to Support agent  
 
-
 ### Platform
 [x] Project multi-users access and RBAC
 [x] Add dimension of analyzed issues 
+[x] Fix API Access - support api keys
 
-[] Fix API Access - support api keys and move cron to rely on admin api key value (change env var)
 [] MCP Access
 [] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
 

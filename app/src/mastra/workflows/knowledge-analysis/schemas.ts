@@ -86,6 +86,17 @@ export const analyzeSourcesOutputSchema = z.object({
 
 export type AnalyzeSourcesOutput = z.infer<typeof analyzeSourcesOutputSchema>
 
+/** Schema for AI-generated knowledge content only (used for structured output) */
+export const compiledKnowledgeContentSchema = z.object({
+  business: z.string(),
+  product: z.string(),
+  technical: z.string(),
+  faq: z.string(),
+  how_to: z.string(),
+})
+
+export type CompiledKnowledgeContent = z.infer<typeof compiledKnowledgeContentSchema>
+
 export const compiledKnowledgeSchema = z.object({
   projectId: z.string(),
   namedPackageId: z.string().nullable().optional(),
