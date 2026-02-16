@@ -25,7 +25,7 @@ export function EditDialog({
   isSaving = false,
   saveLabel = 'Save',
   cancelLabel = 'Cancel',
-  size = '2xl',
+  size = 'xxl',
   error,
 }: EditDialogProps) {
   const handleSave = async () => {

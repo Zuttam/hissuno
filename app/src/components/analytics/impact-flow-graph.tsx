@@ -7,13 +7,19 @@ import type {
   ImpactFlowGraphData,
   FlowGraphNode,
   FlowGraphLink,
+  CustomerSegmentationAnalytics,
 } from '@/lib/supabase/analytics'
+
+type CompanyFlowData = CustomerSegmentationAnalytics['companyImpactFlow']
+
+type ViewMode = 'source' | 'company'
 
 interface ImpactFlowGraphProps {
   data: ImpactFlowGraphData | null
   isLoading?: boolean
   error?: string | null
   projectId?: string
+  companyFlowData?: CompanyFlowData | null
 }
 
 const STATUS_LEGEND = [
@@ -24,8 +30,9 @@ const STATUS_LEGEND = [
   { status: 'closed', label: 'Closed', color: 'var(--accent-primary)' },
 ]
 
-export function ImpactFlowGraph({ data, isLoading, error, projectId }: ImpactFlowGraphProps) {
+export function ImpactFlowGraph({ data, isLoading, error, projectId, companyFlowData }: ImpactFlowGraphProps) {
   const [expandedUsers, setExpandedUsers] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('source')
 
   const handleNodeClick = useCallback((node: FlowGraphNode) => {
     if (node.expandable && node.id.includes('user')) {
@@ -33,8 +40,8 @@ export function ImpactFlowGraph({ data, isLoading, error, projectId }: ImpactFlo
     }
   }, [])
 
-  // Build expanded graph data when users are expanded
-  const graphData = useMemo(() => {
+  // Build expanded graph data when users are expanded (source view)
+  const sourceGraphData = useMemo(() => {
     if (!data) return { nodes: [], links: [] }
 
     if (!expandedUsers) {
@@ -83,7 +90,6 @@ export function ImpactFlowGraph({ data, isLoading, error, projectId }: ImpactFlo
     }
 
     // Add issue nodes
-    const issueNodeStartIdx = nodes.length
     const issueNodes = data.nodes.filter((n) => n.category === 'issue')
     issueNodes.forEach((node) => nodes.push({ ...node }))
 
@@ -161,6 +167,17 @@ export function ImpactFlowGraph({ data, isLoading, error, projectId }: ImpactFlo
     return { nodes, links }
   }, [data, expandedUsers])
 
+  // Company view graph data
+  const companyGraphData = useMemo(() => {
+    if (!companyFlowData || companyFlowData.nodes.length === 0) {
+      return { nodes: [], links: [] }
+    }
+    return { nodes: companyFlowData.nodes, links: companyFlowData.links }
+  }, [companyFlowData])
+
+  const activeGraphData = viewMode === 'company' ? companyGraphData : sourceGraphData
+  const activeTotals = viewMode === 'company' ? companyFlowData?.totals : data?.totals
+
   if (isLoading) {
     return (
       <div className="flex h-[350px] items-center justify-center">
@@ -187,7 +204,7 @@ export function ImpactFlowGraph({ data, isLoading, error, projectId }: ImpactFlo
 
   return (
     <div className="space-y-4">
-      {/* Legend */}
+      {/* Legend + View Toggle */}
       <div className="flex flex-wrap items-center gap-4">
         <span className="font-mono text-xs uppercase text-[color:var(--text-secondary)]">
           Issue Status:
@@ -203,38 +220,63 @@ export function ImpactFlowGraph({ data, isLoading, error, projectId }: ImpactFlo
             </span>
           </div>
         ))}
+
+        {companyFlowData && companyFlowData.nodes.length > 0 && (
+          <div className="ml-auto flex items-center gap-1 rounded-[4px] border border-[color:var(--border-subtle)] p-0.5">
+            <button
+              onClick={() => setViewMode('source')}
+              className={`rounded-[3px] px-2.5 py-1 font-mono text-xs transition-colors ${
+                viewMode === 'source'
+                  ? 'bg-[color:var(--accent-selected)] text-white'
+                  : 'text-[color:var(--text-secondary)] hover:text-[color:var(--foreground)]'
+              }`}
+            >
+              By Source
+            </button>
+            <button
+              onClick={() => setViewMode('company')}
+              className={`rounded-[3px] px-2.5 py-1 font-mono text-xs transition-colors ${
+                viewMode === 'company'
+                  ? 'bg-[color:var(--accent-selected)] text-white'
+                  : 'text-[color:var(--text-secondary)] hover:text-[color:var(--foreground)]'
+              }`}
+            >
+              By Company
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Chart */}
       <SankeyChart
-        data={graphData}
-        height={expandedUsers ? 450 : 350}
-        onNodeClick={handleNodeClick}
-        tooltipData={data.tooltipData}
+        data={activeGraphData}
+        height={expandedUsers && viewMode === 'source' ? 450 : 350}
+        onNodeClick={viewMode === 'source' ? handleNodeClick : undefined}
+        tooltipData={viewMode === 'source' ? data.tooltipData : undefined}
         projectId={projectId}
       />
 
       {/* Summary Stats */}
       <div className="flex items-center gap-6 border-t border-[color:var(--border-subtle)] pt-4">
         <div className="font-mono text-sm">
-          <span className="text-[color:var(--text-secondary)]">Sessions: </span>
+          <span className="text-[color:var(--text-secondary)]">Feedback: </span>
           <span className="font-semibold text-[color:var(--foreground)]">
-            {data.totals.sessions.toLocaleString()}
+            {(activeTotals?.sessions ?? 0).toLocaleString()}
           </span>
         </div>
         <div className="font-mono text-sm">
           <span className="text-[color:var(--text-secondary)]">Issues: </span>
           <span className="font-semibold text-[color:var(--foreground)]">
-            {data.totals.issues.toLocaleString()}
+            {(activeTotals?.issues ?? 0).toLocaleString()}
           </span>
         </div>
         <div className="font-mono text-sm">
           <span className="text-[color:var(--text-secondary)]">Conversion: </span>
           <span className="font-semibold text-[color:var(--foreground)]">
-            {data.totals.conversionRate}%
+            {activeTotals?.conversionRate ?? 0}%
           </span>
         </div>
-        {data.users.length > 0 && (
+        {viewMode === 'source' && data.users.length > 0 && (
           <button
             onClick={() => setExpandedUsers((prev) => !prev)}
             className="ml-auto font-mono text-xs text-[color:var(--accent-selected)] hover:underline"

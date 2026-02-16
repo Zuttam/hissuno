@@ -237,7 +237,7 @@ export default function ProjectCustomersPage() {
               Settings
             </Button>
             <Button variant="primary" size="md" onClick={() => setShowAddDataDialog(true)}>
-              Add Data
+              Add Customers
             </Button>
           </>
         }

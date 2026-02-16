@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils/class'
 
 interface KeyFieldProps {
   label: string
+  labelTooltip?: string
   value: string
   description?: string
   descriptionVariant?: 'default' | 'warning' | 'success'
@@ -16,6 +17,7 @@ interface KeyFieldProps {
 
 export function KeyField({
   label,
+  labelTooltip,
   value,
   description,
   descriptionVariant = 'default',
@@ -53,8 +55,9 @@ export function KeyField({
   if (compact) {
     return (
       <div className={cn('flex items-center gap-2 min-w-0 max-w-full', className)}>
-        <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)] flex-shrink-0">
+        <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)] flex-shrink-0 inline-flex items-center gap-1">
           {label}:
+          {labelTooltip && <InfoIcon className="h-3.5 w-3.5 text-[color:var(--text-tertiary)]" title={labelTooltip} />}
         </span>
         <code className="font-mono text-xs text-[color:var(--foreground)] truncate min-w-0">
           {displayValue}
@@ -95,8 +98,9 @@ export function KeyField({
   return (
     <div className={cn('space-y-1', className)}>
       <div className="flex items-center justify-between">
-        <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+        <span className="text-xs uppercase tracking-wide text-[color:var(--text-secondary)] inline-flex items-center gap-1">
           {label}
+          {labelTooltip && <InfoIcon className="h-4 w-4 text-[color:var(--text-tertiary)]" title={labelTooltip} />}
         </span>
         {description && (
           <span className={cn('text-xs', descriptionColorClass)}>
@@ -197,6 +201,25 @@ function CopyIcon({ className }: { className?: string }) {
       <path d="M7 3.5A1.5 1.5 0 018.5 2h3.879a1.5 1.5 0 011.06.44l3.122 3.12A1.5 1.5 0 0117 6.622V12.5a1.5 1.5 0 01-1.5 1.5h-1v-3.379a3 3 0 00-.879-2.121L10.5 5.379A3 3 0 008.379 4.5H7v-1z" />
       <path d="M4.5 6A1.5 1.5 0 003 7.5v9A1.5 1.5 0 004.5 18h7a1.5 1.5 0 001.5-1.5v-5.879a1.5 1.5 0 00-.44-1.06L9.44 6.439A1.5 1.5 0 008.378 6H4.5z" />
     </svg>
+  )
+}
+
+function InfoIcon({ className, title }: { className?: string; title?: string }) {
+  return (
+    <span title={title} className="inline-flex">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        className={className}
+      >
+        <path
+          fillRule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z"
+          clipRule="evenodd"
+        />
+      </svg>
+    </span>
   )
 }
 

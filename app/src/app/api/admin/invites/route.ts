@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server'
-import { verifyAdminApiSecret } from '@/lib/auth/admin-api'
-import { UnauthorizedError } from '@/lib/auth/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { generateInviteCode } from '@/lib/invites/invite-service'
 
@@ -25,8 +23,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    verifyAdminApiSecret(request)
-
     const body = (await request.json()) as AddInvitesBody
     const { count = 1, promotion_code, promotion_description, user_id, email, filter } = body
 
@@ -153,9 +149,6 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
     console.error('[admin.invites.POST] unexpected error', error)
     return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
   }

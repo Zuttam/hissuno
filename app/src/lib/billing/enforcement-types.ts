@@ -10,11 +10,11 @@
  * Limit dimension identifiers
  *
  * - 'analyzed_sessions': Sessions that have been PM reviewed (pm_reviewed_at IS NOT NULL)
- * - 'projects': Total projects owned by user
+ * - 'analyzed_issues': Issues that have been analyzed (analysis_computed_at IS NOT NULL)
  *
- * Add new dimensions here as needed (e.g., 'issues', 'team_members')
+ * Add new dimensions here as needed (e.g., 'team_members')
  */
-export type LimitDimension = 'analyzed_sessions' | 'projects'
+export type LimitDimension = 'analyzed_sessions' | 'analyzed_issues'
 
 /**
  * Result of an enforcement check

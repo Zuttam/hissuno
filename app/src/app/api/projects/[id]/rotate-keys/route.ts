@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 
@@ -9,20 +10,6 @@ type RouteParams = { id: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -55,9 +42,9 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, id)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, id, { requiredRole: 'owner' })
+    const supabase = await createClient()
 
     // Generate new secret key
     const { data: newSecretKey, error: secError } = await supabase.rpc('generate_project_key', {
@@ -75,7 +62,6 @@ export async function POST(request: Request, context: RouteContext) {
       .from('projects')
       .update({ secret_key: newSecretKey })
       .eq('id', id)
-      .eq('user_id', user.id)
 
     if (updateError) {
       console.error('[projects.rotate-keys] failed to update project', id, updateError)
@@ -87,7 +73,6 @@ export async function POST(request: Request, context: RouteContext) {
       .from('projects')
       .select('*, source_code:source_codes(*)')
       .eq('id', id)
-      .eq('user_id', user.id)
       .single()
 
     if (fetchError) {
@@ -101,6 +86,9 @@ export async function POST(request: Request, context: RouteContext) {
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 

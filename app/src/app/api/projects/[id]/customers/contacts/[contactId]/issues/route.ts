@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { getContactLinkedIssues } from '@/lib/supabase/contacts'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
@@ -19,25 +20,19 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { id: projectId } = await context.params
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser()
+    const { id: projectId, contactId } = await context.params
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
-    if (error || !user) {
-      throw new UnauthorizedError('User not authenticated')
-    }
-
-    await assertUserOwnsProject(supabase, projectId, user.id)
-
-    const issues = await getContactLinkedIssues(await context.params.then((p) => p.contactId))
+    const issues = await getContactLinkedIssues(contactId)
 
     return NextResponse.json({ issues })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[api.contacts.issues.GET] unexpected error', error)
     return NextResponse.json({ error: 'Failed to fetch contact issues.' }, { status: 500 })

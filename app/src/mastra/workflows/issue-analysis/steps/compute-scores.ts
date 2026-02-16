@@ -33,7 +33,7 @@ export const computeScores = createStep({
 
     const {
       issueId, projectId, issue, sessions, sessionTimestamps,
-      technicalImpactScore, technicalImpactReasoning,
+      technicalImpactScore,
       technicalEffortEstimate, technicalEffortReasoning,
       technicalAffectedFiles, technicalAffectedAreas,
       codebaseLeaseId,

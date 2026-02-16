@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { downloadKnowledgePackage, uploadKnowledgePackage } from '@/lib/knowledge/storage'
@@ -14,20 +15,6 @@ type RouteContext = {
 }
 
 const VALID_CATEGORIES: KnowledgeCategory[] = ['business', 'product', 'technical', 'faq', 'how_to']
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
 
 /**
  * GET /api/projects/[id]/knowledge/packages/[packageId]/content/[category]
@@ -46,9 +33,9 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     // Verify package exists and belongs to project
     const { data: pkg, error: pkgError } = await supabase
@@ -99,6 +86,9 @@ export async function GET(_request: Request, context: RouteContext) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
 
     console.error('[knowledge-content.get] unexpected error', error)
     return NextResponse.json({ error: 'Failed to load content.' }, { status: 500 })
@@ -125,9 +115,9 @@ export async function PUT(request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     // Verify package exists and belongs to project
     const { data: pkg, error: pkgError } = await supabase
@@ -212,6 +202,9 @@ export async function PUT(request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[knowledge-content.put] unexpected error', error)

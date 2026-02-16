@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getIssueById } from '@/lib/supabase/issues'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
@@ -11,20 +12,6 @@ type RouteParams = { id: string; issueId: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -40,9 +27,8 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Verify the issue belongs to this project
     const existingIssue = await getIssueById(issueId)
@@ -50,6 +36,7 @@ export async function POST(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Issue not found.' }, { status: 404 })
     }
 
+    const supabase = await createClient()
     const result = await cancelIssueAnalysis({ issueId, supabase })
 
     if (!result.success) {
@@ -68,6 +55,9 @@ export async function POST(_request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[analyze.cancel] unexpected error', error)

@@ -5,11 +5,10 @@ import { Dialog, MarkdownContent } from '@/components/ui'
 
 interface ProductSpecViewProps {
   spec: string
-  generatedAt: string | null
   issueTitle?: string
 }
 
-export function ProductSpecView({ spec, generatedAt, issueTitle }: ProductSpecViewProps) {
+export function ProductSpecView({ spec, issueTitle }: ProductSpecViewProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -35,13 +34,7 @@ export function ProductSpecView({ spec, generatedAt, issueTitle }: ProductSpecVi
   }
 
   return (
-    <div className="space-y-2">
-      {generatedAt && (
-        <p className="text-xs text-[color:var(--text-secondary)]">
-          Generated {formatDateTime(generatedAt)}
-        </p>
-      )}
-
+    <div className="flex flex-col gap-2 py-2">
       <div
         className={`relative overflow-hidden rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] ${
           isExpanded ? '' : 'max-h-96'
@@ -171,7 +164,7 @@ function SpecDialog({ open, onClose, spec, issueTitle }: SpecDialogProps) {
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Product Specification" size="2xl">
+    <Dialog open={open} onClose={onClose} title="Product Specification" size="xxl">
       <div className="flex justify-end gap-2 border-b border-[color:var(--border-subtle)] pb-3 mb-4">
         <button
           type="button"

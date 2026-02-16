@@ -14,7 +14,7 @@
  */
 
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { createRequestScopedClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import {
   insertIssue,
   updateIssueById,
@@ -25,7 +25,7 @@ import {
   getIssueForUpvote,
   getIssueForEmbedding,
   updateIssueArchiveStatusById,
-  verifyProjectOwnership,
+  verifyProjectAccess,
   getIssueProjectId,
   type InsertIssueData,
 } from '@/lib/supabase/issues'
@@ -144,18 +144,10 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
-  }
+  const { supabase } = await createRequestScopedClient()
 
   // Verify user owns the project
-  const project = await verifyProjectOwnership(supabase, input.project_id, user.id)
+  const project = await verifyProjectAccess(supabase, input.project_id)
   if (!project) {
     throw new UnauthorizedError('You do not have permission to create issues for this project.')
   }
@@ -205,15 +197,7 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
-  }
+  const { supabase } = await createRequestScopedClient()
 
   // Verify user owns the project this issue belongs to
   const projectId = await getIssueProjectId(supabase, issueId)
@@ -221,7 +205,7 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
     throw new Error('Issue not found.')
   }
 
-  const project = await verifyProjectOwnership(supabase, projectId, user.id)
+  const project = await verifyProjectAccess(supabase, projectId)
   if (!project) {
     throw new UnauthorizedError('You do not have permission to update this issue.')
   }
@@ -257,15 +241,7 @@ export async function deleteIssue(issueId: string): Promise<boolean> {
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
-  }
+  const { supabase } = await createRequestScopedClient()
 
   // Verify user owns the project this issue belongs to
   const projectId = await getIssueProjectId(supabase, issueId)
@@ -273,7 +249,7 @@ export async function deleteIssue(issueId: string): Promise<boolean> {
     return false // Issue not found
   }
 
-  const project = await verifyProjectOwnership(supabase, projectId, user.id)
+  const project = await verifyProjectAccess(supabase, projectId)
   if (!project) {
     throw new UnauthorizedError('You do not have permission to delete this issue.')
   }
@@ -293,15 +269,7 @@ export async function updateIssueArchiveStatus(
     throw new Error('Supabase must be configured.')
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-
-  if (userError || !user) {
-    throw new UnauthorizedError('Unable to resolve user context.')
-  }
+  const { supabase } = await createRequestScopedClient()
 
   // Verify user owns the project this issue belongs to
   const projectId = await getIssueProjectId(supabase, issueId)
@@ -309,7 +277,7 @@ export async function updateIssueArchiveStatus(
     throw new Error('Issue not found.')
   }
 
-  const project = await verifyProjectOwnership(supabase, projectId, user.id)
+  const project = await verifyProjectAccess(supabase, projectId)
   if (!project) {
     throw new UnauthorizedError('You do not have permission to update this issue.')
   }

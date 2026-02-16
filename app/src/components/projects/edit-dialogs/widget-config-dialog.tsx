@@ -265,6 +265,7 @@ import '@hissuno/widget/styles.css';
             <KeyField label="Project ID" value={projectId} compact />
             <KeyField
               label="Secret Key"
+              labelTooltip="Used to sign JWT tokens that verify end-user identity in the widget. Your backend signs tokens with this key, and the widget sends them to authenticate users. This is not an API key — for programmatic API access, use project API keys in the Access tab."
               value={secretKey ?? 'Not generated'}
               disabled={!secretKey}
               isSecret

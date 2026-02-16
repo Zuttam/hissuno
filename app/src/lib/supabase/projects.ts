@@ -33,7 +33,6 @@ export const listProjects = cache(async (): Promise<ProjectRecord[]> => {
     const { data, error } = await supabase
       .from('projects')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -73,7 +72,6 @@ export const getProjectById = cache(async (projectId: string): Promise<ProjectRe
       .from('projects')
       .select('*')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (error) {
@@ -119,7 +117,6 @@ export async function updateProjectMetadata(
       .from('projects')
       .update(updates)
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .select()
       .single()
 

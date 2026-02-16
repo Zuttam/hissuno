@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { manualRetrySync } from '@/lib/integrations/jira/sync'
 
@@ -19,34 +21,17 @@ export async function POST(
 
   try {
     const { id: projectId, issueId } = await params
-
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      throw new UnauthorizedError('User not authenticated')
-    }
-
-    // Verify project ownership
-    const { data: project } = await supabase
-      .from('projects')
-      .select('id, user_id')
-      .eq('id', projectId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (!project) {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    }
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const result = await manualRetrySync(issueId)
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: error.message }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[issues.jira-sync] unexpected error', error)
     return NextResponse.json({ error: 'Failed to retry Jira sync.' }, { status: 500 })

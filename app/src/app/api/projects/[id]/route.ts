@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { updateGitHubCodebase, cleanupRepository } from '@/lib/codebase'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
@@ -12,20 +13,6 @@ type RouteContext = {
   params: Promise<RouteParams>
 }
 
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
-
 export async function GET(_request: Request, context: RouteContext) {
   const { id } = await context.params
 
@@ -35,12 +22,14 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, id)
+    const supabase = await createClient()
+
     const { data, error } = await supabase
       .from('projects')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
       .single()
 
     if (error) {
@@ -60,6 +49,9 @@ export async function GET(_request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[projects.id.get] unexpected error', error)
@@ -119,16 +111,16 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, id)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, id, { requiredRole: 'owner' })
+    const supabase = await createClient()
+    const actingUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
     // Get the current project
     const { data: currentProject, error: fetchError } = await supabase
       .from('projects')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
       .single()
 
     if (fetchError || !currentProject) {
@@ -154,7 +146,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           await updateGitHubCodebase(
             supabase,
             sourceCode.id,
-            user.id,
+            actingUserId,
             { repositoryUrl, repositoryBranch }
           )
         }
@@ -167,7 +159,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         .from('projects')
         .update(projectUpdates)
         .eq('id', id)
-        .eq('user_id', user.id)
 
       if (updateError) {
         console.error('[projects.id.patch] failed to update project', id, updateError)
@@ -180,7 +171,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       .from('projects')
       .select('*')
       .eq('id', id)
-      .eq('user_id', user.id)
       .single()
 
     if (error) {
@@ -191,6 +181,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ project: data })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
@@ -208,9 +201,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, id)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, id, { requiredRole: 'owner' })
+    const supabase = await createClient()
 
     // Get the codebase knowledge_source with source_code to clean up storage
     const { data: codebaseSource } = await supabase
@@ -227,7 +220,6 @@ export async function DELETE(_request: Request, context: RouteContext) {
       .from('projects')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id)
 
     if (deleteError) {
       console.error('[projects.id.delete] failed to delete project', id, deleteError)
@@ -242,6 +234,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
       return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 

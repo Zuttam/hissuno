@@ -6,7 +6,6 @@
  */
 
 import { createScorer } from '@mastra/core/scores'
-import { z } from 'zod'
 import type { ExpectedClassification } from '../datasets/types'
 
 /**

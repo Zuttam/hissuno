@@ -61,13 +61,19 @@ export function OnboardingWizard() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [hasTrackedSignup, setHasTrackedSignup] = useState(false)
 
+  // Invited user detection: user has projects but hasn't completed onboarding
+  const [invitedProjectId, setInvitedProjectId] = useState<string | null>(null)
+
   // Reveal state — persisted to localStorage
   const [revealedSteps, setRevealedSteps] = useState<Set<OnboardingStepId>>(() => loadRevealedSteps())
 
-  // Get onboarding steps
+  // Get onboarding steps — shortened for invited users
   const steps: StepDefinition[] = useMemo(() => {
+    if (invitedProjectId) {
+      return getStepsForFlow(['account', 'about'])
+    }
     return getStepsForFlow()
-  }, [])
+  }, [invitedProjectId])
 
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
 
@@ -107,6 +113,16 @@ export function OnboardingWizard() {
         const response = await fetch('/api/user/profile')
         const data = await response.json()
 
+        // Check if user already has projects (invited user)
+        let userProjects: { id: string }[] = []
+        try {
+          const projectsResponse = await fetch('/api/projects')
+          const projectsData = await projectsResponse.json()
+          userProjects = projectsData.projects ?? []
+        } catch {
+          // Ignore - will proceed with normal onboarding
+        }
+
         if (data.profile) {
           setFormData((prev) => ({
             ...prev,
@@ -122,29 +138,38 @@ export function OnboardingWizard() {
             },
           }))
 
-          // Restore saved step (only if not returning from checkout)
-          let savedStepId = data.profile.onboarding_current_step as string | null
-          const isCheckoutReturn = searchParams.get('checkout') === 'success'
+          // Detect invited user: has projects but hasn't completed onboarding
+          if (userProjects.length > 0 && !data.profile.onboarding_completed) {
+            setInvitedProjectId(userProjects[0].id)
+            // Skip step restoration for invited users - they start from step 0
+          } else {
+            // Restore saved step (only if not returning from checkout)
+            let savedStepId = data.profile.onboarding_current_step as string | null
+            const isCheckoutReturn = searchParams.get('checkout') === 'success'
 
-          // Map legacy 'personalize' step to 'project'
-          if (savedStepId === 'personalize') {
-            savedStepId = 'project'
-          }
+            // Map legacy 'personalize' step to 'project'
+            if (savedStepId === 'personalize') {
+              savedStepId = 'project'
+            }
 
-          if (savedStepId && !isCheckoutReturn) {
-            const stepsForFlow = getStepsForFlow()
-            const savedIndex = stepsForFlow.findIndex((s) => s.id === savedStepId)
-            if (savedIndex >= 0) {
-              setCurrentStepIndex(savedIndex)
-            }
-          } else if (isCheckoutReturn) {
-            // Go to billing step on checkout return
-            const stepsForFlow = getStepsForFlow()
-            const billingIndex = stepsForFlow.findIndex((s) => s.id === 'billing')
-            if (billingIndex >= 0) {
-              setCurrentStepIndex(billingIndex)
+            if (savedStepId && !isCheckoutReturn) {
+              const stepsForFlow = getStepsForFlow()
+              const savedIndex = stepsForFlow.findIndex((s) => s.id === savedStepId)
+              if (savedIndex >= 0) {
+                setCurrentStepIndex(savedIndex)
+              }
+            } else if (isCheckoutReturn) {
+              // Go to billing step on checkout return
+              const stepsForFlow = getStepsForFlow()
+              const billingIndex = stepsForFlow.findIndex((s) => s.id === 'billing')
+              if (billingIndex >= 0) {
+                setCurrentStepIndex(billingIndex)
+              }
             }
           }
+        } else if (userProjects.length > 0) {
+          // No profile yet but has projects (edge case) - still an invited user
+          setInvitedProjectId(userProjects[0].id)
         }
       } catch (err) {
         console.error('[onboarding] Failed to load profile:', err)
@@ -261,9 +286,42 @@ export function OnboardingWizard() {
     setPhase('profile')
     setError(null)
 
-    const isDemoMode = formData.project.projectMode === 'demo'
-
     try {
+      // Invited user flow: skip billing & project creation
+      if (invitedProjectId) {
+        const profileResponse = await fetch('/api/user/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: formData.profile.fullName,
+            companyName: formData.profile.companyName,
+            role: formData.profile.role,
+            companySize: formData.profile.companySize || null,
+            communicationChannels: formData.about?.selectedChannels ?? [],
+            onboardingCompleted: true,
+            onboardingCurrentStep: null,
+            billingSkipped: true,
+          }),
+        })
+
+        if (!profileResponse.ok) {
+          throw new Error('Failed to save profile')
+        }
+
+        const utm = getStoredUTM()
+        trackOnboardingCompleted({
+          selectedChannels: formData.about?.selectedChannels ?? [],
+          utm: utm ?? undefined,
+        })
+        clearStoredUTM()
+
+        setPhase('redirecting')
+        localStorage.removeItem(REVEALED_STEPS_KEY)
+        router.push(`/projects/${invitedProjectId}/dashboard`)
+        return
+      }
+
+      // Normal flow
       // 1. Save profile with channels, clear current step
       const profileResponse = await fetch('/api/user/profile', {
         method: 'POST',
@@ -292,6 +350,8 @@ export function OnboardingWizard() {
 
       // 3. Clear stored UTM after successful onboarding
       clearStoredUTM()
+
+      const isDemoMode = formData.project.projectMode === 'demo'
 
       if (isDemoMode) {
         // Demo flow: create demo project via dedicated endpoint
@@ -365,7 +425,7 @@ export function OnboardingWizard() {
       setIsSubmitting(false)
       setPhase('idle')
     }
-  }, [formData, steps, router])
+  }, [formData, steps, router, invitedProjectId])
 
   // Compute the furthest step the user can reach by validating forward from current
   const maxReachableStep = useMemo(() => {
@@ -390,7 +450,7 @@ export function OnboardingWizard() {
   )
 
   // Get button labels
-  const submitLabel = 'Get Started'
+  const submitLabel = invitedProjectId ? 'Join Project' : 'Get Started'
   const submittingLabel =
     phase === 'profile'
       ? 'Saving...'

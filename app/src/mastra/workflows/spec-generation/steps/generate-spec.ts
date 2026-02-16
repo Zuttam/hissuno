@@ -28,8 +28,6 @@ export const generateSpec = createStep({
       linkedSessions,
       knowledgeContext,
       localCodePath,
-      codebaseLeaseId,
-      codebaseCommitSha,
       specGuidelines,
     } = inputData
 

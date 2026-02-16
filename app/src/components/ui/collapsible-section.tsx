@@ -5,7 +5,7 @@ import { forwardRef, useEffect, useState } from 'react'
 type CollapsibleSectionVariant = 'default' | 'flat'
 
 interface CollapsibleSectionProps {
-  title: string
+  title: React.ReactNode
   collapsedSummary?: string
   /** Content to show below the header when collapsed (e.g., quick filters) */
   collapsedContent?: React.ReactNode

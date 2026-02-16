@@ -4,16 +4,16 @@ import Link from 'next/link'
 import { Dialog } from '@/components/ui'
 import { Button } from '@/components/ui'
 
-type LimitDimension = 'projects' | 'analyzed_sessions'
+type LimitDimension = 'analyzed_sessions' | 'analyzed_issues'
 
 const dimensionConfig: Record<LimitDimension, { title: string; description: string }> = {
-  projects: {
-    title: 'Project limit reached',
-    description: "You've reached the maximum number of projects for your current plan.",
-  },
   analyzed_sessions: {
     title: 'Feedback analysis limit reached',
     description: "You've used all your feedback analyses for this billing period.",
+  },
+  analyzed_issues: {
+    title: 'Issue analysis limit reached',
+    description: "You've used all your issue analyses for this billing period.",
   },
 }
 
@@ -35,7 +35,7 @@ export function LimitReachedDialog({
   dimension = 'analyzed_sessions',
 }: LimitReachedDialogProps) {
   const config = dimensionConfig[dimension]
-  const unitLabel = dimension === 'projects' ? 'projects' : 'feedback analyzed'
+  const unitLabel = dimension === 'analyzed_issues' ? 'issues analyzed' : 'feedback analyzed'
 
   return (
     <Dialog open={open} onClose={onClose} title="Limit Reached">

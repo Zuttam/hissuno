@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { createManualSession } from '@/lib/supabase/sessions'
-import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { createIssueAdmin } from '@/lib/issues/issues-service'
 import type { SessionTag } from '@/types/session'
 
@@ -99,20 +100,6 @@ const DEMO_SESSIONS: DemoSession[] = [
   },
 ]
 
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
-
 /**
  * POST /api/projects/[id]/demo-sessions
  * Creates demo sessions with optional linked issues for onboarding.
@@ -125,8 +112,8 @@ export async function POST(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const adminSupabase = createAdminClient()
     const createdSessions: string[] = []
@@ -196,6 +183,9 @@ export async function POST(_request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[demo-sessions.post] unexpected error', error)

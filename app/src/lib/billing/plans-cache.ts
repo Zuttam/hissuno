@@ -45,8 +45,8 @@ function getPlanMetadata(): Record<string, PlanMetadata> {
   if (basicId) {
     metadata[basicId] = {
       name: 'basic',
-      limits: { sessions_limit: 200, projects_limit: 1 },
-      features: ['200 analyzed sessions/month', '1 project', 'Community support'],
+      limits: { sessions_limit: 200, issues_limit: 200 },
+      features: ['200 analyzed sessions/month', '200 analyzed issues/month', 'Community support'],
       is_recommended: false,
       sort_order: 1,
     }
@@ -55,8 +55,8 @@ function getPlanMetadata(): Record<string, PlanMetadata> {
   if (proId) {
     metadata[proId] = {
       name: 'pro',
-      limits: { sessions_limit: 1000, projects_limit: 5 },
-      features: ['1,000 analyzed sessions/month', '5 projects', 'Priority support', 'Custom branding'],
+      limits: { sessions_limit: 1000, issues_limit: 1000 },
+      features: ['1,000 analyzed sessions/month', '1,000 analyzed issues/month', 'Priority support', 'Custom branding'],
       is_recommended: true,
       sort_order: 2,
     }
@@ -64,11 +64,11 @@ function getPlanMetadata(): Record<string, PlanMetadata> {
 
   if (maxId) {
     metadata[maxId] = {
-      name: 'unlimited',
-      limits: { sessions_limit: 10000, projects_limit: null },
+      name: 'max',
+      limits: { sessions_limit: 10000, issues_limit: 10000 },
       features: [
         '10,000 sessions/month',
-        'unlimited projects',
+        'Unlimited analyzed issues',
         'Dedicated support',
         'Custom integrations',
         'SLA guarantee',

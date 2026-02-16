@@ -1,7 +1,10 @@
+import type { Database } from '@/types/supabase'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, createAdminClient, isSupabaseConfigured } from '../server'
+import { createRequestScopedClient, createAdminClient, isSupabaseConfigured } from '../server'
 import type { PmAgentSettings, PmAgentSettingsInput } from './types'
 import { DEFAULT_PM_AGENT_SETTINGS } from './types'
+
+type ProjectSettingsInsert = Database['public']['Tables']['project_settings']['Insert']
 
 const COLUMNS = 'classification_guidelines, spec_guidelines, analysis_guidelines'
 
@@ -15,22 +18,13 @@ export async function getPmAgentSettings(projectId: string): Promise<PmAgentSett
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const { supabase } = await createRequestScopedClient()
 
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -114,22 +108,13 @@ export async function updatePmAgentSettings(
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const { supabase } = await createRequestScopedClient()
 
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -137,7 +122,7 @@ export async function updatePmAgentSettings(
     }
 
     // Build update payload with only provided fields
-    const updatePayload: Record<string, unknown> = {
+    const updatePayload: ProjectSettingsInsert = {
       project_id: projectId,
       updated_at: new Date().toISOString(),
     }

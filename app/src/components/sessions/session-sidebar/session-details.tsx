@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Badge } from '@/components/ui'
+import { Badge, Combobox } from '@/components/ui'
+import { useContacts } from '@/hooks/use-contacts'
 import type { SessionWithProject, SessionSource, SessionType, UpdateSessionInput } from '@/types/session'
 import { SESSION_SOURCE_INFO, SESSION_TYPE_INFO, getSessionUserDisplay } from '@/types/session'
 
@@ -17,11 +18,15 @@ function formatDateTime(dateString: string): string {
 interface SessionDetailsProps {
   session: SessionWithProject
   onUpdateSession?: (input: UpdateSessionInput) => Promise<boolean>
+  onSessionUpdated?: () => void
 }
 
-export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps) {
+export function SessionDetails({ session, onUpdateSession, onSessionUpdated }: SessionDetailsProps) {
   const sourceInfo = SESSION_SOURCE_INFO[session.source as SessionSource] || SESSION_SOURCE_INFO.widget
   const [isSaving, setIsSaving] = useState(false)
+  const [isChangingCustomer, setIsChangingCustomer] = useState(false)
+  const [selectedContactId, setSelectedContactId] = useState<string | undefined>(session.contact_id ?? undefined)
+  const { contacts } = useContacts({ filters: { projectId: session.project_id } })
   const [editingMetadataKey, setEditingMetadataKey] = useState<string | null>(null)
   const [editedMetadataValue, setEditedMetadataValue] = useState('')
   const [isAddingMetadata, setIsAddingMetadata] = useState(false)
@@ -88,31 +93,33 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
     }
   }, [handleAddMetadata])
 
+  const handleCustomerSave = useCallback(async () => {
+    if (!onUpdateSession) return
+    setIsSaving(true)
+    const success = await onUpdateSession({ contact_id: selectedContactId ?? null })
+    setIsSaving(false)
+    if (success) {
+      setIsChangingCustomer(false)
+      onSessionUpdated?.()
+    }
+  }, [onUpdateSession, selectedContactId, onSessionUpdated])
+
+  const handleCustomerEditStart = useCallback(() => {
+    setSelectedContactId(session.contact_id ?? undefined)
+    setIsChangingCustomer(true)
+  }, [session.contact_id])
+
+  const handleCustomerEditCancel = useCallback(() => {
+    setSelectedContactId(session.contact_id ?? undefined)
+    setIsChangingCustomer(false)
+  }, [session.contact_id])
+
+  const contactItems = contacts.map((c) => ({ value: c.id, label: c.name }))
+
   const isExternalSource = session.source === 'gong' || session.source === 'intercom'
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Source, Type, Archived, and Project */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Badge variant={sourceInfo.variant}>
-            {sourceInfo.label}
-          </Badge>
-          <Badge variant={SESSION_TYPE_INFO[session.session_type as SessionType]?.variant ?? 'default'}>
-            {SESSION_TYPE_INFO[session.session_type as SessionType]?.label ?? session.session_type}
-          </Badge>
-          {session.is_archived && (
-            <Badge variant="default">Archived</Badge>
-          )}
-        </div>
-        <Link
-          href={`/projects/${session.project_id}`}
-          className="font-mono text-sm text-[color:var(--accent-primary)] hover:underline"
-        >
-          {session.project?.name || 'Unknown Project'}
-        </Link>
-      </div>
-
       {/* Session ID */}
       <div className="flex flex-col gap-1">
         <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
@@ -123,47 +130,100 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
         </p>
       </div>
 
-      {/* User */}
+      {/* Customer */}
       {(() => {
         const userDisplay = getSessionUserDisplay(session)
-        return (
-          <div className="flex flex-col gap-1">
-            <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-              User
-            </label>
-            {userDisplay.name ? (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-                      userDisplay.contactId
-                        ? 'bg-[color:var(--accent-info)]'
-                        : userDisplay.isHissuno
-                          ? 'bg-[color:var(--accent-success)]'
-                          : 'bg-[color:var(--text-tertiary)]'
-                    }`}
-                  />
-                  {userDisplay.contactId ? (
-                    <Link
-                      href={`/projects/${session.project_id}/customers/contacts/${userDisplay.contactId}`}
-                      className="text-sm text-[color:var(--foreground)] hover:underline"
-                    >
-                      {userDisplay.name}
-                    </Link>
+        if (isChangingCustomer) {
+          return (
+            <div className="flex flex-col gap-1">
+              <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                Customer
+              </label>
+              <div className="flex items-center gap-1">
+                <Combobox
+                  items={contactItems}
+                  value={selectedContactId}
+                  onValueChange={(val) => setSelectedContactId(val)}
+                  placeholder="Search contacts..."
+                  emptyMessage="No contacts found"
+                  size="sm"
+                  className="flex-1"
+                  inputClassName="!rounded-[4px] !border !border-[color:var(--border-subtle)] !px-2 !py-1 !text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleCustomerSave()}
+                  disabled={isSaving}
+                  className="rounded-[4px] p-1 text-[color:var(--accent-success)] transition hover:bg-[color:var(--surface-hover)] disabled:opacity-50"
+                  aria-label="Save"
+                >
+                  {isSaving ? (
+                    <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" /></svg>
                   ) : (
-                    <span className="text-sm text-[color:var(--foreground)]">{userDisplay.name}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                   )}
-                  <Badge variant={userDisplay.contactId ? 'info' : userDisplay.isHissuno ? 'success' : 'default'}>
-                    {userDisplay.contactId ? 'Contact' : userDisplay.isHissuno ? 'Hissuno' : 'External'}
-                  </Badge>
-                </div>
-                {userDisplay.companyName && (
-                  <span className="ml-4 text-xs text-[color:var(--text-secondary)]">{userDisplay.companyName}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCustomerEditCancel}
+                  className="rounded-[4px] p-1 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
+                  aria-label="Cancel"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
+              </div>
+            </div>
+          )
+        }
+        return (
+          <div className="group flex flex-col gap-1">
+            <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+              Customer
+            </label>
+            <div className="flex items-center gap-1">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                {userDisplay.name ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-block h-2 w-2 shrink-0 rounded-full ${
+                          userDisplay.contactId
+                            ? 'bg-[color:var(--accent-info)]'
+                            : userDisplay.isHissuno
+                              ? 'bg-[color:var(--accent-success)]'
+                              : 'bg-[color:var(--text-tertiary)]'
+                        }`}
+                      />
+                      {userDisplay.contactId ? (
+                        <Link
+                          href={`/projects/${session.project_id}/customers/contacts/${userDisplay.contactId}`}
+                          className="text-sm text-[color:var(--foreground)] hover:underline"
+                        >
+                          {userDisplay.name}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-[color:var(--foreground)]">{userDisplay.name}</span>
+                      )}
+                    </div>
+                    {userDisplay.companyName && (
+                      <span className="ml-4 text-xs text-[color:var(--text-secondary)]">{userDisplay.companyName}</span>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-[color:var(--text-tertiary)]">Anonymous</p>
                 )}
               </div>
-            ) : (
-              <p className="text-sm text-[color:var(--text-tertiary)]">Anonymous</p>
-            )}
+              {onUpdateSession && (
+                <button
+                  type="button"
+                  onClick={handleCustomerEditStart}
+                  className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+                  aria-label="Edit Customer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                </button>
+              )}
+            </div>
           </div>
         )
       })()}
@@ -331,7 +391,7 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
       {(session.page_title || session.page_url) && (
         <div className="flex flex-col gap-1">
           <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Page
+            Location
           </label>
           {session.page_title && (
             <p className="text-sm text-[color:var(--foreground)]">
@@ -351,25 +411,6 @@ export function SessionDetails({ session, onUpdateSession }: SessionDetailsProps
         </div>
       )}
 
-      {/* Timestamps */}
-      <div className="grid grid-cols-2 gap-4 text-xs">
-        <div className="flex flex-col gap-1">
-          <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Created
-          </label>
-          <p className="text-[color:var(--foreground)]">
-            {formatDateTime(session.created_at)}
-          </p>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Last Activity
-          </label>
-          <p className="text-[color:var(--foreground)]">
-            {formatDateTime(session.last_activity_at)}
-          </p>
-        </div>
-      </div>
     </div>
   )
 }

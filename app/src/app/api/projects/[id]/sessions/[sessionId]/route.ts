@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { getSessionById, updateSession } from '@/lib/supabase/sessions'
 import { getSessionMessages } from '@/lib/supabase/session-messages'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import type { ChatMessage, UpdateSessionInput } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -12,20 +13,6 @@ type RouteParams = { id: string; sessionId: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -42,9 +29,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Get session metadata from Supabase
     const session = await getSessionById(sessionId)
@@ -66,6 +52,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
 
     console.error('[sessions.getById] unexpected error', error)
     return NextResponse.json({ error: 'Unable to load session.' }, { status: 500 })
@@ -86,9 +75,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // First verify the session belongs to this project
     const existingSession = await getSessionById(sessionId)
@@ -104,6 +92,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.status !== undefined) input.status = body.status
     if (body.user_id !== undefined) input.user_id = body.user_id
     if (body.user_metadata !== undefined) input.user_metadata = body.user_metadata
+    if (body.contact_id !== undefined) input.contact_id = body.contact_id
     if (body.is_human_takeover !== undefined) input.is_human_takeover = body.is_human_takeover
 
     // Check if there's anything to update
@@ -121,6 +110,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[sessions.update] unexpected error', error)

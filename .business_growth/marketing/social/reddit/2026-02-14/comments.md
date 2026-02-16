@@ -1,6 +1,6 @@
 # Reddit Comments - 2026-02-14
 
-## Status: 2/9 POSTED | 0 SKIPPED | 7 PENDING
+## Status: 9/9 POSTED | 0 SKIPPED | 0 PENDING
 
 ---
 
@@ -48,15 +48,15 @@ What actually helped: we stopped treating Figma comments as a feedback channel e
 
 The bigger question is worth asking though: if your stakeholders are surfacing important product feedback in Figma comments, where SHOULD that feedback be going? Most teams don't have a clear answer and that's why it ends up scattered across Figma, Slack, email, and the occasional frustrated message to the PM.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
 ### Comment 3 - r/SaaS (POST THIRD, afternoon ~2-3 hours after Comment 2)
 - **Thread**: The moment I realised my SaaS math didn't make sense
-- **URL**: https://www.reddit.com/r/SaaS/comments/1r44n2p/the_moment_i_realised_my_saas_math_didnt_make/
+- **URL**: https://www.reddit.com/r/SaaS/comments/1r4d7t7/the_moment_i_realised_my_saas_math_didnt_make/
 - **Author**: u/Glittering_Rub2516
-- **Engagement**: 12 upvotes, 14 comments
+- **Engagement**: 14 upvotes, 19 comments
 - **Profile**: default (frustrated_pm26)
 - **Type**: Brand building - positive feedback != validation
 
@@ -70,15 +70,15 @@ The moment you actually ran the numbers was the moment you started treating this
 
 The real test isn't whether people say nice things about your idea. It's whether they'll change their behavior for it. Will they stop using the spreadsheet they've been using for 3 years? Will they actually log in next week? Will they get annoyed when it's down? If the answer to those questions is no, positive feedback is just politeness.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
 ### Comment 4 - r/Entrepreneur (ALT SESSION - MindVegetable9898)
 - **Thread**: Tried anti-selling approach and it actually worked, still confused though
-- **URL**: https://www.reddit.com/r/Entrepreneur/comments/1r3c18l/tried_antiselling_approach_and_it_actually_worked/
+- **URL**: https://www.reddit.com/r/Entrepreneur/comments/1r3sp1j/tried_antiselling_approach_and_it_actually_worked/
 - **Author**: u/SpawnPointDevops
-- **Engagement**: 130 upvotes, 63 comments
+- **Engagement**: 201 upvotes, 67 comments
 - **Profile**: shipping-saas (MindVegetable9898)
 - **Type**: Core - customer understanding
 
@@ -92,15 +92,15 @@ Think about what happened: instead of you saying "here's what our product does,"
 
 The question of when to use it comes down to whether you're selling to people who already know they have the problem. If they reached out to you, they know. Anti-selling just makes them articulate it clearly. If you're cold outreach, they might not know they have the problem yet, and anti-selling gives them an easy exit.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
 ### Comment 5 - r/Entrepreneur (ALT SESSION - MindVegetable9898, ~10 min after Comment 4)
 - **Thread**: spent a full week building a demo for a potential client. turns out they had an in-house team the entire time.
-- **URL**: https://www.reddit.com/r/Entrepreneur/comments/1r3blvy/spent_a_full_week_building_a_demo_for_a_potential/
+- **URL**: https://www.reddit.com/r/Entrepreneur/comments/1r3o8w3/spent_a_full_week_building_a_demo_for_a_potential/
 - **Author**: u/Scary_Historian_9031
-- **Engagement**: 52 upvotes, 35 comments
+- **Engagement**: 57 upvotes, 36 comments
 - **Profile**: shipping-saas (MindVegetable9898)
 - **Type**: Brand building - qualifying before building
 
@@ -118,15 +118,15 @@ The "show me what you can do" request without any commitment on their end is the
 
 I now have a rule: no custom work until I understand their current process. If they won't spend 30 minutes describing how they do things today, they won't spend money on how I do things tomorrow.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
 ### Comment 6 - r/SaaS (ALT SESSION - MindVegetable9898, ~15 min after Comment 5)
 - **Thread**: I built a job-fit analyzer because I was wasting hours applying - struggling to get users
-- **URL**: https://www.reddit.com/r/SaaS/comments/1r459fj/i_built_a_jobfit_analyzer_because_i_was_wasting/
+- **URL**: https://www.reddit.com/r/SaaS/comments/1r4eg7g/i_built_a_jobfit_analyzer_because_i_was_wasting/
 - **Author**: u/Mycologist-Crafty
-- **Engagement**: 7 upvotes, 26 comments
+- **Engagement**: 11 upvotes, 35 comments
 - **Profile**: shipping-saas (MindVegetable9898)
 - **Type**: Core - retention feedback loop
 
@@ -144,15 +144,15 @@ If usage is naturally low-frequency, you have two options:
 
 But you won't know which direction to go unless you talk to the people who tried it and left. Not a feedback form - an actual conversation. "You used this last week for one job. What happened next? Did you apply? Did you get a response? What did you do after?" The answers will tell you where the real product is hiding.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
 ### Comment 7 - r/ExperiencedDevs (ENG SESSION - eng_lead_ftw)
 - **Thread**: Should I ask for a demotion back to senior SWE?
-- **URL**: https://www.reddit.com/r/ExperiencedDevs/comments/1r3d4kl/should_i_ask_for_a_demotion_back_to_senior_swe/
+- **URL**: https://www.reddit.com/r/ExperiencedDevs/comments/1r3svjy/should_i_ask_for_a_demotion_back_to_senior_swe/
 - **Author**: u/DuncSully
-- **Engagement**: 206 upvotes, 70 comments
+- **Engagement**: 239 upvotes, 83 comments
 - **Profile**: eng-lead (eng_lead_ftw)
 - **Type**: Peripheral trust - career/leadership perspective
 
@@ -172,15 +172,15 @@ The "faking it" feeling you describe is common and usually means one of two thin
 
 Before requesting a demotion, figure out which one it is. If it's #1, go back to senior without guilt. If it's #2, consider whether a different company with better staff engineering culture would change the picture.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
 ### Comment 8 - r/ExperiencedDevs (ENG SESSION - eng_lead_ftw, ~15 min after Comment 7)
 - **Thread**: This can't be right... (on-call with 80 page-outs/week)
-- **URL**: https://www.reddit.com/r/ExperiencedDevs/comments/1r3cxyz/this_cant_be_right/
+- **URL**: https://www.reddit.com/r/ExperiencedDevs/comments/1r3u5gu/this_cant_be_right/
 - **Author**: u/Pianomann69
-- **Engagement**: 125 upvotes, 56 comments
+- **Engagement**: 174 upvotes, 75 comments
 - **Profile**: eng-lead (eng_lead_ftw)
 - **Type**: Adjacent - leadership on process costs
 
@@ -198,15 +198,15 @@ Put that in a doc. Present it to engineering leadership. Frame it as a trade-off
 
 When you present the cost in terms of engineer-hours and opportunity cost, the "we MUST have these alerts" mandate usually gets reconsidered pretty quickly. People who mandate processes are rarely aware of what those processes actually cost.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
 ### Comment 9 - r/ExperiencedDevs (ENG SESSION - eng_lead_ftw, ~20 min after Comment 8)
 - **Thread**: Thinking about starting a company: Any experiences? Advice?
-- **URL**: https://www.reddit.com/r/ExperiencedDevs/comments/1r3h2m5/thinking_about_starting_a_company_any_experiences/
+- **URL**: https://www.reddit.com/r/ExperiencedDevs/comments/1r401ai/thinking_about_starting_a_company_any_experiences/
 - **Author**: u/Lame_Johnny
-- **Engagement**: ~15 upvotes, ~20 comments
+- **Engagement**: 13 upvotes, 35 comments
 - **Profile**: eng-lead (eng_lead_ftw)
 - **Type**: Peripheral trust - engineer to founder
 
@@ -228,7 +228,7 @@ What doesn't transfer well:
 
 The miserable job is a fine reason to start, but make sure you're running toward something, not just away from something.
 
-- **Posted**: [ ] PENDING
+- **Posted**: [x] POSTED
 
 ---
 
@@ -265,3 +265,55 @@ The miserable job is a fine reason to start, but make sure you're running toward
 - 3 core, 2 adjacent, 2 brand-building, 2 peripheral trust
 - Profile balance: 3/3/3 (frustrated_pm26 / MindVegetable9898 / eng_lead_ftw)
 - 4 subreddits: ProductManagement (2), SaaS (2), Entrepreneur (2), ExperiencedDevs (3)
+
+---
+
+## Follow-Up Activity - 2026-02-14
+
+### Profile: frustrated_pm26
+- **Thread**: How do you handle turning Figma comments into Jira tickets? (r/UXDesign)
+- **Original comment**: Comment 2 from 2026-02-14
+- **Their reply**: u/anmolnandha (OP) - "Yes this is exactly my issue. My client isn't disciplined enough to commit to a structure such as you have and they quickly devolve into using Figma comments as a one stop shop for feedback, discussion, and ticketing system. So I got to thinking was wondering if it would be worth having or creating a tool that collates comments in a Figma file, ai reads through and suggests which should be added as comments on existing tickets and which should be tickets for themselves. Does that make sense?"
+- **Our response**: Validated their triage layer idea, noted classification is the hard part ("love this color" vs "breaks enterprise checkout flow"), encouraged building around existing behavior since client won't commit to process discipline.
+- **Upvotes on original**: 3
+- **Status**: POSTED
+
+---
+
+### Profile: MindVegetable9898
+- **Thread**: I built a job-fit analyzer because I was wasting hours applying - struggling to get users (r/SaaS)
+- **Original comment**: Comment 6 from 2026-02-14
+- **Their reply**: u/Mycologist-Crafty (OP) - "That's a really good point. From the conversations I've had so far, it does look closer to a frequency problem than a retention problem. People come with a specific decision in mind, not a daily workflow. I'm trying to understand what happens right after the result: whether they actually apply, skip it, or adjust something and retry. Those follow-up steps seem more important than the initial analysis itself. Still early, but I agree the direction probably depends on those behaviours more than feature requests."
+- **Our response**: Highlighted "adjust and retry" users as best signal - treating it as a tool not a one-time check. Validated their behavior-watching approach vs feature request collecting.
+- **Upvotes on original**: 1
+- **Status**: POSTED
+
+---
+
+## Notification Summary - 2026-02-14
+
+### eng_lead_ftw
+- 1st upvote on "Thinking about starting a company" (today) - 9h ago
+- u/MaryClimber replied on "Tech lead woes" - "Thanks bud, needed to hear this" (2d ago) - SKIP (just appreciation)
+- 1st upvote on "Tech lead woes" - 2d ago
+- 1st upvote on "As the team lead" - 3d ago
+- 1st upvote on "How do you handle" - 3d ago
+- 1st upvote on "Sprint planning" - 3d ago
+- Achievement unlocked - 4d ago
+
+### frustrated_pm26
+- u/anmolnandha (OP) replied on "Figma comments" - 9h ago - RESPONDED
+- 1st upvote on r/UXDesign "How do you handle" - 12h ago
+- 1st upvote on "Why Strava Removing" - 20h ago
+- 5 upvotes on "AI finally made me" - 1d ago
+- u/thetippytophat replied "same boat" - 1d ago - SKIP (agreement)
+- 3 upvotes on "PMfluencers" - 2d ago
+- **50 upvotes** on "Learning fatigue" - 2d ago (strong performer)
+- u/monkimal replied context switching pain - 2d ago - SKIP (borderline old)
+- u/Pandas1104 replied appreciation - 2d ago - SKIP
+
+### MindVegetable9898
+- 1st upvote on "What skill would yo" (r/Entrepreneur) - 1h ago
+- u/Mycologist-Crafty (OP) replied on "job-fit analyzer" - 12h ago - RESPONDED
+- u/Wide_Brief3025 replied on older SaaS thread - 3d ago - SKIP (too old)
+- Achievement unlocked - 3d ago

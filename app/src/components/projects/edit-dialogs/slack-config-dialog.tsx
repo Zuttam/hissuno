@@ -303,7 +303,7 @@ export function SlackConfigDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Slack Integration" size="2xl">
+    <Dialog open={open} onClose={onClose} title="Slack Integration" size="xxl">
       <div className="flex flex-col gap-6">
         {error && (
           <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-3 font-mono text-sm text-[color:var(--accent-danger)]">

@@ -9,7 +9,7 @@ interface UsageSectionProps {
 }
 
 export function UsageSection({ usage }: UsageSectionProps) {
-  const { analyzedSessionsUsed, analyzedSessionsLimit, projectsUsed, projectsLimit, periodStart, periodEnd } =
+  const { analyzedSessionsUsed, analyzedSessionsLimit, analyzedIssuesUsed, analyzedIssuesLimit, periodStart, periodEnd } =
     usage
 
   const formatDate = (dateStr: string) => {
@@ -31,7 +31,7 @@ export function UsageSection({ usage }: UsageSectionProps) {
   }
 
   const analyzedSessionsPercentage = getUsagePercentage(analyzedSessionsUsed, analyzedSessionsLimit)
-  const projectsPercentage = getUsagePercentage(projectsUsed, projectsLimit)
+  const analyzedIssuesPercentage = getUsagePercentage(analyzedIssuesUsed, analyzedIssuesLimit)
 
   return (
     <FloatingCard
@@ -84,16 +84,16 @@ export function UsageSection({ usage }: UsageSectionProps) {
           )}
         </div>
 
-        {/* Projects Usage */}
+        {/* Analyzed Issues Usage */}
         <div>
           <div className="mb-2 flex items-end justify-between">
-            <span className="text-sm text-slate-600 dark:text-slate-400">Projects</span>
+            <span className="text-sm text-slate-600 dark:text-slate-400">Analyzed Issues</span>
             <span className="text-2xl font-bold text-slate-900 dark:text-slate-50">
-              {projectsUsed.toLocaleString()}
-              {projectsLimit !== null ? (
+              {analyzedIssuesUsed.toLocaleString()}
+              {analyzedIssuesLimit !== null ? (
                 <span className="text-base font-normal text-slate-500">
                   {' '}
-                  / {projectsLimit.toLocaleString()}
+                  / {analyzedIssuesLimit.toLocaleString()}
                 </span>
               ) : (
                 <span className="text-base font-normal text-slate-500"> / Unlimited</span>
@@ -101,20 +101,20 @@ export function UsageSection({ usage }: UsageSectionProps) {
             </span>
           </div>
 
-          {projectsLimit !== null && (
+          {analyzedIssuesLimit !== null && (
             <>
               <div className="h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                 <div
-                  className={`h-full transition-all duration-300 ${getProgressColor(projectsPercentage)}`}
-                  style={{ width: `${projectsPercentage}%` }}
+                  className={`h-full transition-all duration-300 ${getProgressColor(analyzedIssuesPercentage)}`}
+                  style={{ width: `${analyzedIssuesPercentage}%` }}
                 />
               </div>
 
-              {projectsPercentage >= 75 && (
+              {analyzedIssuesPercentage >= 75 && (
                 <p className="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
-                  {projectsPercentage >= 90
-                    ? 'You are approaching your project limit. Consider upgrading.'
-                    : 'You have used over 75% of your projects.'}
+                  {analyzedIssuesPercentage >= 90
+                    ? 'You are approaching your analyzed issues limit. Consider upgrading.'
+                    : 'You have used over 75% of your analyzed issues.'}
                 </p>
               )}
             </>

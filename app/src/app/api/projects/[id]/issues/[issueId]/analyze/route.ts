@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { getIssueById } from '@/lib/supabase/issues'
 import {
   triggerIssueAnalysis,
   getIssueAnalysisStatus,
 } from '@/lib/issues/analysis-service'
+import { enforceLimit, LimitExceededError } from '@/lib/billing/enforcement-service'
+import { getProjectOwnerUserId } from '@/lib/auth/project-members'
 
 export const runtime = 'nodejs'
 
@@ -14,20 +17,6 @@ type RouteParams = { id: string; issueId: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -42,9 +31,8 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Verify the issue belongs to this project
     const existingIssue = await getIssueById(issueId)
@@ -52,12 +40,16 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Issue not found.' }, { status: 404 })
     }
 
+    const supabase = await createClient()
     const status = await getIssueAnalysisStatus({ issueId, supabase })
 
     return NextResponse.json(status)
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[analyze] GET error', error)
     return NextResponse.json({ error: 'Failed to get status.' }, { status: 500 })
@@ -76,9 +68,8 @@ export async function POST(_request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Verify the issue belongs to this project
     const existingIssue = await getIssueById(issueId)
@@ -86,6 +77,21 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Issue not found.' }, { status: 404 })
     }
 
+    // Enforce analyzed issues limit against the project owner's subscription
+    const enforcementUserId = await getProjectOwnerUserId(projectId)
+    try {
+      await enforceLimit({
+        userId: enforcementUserId,
+        dimension: 'analyzed_issues',
+      })
+    } catch (error) {
+      if (error instanceof LimitExceededError) {
+        return NextResponse.json(error.toResponse(), { status: 429 })
+      }
+      throw error
+    }
+
+    const supabase = await createClient()
     const result = await triggerIssueAnalysis({
       projectId,
       issueId,
@@ -111,6 +117,9 @@ export async function POST(_request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[analyze] POST error', error)
     return NextResponse.json({ error: 'Failed to start analysis.' }, { status: 500 })

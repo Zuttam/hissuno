@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { listCustomFieldDefinitions, createCustomFieldDefinition } from '@/lib/supabase/customer-custom-fields'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { CUSTOM_FIELD_TYPES } from '@/types/customer'
@@ -13,20 +14,6 @@ export const runtime = 'nodejs'
 type RouteParams = { id: string }
 type RouteContext = { params: Promise<RouteParams> }
 
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
-
 /**
  * GET /api/projects/[id]/customers/custom-fields
  */
@@ -38,8 +25,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     const { searchParams } = new URL(request.url)
     const entityType = (searchParams.get('entity_type') as CustomerEntityType) ?? undefined
@@ -49,6 +37,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     console.error('[custom-fields.list] unexpected error', error)
     return NextResponse.json({ error: 'Unable to load custom fields.' }, { status: 500 })
@@ -66,8 +57,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     const body = await request.json()
 
@@ -108,6 +100,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
     if (error instanceof Error && error.message.includes('Maximum')) {
       return NextResponse.json({ error: error.message }, { status: 400 })

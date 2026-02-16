@@ -6,8 +6,7 @@
 
 import { cache } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from './server'
+import { createRequestScopedClient, isSupabaseConfigured } from './server'
 import type {
   CompanyRecord,
   CompanyWithContacts,
@@ -165,15 +164,7 @@ export const listCompanies = cache(async (filters: CompanyFilters = {}): Promise
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     // Build query
     let query = supabase
@@ -237,15 +228,7 @@ export const getCompanyById = cache(async (companyId: string): Promise<CompanyWi
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
-
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
+    const { supabase } = await createRequestScopedClient()
 
     const { data: company, error } = await supabase
       .from('companies')
@@ -261,12 +244,11 @@ export const getCompanyById = cache(async (companyId: string): Promise<CompanyWi
       throw new Error('Unable to load company.')
     }
 
-    // Verify ownership via RLS (already enforced, but double-check)
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', company.project_id)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {

@@ -16,7 +16,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   const resolvedSearchParams =
     await (searchParams ??
       Promise.resolve<Record<string, string | string[] | undefined>>({}))
-  const invite = extractParam(resolvedSearchParams?.invite)
+  const invite = extractParam(resolvedSearchParams?.invite) ?? extractParam(resolvedSearchParams?.invite_code)
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-linear-to-br from-slate-100 via-white to-slate-200 px-4 py-16 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">

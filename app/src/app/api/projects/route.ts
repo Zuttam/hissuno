@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server'
 import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/codebase'
 import { triggerKnowledgeAnalysis } from '@/lib/knowledge/analysis-service'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { enforceLimit, LimitExceededError } from '@/lib/billing/enforcement-service'
+import { ForbiddenError } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { addProjectMember } from '@/lib/auth/project-members'
 import { createProjectSetupNotifications } from '@/lib/notifications/setup-notifications'
 import type { Database } from '@/types/supabase'
 import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
@@ -14,20 +16,6 @@ import {
 
 export const runtime = 'nodejs'
 
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
-
 export async function GET() {
   if (!isSupabaseConfigured()) {
     console.error('[projects.get] Supabase must be configured to list projects')
@@ -35,12 +23,13 @@ export async function GET() {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
+    await requireRequestIdentity()
+
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from('projects')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) {
@@ -98,13 +87,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
+    const identity = await requireRequestIdentity()
 
-    // Enforce project limit before creation
-    await enforceLimit({
-      userId: user.id,
-      dimension: 'projects',
-    })
+    if (identity.type !== 'user') {
+      return NextResponse.json({ error: 'API keys cannot create projects.' }, { status: 403 })
+    }
+
+    const supabase = await createClient()
 
     let codebaseId: string | null = null
 
@@ -113,14 +102,14 @@ export async function POST(request: Request) {
       const { codebase } = await createGitHubCodebase({
         repositoryUrl,
         repositoryBranch,
-        userId: user.id,
+        userId: identity.userId,
       })
       codebaseId = codebase.id
 
       // Sync (clone) GitHub codebase immediately
       const syncResult = await syncGitHubCodebase({
         codebaseId: codebase.id,
-        userId: user.id,
+        userId: identity.userId,
         projectId: id,
       })
 
@@ -135,7 +124,7 @@ export async function POST(request: Request) {
       id,
       name,
       description,
-      user_id: user.id,
+      user_id: identity.userId,
     }
 
     const { data: createdProject, error: projectInsertError } = await supabase
@@ -148,6 +137,14 @@ export async function POST(request: Request) {
       console.error('[projects.post] failed to create project', projectInsertError)
       return NextResponse.json({ error: 'Failed to create project.' }, { status: 500 })
     }
+
+    // Add creator as owner in project_members
+    await addProjectMember({
+      projectId: id,
+      userId: identity.userId,
+      role: 'owner',
+      status: 'active',
+    })
 
     // Create knowledge sources
     const knowledgeSourcesToInsert: KnowledgeSourceInsert[] = []
@@ -209,7 +206,7 @@ export async function POST(request: Request) {
       try {
         const analysisResult = await triggerKnowledgeAnalysis({
           projectId: id,
-          userId: user.id,
+          userId: identity.userId,
           supabase,
         })
 
@@ -225,7 +222,7 @@ export async function POST(request: Request) {
     }
 
     // Create setup notifications (fire-and-forget)
-    void createProjectSetupNotifications(user.id, id, {
+    void createProjectSetupNotifications(identity.userId, id, {
       hasKnowledgeSources: knowledgeSourcesToInsert.length > 0,
     }).catch((err) => console.error('[projects.post] setup notifications error:', err))
 
@@ -235,8 +232,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
 
-    if (error instanceof LimitExceededError) {
-      return NextResponse.json(error.toResponse(), { status: 429 })
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
 
     console.error('[projects.post] unexpected error', error)

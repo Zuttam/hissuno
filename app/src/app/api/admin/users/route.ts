@@ -1,6 +1,4 @@
 import { NextResponse } from 'next/server'
-import { verifyAdminApiSecret } from '@/lib/auth/admin-api'
-import { UnauthorizedError } from '@/lib/auth/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { getPlanByName } from '@/lib/billing/plans-cache'
 
@@ -12,7 +10,7 @@ interface CreateUserBody {
   password?: string
   plan_name?: string
   sessions_limit?: number | null
-  projects_limit?: number | null
+  issues_limit?: number | null
   onboarding_completed?: boolean
 }
 
@@ -22,10 +20,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    verifyAdminApiSecret(request)
-
     const body = (await request.json()) as CreateUserBody
-    const { email, name, password, plan_name = 'pro', sessions_limit, projects_limit, onboarding_completed } = body
+    const { email, name, password, plan_name = 'pro', sessions_limit, issues_limit, onboarding_completed } = body
 
     if (!email || typeof email !== 'string') {
       return NextResponse.json({ error: 'email is required.' }, { status: 400 })
@@ -38,17 +34,17 @@ export async function POST(request: Request) {
     // Resolve plan: look up by name, fall back to admin_custom
     let resolvedPlanId = 'admin_custom'
     let defaultSessionsLimit: number | null = null
-    let defaultProjectsLimit: number | null = null
+    let defaultIssuesLimit: number | null = null
 
     const plan = await getPlanByName(plan_name)
     if (plan) {
       resolvedPlanId = plan.id
       defaultSessionsLimit = plan.limits.sessions_limit
-      defaultProjectsLimit = plan.limits.projects_limit
+      defaultIssuesLimit = plan.limits.issues_limit
     }
 
     const finalSessionsLimit = sessions_limit !== undefined ? sessions_limit : defaultSessionsLimit
-    const finalProjectsLimit = projects_limit !== undefined ? projects_limit : defaultProjectsLimit
+    const finalIssuesLimit = issues_limit !== undefined ? issues_limit : defaultIssuesLimit
 
     const supabase = createAdminClient()
 
@@ -94,7 +90,7 @@ export async function POST(request: Request) {
           plan_id: resolvedPlanId,
           plan_name: plan_name,
           sessions_limit: finalSessionsLimit,
-          projects_limit: finalProjectsLimit,
+          issues_limit: finalIssuesLimit,
           status: 'active',
         },
         { onConflict: 'user_id' }
@@ -122,9 +118,6 @@ export async function POST(request: Request) {
       { status: 201 }
     )
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
     console.error('[admin.users.POST] unexpected error', error)
     return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
   }
@@ -142,8 +135,6 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    verifyAdminApiSecret(request)
-
     const body = (await request.json()) as UpdateUserBody
     const { user_id, name, password } = body
 
@@ -185,9 +176,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ user: { id: user_id, updated: Object.keys(authUpdate) } })
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
-    }
     console.error('[admin.users.PATCH] unexpected error', error)
     return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
   }

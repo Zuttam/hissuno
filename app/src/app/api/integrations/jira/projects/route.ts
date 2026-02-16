@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { createRequestScopedClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getJiraConnection } from '@/lib/integrations/jira'
 import { getJiraProjects } from '@/lib/integrations/jira/client'
@@ -21,22 +21,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+    const { supabase } = await createRequestScopedClient()
 
-    if (authError || !user) {
-      throw new UnauthorizedError('User not authenticated')
-    }
-
-    // Verify project ownership
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
-      .select('id, user_id')
+      .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {

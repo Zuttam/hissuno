@@ -1,5 +1,5 @@
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '../server'
+import { createRequestScopedClient, isSupabaseConfigured } from '../server'
 import type { IssueSettings, IssueSettingsInput } from './types'
 import { DEFAULT_ISSUE_SETTINGS } from './types'
 
@@ -13,22 +13,13 @@ export async function getIssueSettings(projectId: string): Promise<IssueSettings
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const { supabase } = await createRequestScopedClient()
 
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {
@@ -72,22 +63,13 @@ export async function updateIssueSettings(
   }
 
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const { supabase } = await createRequestScopedClient()
 
-    if (userError || !user) {
-      throw new UnauthorizedError('Unable to resolve user context.')
-    }
-
-    // Verify user owns this project
+    // Verify user has access to this project (RLS handles membership)
     const { data: project } = await supabase
       .from('projects')
       .select('id')
       .eq('id', projectId)
-      .eq('user_id', user.id)
       .single()
 
     if (!project) {

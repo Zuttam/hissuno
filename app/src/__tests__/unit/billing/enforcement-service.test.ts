@@ -45,7 +45,7 @@ function createMockSubscription(overrides: Partial<Subscription> = {}): Subscrip
     plan_id: 'plan-123',
     plan_name: 'pro',
     sessions_limit: 100,
-    projects_limit: 5,
+    issues_limit: 100,
     status: 'active',
     current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     lemon_squeezy_subscription_id: 'ls-123',
@@ -60,8 +60,8 @@ function createMockUsageMetrics(overrides: Partial<UsageMetrics> = {}): UsageMet
   return {
     analyzedSessionsUsed: 0,
     analyzedSessionsLimit: 100,
-    projectsUsed: 0,
-    projectsLimit: 5,
+    analyzedIssuesUsed: 0,
+    analyzedIssuesLimit: 100,
     periodStart: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
     periodEnd: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
     ...overrides,
@@ -200,24 +200,24 @@ describe('Enforcement Service', () => {
       expect(result.isOverLimit).toBe(true)
     })
 
-    it('should work with projects dimension', async () => {
+    it('should work with analyzed_issues dimension', async () => {
       mockGetBillingInfo.mockResolvedValue(
         createMockBillingInfo({
-          subscription: { projects_limit: 5 },
-          usage: { projectsUsed: 5 },
+          subscription: { issues_limit: 100 },
+          usage: { analyzedIssuesUsed: 100 },
         })
       )
 
       const result = await checkEnforcement({
         userId: 'user-123',
-        dimension: 'projects',
+        dimension: 'analyzed_issues',
       })
 
       expect(result.allowed).toBe(false)
       expect(result.isOverLimit).toBe(true)
-      expect(result.dimension).toBe('projects')
-      expect(result.current).toBe(5)
-      expect(result.limit).toBe(5)
+      expect(result.dimension).toBe('analyzed_issues')
+      expect(result.current).toBe(100)
+      expect(result.limit).toBe(100)
     })
 
     it('should include upgradeUrl when over limit', async () => {
@@ -281,17 +281,17 @@ describe('Enforcement Service', () => {
       expect(result.remaining).toBe(0)
     })
 
-    it('should block projects when no subscription (limit = 0)', async () => {
+    it('should block analyzed_issues when no subscription (limit = 0)', async () => {
       mockGetBillingInfo.mockResolvedValue(
         createMockBillingInfo({
           subscription: null,
-          usage: { projectsUsed: 0, projectsLimit: null },
+          usage: { analyzedIssuesUsed: 0, analyzedIssuesLimit: null },
         })
       )
 
       const result = await checkEnforcement({
         userId: 'user-123',
-        dimension: 'projects',
+        dimension: 'analyzed_issues',
       })
 
       expect(result.allowed).toBe(false)
@@ -464,17 +464,17 @@ describe('Enforcement Service', () => {
       expect(result.message).toBe('Unlimited')
     })
 
-    it('should allow unlimited projects when projects_limit is null', async () => {
+    it('should allow unlimited analyzed_issues when issues_limit is null', async () => {
       mockGetBillingInfo.mockResolvedValue(
         createMockBillingInfo({
-          subscription: { projects_limit: null },
-          usage: { projectsUsed: 1000 },
+          subscription: { issues_limit: null },
+          usage: { analyzedIssuesUsed: 1000 },
         })
       )
 
       const result = await checkEnforcement({
         userId: 'user-123',
-        dimension: 'projects',
+        dimension: 'analyzed_issues',
       })
 
       expect(result.allowed).toBe(true)
@@ -499,11 +499,11 @@ describe('Enforcement Service', () => {
       expect(mockSendLimitNotificationIfNeeded).not.toHaveBeenCalled()
     })
 
-    it('should handle mixed limits (analyzed_sessions limited, projects unlimited)', async () => {
+    it('should handle mixed limits (analyzed_sessions limited, analyzed_issues unlimited)', async () => {
       mockGetBillingInfo.mockResolvedValue(
         createMockBillingInfo({
-          subscription: { sessions_limit: 100, projects_limit: null },
-          usage: { analyzedSessionsUsed: 100, projectsUsed: 50 },
+          subscription: { sessions_limit: 100, issues_limit: null },
+          usage: { analyzedSessionsUsed: 100, analyzedIssuesUsed: 50 },
         })
       )
 
@@ -516,14 +516,14 @@ describe('Enforcement Service', () => {
       expect(sessionsResult.isOverLimit).toBe(true)
       expect(sessionsResult.limit).toBe(100)
 
-      const projectsResult = await checkEnforcement({
+      const issuesResult = await checkEnforcement({
         userId: 'user-123',
-        dimension: 'projects',
+        dimension: 'analyzed_issues',
       })
 
-      expect(projectsResult.allowed).toBe(true)
-      expect(projectsResult.isOverLimit).toBe(false)
-      expect(projectsResult.limit).toBeNull()
+      expect(issuesResult.allowed).toBe(true)
+      expect(issuesResult.isOverLimit).toBe(false)
+      expect(issuesResult.limit).toBeNull()
     })
   })
 
@@ -659,20 +659,20 @@ describe('Enforcement Service', () => {
     it('should throw with correct dimension in error', async () => {
       mockGetBillingInfo.mockResolvedValue(
         createMockBillingInfo({
-          subscription: { projects_limit: 5 },
-          usage: { projectsUsed: 5 },
+          subscription: { issues_limit: 100 },
+          usage: { analyzedIssuesUsed: 100 },
         })
       )
 
       try {
         await enforceLimit({
           userId: 'user-123',
-          dimension: 'projects',
+          dimension: 'analyzed_issues',
         })
         expect.fail('Should have thrown')
       } catch (error) {
         expect(error).toBeInstanceOf(LimitExceededError)
-        expect((error as LimitExceededError).dimension).toBe('projects')
+        expect((error as LimitExceededError).dimension).toBe('analyzed_issues')
       }
     })
   })
@@ -719,16 +719,16 @@ describe('LimitExceededError', () => {
     const result: EnforcementResult = {
       allowed: false,
       isOverLimit: true,
-      dimension: 'projects',
-      current: 5,
-      limit: 5,
+      dimension: 'analyzed_issues',
+      current: 100,
+      limit: 100,
       remaining: 0,
-      message: 'Projects limit reached',
+      message: 'Analyzed issues limit reached',
     }
 
     const error = new LimitExceededError(result)
 
-    expect(error.dimension).toBe('projects')
+    expect(error.dimension).toBe('analyzed_issues')
   })
 
   it('should set message from result', () => {

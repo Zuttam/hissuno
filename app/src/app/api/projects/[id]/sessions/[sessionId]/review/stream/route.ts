@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getSessionById } from '@/lib/supabase/sessions'
 import { createSSEStreamWithExecutor, createSSEEvent, BaseSSEEvent } from '@/lib/sse'
@@ -18,20 +19,6 @@ type RouteContext = {
 }
 
 const LOG_PREFIX = '[session-review.stream]'
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
 
 /**
  * Session review SSE event types
@@ -105,9 +92,8 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     // Verify the session belongs to this project
     const existingSession = await getSessionById(sessionId)
@@ -455,6 +441,9 @@ export async function GET(_request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error(`${LOG_PREFIX} unexpected error`, error)

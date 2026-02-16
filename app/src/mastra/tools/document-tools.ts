@@ -192,7 +192,6 @@ function extractSections(text: string): Array<{ title: string; level: number; co
  * Extract key topics based on document type
  */
 function extractKeyTopics(text: string, documentType: string): string[] {
-  const lowerText = text.toLowerCase()
   const topics: string[] = []
 
   // Common topic patterns by type
@@ -342,8 +341,7 @@ export const readCodebaseFilesTool = createTool({
         totalFiles: files.length,
         skipped,
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to read codebase'
+    } catch {
       return {
         files: [],
         totalFiles: 0,

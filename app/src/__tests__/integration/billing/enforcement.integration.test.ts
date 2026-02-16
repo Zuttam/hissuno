@@ -132,7 +132,7 @@ function createSubscription(overrides: Partial<Subscription> = {}): Subscription
     plan_id: 'plan-pro',
     plan_name: 'pro',
     sessions_limit: 1000,
-    projects_limit: 10,
+    issues_limit: 1000,
     status: 'active',
     current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     lemon_squeezy_subscription_id: 'ls-123',
@@ -146,7 +146,7 @@ function createSubscription(overrides: Partial<Subscription> = {}): Subscription
 function createBillingInfo(options: {
   subscription?: Partial<Subscription> | null
   analyzedSessionsUsed?: number
-  projectsUsed?: number
+  analyzedIssuesUsed?: number
   periodStart?: string
   periodEnd?: string
 }): BillingInfo {
@@ -165,8 +165,8 @@ function createBillingInfo(options: {
     usage: {
       analyzedSessionsUsed: options.analyzedSessionsUsed ?? 0,
       analyzedSessionsLimit: subscription?.sessions_limit ?? null,
-      projectsUsed: options.projectsUsed ?? 0,
-      projectsLimit: subscription?.projects_limit ?? null,
+      analyzedIssuesUsed: options.analyzedIssuesUsed ?? 0,
+      analyzedIssuesLimit: subscription?.issues_limit ?? null,
       periodStart,
       periodEnd,
     },
@@ -371,9 +371,9 @@ describe('Billing Enforcement Integration', () => {
       setupUser('user-123', 'test@example.com', 'Test User')
 
       const billingInfo = createBillingInfo({
-        subscription: { sessions_limit: 100, projects_limit: 5 },
+        subscription: { sessions_limit: 100, issues_limit: 100 },
         analyzedSessionsUsed: 100,
-        projectsUsed: 5,
+        analyzedIssuesUsed: 100,
         periodStart: '2026-01-01T00:00:00Z',
       })
       mockGetBillingInfo.mockResolvedValue(billingInfo)
@@ -389,20 +389,20 @@ describe('Billing Enforcement Integration', () => {
         message: 'Sessions limit reached',
       })
 
-      // Projects limit reached
+      // Issues limit reached
       await sendLimitNotificationIfNeeded('user-123', {
         allowed: false,
         isOverLimit: true,
-        dimension: 'projects',
-        current: 5,
-        limit: 5,
+        dimension: 'analyzed_issues',
+        current: 100,
+        limit: 100,
         remaining: 0,
-        message: 'Projects limit reached',
+        message: 'Analyzed issues limit reached',
       })
 
       expect(emailsSent).toHaveLength(2)
       expect(emailsSent[0].dimension).toBe('analyzed_sessions')
-      expect(emailsSent[1].dimension).toBe('projects')
+      expect(emailsSent[1].dimension).toBe('analyzed_issues')
     })
 
     it('should NOT send notification for unlimited plans', async () => {
@@ -462,36 +462,36 @@ describe('Billing Enforcement Integration', () => {
       expect(result.remaining).toBe(900)
     })
 
-    it('should immediately allow more projects after upgrade', async () => {
-      // User on Basic plan at project limit (1 project)
+    it('should immediately allow more analyzed issues after upgrade', async () => {
+      // User on Basic plan at issues limit (200 issues)
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
-          subscription: { projects_limit: 1, plan_name: 'basic' },
-          projectsUsed: 1,
+          subscription: { issues_limit: 200, plan_name: 'basic' },
+          analyzedIssuesUsed: 200,
         })
       )
 
       // Should be blocked before upgrade
       await expect(
-        enforceLimit({ userId: 'user-123', dimension: 'projects' })
+        enforceLimit({ userId: 'user-123', dimension: 'analyzed_issues' })
       ).rejects.toThrow(LimitExceededError)
 
-      // Simulate upgrade to Pro (10 projects)
+      // Simulate upgrade to Pro (1000 issues)
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
-          subscription: { projects_limit: 10, plan_name: 'pro' },
-          projectsUsed: 1,
+          subscription: { issues_limit: 1000, plan_name: 'pro' },
+          analyzedIssuesUsed: 200,
         })
       )
 
       // Should be allowed immediately
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'projects',
+        dimension: 'analyzed_issues',
       })
 
       expect(result.allowed).toBe(true)
-      expect(result.remaining).toBe(9)
+      expect(result.remaining).toBe(800)
     })
 
     it('should immediately grant unlimited access on upgrade to unlimited plan', async () => {
@@ -668,44 +668,46 @@ describe('Billing Enforcement Integration', () => {
       expect(result.remaining).toBe(100)
     })
 
-    it('should handle project limit downgrade (projects persist across periods)', async () => {
-      // Projects don't reset like sessions - they persist
-      // User on Pro (10 projects), has 5 projects
-      // Downgrades to Basic (1 project)
-      // Current projects remain, but can't create new ones after renewal
+    it('should handle analyzed issues limit downgrade', async () => {
+      // User on Pro (1000 issues), has analyzed 500
+      // Downgrades to Basic (200 issues)
+      // At renewal, usage resets
 
       // Before renewal - still on Pro
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: {
-            projects_limit: 10,
+            issues_limit: 1000,
             plan_name: 'pro',
           },
-          projectsUsed: 5,
+          analyzedIssuesUsed: 500,
         })
       )
 
       const result = await enforceLimit({
         userId: 'user-123',
-        dimension: 'projects',
+        dimension: 'analyzed_issues',
       })
       expect(result.allowed).toBe(true)
 
-      // After renewal - now on Basic, but still has 5 projects
+      // After renewal - now on Basic with reset usage
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: {
-            projects_limit: 1,
+            issues_limit: 200,
             plan_name: 'basic',
           },
-          projectsUsed: 5, // Projects persist
+          analyzedIssuesUsed: 0, // Usage resets with new period
         })
       )
 
-      // Cannot create new projects (5 > 1)
-      await expect(
-        enforceLimit({ userId: 'user-123', dimension: 'projects' })
-      ).rejects.toThrow(LimitExceededError)
+      // Can analyze up to 200 issues in new period
+      const resultAfter = await enforceLimit({
+        userId: 'user-123',
+        dimension: 'analyzed_issues',
+      })
+      expect(resultAfter.allowed).toBe(true)
+      expect(resultAfter.limit).toBe(200)
     })
   })
 
@@ -754,17 +756,17 @@ describe('Billing Enforcement Integration', () => {
       expect(result.limit).toBe(100) // Still has plan limits within period
     })
 
-    it('should block projects when no subscription', async () => {
+    it('should block analyzed_issues when no subscription', async () => {
       mockGetBillingInfo.mockResolvedValue(
         createBillingInfo({
           subscription: null,
-          projectsUsed: 0,
+          analyzedIssuesUsed: 0,
         })
       )
 
       // No subscription = blocked (limit = 0)
       await expect(
-        enforceLimit({ userId: 'user-123', dimension: 'projects' })
+        enforceLimit({ userId: 'user-123', dimension: 'analyzed_issues' })
       ).rejects.toThrow(LimitExceededError)
     })
   })
@@ -810,10 +812,10 @@ describe('Billing Enforcement Integration', () => {
         createBillingInfo({
           subscription: {
             sessions_limit: 100,
-            projects_limit: null, // Unlimited
+            issues_limit: null, // Unlimited
           },
           analyzedSessionsUsed: 100,
-          projectsUsed: 50,
+          analyzedIssuesUsed: 50,
         })
       )
 
@@ -822,13 +824,13 @@ describe('Billing Enforcement Integration', () => {
         enforceLimit({ userId: 'user-123', dimension: 'analyzed_sessions' })
       ).rejects.toThrow(LimitExceededError)
 
-      // Projects allowed
-      const projectResult = await enforceLimit({
+      // Issues allowed
+      const issuesResult = await enforceLimit({
         userId: 'user-123',
-        dimension: 'projects',
+        dimension: 'analyzed_issues',
       })
-      expect(projectResult.allowed).toBe(true)
-      expect(projectResult.limit).toBeNull()
+      expect(issuesResult.allowed).toBe(true)
+      expect(issuesResult.limit).toBeNull()
     })
 
     it('should handle rapid successive enforcement checks', async () => {

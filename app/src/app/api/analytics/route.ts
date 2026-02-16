@@ -7,6 +7,7 @@ import {
   getIssuesStripAnalytics,
   getImpactFlowAnalytics,
   getProjectAnalytics,
+  getCustomerSegmentationAnalytics,
   type AnalyticsPeriod,
 } from '@/lib/supabase/analytics'
 
@@ -50,6 +51,14 @@ export async function GET(request: NextRequest) {
 
     if (type === 'impact-flow') {
       const data = await getImpactFlowAnalytics(period, projectId)
+      return NextResponse.json({ data })
+    }
+
+    if (type === 'customer-segmentation') {
+      if (!projectId) {
+        return NextResponse.json({ error: 'projectId is required for type=customer-segmentation.' }, { status: 400 })
+      }
+      const data = await getCustomerSegmentationAnalytics(projectId, period)
       return NextResponse.json({ data })
     }
 

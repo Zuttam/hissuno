@@ -1,6 +1,10 @@
 import { createServerClient, createBrowserClient as createSupabaseClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { cookies, headers } from 'next/headers'
 import { supabaseConfig, isSupabaseConfigured, isServiceRoleConfigured } from '@/lib/config/supabase'
+import { API_KEY_ID_HEADER, API_KEY_CREATED_BY_HEADER, API_KEY_PROJECT_ID_HEADER } from '@/lib/auth/identity'
+import { UnauthorizedError } from '@/lib/auth/server'
+import type { Database } from '@/types/supabase'
 
 export { isSupabaseConfigured, isServiceRoleConfigured }
 
@@ -47,6 +51,40 @@ export async function createClient() {
       },
     }
   )
+}
+
+export interface RequestScopedClient {
+  supabase: SupabaseClient<Database>
+  userId: string
+  /** Non-null for API key requests. Cross-project queries MUST be scoped to this. */
+  apiKeyProjectId: string | null
+}
+
+/**
+ * Creates a request-scoped Supabase client by reading request headers to determine auth type.
+ *
+ * - User requests: Returns cookie-based client (RLS enforced) + user ID from getUser().
+ * - API key requests: Returns admin client (bypasses RLS) + creator's user ID from headers.
+ *
+ * Safety: Admin client bypasses RLS, but API keys are always project-scoped.
+ * All project-scoped routes pass projectId in queries, so data is correctly scoped.
+ * The helper returns apiKeyProjectId for defense-in-depth guards in cross-project queries.
+ */
+export async function createRequestScopedClient(): Promise<RequestScopedClient> {
+  const h = await headers()
+  const apiKeyId = h.get(API_KEY_ID_HEADER)
+
+  if (apiKeyId) {
+    const createdBy = h.get(API_KEY_CREATED_BY_HEADER)
+    const projectId = h.get(API_KEY_PROJECT_ID_HEADER)
+    if (!createdBy || !projectId) throw new UnauthorizedError('Invalid API key headers.')
+    return { supabase: createAdminClient(), userId: createdBy, apiKeyProjectId: projectId }
+  }
+
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) throw new UnauthorizedError()
+  return { supabase, userId: user.id, apiKeyProjectId: null }
 }
 
 /**

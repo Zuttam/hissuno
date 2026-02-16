@@ -1,6 +1,7 @@
 'use client'
 
-import { Badge } from '@/components/ui'
+import { useRef, useEffect } from 'react'
+import { Badge, Checkbox } from '@/components/ui'
 import type { IssueWithProject, IssueType, IssuePriority, IssueStatus, EffortEstimate } from '@/types/issue'
 
 interface IssuesTableProps {
@@ -8,6 +9,35 @@ interface IssuesTableProps {
   selectedIssueId: string | null
   onSelectIssue: (issue: IssueWithProject) => void
   onArchive: (issue: IssueWithProject) => void
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string) => void
+  onToggleAll?: () => void
+  isAllSelected?: boolean
+  isIndeterminate?: boolean
+}
+
+function IssueHeaderCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  checked: boolean
+  indeterminate: boolean
+  onChange: () => void
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = indeterminate
+    }
+  }, [indeterminate])
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <Checkbox ref={ref} checked={checked} onChange={onChange} />
+    </div>
+  )
 }
 
 export function IssuesTable({
@@ -15,12 +45,28 @@ export function IssuesTable({
   selectedIssueId,
   onSelectIssue,
   onArchive,
+  selectedIds,
+  onToggleSelect,
+  onToggleAll,
+  isAllSelected = false,
+  isIndeterminate = false,
 }: IssuesTableProps) {
+  const hasSelection = Boolean(selectedIds && onToggleSelect && onToggleAll)
+
   return (
     <div className="overflow-hidden rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)]">
       <table className="w-full font-mono text-sm">
         <thead>
           <tr className="border-b border-[color:var(--border-subtle)]">
+            {hasSelection && (
+              <th className="w-10 px-3 py-2">
+                <IssueHeaderCheckbox
+                  checked={isAllSelected}
+                  indeterminate={isIndeterminate}
+                  onChange={onToggleAll!}
+                />
+              </th>
+            )}
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Title
             </th>
@@ -64,6 +110,8 @@ export function IssuesTable({
               isSelected={selectedIssueId === issue.id}
               onSelect={() => onSelectIssue(issue)}
               onArchive={() => onArchive(issue)}
+              isChecked={selectedIds?.has(issue.id) ?? false}
+              onToggleCheck={onToggleSelect ? () => onToggleSelect(issue.id) : undefined}
             />
           ))}
         </tbody>
@@ -77,9 +125,11 @@ interface IssueRowProps {
   isSelected: boolean
   onSelect: () => void
   onArchive: () => void
+  isChecked: boolean
+  onToggleCheck?: () => void
 }
 
-function IssueRow({ issue, isSelected, onSelect, onArchive }: IssueRowProps) {
+function IssueRow({ issue, isSelected, onSelect, onArchive, isChecked, onToggleCheck }: IssueRowProps) {
   const truncatedTitle = issue.title.length > 50
     ? `${issue.title.slice(0, 50)}...`
     : issue.title
@@ -93,6 +143,17 @@ function IssueRow({ issue, isSelected, onSelect, onArchive }: IssueRowProps) {
           : 'hover:bg-[color:var(--surface-hover)]'
       } ${issue.is_archived ? 'opacity-60' : ''}`}
     >
+      {onToggleCheck && (
+        <td
+          className="w-10 px-3 py-2"
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleCheck()
+          }}
+        >
+          <Checkbox checked={isChecked} onChange={onToggleCheck} />
+        </td>
+      )}
       <td className="px-3 py-2">
         <span className="inline-flex items-center gap-2">
           <span className="text-[color:var(--foreground)]" title={issue.title}>

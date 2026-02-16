@@ -165,7 +165,7 @@ export function SessionReviewSection({
                 <div>
                   <p className="font-medium text-[color:var(--foreground)]">No issues found</p>
                   <p className="text-xs text-[color:var(--text-secondary)]">
-                    Session does not contain actionable feedback
+                    Not actionable feedback found
                   </p>
                 </div>
               </div>

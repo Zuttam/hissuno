@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from 'react'
 import Image from 'next/image'
 import { MessageSquare, Code2, PenLine } from 'lucide-react'
-import { Input, Select, CollapsibleSection, Button, FilterChip, FilterLabel } from '@/components/ui'
+import { Input, Select, CollapsibleSection, Button, Combobox, FilterChip, FilterLabel } from '@/components/ui'
 import type { SessionFilters, SessionSource } from '@/types/session'
 import { SESSION_SOURCE_INFO, SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
 import type { ProjectRecord } from '@/lib/supabase/projects'
@@ -25,6 +25,8 @@ interface SessionsFiltersProps {
   filters: SessionFilters
   onFilterChange: (filters: SessionFilters) => void
   hideProjectFilter?: boolean
+  companies?: { id: string; name: string }[]
+  contacts?: { id: string; name: string }[]
 }
 
 
@@ -33,6 +35,8 @@ export function SessionsFilters({
   filters,
   onFilterChange,
   hideProjectFilter = false,
+  companies,
+  contacts,
 }: SessionsFiltersProps) {
   const { tags: customTags } = useCustomTags({ projectId: filters.projectId })
 
@@ -80,6 +84,11 @@ export function SessionsFilters({
     onFilterChange({ ...filters, isHumanTakeover: !filters.isHumanTakeover || undefined })
   }, [filters, onFilterChange])
 
+  // Analyzed handler
+  const handleAnalyzedToggle = useCallback(() => {
+    onFilterChange({ ...filters, isAnalyzed: !filters.isAnalyzed || undefined })
+  }, [filters, onFilterChange])
+
   // Project handler
   const handleProjectChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -104,13 +113,6 @@ export function SessionsFilters({
   )
 
   // Search handlers
-  const handleUserIdChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      onFilterChange({ ...filters, userId: e.target.value || undefined })
-    },
-    [filters, onFilterChange]
-  )
-
   const handleSessionIdChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onFilterChange({ ...filters, sessionId: e.target.value || undefined })
@@ -121,6 +123,20 @@ export function SessionsFilters({
   const handleNameChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onFilterChange({ ...filters, name: e.target.value || undefined })
+    },
+    [filters, onFilterChange]
+  )
+
+  const handleCompanySelect = useCallback(
+    (companyId: string | undefined) => {
+      onFilterChange({ ...filters, companyId })
+    },
+    [filters, onFilterChange]
+  )
+
+  const handleContactSelect = useCallback(
+    (contactId: string | undefined) => {
+      onFilterChange({ ...filters, contactId })
     },
     [filters, onFilterChange]
   )
@@ -140,7 +156,10 @@ export function SessionsFilters({
     if (filters.dateTo) count++
     if (filters.showArchived) count++
     if (filters.isHumanTakeover) count++
+    if (filters.isAnalyzed) count++
     if (filters.tags && filters.tags.length > 0) count++
+    if (filters.companyId) count++
+    if (filters.contactId) count++
     return count
   }, [filters])
 
@@ -153,6 +172,16 @@ export function SessionsFilters({
   // All custom tag slugs
   const customTagSlugs = useMemo(() => customTags.map((t) => t.slug), [customTags])
 
+  const companyItems = useMemo(
+    () => (companies ?? []).map((c) => ({ value: c.id, label: c.name })),
+    [companies]
+  )
+
+  const contactItems = useMemo(
+    () => (contacts ?? []).map((c) => ({ value: c.id, label: c.name })),
+    [contacts]
+  )
+
   // Quick filters (collapsed state)
   const quickFilters = (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -160,6 +189,7 @@ export function SessionsFilters({
       <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
       <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
       <FilterChip label="Needs Human" active={filters.isHumanTakeover ?? false} onClick={handleHumanTakeoverToggle} />
+      <FilterChip label="Analyzed" active={filters.isAnalyzed ?? false} onClick={handleAnalyzedToggle} />
       <span className="ml-2" />
       <FilterLabel>Type:</FilterLabel>
       {SESSION_TAGS.map((tag) => (
@@ -182,6 +212,7 @@ export function SessionsFilters({
         <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
         <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
         <FilterChip label="Needs Human" active={filters.isHumanTakeover ?? false} onClick={handleHumanTakeoverToggle} />
+        <FilterChip label="Analyzed" active={filters.isAnalyzed ?? false} onClick={handleAnalyzedToggle} />
         <span className="ml-2" />
         <FilterLabel>Type:</FilterLabel>
         {SESSION_TAGS.map((tag) => (
@@ -265,18 +296,34 @@ export function SessionsFilters({
             className="h-6 w-32 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
           />
         </div>
+        {companyItems.length > 0 && (
+          <div className="flex items-center gap-1 whitespace-nowrap">
+            <FilterLabel>Company:</FilterLabel>
+            <Combobox
+              items={companyItems}
+              value={filters.companyId}
+              onValueChange={handleCompanySelect}
+              placeholder="Filter by company..."
+              emptyMessage="No matches"
+              size="sm"
+            />
+          </div>
+        )}
+        {contactItems.length > 0 && (
+          <div className="flex items-center gap-1 whitespace-nowrap">
+            <FilterLabel>Contact:</FilterLabel>
+            <Combobox
+              items={contactItems}
+              value={filters.contactId}
+              onValueChange={handleContactSelect}
+              placeholder="Filter by contact..."
+              emptyMessage="No matches"
+              size="sm"
+            />
+          </div>
+        )}
         <div className="flex items-center gap-1">
-          <FilterLabel>User:</FilterLabel>
-          <Input
-            type="text"
-            placeholder="ID..."
-            value={filters.userId || ''}
-            onChange={handleUserIdChange}
-            className="h-6 w-24 rounded-full border border-[color:var(--border-subtle)] bg-transparent px-2 py-0 text-[10px]"
-          />
-        </div>
-        <div className="flex items-center gap-1">
-          <FilterLabel>Session:</FilterLabel>
+          <FilterLabel>Feedback:</FilterLabel>
           <Input
             type="text"
             placeholder="ID..."

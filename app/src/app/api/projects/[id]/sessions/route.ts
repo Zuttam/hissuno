@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
 import { listSessions, getProjectIntegrationStats, createManualSession } from '@/lib/supabase/sessions'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import type { SessionFilters, CreateSessionInput, CreateMessageInput, SessionTag } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -11,20 +12,6 @@ type RouteParams = { id: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 /**
@@ -43,9 +30,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const { searchParams } = new URL(request.url)
 
@@ -68,6 +54,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       dateTo: searchParams.get('dateTo') || undefined,
       showArchived: searchParams.get('showArchived') === 'true',
       isHumanTakeover: searchParams.get('isHumanTakeover') === 'true' || undefined,
+      isAnalyzed: searchParams.get('isAnalyzed') === 'true' || undefined,
+      companyId: searchParams.get('companyId') || undefined,
+      contactId: searchParams.get('contactId') || undefined,
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) : 50,
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined,
     }
@@ -78,6 +67,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[sessions.get] unexpected error', error)
@@ -98,9 +90,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
 
@@ -153,6 +144,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[sessions.post] unexpected error', error)

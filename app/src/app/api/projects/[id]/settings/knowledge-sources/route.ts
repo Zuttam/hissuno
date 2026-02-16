@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { assertUserOwnsProject } from '@/lib/auth/authorization'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { uploadDocument } from '@/lib/knowledge/storage'
@@ -13,20 +14,6 @@ type RouteParams = { id: string }
 
 type RouteContext = {
   params: Promise<RouteParams>
-}
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
 }
 
 const VALID_SOURCE_TYPES: KnowledgeSourceType[] = [
@@ -193,9 +180,9 @@ export async function GET(_request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from('knowledge_sources')
@@ -212,6 +199,9 @@ export async function GET(_request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[knowledge-sources.get] unexpected error', error)
@@ -236,9 +226,10 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
+    const actingUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
     const contentType = request.headers.get('content-type') ?? ''
     let sourceData: KnowledgeSourceInsert
@@ -291,7 +282,7 @@ export async function POST(request: Request, context: RouteContext) {
 
       // Special handling for codebase type
       if (type === 'codebase') {
-        return handleCodebaseCreate(supabase, user.id, projectId, {
+        return handleCodebaseCreate(supabase, actingUserId, projectId, {
           repositoryUrl,
           repositoryBranch,
           analysisScope: analysis_scope,
@@ -338,6 +329,9 @@ export async function POST(request: Request, context: RouteContext) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
 
     console.error('[knowledge-sources.post] unexpected error', error)
     return NextResponse.json({ error: 'Failed to create knowledge source.' }, { status: 500 })
@@ -363,9 +357,9 @@ export async function DELETE(request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
 
     // First fetch the source to get storage_path for cleanup
     const { data: source, error: fetchError } = await supabase
@@ -410,6 +404,9 @@ export async function DELETE(request: Request, context: RouteContext) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    }
 
     console.error('[knowledge-sources.delete] unexpected error', error)
     return NextResponse.json({ error: 'Failed to delete knowledge source.' }, { status: 500 })
@@ -436,9 +433,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
-
-    await assertUserOwnsProject(supabase, user.id, projectId)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await createClient()
+    const actingUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
     const payload = await request.json().catch(() => null)
 
@@ -490,7 +488,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           await updateGitHubCodebase(
             supabase,
             source.source_code_id,
-            user.id,
+            actingUserId,
             {
               repositoryUrl: payload.repositoryUrl,
               repositoryBranch: payload.repositoryBranch,
@@ -544,6 +542,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
     }
 
     console.error('[knowledge-sources.patch] unexpected error', error)

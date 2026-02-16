@@ -18,23 +18,30 @@ export function generateInviteCode(): string {
  * Creates an invite code for a specific email address.
  * Used to auto-generate invites when someone joins the waitlist.
  */
-export async function createInviteForEmail(ownerUserId: string, targetEmail: string): Promise<string> {
+export async function createInviteForEmail(
+  ownerUserId: string,
+  targetEmail: string
+): Promise<{ code: string; inviteId: string }> {
   const supabase = createAdminClient()
   const code = generateInviteCode()
 
-  const { error } = await supabase.from('invites').insert({
-    code,
-    owner_user_id: ownerUserId,
-    target_email: targetEmail,
-  })
+  const { data, error } = await supabase
+    .from('invites')
+    .insert({
+      code,
+      owner_user_id: ownerUserId,
+      target_email: targetEmail,
+    })
+    .select('id')
+    .single()
 
-  if (error) {
+  if (error || !data) {
     console.error('[invite-service.createInviteForEmail] Failed to create invite:', error)
     throw new Error('Failed to create invite.')
   }
 
   console.log(`[invite-service.createInviteForEmail] Created invite ${code} for ${targetEmail}`)
-  return code
+  return { code, inviteId: data.id }
 }
 
 /**
@@ -122,6 +129,26 @@ export async function claimInvite(code: string, userId: string): Promise<void> {
 
   if (activateError) {
     console.error('[invite-service.claimInvite] Failed to activate user profile:', activateError)
+  }
+
+  // Activate any pending project memberships linked to this invite
+  const { data: activatedMembers, error: membersError } = await supabase
+    .from('project_members')
+    .update({
+      user_id: userId,
+      status: 'active',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('signup_invite_id', invite.id)
+    .eq('status', 'pending')
+    .select('project_id')
+
+  if (membersError) {
+    console.error('[invite-service.claimInvite] Failed to activate project memberships:', membersError)
+  } else if (activatedMembers && activatedMembers.length > 0) {
+    console.log(
+      `[invite-service.claimInvite] Activated ${activatedMembers.length} project membership(s) for user ${userId}`
+    )
   }
 
   console.log(`[invite-service.claimInvite] Invite ${normalizedCode} claimed by user ${userId}`)
