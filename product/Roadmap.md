@@ -167,8 +167,8 @@
 ### Feedback (f.k.a sessions)
 [] Support Zendesk in early access
 
-
 ### Platform
+[] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
 [] Delete project
 
 ### Issues
@@ -179,13 +179,13 @@
 ## Phase 11
 
 ### Marketing 
-[] Support promotions
+[] Support referral promotions
 
 ### Integrations
 [] Decide on RBAC integrations access for members
 
 ### Feedback (f.k.a sessions)
-[] Add posthog sessions support
+[] Add behavioral feedback (posthog/amplitude/etc) support
 
 ### Suport
 [] Email agent
@@ -194,7 +194,6 @@
 [] Create initial implementation 
 
 ### Platform
-[] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
 [] MCP Apps
 
 

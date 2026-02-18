@@ -9,10 +9,7 @@ import { addProjectMember } from '@/lib/auth/project-members'
 import { createProjectSetupNotifications } from '@/lib/notifications/setup-notifications'
 import type { Database } from '@/types/supabase'
 import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
-import {
-  createClient,
-  isSupabaseConfigured,
-} from '@/lib/supabase/server'
+import { createAdminClient, createRequestScopedClient, isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
@@ -23,14 +20,19 @@ export async function GET() {
   }
 
   try {
-    await requireRequestIdentity()
+    const { supabase, apiKeyProjectId } = await createRequestScopedClient()
 
-    const supabase = await createClient()
-
-    const { data, error } = await supabase
+    let query = supabase
       .from('projects')
       .select('*')
       .order('created_at', { ascending: false })
+
+    // API keys are project-scoped — only return their project
+    if (apiKeyProjectId) {
+      query = query.eq('id', apiKeyProjectId)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error('[projects.get] failed to list projects', error)
@@ -93,7 +95,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'API keys cannot create projects.' }, { status: 403 })
     }
 
-    const supabase = await createClient()
+    // Use admin client for project creation: this is a bootstrap operation where
+    // the user doesn't yet have a project_members entry, so the cookie-based client
+    // would fail RLS (SELECT policy checks project_members, INSERT needs auth.uid()).
+    const supabase = createAdminClient()
 
     let codebaseId: string | null = null
 
