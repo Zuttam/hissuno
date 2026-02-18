@@ -81,3 +81,4 @@ All files containing `project.user_id !== user.id`
 - `projects/route.ts` (POST) uses `createAdminClient()` directly because project creation is a bootstrap operation (no project_members entry exists yet).
 - Agent found and fixed `slack/channels/leave/route.ts` which wasn't in the original audit list.
 - Two knowledge route files needed type annotation updates for helper function parameters that referenced `ReturnType<typeof createClient>`.
+- Removed explicit `DbClient` type alias from `authorization.ts` — `getClientForIdentity()` now infers its return type from the factory functions. Adding `<Database>` generics to `createClient`/`createAdminClient` would have been the ideal fix, but surfaced 230+ pre-existing type errors across the codebase (JSONB `metadata` fields typed as `Json | null`, nullable columns, etc.). Deferring typed clients to a separate effort.

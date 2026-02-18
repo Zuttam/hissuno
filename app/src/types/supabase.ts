@@ -531,6 +531,7 @@ export type Database = {
       intercom_connections: {
         Row: {
           access_token: string
+          auth_method: string
           created_at: string
           filter_config: Json | null
           id: string
@@ -548,6 +549,7 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          auth_method?: string
           created_at?: string
           filter_config?: Json | null
           id?: string
@@ -565,6 +567,7 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          auth_method?: string
           created_at?: string
           filter_config?: Json | null
           id?: string

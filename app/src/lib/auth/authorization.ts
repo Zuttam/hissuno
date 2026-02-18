@@ -1,12 +1,8 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/supabase'
 import type { RequestIdentity } from './identity'
 import type { ProjectRole } from '@/types/project-members'
 import { hasProjectAccess, hasProjectRole } from './project-members'
 import { UnauthorizedError } from './server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-
-type DbClient = SupabaseClient<Database>
 
 export class ForbiddenError extends Error {
   status = 403
@@ -68,7 +64,7 @@ export async function assertProjectAccess(
  * and the route handler uses assertProjectAccess for authz. API key requests have
  * no JWT session, so the cookie-based client would fail auth checks.
  */
-export async function getClientForIdentity(identity: RequestIdentity): Promise<DbClient> {
+export async function getClientForIdentity(identity: RequestIdentity) {
   if (identity.type === 'user') {
     return createClient()
   }

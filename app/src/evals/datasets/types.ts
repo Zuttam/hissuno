@@ -35,9 +35,10 @@ export interface PMEvalExpectedOutcome {
   classification: ExpectedClassification
 
   /**
-   * Whether the agent should find an existing issue to upvote
+   * Whether the agent should find an existing issue to upvote.
+   * Defaults to false when not specified.
    */
-  shouldFindExisting: boolean
+  shouldFindExisting?: boolean
 
   /**
    * ID of existing issue that should be found (for duplicate detection tests)

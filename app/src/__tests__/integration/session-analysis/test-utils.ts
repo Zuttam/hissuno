@@ -543,12 +543,13 @@ export function assertDuplicateDetection(
   expected: PMEvalTestCase['expected']
 ): { passed: boolean; message: string } {
   const foundDuplicate = actual.action === 'upvoted'
+  const shouldFindExisting = expected.shouldFindExisting ?? false
 
-  if (expected.shouldFindExisting === foundDuplicate) {
+  if (shouldFindExisting === foundDuplicate) {
     return { passed: true, message: 'Duplicate detection correct' }
   }
 
-  if (expected.shouldFindExisting) {
+  if (shouldFindExisting) {
     return {
       passed: false,
       message: `Expected to find existing issue, but created new one instead`,
