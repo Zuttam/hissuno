@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getIssueById } from '@/lib/supabase/issues'
-import { createClient, createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
 import { mastra } from '@/mastra'
 import { getPmAgentSettingsAdmin } from '@/lib/supabase/project-settings/pm-agent'
@@ -83,7 +83,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Issue not found.' }, { status: 404 })
     }
 
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Fetch the specific analysis run by runId (exact match, not "latest")
     const { data: analysisRun, error: runError } = await supabase

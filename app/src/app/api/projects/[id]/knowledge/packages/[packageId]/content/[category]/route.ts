@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { downloadKnowledgePackage, uploadKnowledgePackage } from '@/lib/knowledge/storage'
 import type { KnowledgeCategory } from '@/lib/knowledge/types'
 
@@ -35,7 +35,7 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Verify package exists and belongs to project
     const { data: pkg, error: pkgError } = await supabase
@@ -117,7 +117,7 @@ export async function PUT(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Verify package exists and belongs to project
     const { data: pkg, error: pkgError } = await supabase

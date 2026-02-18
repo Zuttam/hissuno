@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { validateCSVFileName, createCSVUploadUrl, MAX_CSV_FILE_SIZE } from '@/lib/customers/csv-storage'
 
 export const runtime = 'nodejs'
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       )
     }
 
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const { uploadUrl, token, storagePath, error: urlError } = await createCSVUploadUrl(projectId, filename, supabase)
 
     if (urlError) {

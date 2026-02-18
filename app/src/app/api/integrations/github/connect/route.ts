@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError, getSafeRedirectPath } from '@/lib/auth/server'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 
 export const runtime = 'nodejs'
 
@@ -55,7 +56,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    if (project.user_id !== user.id) {
+    const hasAccess = await hasProjectAccess(projectId, user.id)
+    if (!hasAccess) {
       return NextResponse.json({ error: 'Not authorized to modify this project' }, { status: 403 })
     }
 

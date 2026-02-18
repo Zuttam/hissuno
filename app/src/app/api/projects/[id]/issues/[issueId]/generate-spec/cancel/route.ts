@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getIssueById } from '@/lib/supabase/issues'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { cancelSpecGeneration } from '@/lib/issues/spec-generation-service'
 
 export const runtime = 'nodejs'
@@ -36,7 +36,7 @@ export async function POST(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Issue not found.' }, { status: 404 })
     }
 
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const result = await cancelSpecGeneration({ issueId, supabase })
 
     if (!result.success) {

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
@@ -16,7 +16,7 @@ type RouteContext = {
  * Helper to verify package belongs to project
  */
 async function verifyPackageOwnership(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getClientForIdentity>>,
   packageId: string,
   projectId: string
 ) {
@@ -48,7 +48,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Verify package belongs to project
     const isOwned = await verifyPackageOwnership(supabase, packageId, projectId)
@@ -141,7 +141,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Verify package belongs to project
     const isOwned = await verifyPackageOwnership(supabase, packageId, projectId)

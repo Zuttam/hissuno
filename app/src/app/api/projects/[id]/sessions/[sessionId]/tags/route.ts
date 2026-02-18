@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getSessionById, updateSessionTags } from '@/lib/supabase/sessions'
 import { getProjectCustomTags } from '@/lib/supabase/custom-tags'
@@ -100,7 +100,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
     await assertProjectAccess(identity, projectId)
 
     // Get session with tags
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .select('id, tags, tags_auto_applied_at, project_id')

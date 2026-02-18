@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 import { getGitHubInstallationToken, fetchRepoBranches } from '@/lib/integrations/github'
 
 export const runtime = 'nodejs'
@@ -40,14 +41,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
       throw new UnauthorizedError('User not authenticated')
     }
 
-    // Verify user owns this project
+    // Verify user has access to this project
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id, user_id')
       .eq('id', projectId)
       .single()
 
-    if (projectError || !project || project.user_id !== user.id) {
+    if (projectError || !project) {
+      throw new UnauthorizedError('Not authorized to access this project')
+    }
+
+    const hasAccess = await hasProjectAccess(projectId, user.id)
+    if (!hasAccess) {
       throw new UnauthorizedError('Not authorized to access this project')
     }
 

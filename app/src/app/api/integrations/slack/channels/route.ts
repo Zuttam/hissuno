@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 import { updateSlackChannelMode, type ChannelMode, type CaptureScope } from '@/lib/integrations/slack'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -43,7 +44,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    if (project.user_id !== user.id) {
+    const hasAccessGet = await hasProjectAccess(projectId, user.id)
+    if (!hasAccessGet) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 
@@ -165,7 +167,8 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Project not found' }, { status: 404 })
       }
 
-      if (project.user_id !== user.id) {
+      const hasAccessPatch = await hasProjectAccess(projectId, user.id)
+      if (!hasAccessPatch) {
         return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
       }
 
@@ -212,13 +215,13 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'channelDbId is required' }, { status: 400 })
     }
 
-    // Verify user owns the project for this channel
+    // Verify user has access to the project for this channel
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: channel, error: channelError } = await (supabase as any)
       .from('slack_channels')
       .select(`
         id,
-        slack_workspace_tokens!inner(project_id, projects!inner(user_id))
+        slack_workspace_tokens!inner(project_id)
       `)
       .eq('id', channelDbId)
       .single()
@@ -229,9 +232,10 @@ export async function PATCH(request: NextRequest) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tokens = channel.slack_workspace_tokens as any
-    const projectOwnerId = tokens?.projects?.user_id
+    const channelProjectId = tokens?.project_id
 
-    if (projectOwnerId !== user.id) {
+    const hasAccessChannel = await hasProjectAccess(channelProjectId, user.id)
+    if (!hasAccessChannel) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 

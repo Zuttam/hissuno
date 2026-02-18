@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getCompanyById, updateCompanyById, deleteCompanyById } from '@/lib/supabase/companies'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { COMPANY_STAGES } from '@/types/customer'
 import type { UpdateCompanyInput } from '@/types/customer'
 
@@ -58,7 +58,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const existing = await getCompanyById(companyId)
     if (!existing || existing.project_id !== projectId) {
@@ -104,7 +104,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const existing = await getCompanyById(companyId)
     if (!existing || existing.project_id !== projectId) {

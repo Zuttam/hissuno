@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import type { NamedPackageWithSources } from '@/lib/knowledge/types'
 
 export const runtime = 'nodejs'
@@ -28,7 +28,7 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Fetch the package
     const { data: pkg, error: pkgError } = await supabase
@@ -116,7 +116,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Verify package exists and belongs to project
     const { data: existing, error: fetchError } = await supabase
@@ -217,7 +217,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Verify package exists and belongs to project
     const { data: existing, error: fetchError } = await supabase

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured, createAdminClient } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 import { SlackClient } from '@/lib/integrations/slack/client'
 
 export const runtime = 'nodejs'
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
       throw new UnauthorizedError('User not authenticated')
     }
 
-    // Verify user owns this project and get channel info
+    // Verify user has access to this project and get channel info
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: channel, error: channelError } = await (supabase as any)
       .from('slack_channels')
@@ -48,8 +49,7 @@ export async function POST(request: NextRequest) {
         slack_workspace_tokens!inner(
           id,
           project_id,
-          bot_token,
-          projects!inner(user_id)
+          bot_token
         )
       `)
       .eq('id', channelDbId)
@@ -61,9 +61,10 @@ export async function POST(request: NextRequest) {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tokens = channel.slack_workspace_tokens as any
-    const projectOwnerId = tokens?.projects?.user_id
+    const channelProjectId = tokens?.project_id
 
-    if (projectOwnerId !== user.id) {
+    const hasAccess = await hasProjectAccess(channelProjectId, user.id)
+    if (!hasAccess) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 

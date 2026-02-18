@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { listCustomFieldDefinitions, createCustomFieldDefinition } from '@/lib/supabase/customer-custom-fields'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { CUSTOM_FIELD_TYPES } from '@/types/customer'
 import type { CustomerEntityType } from '@/types/customer'
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const { searchParams } = new URL(request.url)
     const entityType = (searchParams.get('entity_type') as CustomerEntityType) ?? undefined
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const body = await request.json()
 

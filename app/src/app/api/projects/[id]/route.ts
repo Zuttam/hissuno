@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { updateGitHubCodebase, cleanupRepository } from '@/lib/codebase'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
@@ -24,7 +24,7 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, id)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const { data, error } = await supabase
       .from('projects')
@@ -113,7 +113,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, id, { requiredRole: 'owner' })
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const actingUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
     // Get the current project
@@ -203,7 +203,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, id, { requiredRole: 'owner' })
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Get the codebase knowledge_source with source_code to clean up storage
     const { data: codebaseSource } = await supabase

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
 import { mastra } from '@/mastra'
 
@@ -66,7 +66,7 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // Fetch the latest running analysis from project_analyses table
     const { data: latestAnalysis, error: analysisError } = await supabase
@@ -214,7 +214,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
           // Mark the analysis as failed in the database
           try {
-            const supabaseForError = await createClient()
+            const supabaseForError = await getClientForIdentity(identity)
             await supabaseForError
               .from('project_analyses')
               .update({

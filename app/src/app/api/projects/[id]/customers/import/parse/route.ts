@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { downloadCSVImport } from '@/lib/customers/csv-storage'
 import { parseCSVContent, suggestMappings } from '@/lib/customers/csv-import'
 import type { CustomerEntityType } from '@/types/customer'
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const body = await request.json()
     const storagePath = body.storagePath as string | undefined

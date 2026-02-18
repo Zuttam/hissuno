@@ -6,6 +6,7 @@
 import { NextRequest } from 'next/server'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
 import { hasIntercomConnection } from '@/lib/integrations/intercom'
 import { syncIntercomConversations, type SyncProgressEvent, type SyncMode } from '@/lib/integrations/intercom/sync'
@@ -23,7 +24,7 @@ async function resolveUserAndProject(projectId: string) {
     throw new UnauthorizedError('User not authenticated')
   }
 
-  // Verify user owns this project
+  // Verify user has access to this project
   const { data: project, error: projectError } = await supabase
     .from('projects')
     .select('id, user_id')
@@ -34,7 +35,8 @@ async function resolveUserAndProject(projectId: string) {
     throw new Error('Project not found')
   }
 
-  if (project.user_id !== user.id) {
+  const hasAccess = await hasProjectAccess(projectId, user.id)
+  if (!hasAccess) {
     throw new UnauthorizedError('Not authorized to access this project')
   }
 

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { uploadDocument, validateUploadedFile } from '@/lib/knowledge/storage'
 import { createGitHubCodebase, syncGitHubCodebase, deleteCodebase, updateGitHubCodebase } from '@/lib/codebase'
 import { hasGitHubInstallation } from '@/lib/integrations/github'
@@ -67,7 +67,7 @@ function isUserAddableType(type: string): type is KnowledgeSourceType {
  * Helper to create or replace a codebase knowledge source
  */
 async function handleCodebaseCreate(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: Awaited<ReturnType<typeof getClientForIdentity>>,
   userId: string,
   projectId: string,
   params: {
@@ -205,7 +205,7 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const { data, error } = await supabase
       .from('knowledge_sources')
@@ -251,7 +251,7 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const actingUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
     const contentType = request.headers.get('content-type') ?? ''
@@ -396,7 +396,7 @@ export async function DELETE(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     // First fetch the source to get storage_path for cleanup
     const { data: source, error: fetchError } = await supabase
@@ -472,7 +472,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const actingUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
     const payload = await request.json().catch(() => null)

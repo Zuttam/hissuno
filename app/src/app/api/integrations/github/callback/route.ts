@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 import { storeGitHubInstallation } from '@/lib/integrations/github'
 import { getInstallationInfo } from '@/lib/integrations/github/jwt'
 
@@ -66,7 +67,8 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Project not found.', origin)
     }
 
-    if (project.user_id !== userId) {
+    const hasAccess = await hasProjectAccess(projectId, userId)
+    if (!hasAccess) {
       return redirectWithError('Project access denied.', origin)
     }
 

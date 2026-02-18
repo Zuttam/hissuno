@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 import { storeIntercomCredentials } from '@/lib/integrations/intercom'
 import { exchangeIntercomOAuthCode } from '@/lib/integrations/intercom/oauth'
 import { IntercomClient } from '@/lib/integrations/intercom/client'
@@ -71,7 +72,8 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Project not found.')
     }
 
-    if (project.user_id !== userId) {
+    const hasAccess = await hasProjectAccess(projectId, userId)
+    if (!hasAccess) {
       return redirectWithError('Project access denied.')
     }
 

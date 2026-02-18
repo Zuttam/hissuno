@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getJiraIssueSyncStatus } from '@/lib/integrations/jira'
 
@@ -24,7 +24,7 @@ export async function GET(
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
 
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const syncStatus = await getJiraIssueSyncStatus(supabase, issueId)
     return NextResponse.json(syncStatus)
   } catch (error) {

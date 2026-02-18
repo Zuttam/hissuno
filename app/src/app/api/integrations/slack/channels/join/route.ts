@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, isSupabaseConfigured, createAdminClient } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 import { getSlackBotTokenByProject, getOrCreateSlackChannel } from '@/lib/integrations/slack'
 import { SlackClient } from '@/lib/integrations/slack/client'
 
@@ -50,7 +51,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
 
-    if (project.user_id !== user.id) {
+    const hasAccess = await hasProjectAccess(projectId, user.id)
+    if (!hasAccess) {
       return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
     }
 

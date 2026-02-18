@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { getContactById, updateContactById, deleteContactById } from '@/lib/supabase/contacts'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import type { UpdateContactInput } from '@/types/customer'
 
 export const runtime = 'nodejs'
@@ -57,7 +57,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const existing = await getContactById(contactId)
     if (!existing || existing.project_id !== projectId) {
@@ -98,7 +98,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
 
     const existing = await getContactById(contactId)
     if (!existing || existing.project_id !== projectId) {

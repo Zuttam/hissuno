@@ -1,29 +1,17 @@
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { addProjectMember } from '@/lib/auth/project-members'
 import { createDemoProjectData } from '@/lib/demo/demo-data-service'
 import { createProjectSetupNotifications } from '@/lib/notifications/setup-notifications'
 import type { Database } from '@/types/supabase'
 import {
-  createClient,
+  createAdminClient,
   isSupabaseConfigured,
 } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
 
 /**
  * POST /api/projects/demo
@@ -36,13 +24,17 @@ export async function POST() {
   }
 
   try {
-    const { supabase, user } = await resolveUser()
+    const identity = await requireRequestIdentity()
+    if (identity.type !== 'user') {
+      return NextResponse.json({ error: 'API keys cannot create demo projects.' }, { status: 403 })
+    }
+    const supabase = createAdminClient()
 
     // Guard: only one demo project per user
     const { count: existingDemoCount } = await supabase
       .from('projects')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('user_id', identity.userId)
       .eq('is_demo', true)
 
     if (existingDemoCount && existingDemoCount > 0) {
@@ -55,7 +47,7 @@ export async function POST() {
       id,
       name: 'Demo Project',
       description: 'A pre-built project with sample data to help you explore Hissuno.',
-      user_id: user.id,
+      user_id: identity.userId,
       is_demo: true,
     }
 
@@ -69,6 +61,14 @@ export async function POST() {
       console.error('[projects.demo.post] failed to create demo project', projectInsertError)
       return NextResponse.json({ error: 'Failed to create demo project.' }, { status: 500 })
     }
+
+    // Add the user as the project owner
+    await addProjectMember({
+      projectId: id,
+      userId: identity.userId,
+      role: 'owner',
+      status: 'active',
+    })
 
     // Populate demo data (sessions, issues, companies, contacts)
     try {
@@ -84,7 +84,7 @@ export async function POST() {
     }
 
     // Create setup notifications (fire-and-forget)
-    void createProjectSetupNotifications(user.id, id, {
+    void createProjectSetupNotifications(identity.userId, id, {
       hasKnowledgeSources: false,
     }).catch((err) => console.error('[projects.demo.post] setup notifications error:', err))
 

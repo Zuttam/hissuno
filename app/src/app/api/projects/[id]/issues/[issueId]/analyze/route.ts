@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
-import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { getIssueById } from '@/lib/supabase/issues'
 import {
   triggerIssueAnalysis,
@@ -40,7 +40,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Issue not found.' }, { status: 404 })
     }
 
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const status = await getIssueAnalysisStatus({ issueId, supabase })
 
     return NextResponse.json(status)
@@ -91,7 +91,7 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       throw error
     }
 
-    const supabase = await createClient()
+    const supabase = await getClientForIdentity(identity)
     const result = await triggerIssueAnalysis({
       projectId,
       issueId,
