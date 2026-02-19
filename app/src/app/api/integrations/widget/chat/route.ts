@@ -5,6 +5,7 @@ import { triggerChatRun, getChatRunStatus } from '@/lib/agent/chat-run-service'
 import { createAdminClient } from '@/lib/supabase/server'
 import { saveSessionMessage } from '@/lib/supabase/session-messages'
 import { resolveContactForSession } from '@/lib/customers/contact-resolution'
+import { hasProjectAccess } from '@/lib/auth/project-members'
 import { isOriginAllowed, verifyWidgetJWT } from '@/lib/utils/widget-auth'
 
 export const runtime = 'nodejs'
@@ -248,12 +249,22 @@ export async function POST(request: NextRequest) {
     // Use admin client since this is public-facing (no user auth)
     const supabase = createAdminClient()
 
-    // Eagerly resolve contact for data tool scoping
+    // Eagerly resolve contact for session tracking (links session to contact record)
     const contactResult = await resolveContactForSession(supabase, {
       projectId,
       sessionId,
       userMetadata: userMetadata ?? null,
     })
+
+    // If the user is a project member, give them team-member mode (full project access)
+    // by passing contactId: null. Contact resolution still links the session for tracking.
+    let toolScopingContactId = contactResult.contactId
+    if (userId) {
+      const isTeamMember = await hasProjectAccess(projectId, userId)
+      if (isTeamMember) {
+        toolScopingContactId = null
+      }
+    }
 
     // Trigger chat run (creates record, returns runId)
     const result = await triggerChatRun({
@@ -263,7 +274,7 @@ export async function POST(request: NextRequest) {
       userId,
       userMetadata,
       packageId,
-      contactId: contactResult.contactId,
+      contactId: toolScopingContactId,
       supabase,
     })
 
