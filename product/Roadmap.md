@@ -168,6 +168,7 @@
 [] Support Zendesk in early access
 
 ### Platform
+[] Enable additional notifications 
 [] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
 [] Delete project
 

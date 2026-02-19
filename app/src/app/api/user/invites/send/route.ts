@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { requireSessionUser, UnauthorizedError } from '@/lib/auth/server'
+import { requireUserIdentity } from '@/lib/auth/identity'
+import { UnauthorizedError } from '@/lib/auth/server'
+import { ForbiddenError } from '@/lib/auth/authorization'
 import { isSupabaseConfigured, createAdminClient } from '@/lib/supabase/server'
 import { sendInviteEmailIfNeeded } from '@/lib/notifications/invite-notifications'
 
@@ -11,7 +13,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await requireSessionUser()
+    const identity = await requireUserIdentity()
 
     const body = await request.json()
     const { inviteId, recipientEmail } = body as { inviteId?: string; recipientEmail?: string }
@@ -33,7 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invite not found.' }, { status: 404 })
     }
 
-    if (invite.owner_user_id !== user.id) {
+    if (invite.owner_user_id !== identity.userId) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 403 })
     }
 
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
 
     // Send invite email with dedup and tracking
     const result = await sendInviteEmailIfNeeded({
-      userId: user.id,
+      userId: identity.userId,
       inviteId: invite.id,
       inviteCode: invite.code,
       recipientEmail,
@@ -71,6 +73,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
     console.error('[api.user.invites.send] unexpected error', error)
     return NextResponse.json({ error: 'Failed to send invite.' }, { status: 500 })

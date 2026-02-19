@@ -70,16 +70,6 @@ export async function getSessionUser(headersLike?: HeadersInput | Promise<Header
   return extractUserFromHeaders(nextHeaders())
 }
 
-export async function requireSessionUser(headersLike?: HeadersInput | Promise<HeadersInput>): Promise<SessionUser> {
-  const user = await getSessionUser(headersLike)
-
-  if (!user) {
-    throw new UnauthorizedError()
-  }
-
-  return user
-}
-
 /**
  * Default paths for post-authentication redirects.
  */

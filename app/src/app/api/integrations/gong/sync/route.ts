@@ -4,44 +4,15 @@
  */
 
 import { NextRequest } from 'next/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
+import { requireUserIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
 import { hasGongConnection } from '@/lib/integrations/gong'
 import { syncGongCalls, type SyncProgressEvent, type SyncMode } from '@/lib/integrations/gong/sync'
 
 export const runtime = 'nodejs'
-
-async function resolveUserAndProject(projectId: string) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  // Verify user has access to this project
-  const { data: project, error: projectError } = await supabase
-    .from('projects')
-    .select('id, user_id')
-    .eq('id', projectId)
-    .single()
-
-  if (projectError || !project) {
-    throw new Error('Project not found')
-  }
-
-  const hasAccess = await hasProjectAccess(projectId, user.id)
-  if (!hasAccess) {
-    throw new UnauthorizedError('Not authorized to access this project')
-  }
-
-  return { supabase, user, project }
-}
 
 /**
  * SSE event types for Gong sync
@@ -89,19 +60,19 @@ export async function GET(request: NextRequest) {
   let supabase
 
   try {
-    const resolved = await resolveUserAndProject(projectId)
-    supabase = resolved.supabase
+    const identity = await requireUserIdentity()
+    await assertProjectAccess(identity, projectId)
+    supabase = await getClientForIdentity(identity)
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      return new Response(JSON.stringify({ error: error.message }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized.' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       })
     }
-
-    if (error instanceof Error && error.message === 'Project not found') {
-      return new Response(JSON.stringify({ error: 'Project not found' }), {
-        status: 404,
+    if (error instanceof ForbiddenError) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 403,
         headers: { 'Content-Type': 'application/json' },
       })
     }

@@ -48,14 +48,14 @@ export const NOTIFICATION_TYPE_INFO: NotificationTypeInfo[] = [
   {
     type: 'new_issue_created',
     label: 'New Issue Created',
-    description: 'When an issue is auto-created from a session',
+    description: 'When an issue is auto-created from a feedback',
     active: false,
     supportedChannels: ['email', 'slack'],
   },
   {
     type: 'session_reviewed',
     label: 'Session Reviewed',
-    description: 'When a session is reviewed by the PM agent',
+    description: 'When a feedback is reviewed by the PM agent',
     active: false,
     supportedChannels: ['email', 'slack'],
   },

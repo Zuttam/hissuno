@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import { requireSessionUser, UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { requireUserIdentity } from '@/lib/auth/identity'
+import { UnauthorizedError } from '@/lib/auth/server'
+import { ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
@@ -10,13 +12,13 @@ export async function GET() {
   }
 
   try {
-    const user = await requireSessionUser()
-    const supabase = await createClient()
+    const identity = await requireUserIdentity()
+    const supabase = await getClientForIdentity(identity)
 
     const { data: profile, error } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', identity.userId)
       .single()
 
     if (error && error.code !== 'PGRST116') {
@@ -30,6 +32,9 @@ export async function GET() {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('[user.profile.get] unexpected error', error)
     return NextResponse.json({ error: 'Unable to load profile.' }, { status: 500 })
   }
@@ -41,8 +46,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await requireSessionUser()
-    const supabase = await createClient()
+    const identity = await requireUserIdentity()
+    const supabase = await getClientForIdentity(identity)
     const body = await request.json()
 
     const {
@@ -60,13 +65,13 @@ export async function POST(request: Request) {
     const { data: existingProfile } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', identity.userId)
       .single()
 
     // Build update object - only include fields that were explicitly provided
     // This ensures partial updates don't reset other fields
     const updateData: Record<string, unknown> = {
-      user_id: user.id,
+      user_id: identity.userId,
     }
 
     // Profile fields - only update if provided (not undefined)
@@ -123,6 +128,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
     console.error('[user.profile.post] unexpected error', error)
     return NextResponse.json({ error: 'Unable to save profile.' }, { status: 500 })

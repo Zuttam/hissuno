@@ -84,13 +84,13 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-end">
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
       {/* Summary Cards */}
-      <StatCardGrid columns={4}>
+      <StatCardGrid columns={3}>
         <StatCard
           label="Feedback"
           value={data.sessions.total}

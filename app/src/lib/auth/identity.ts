@@ -1,5 +1,6 @@
 import { headers as nextHeaders } from 'next/headers'
 import { UnauthorizedError, USER_ID_HEADER, USER_EMAIL_HEADER, USER_NAME_HEADER } from './server'
+import { ForbiddenError } from './authorization'
 
 export const API_KEY_ID_HEADER = 'x-api-key-id'
 export const API_KEY_PROJECT_ID_HEADER = 'x-api-key-project-id'
@@ -8,6 +9,8 @@ export const API_KEY_CREATED_BY_HEADER = 'x-api-key-created-by'
 export type RequestIdentity =
   | { type: 'user'; userId: string; email: string | null; name: string | null }
   | { type: 'api_key'; projectId: string; keyId: string; createdByUserId: string }
+
+export type UserIdentity = Extract<RequestIdentity, { type: 'user' }>
 
 /**
  * Reads proxy-injected headers to determine request identity.
@@ -56,5 +59,17 @@ export async function requireRequestIdentity(headersLike?: Headers): Promise<Req
     throw new UnauthorizedError()
   }
 
+  return identity
+}
+
+/**
+ * Requires a user identity (rejects API key identities).
+ * Use this for routes that only make sense for authenticated users (e.g. profile, billing).
+ */
+export async function requireUserIdentity(headersLike?: Headers): Promise<UserIdentity> {
+  const identity = await requireRequestIdentity(headersLike)
+  if (identity.type !== 'user') {
+    throw new ForbiddenError('This endpoint requires user authentication.')
+  }
   return identity
 }

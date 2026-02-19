@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
-import { requireSessionUser, UnauthorizedError } from '@/lib/auth/server'
-import { createClient, isSupabaseConfigured, createAdminClient } from '@/lib/supabase/server'
+import { requireUserIdentity } from '@/lib/auth/identity'
+import { UnauthorizedError } from '@/lib/auth/server'
+import { ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
+import { isSupabaseConfigured, createAdminClient } from '@/lib/supabase/server'
 import { resolvePreferences, type NotificationPreferences } from '@/types/notification-preferences'
 import { resolveSlackUserId } from '@/lib/notifications/slack-notifications'
 
@@ -12,14 +14,14 @@ export async function GET() {
   }
 
   try {
-    const user = await requireSessionUser()
-    const supabase = await createClient()
+    const identity = await requireUserIdentity()
+    const supabase = await getClientForIdentity(identity)
 
     // Fetch user profile preferences
     const { data: profile, error } = await supabase
       .from('user_profiles')
       .select('notification_preferences, notifications_silenced, slack_notification_channel')
-      .eq('user_id', user.id)
+      .eq('user_id', identity.userId)
       .single()
 
     if (error && error.code !== 'PGRST116') {
@@ -100,6 +102,9 @@ export async function GET() {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
     console.error('[notification-preferences.get] unexpected error', error)
     return NextResponse.json({ error: 'Unable to load preferences.' }, { status: 500 })
   }
@@ -111,8 +116,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await requireSessionUser()
-    const supabase = await createClient()
+    const identity = await requireUserIdentity()
+    const supabase = await getClientForIdentity(identity)
     const body = await request.json()
 
     const { preferences, silenced, slackNotificationChannel } = body as {
@@ -122,7 +127,7 @@ export async function POST(request: Request) {
     }
 
     const updateData: Record<string, unknown> = {
-      user_id: user.id,
+      user_id: identity.userId,
     }
 
     if (preferences !== undefined) {
@@ -153,7 +158,7 @@ export async function POST(request: Request) {
       const hasSlackEnabled = Object.values(preferences).some((pref) => pref?.slack)
       if (hasSlackEnabled) {
         // Fire-and-forget: resolve Slack user ID in background
-        void resolveSlackUserId(user.id).catch((err) => {
+        void resolveSlackUserId(identity.userId).catch((err) => {
           console.error('[notification-preferences.post] failed to resolve Slack user', err)
         })
       }
@@ -163,6 +168,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
     console.error('[notification-preferences.post] unexpected error', error)
     return NextResponse.json({ error: 'Unable to save preferences.' }, { status: 500 })

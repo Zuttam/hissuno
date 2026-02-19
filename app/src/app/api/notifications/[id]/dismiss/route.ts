@@ -1,22 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { requireUserIdentity } from '@/lib/auth/identity'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
-
-async function resolveUser() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
-
-  if (error || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  return { supabase, user }
-}
 
 export async function POST(
   _request: Request,
@@ -27,14 +15,15 @@ export async function POST(
   }
 
   try {
-    const { supabase, user } = await resolveUser()
+    const identity = await requireUserIdentity()
+    const supabase = await getClientForIdentity(identity)
     const { id } = await params
 
     const { error } = await supabase
       .from('user_notifications')
       .update({ dismissed_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('user_id', user.id)
+      .eq('user_id', identity.userId)
 
     if (error) {
       console.error('[notifications.dismiss.post] failed to dismiss notification', error)
@@ -45,6 +34,9 @@ export async function POST(
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
 
     console.error('[notifications.dismiss.post] unexpected error', error)

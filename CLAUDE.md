@@ -61,11 +61,23 @@ supabase gen types typescript --local > ../src/types/supabase.ts  # Regenerate t
 
 ## Architecture
 
+### Authentication & Proxy (Next.js 16)
+
+Next.js 16 uses `proxy.ts` (not `middleware.ts`) for request interception. Our proxy (`src/proxy.ts`) is the **sole trust boundary** for authentication:
+
+1. Validates JWT sessions via `supabase.auth.getUser()` or API keys via hash lookup
+2. Injects identity headers (`x-user-id`, `x-user-email`, `x-user-name`, `x-api-key-id`, etc.)
+3. **Strips all identity headers** when no valid credentials are present — prevents header forgery
+4. Downstream code (`resolveRequestIdentity`) trusts these proxy-injected headers — it does NO database calls
+
+**Security invariant**: Identity headers are ONLY trustworthy because the proxy strips/rewrites them on every request. Never read these headers outside of `resolveRequestIdentity()`, and never set them outside of `proxy.ts`.
+
 ### Project Structure
 
 ```
 app/
 ├── src/
+│   ├── proxy.ts               # Next.js 16 proxy (auth gateway)
 │   ├── app/                    # Next.js App Router
 │   │   ├── (auth)/            # Login, signup (public)
 │   │   ├── (authenticated)/   # Protected dashboard routes
@@ -126,7 +138,9 @@ await doSomething({ projectId, userId })
 
 ```typescript
 import { NextResponse } from 'next/server'
+import { requireRequestIdentity } from '@/lib/auth/identity'
 import { UnauthorizedError } from '@/lib/auth/server'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 
 export const runtime = 'nodejs'
 
@@ -135,13 +149,18 @@ export async function GET() {
     return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
   }
   try {
-    const { supabase, user } = await resolveUser()
-    // Query with RLS context - always filter by user_id
-    const { data } = await supabase.from('table').select('*').eq('user_id', user.id)
+    const identity = await requireRequestIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await getClientForIdentity(identity)
+    // Query with RLS context
+    const { data } = await supabase.from('table').select('*')
     return NextResponse.json({ data })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
     console.error('[route.method] unexpected error', error)
     return NextResponse.json({ error: 'Operation failed.' }, { status: 500 })
@@ -406,7 +425,7 @@ export const listProjects = cache(async (): Promise<ProjectWithCodebase[]> => {
 ## Important Notes
 
 1. **No internal HTTP calls**: Never fetch from one API route to another. Use service functions.
-2. **Auth everywhere**: All API routes should authenticate via `resolveUser()`. Public routes must be added to the `PUBLIC_PATHS` array in `src/proxy.ts`.
+2. **Auth everywhere**: All API routes authenticate via `requireRequestIdentity()` (from `@/lib/auth/identity`). Public routes must be added to the `PUBLIC_PATHS` array in `src/proxy.ts`.
 3. **RLS context**: Always filter queries by `user_id` to work with Supabase RLS.
 4. **Runtime**: Use `export const runtime = 'nodejs'` for routes requiring Node.js APIs.
 5. **FormData**: Prefer FormData over JSON for POST requests with optional file uploads.

@@ -6,9 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
+import { requireUserIdentity } from '@/lib/auth/identity'
+import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
 import {
   hasIntercomConnection,
   updateIntercomSettings,
@@ -19,36 +20,6 @@ import {
 } from '@/lib/integrations/intercom'
 
 export const runtime = 'nodejs'
-
-async function resolveUserAndProject(projectId: string) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    throw new UnauthorizedError('User not authenticated')
-  }
-
-  // Verify user has access to this project
-  const { data: project, error: projectError } = await supabase
-    .from('projects')
-    .select('id, user_id')
-    .eq('id', projectId)
-    .single()
-
-  if (projectError || !project) {
-    throw new Error('Project not found')
-  }
-
-  const hasAccess = await hasProjectAccess(projectId, user.id)
-  if (!hasAccess) {
-    throw new UnauthorizedError('Not authorized to access this project')
-  }
-
-  return { supabase, user, project }
-}
 
 /**
  * GET /api/integrations/intercom?projectId=xxx
@@ -66,7 +37,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
     }
 
-    const { supabase } = await resolveUserAndProject(projectId)
+    const identity = await requireUserIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await getClientForIdentity(identity)
 
     // Get connection status
     const status = await hasIntercomConnection(supabase, projectId)
@@ -83,11 +56,10 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: error.message }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
-
-    if (error instanceof Error && error.message === 'Project not found') {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
 
     console.error('[integrations.intercom.get] unexpected error', error)
@@ -118,7 +90,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
     }
 
-    const { supabase } = await resolveUserAndProject(projectId)
+    const identity = await requireUserIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await getClientForIdentity(identity)
 
     // Update settings
     const result = await updateIntercomSettings(supabase, projectId, {
@@ -134,11 +108,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: error.message }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
-
-    if (error instanceof Error && error.message === 'Project not found') {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
 
     console.error('[integrations.intercom.patch] unexpected error', error)
@@ -162,7 +135,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
     }
 
-    const { supabase } = await resolveUserAndProject(projectId)
+    const identity = await requireUserIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await getClientForIdentity(identity)
 
     // Disconnect
     const result = await disconnectIntercom(supabase, projectId)
@@ -174,11 +149,10 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      return NextResponse.json({ error: error.message }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
-
-    if (error instanceof Error && error.message === 'Project not found') {
-      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
     }
 
     console.error('[integrations.intercom.delete] unexpected error', error)
