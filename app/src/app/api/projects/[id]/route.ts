@@ -128,6 +128,22 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ error: 'Project not found.' }, { status: 404 })
     }
 
+    // Check for duplicate project name (case-insensitive) across user's projects
+    if (projectUpdates.name) {
+      const { data: duplicates } = await supabase
+        .from('project_members')
+        .select('project:projects!inner(id, name)')
+        .eq('user_id', identity.type === 'user' ? identity.userId : identity.createdByUserId)
+        .eq('status', 'active')
+        .ilike('project.name', projectUpdates.name as string)
+        .neq('project.id', id)
+        .limit(1)
+
+      if (duplicates && duplicates.length > 0) {
+        return NextResponse.json({ error: `You already have a project named "${projectUpdates.name}". Please choose a different name.` }, { status: 409 })
+      }
+    }
+
     // Update source code if needed - get source_code through codebase knowledge_source
     if (hasSourceCodeUpdates) {
       const { data: codebaseSource } = await supabase

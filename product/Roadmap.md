@@ -175,6 +175,7 @@
 ### Issues
 [] Draft email response to users
 [] Lieaner Integration
+[] notify issue resolution to user
 
 
 ## Phase 11

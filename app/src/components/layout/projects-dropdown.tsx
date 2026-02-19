@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { useProjects } from '@/hooks/use-projects'
+import { useProject } from '@/components/providers/project-provider'
 import { DropdownButton } from '@/components/ui'
 import { CreateProjectDialog } from '@/components/projects/create-project-dialog'
 
@@ -16,7 +16,7 @@ export function ProjectsDropdown() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
-  const { projects, isLoading, refresh: refreshProjects } = useProjects()
+  const { projects, isLoadingProjects: isLoading, refreshProjects } = useProject()
 
   const active = isProjectsActive(pathname)
 

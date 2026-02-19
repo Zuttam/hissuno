@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useProject } from '@/components/providers/project-provider'
-import { useProjects } from '@/hooks/use-projects'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 
 interface ProjectsRedirectProps {
@@ -13,8 +12,7 @@ interface ProjectsRedirectProps {
 export function ProjectsRedirect({ initialProjects }: ProjectsRedirectProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { projectId, setProjectId, isLoading: isProjectLoading } = useProject()
-  const { projects, isLoading: isProjectsLoading } = useProjects(initialProjects)
+  const { projectId, setProjectId, isLoading: isProjectLoading, projects, isLoadingProjects: isProjectsLoading } = useProject()
   const [isAccepting, setIsAccepting] = useState(false)
   const acceptAttempted = useRef(false)
 

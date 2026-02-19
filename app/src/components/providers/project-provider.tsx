@@ -7,10 +7,17 @@ const LAST_PROJECT_KEY = 'hissuno-last-project'
 
 
 interface ProjectContextValue {
+  // Current project
   project: ProjectRecord | null
   projectId: string | null
   setProjectId: (id: string | null) => void
   isLoading: boolean
+  refreshProject: () => Promise<void>
+  // All projects
+  projects: ProjectRecord[]
+  isLoadingProjects: boolean
+  projectsError: string | null
+  refreshProjects: () => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null)
@@ -51,6 +58,11 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isInitialized, setIsInitialized] = useState(false)
 
+  // Projects list state
+  const [projects, setProjects] = useState<ProjectRecord[]>([])
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true)
+  const [projectsError, setProjectsError] = useState<string | null>(null)
+
   // Load stored project ID on mount
   useEffect(() => {
     const storedId = getStoredProjectId()
@@ -58,6 +70,28 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       setProjectIdState(storedId)
     }
     setIsInitialized(true)
+  }, [])
+
+  // --- Current project fetching ---
+
+  const fetchProject = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/projects/${id}`, { cache: 'no-store' })
+
+      if (!response.ok) {
+        console.error('[ProjectProvider] failed to fetch project', id)
+        setProject(null)
+        storeProjectId(null)
+        setProjectIdState(null)
+        return
+      }
+
+      const payload = await response.json()
+      setProject(payload.project ?? null)
+    } catch (error) {
+      console.error('[ProjectProvider] error fetching project', error)
+      setProject(null)
+    }
   }, [])
 
   // Fetch project data when projectId changes
@@ -73,47 +107,53 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
     let cancelled = false
     setIsLoading(true)
 
-    async function fetchProject() {
-      try {
-        const response = await fetch(`/api/projects/${projectId}`, { cache: 'no-store' })
-        if (cancelled) return
-
-        if (!response.ok) {
-          // Project might not exist or user might not have access
-          console.error('[ProjectProvider] failed to fetch project', projectId)
-          setProject(null)
-          // Clear stored ID if project is not accessible
-          storeProjectId(null)
-          setProjectIdState(null)
-          return
-        }
-
-        const payload = await response.json()
-        if (cancelled) return
-
-        setProject(payload.project ?? null)
-      } catch (error) {
-        if (cancelled) return
-        console.error('[ProjectProvider] error fetching project', error)
-        setProject(null)
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false)
-        }
-      }
-    }
-
-    void fetchProject()
+    void fetchProject(projectId).then(() => {
+      if (!cancelled) setIsLoading(false)
+    })
 
     return () => {
       cancelled = true
     }
-  }, [projectId, isInitialized])
+  }, [projectId, isInitialized, fetchProject])
+
+  const refreshProject = useCallback(async () => {
+    if (projectId) {
+      await fetchProject(projectId)
+    }
+  }, [projectId, fetchProject])
 
   const setProjectId = useCallback((id: string | null) => {
     storeProjectId(id)
     setProjectIdState(id)
   }, [])
+
+  // --- Projects list fetching ---
+
+  const fetchProjects = useCallback(async () => {
+    setIsLoadingProjects(true)
+    setProjectsError(null)
+    try {
+      const response = await fetch('/api/projects', { cache: 'no-store' })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        const message = typeof payload?.error === 'string' ? payload.error : 'Failed to load projects.'
+        throw new Error(message)
+      }
+      const payload = await response.json()
+      setProjects(payload.projects ?? [])
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unexpected error loading projects.'
+      setProjectsError(message)
+    } finally {
+      setIsLoadingProjects(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void fetchProjects()
+  }, [fetchProjects])
+
+  // --- Context value ---
 
   const value = useMemo(
     () => ({
@@ -121,8 +161,13 @@ export function ProjectProvider({ children }: ProjectProviderProps) {
       projectId,
       setProjectId,
       isLoading: !isInitialized || isLoading,
+      refreshProject,
+      projects,
+      isLoadingProjects,
+      projectsError,
+      refreshProjects: fetchProjects,
     }),
-    [project, projectId, setProjectId, isLoading, isInitialized]
+    [project, projectId, setProjectId, isLoading, isInitialized, refreshProject, projects, isLoadingProjects, projectsError, fetchProjects]
   )
 
   return <ProjectContext.Provider value={value}>{children}</ProjectContext.Provider>

@@ -1,4 +1,5 @@
 import { ComponentPropsWithoutRef } from 'react'
+import { cn } from '@/lib/utils/class'
 
 type AlertVariant = 'default' | 'info' | 'success' | 'warning' | 'danger'
 
@@ -9,22 +10,17 @@ type AlertProps = {
 
 const variantClasses: Record<AlertVariant, string> = {
   default:
-    'border-[--border-subtle] bg-[--surface] text-[--foreground]',
-  info: 'border-[--accent-primary] bg-transparent text-[--foreground]',
+    'border-2 border-[--border-subtle] bg-[--surface] text-[--foreground]',
+  info: 'border-2 border-[--accent-primary] bg-transparent text-[--foreground]',
   success:
-    'border-[--accent-success] bg-transparent text-[--foreground]',
+    'border-2 border-[--accent-success] bg-transparent text-[--foreground]',
   warning:
-    'border-[--accent-warning] bg-transparent text-[--foreground]',
+    'border-2 border-[--accent-warning] bg-transparent text-[--foreground]',
   danger:
-    'border-[--accent-danger] bg-transparent text-[--foreground]',
+    'border-2 border-[--accent-danger] bg-transparent text-[--foreground]',
 }
 
 export function Alert({ variant = 'default', className, ...props }: AlertProps) {
-  const baseClasses = 'rounded-[4px] border-2 px-4 py-3 text-sm font-mono'
-  const mergedClasses = [baseClasses, variantClasses[variant], className ?? '']
-    .filter(Boolean)
-    .join(' ')
-
-  return <div {...props} className={mergedClasses} />
+  return <div {...props} className={cn('rounded-[4px] px-4 py-3 text-sm font-mono', variantClasses[variant], className)} />
 }
 

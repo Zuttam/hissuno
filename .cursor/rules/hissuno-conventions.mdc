@@ -379,7 +379,6 @@ describe('MarkdownViewer', () => {
 Use `@/` for imports from `src/`:
 ```tsx
 import { Button } from '@/components/ui'
-import { useProjects } from '@/hooks/use-projects'
 import { createClient } from '@/lib/supabase/server'
 import type { SessionWithProject } from '@/types/session'
 ```

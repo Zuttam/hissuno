@@ -100,6 +100,20 @@ export async function POST(request: Request) {
     // would fail RLS (SELECT policy checks project_members, INSERT needs auth.uid()).
     const supabase = createAdminClient()
 
+    // Check for duplicate project name (case-insensitive) across user's projects
+    const { data: existingProject } = await supabase
+      .from('project_members')
+      .select('project:projects!inner(id, name)')
+      .eq('user_id', identity.userId)
+      .eq('status', 'active')
+      .ilike('project.name', name)
+      .limit(1)
+      .single()
+
+    if (existingProject) {
+      return NextResponse.json({ error: `You already have a project named "${name}". Please choose a different name.` }, { status: 409 })
+    }
+
     let codebaseId: string | null = null
 
     // Create GitHub codebase if provided

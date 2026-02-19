@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useProject } from '@/components/providers/project-provider'
 import { ProjectAnalytics } from '@/components/analytics/project-analytics'
@@ -16,8 +16,9 @@ import { PendingReviews } from '@/components/dashboard/pending-reviews'
 export default function DashboardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { project, projectId, isLoading } = useProject()
+  const { project, projectId, isLoading, refreshProject, refreshProjects } = useProject()
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const hasPendingSave = useRef(false)
   const { data: dashboardData, isLoading: dashboardLoading } = useDashboardData({
     projectId: projectId ?? '',
   })
@@ -36,10 +37,15 @@ export default function DashboardPage() {
     if (searchParams.get('dialog')) {
       router.replace(`/projects/${projectId}/dashboard`)
     }
+    if (hasPendingSave.current) {
+      hasPendingSave.current = false
+      void refreshProject()
+      void refreshProjects()
+    }
   }
 
   const handleProjectSaved = () => {
-    router.refresh()
+    hasPendingSave.current = true
   }
 
   const handleOpenEditDialog = () => {

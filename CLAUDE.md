@@ -345,7 +345,7 @@ export type SessionTag = (typeof SESSION_TAGS)[number]
 
 ```typescript
 import { Button } from '@/components/ui'
-import { useProjects } from '@/hooks/use-projects'
+import { useProjects } from '@/hooks/use-analytics'
 import type { SessionWithProject } from '@/types/session'
 ```
 

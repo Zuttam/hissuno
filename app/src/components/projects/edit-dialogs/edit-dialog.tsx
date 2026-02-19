@@ -37,20 +37,18 @@ export function EditDialog({
   return (
     <Dialog open={open} onClose={onClose} title={title} size={size}>
       <div className="flex flex-col gap-6">
-        {/* Error display */}
-        {error && (
-          <Alert variant="danger">{error}</Alert>
-        )}
-
         {/* Content */}
         <div className="max-h-[60vh] overflow-y-auto pr-1">
           {children}
         </div>
 
-        {/* Footer with Save/Cancel */}
+        {/* Footer with alerts and Save/Cancel */}
         <div className="flex items-center gap-3 border-t border-[color:var(--border-subtle)] pt-4">
+          {error && (
+            <Alert variant="danger" className="border-0 py-2 px-3 text-xs">❌ {error}</Alert>
+          )}
           {saved && (
-            <Alert variant="success" className="py-2 px-3 text-xs">✅ Settings saved</Alert>
+            <Alert variant="success" className="border-0 py-2 px-3 text-xs">✅ Saved</Alert>
           )}
           <div className="flex-1" />
           <Button

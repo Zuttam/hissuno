@@ -63,6 +63,7 @@ export function ProjectDetailsDialog({
   const [description, setDescription] = useState(initialDescription)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
 
   const handleNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value)
@@ -81,6 +82,7 @@ export function ProjectDetailsDialog({
 
     setIsSaving(true)
     setError(null)
+    setSaved(false)
 
     try {
       const response = await fetch(`/api/projects/${projectId}`, {
@@ -102,6 +104,8 @@ export function ProjectDetailsDialog({
         name: data.project.name,
         description: data.project.description,
       })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update project')
     } finally {
@@ -117,6 +121,7 @@ export function ProjectDetailsDialog({
       title="Project Details"
       isSaving={isSaving}
       error={error}
+      saved={saved}
     >
       <ProjectInfoSection
         name={name}

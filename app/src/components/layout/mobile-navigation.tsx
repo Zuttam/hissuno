@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useProjects } from '@/hooks/use-projects'
+import { useProject } from '@/components/providers/project-provider'
 import { MenuIcon } from '@/components/ui/menu-icon'
 import type { NavItem } from './app-navigation'
 
@@ -27,7 +27,7 @@ export function MobileNavigation({ items }: MobileNavigationProps) {
   const [projectsExpanded, setProjectsExpanded] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
-  const { projects, isLoading } = useProjects()
+  const { projects, isLoadingProjects: isLoading } = useProject()
 
   // Close on route change
   useEffect(() => {

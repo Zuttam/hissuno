@@ -2,7 +2,6 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { useProjects } from '@/hooks/use-projects'
 import { useProject } from '@/components/providers/project-provider'
 import { CreateProjectDialog } from '@/components/projects/create-project-dialog'
 
@@ -17,8 +16,7 @@ export function SidebarProjectSelector({ isCollapsed, onNavigate }: SidebarProje
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
   const router = useRouter()
-  const { projects, isLoading: isLoadingProjects, refresh: refreshProjects } = useProjects()
-  const { project: currentProject, projectId: currentProjectId, setProjectId, isLoading: isLoadingProject } = useProject()
+  const { project: currentProject, projectId: currentProjectId, setProjectId, isLoading: isLoadingProject, projects, isLoadingProjects, refreshProjects } = useProject()
 
   const isLoading = isLoadingProjects || isLoadingProject
 
