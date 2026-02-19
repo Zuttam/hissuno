@@ -8,6 +8,7 @@ import { COMMUNICATION_CHANNELS } from '../types'
 
 const CHANNEL_LOGOS: Record<string, { src: string; alt: string }> = {
   intercom: { src: '/logos/intercom.svg', alt: 'Intercom' },
+  zendesk: { src: '/logos/zendesk.svg', alt: 'Zendesk' },
   gong: { src: '/logos/gong.svg', alt: 'Gong' },
   slack: { src: '/logos/slack.svg', alt: 'Slack' },
 }

@@ -6,7 +6,7 @@ export type SessionStatus = 'active' | 'closing_soon' | 'awaiting_idle_response'
 /**
  * Session source channels
  */
-export type SessionSource = 'widget' | 'slack' | 'intercom' | 'gong' | 'api' | 'manual'
+export type SessionSource = 'widget' | 'slack' | 'intercom' | 'zendesk' | 'gong' | 'api' | 'manual'
 
 /**
  * Session content type (determines how content is rendered)
@@ -47,6 +47,7 @@ export const SESSION_SOURCE_INFO: Record<
   widget: { label: 'Widget', variant: 'info' },
   slack: { label: 'Slack', variant: 'warning' },
   intercom: { label: 'Intercom', variant: 'success' },
+  zendesk: { label: 'Zendesk', variant: 'success' },
   gong: { label: 'Gong', variant: 'default' },
   api: { label: 'API', variant: 'default' },
   manual: { label: 'Manual', variant: 'default' },

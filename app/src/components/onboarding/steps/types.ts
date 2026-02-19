@@ -62,7 +62,7 @@ export interface ProjectFormData {
 /**
  * Communication channel options
  */
-export type CommunicationChannel = 'intercom' | 'gong' | 'email' | 'slack' | 'other'
+export type CommunicationChannel = 'intercom' | 'zendesk' | 'gong' | 'email' | 'slack' | 'other'
 
 /**
  * Communication channel metadata
@@ -179,6 +179,12 @@ export const COMMUNICATION_CHANNELS: CommunicationChannelInfo[] = [
     emoji: '💬',
     label: 'Intercom',
     description: 'Customer support conversations from Intercom',
+  },
+  {
+    id: 'zendesk',
+    emoji: '🎫',
+    label: 'Zendesk',
+    description: 'Support tickets and conversations from Zendesk',
   },
   {
     id: 'gong',

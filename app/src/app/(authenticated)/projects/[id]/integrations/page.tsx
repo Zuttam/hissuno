@@ -13,6 +13,7 @@ import { SlackConfigDialog } from '@/components/projects/edit-dialogs/slack-conf
 import { GitHubConfigDialog } from '@/components/projects/edit-dialogs/github-config-dialog'
 import { IntercomConfigDialog } from '@/components/projects/edit-dialogs/intercom-config-dialog'
 import { GongConfigDialog } from '@/components/projects/edit-dialogs/gong-config-dialog'
+import { ZendeskConfigDialog } from '@/components/projects/edit-dialogs/zendesk-config-dialog'
 import { JiraConfigDialog } from '@/components/projects/edit-dialogs/jira-config-dialog'
 import { FloatingCard } from '@/components/ui/floating-card'
 import { Badge, Button, Spinner, PageHeader } from '@/components/ui'
@@ -74,6 +75,10 @@ function IntercomIcon() {
   return <Image src="/logos/intercom.svg" alt="Intercom" width={32} height={32} />
 }
 
+function ZendeskIcon() {
+  return <Image src="/logos/zendesk.svg" alt="Zendesk" width={32} height={32} />
+}
+
 function GmailIcon() {
   return <Image src="/logos/gmail.svg" alt="Gmail" width={32} height={32} />
 }
@@ -109,6 +114,7 @@ export default function IntegrationsPage() {
   const [showSlackDialog, setShowSlackDialog] = useState(false)
   const [showGithubDialog, setShowGithubDialog] = useState(false)
   const [showIntercomDialog, setShowIntercomDialog] = useState(false)
+  const [showZendeskDialog, setShowZendeskDialog] = useState(false)
   const [showGongDialog, setShowGongDialog] = useState(false)
   const [showJiraDialog, setShowJiraDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -117,6 +123,7 @@ export default function IntegrationsPage() {
   const [slackConnected, setSlackConnected] = useState(false)
   const [githubConnected, setGithubConnected] = useState(false)
   const [intercomConnected, setIntercomConnected] = useState(false)
+  const [zendeskConnected, setZendeskConnected] = useState(false)
   const [gongConnected, setGongConnected] = useState(false)
   const [jiraConnected, setJiraConnected] = useState(false)
   const {enabled: gongEnabled, isLoading: isGongLoading}  = useFeatureFlag('gong-integration')
@@ -152,11 +159,12 @@ export default function IntegrationsPage() {
     if (!projectId) return
 
     try {
-      const [widgetRes, slackRes, githubRes, intercomRes, gongRes, jiraRes] = await Promise.all([
+      const [widgetRes, slackRes, githubRes, intercomRes, zendeskRes, gongRes, jiraRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/sessions?stats=true`),
         fetch(`/api/integrations/slack?projectId=${projectId}`),
         fetch(`/api/integrations/github?projectId=${projectId}`),
         fetch(`/api/integrations/intercom?projectId=${projectId}`),
+        fetch(`/api/integrations/zendesk?projectId=${projectId}`),
         fetch(`/api/integrations/gong?projectId=${projectId}`),
         fetch(`/api/integrations/jira?projectId=${projectId}`),
       ])
@@ -179,6 +187,11 @@ export default function IntegrationsPage() {
       if (intercomRes.ok) {
         const data = await intercomRes.json()
         setIntercomConnected(data.connected)
+      }
+
+      if (zendeskRes.ok) {
+        const data = await zendeskRes.json()
+        setZendeskConnected(data.connected)
       }
 
       if (gongRes.ok) {
@@ -209,6 +222,8 @@ export default function IntegrationsPage() {
       setShowGithubDialog(true)
     } else if (dialog === 'intercom') {
       setShowIntercomDialog(true)
+    } else if (dialog === 'zendesk') {
+      setShowZendeskDialog(true)
     } else if (dialog === 'gong' && gongEnabled) {
       setShowGongDialog(true)
     } else if (dialog === 'jira' && jiraEnabled) {
@@ -256,6 +271,13 @@ export default function IntegrationsPage() {
     }
   }
 
+  const handleCloseZendeskDialog = () => {
+    setShowZendeskDialog(false)
+    if (searchParams.get('dialog')) {
+      router.replace(`/projects/${projectId}/integrations`)
+    }
+  }
+
   const handleCloseGongDialog = () => {
     setShowGongDialog(false)
     if (searchParams.get('dialog')) {
@@ -276,11 +298,12 @@ export default function IntegrationsPage() {
 
     const fetchStatuses = async () => {
       try {
-        const [widgetRes, slackRes, githubRes, intercomRes, gongRes, jiraRes] = await Promise.all([
+        const [widgetRes, slackRes, githubRes, intercomRes, zendeskRes, gongRes, jiraRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/sessions?stats=true`),
           fetch(`/api/integrations/slack?projectId=${projectId}`),
           fetch(`/api/integrations/github?projectId=${projectId}`),
           fetch(`/api/integrations/intercom?projectId=${projectId}`),
+          fetch(`/api/integrations/zendesk?projectId=${projectId}`),
           fetch(`/api/integrations/gong?projectId=${projectId}`),
           fetch(`/api/integrations/jira?projectId=${projectId}`),
         ])
@@ -303,6 +326,11 @@ export default function IntegrationsPage() {
         if (intercomRes.ok) {
           const data = await intercomRes.json()
           setIntercomConnected(data.connected)
+        }
+
+        if (zendeskRes.ok) {
+          const data = await zendeskRes.json()
+          setZendeskConnected(data.connected)
         }
 
         if (gongRes.ok) {
@@ -358,6 +386,14 @@ export default function IntegrationsPage() {
         description: 'Sync conversations from Intercom',
         status: intercomConnected ? 'active' : 'not_connected',
         icon: <IntercomIcon />,
+        category: 'sessions',
+      },
+      {
+        id: 'zendesk',
+        name: 'Zendesk',
+        description: 'Sync solved/closed tickets from Zendesk',
+        status: zendeskConnected ? 'active' : 'not_connected',
+        icon: <ZendeskIcon />,
         category: 'sessions',
       },
       {
@@ -432,7 +468,7 @@ export default function IntegrationsPage() {
         comingSoon: true,
       },
     ])
-  }, [widgetStats, slackConnected, githubConnected, intercomConnected, gongConnected, jiraConnected, gongEnabled, jiraEnabled])
+  }, [widgetStats, slackConnected, githubConnected, intercomConnected, zendeskConnected, gongConnected, jiraConnected, gongEnabled, jiraEnabled])
 
   const sessionIntegrations = integrations.filter(i => i.category === 'sessions')
   const issueIntegrations = integrations.filter(i => i.category === 'issues')
@@ -444,7 +480,7 @@ export default function IntegrationsPage() {
   const handleConfigureIntegration = (integrationId: string) => {
     if (integrationId === 'gong' && !gongEnabled) return
     if (integrationId === 'jira' && !jiraEnabled) return
-    if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github' || integrationId === 'intercom' || integrationId === 'gong' || integrationId === 'jira') {
+    if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github' || integrationId === 'intercom' || integrationId === 'zendesk' || integrationId === 'gong' || integrationId === 'jira') {
       router.push(`/projects/${projectId}/integrations?dialog=${integrationId}`)
     }
   }
@@ -592,6 +628,13 @@ export default function IntegrationsPage() {
       <IntercomConfigDialog
         open={showIntercomDialog}
         onClose={handleCloseIntercomDialog}
+        projectId={projectId}
+        onStatusChanged={refreshStatuses}
+      />
+
+      <ZendeskConfigDialog
+        open={showZendeskDialog}
+        onClose={handleCloseZendeskDialog}
         projectId={projectId}
         onStatusChanged={refreshStatuses}
       />

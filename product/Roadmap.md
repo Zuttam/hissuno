@@ -165,7 +165,7 @@
 [] Improve landing pages | remove ai support and fde | focus on pm | add pricing
 
 ### Feedback (f.k.a sessions)
-[] Support Zendesk in early access
+[x] Support Zendesk in early access
 
 ### Platform
 [] Enable additional notifications 
@@ -173,10 +173,13 @@
 [] Delete project
 
 ### Issues
-[] Draft email response to users
 [] Lieaner Integration
+[] Move priority analysis on RICE methodology 
+[] Unify linkedin feedback and customer into one tree 
+[] Enable manual edit of RICE scores 
+[] Enable manual edit of linked feedback - detach and attach
+[] Make it easier to search for linked feedback -> both attach and create 
 [] notify issue resolution to user
-
 
 ## Phase 11
 
@@ -200,6 +203,8 @@
 
 
 ### Issues 
+
+[] Draft email response to users
 [] Jira Integration 
 [] Add product area to the issue analysis - Classify on product area
 
