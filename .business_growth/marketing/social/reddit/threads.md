@@ -10,15 +10,15 @@
 ### High Priority
 | Title | Subreddit | URL | Comments | Age | Relevance | Status |
 |-------|-----------|-----|----------|-----|-----------|--------|
-| The gap between customer feedback tools and the CRM is where prioritization goes to die | r/CustomerSuccess | https://www.reddit.com/r/CustomerSuccess/comments/1r9fz3r/ | 3 | 6h | Exact value prop match. Commenter asking for tool recs. | new |
-| How do you manage user feedback as your SaaS grows? | r/SaaS | https://www.reddit.com/r/SaaS/comments/1r7dt0n/ | 14 | 2d | Direct audience. Active discussion on tagging, context loss, scaling feedback. | new |
-| Is anyone else tired of building features nobody uses? | r/SaaS | https://www.reddit.com/search/?q=feature+request+prioritize+what+to+build+saas&type=all&t=week | 10 | 7d | Building without customer signal = disconnected feedback loop. | new |
+| The gap between customer feedback tools and the CRM is where prioritization goes to die | r/CustomerSuccess | https://www.reddit.com/r/CustomerSuccess/comments/1r9fz3r/ | 3 | 6h | Exact value prop match. Commenter asking for tool recs. | engaged |
+| How do you manage user feedback as your SaaS grows? | r/SaaS | https://www.reddit.com/r/SaaS/comments/1r7dt0n/ | 14 | 2d | Direct audience. Active discussion on tagging, context loss, scaling feedback. | engaged |
+| Is anyone else tired of building features nobody uses? | r/SaaS | https://www.reddit.com/search/?q=feature+request+prioritize+what+to+build+saas&type=all&t=week | 10 | 7d | Building without customer signal = disconnected feedback loop. | engaged |
 
 ### Medium Priority
 | Title | Subreddit | URL | Comments | Age | Relevance | Status |
 |-------|-----------|-----|----------|-----|-----------|--------|
 | How do you analyze customer feedback once spreadsheets stop working? | r/CustomerSuccess | https://www.reddit.com/r/CustomerSuccess/comments/1r7s5ls/ | 6 | 2d | Spreadsheet pain, pattern detection. Note: flagged as possible AI post. | new |
-| What are you building? Let's self promote | r/SaaSDevelopers | (search result) | 68 | 1d | Explicit self-promo thread. Good for brief Hissuno intro. | new |
+| What are you building? Let's self promote | r/SaaSDevelopers | https://www.reddit.com/r/SaasDevelopers/comments/1r8pis8/ | 68 | 1d | Explicit self-promo thread. Good for brief Hissuno intro. | engaged |
 | What I learned talking to 15+ Product Managers about how they handle customer feedback | r/SideProject | (search result) | 2 | 6h | Very fresh PM feedback perspective. | new |
 | Why is getting user feedback 10x harder than building the product? Is it just me? | r/SaaS | (search result) | 69 | 6d | High engagement. Feedback collection pain. | new |
 | How do you capture customer sentiment before complaints? | r/customerexperience | (search result) | 11 | 6d | Proactive signal detection. | new |
@@ -35,3 +35,7 @@
 ### Engaged Threads
 | Title | Subreddit | Date Engaged | Type | URL |
 |-------|-----------|--------------|------|-----|
+| The gap between customer feedback tools and the CRM is where prioritization goes to die | r/CustomerSuccess | 2026-02-20 | Reply to commenter | https://www.reddit.com/r/CustomerSuccess/comments/1r9fz3r/ |
+| How do you manage user feedback as your SaaS grows? | r/SaaS | 2026-02-20 | Value-add comment | https://www.reddit.com/r/SaaS/comments/1r7dt0n/ |
+| Is anyone else tired of building features nobody uses? | r/SaaS | 2026-02-20 | Value-add comment | https://www.reddit.com/search/?q=feature+request+prioritize+what+to+build+saas&type=all&t=week |
+| What are you building? Let's self promote | r/SaaSDevelopers | 2026-02-20 | Self-promo | https://www.reddit.com/r/SaasDevelopers/comments/1r8pis8/ |

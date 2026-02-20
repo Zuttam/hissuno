@@ -11,7 +11,6 @@ import { IssuesFilters } from '@/components/issues/issues-filters'
 import { IssuesTable } from '@/components/issues/issues-table'
 import { IssueSidebar } from '@/components/issues/issue-sidebar'
 import { CreateIssueDialog } from '@/components/issues/create-issue-dialog'
-import { IssuesSettingsDialog } from '@/components/projects/edit-dialogs/issues-settings-dialog'
 import { Button, PageHeader, Pagination, Spinner } from '@/components/ui'
 import { Card } from '@/components/ui/card'
 import { BatchActionBar } from '@/components/ui/batch-action-bar'
@@ -30,14 +29,11 @@ export default function ProjectIssuesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
   // Auto-open dialog or sidebar based on URL params
   useEffect(() => {
     const dialog = searchParams.get('dialog')
-    if (dialog === 'settings') {
-      setShowSettingsDialog(true)
-    } else if (dialog === 'create') {
+    if (dialog === 'create') {
       setShowCreateDialog(true)
     }
     const issueParam = searchParams.get('issue')
@@ -45,14 +41,6 @@ export default function ProjectIssuesPage() {
       setSelectedIssueId(issueParam)
     }
   }, [searchParams])
-
-  // Clear URL param when dialog closes
-  const handleCloseSettingsDialog = () => {
-    setShowSettingsDialog(false)
-    if (searchParams.get('dialog')) {
-      router.replace(`/projects/${projectId}/issues`)
-    }
-  }
 
   const handleCloseCreateDialog = () => {
     setShowCreateDialog(false)
@@ -273,11 +261,6 @@ export default function ProjectIssuesPage() {
     downloadAsCSV(csv, generateExportFilename('issues', project?.name))
   }, [issues, selection, project])
 
-  // Handlers for opening dialogs - updates URL for consistent tracking
-  const handleOpenSettingsDialog = () => {
-    router.push(`/projects/${projectId}/issues?dialog=settings`)
-  }
-
   const handleOpenCreateDialog = () => {
     router.push(`/projects/${projectId}/issues?dialog=create`)
   }
@@ -304,7 +287,7 @@ export default function ProjectIssuesPage() {
             <Button
               variant="secondary"
               size="md"
-              onClick={handleOpenSettingsDialog}
+              onClick={() => router.push(`/projects/${projectId}/agents?tab=issues`)}
             >
               Settings
             </Button>
@@ -423,11 +406,6 @@ export default function ProjectIssuesPage() {
         onCreateIssue={createIssue}
       />
 
-      <IssuesSettingsDialog
-        open={showSettingsDialog}
-        onClose={handleCloseSettingsDialog}
-        projectId={projectId}
-      />
     </>
   )
 }

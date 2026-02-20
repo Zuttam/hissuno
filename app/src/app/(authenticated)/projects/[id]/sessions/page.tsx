@@ -14,7 +14,6 @@ import { SessionsTable } from '@/components/sessions/sessions-table'
 import { SessionSidebar } from '@/components/sessions/session-sidebar'
 import { CreateSessionDialog } from '@/components/sessions/create-session-dialog'
 import { ContactPickerDialog } from '@/components/sessions/contact-picker-dialog'
-import { SessionsSettingsDialog } from '@/components/projects/edit-dialogs/sessions-settings-dialog'
 import { Button, PageHeader, Pagination, Spinner } from '@/components/ui'
 import { Card } from '@/components/ui/card'
 import { BatchActionBar } from '@/components/ui/batch-action-bar'
@@ -34,14 +33,11 @@ export default function ProjectSessionsPage() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [expandMessages, setExpandMessages] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
   // Auto-open dialog or sidebar based on URL params
   useEffect(() => {
     const dialog = searchParams.get('dialog')
-    if (dialog === 'settings') {
-      setShowSettingsDialog(true)
-    } else if (dialog === 'create') {
+    if (dialog === 'create') {
       setShowCreateDialog(true)
     }
     const sessionParam = searchParams.get('session')
@@ -53,14 +49,6 @@ export default function ProjectSessionsPage() {
       setFilters(prev => ({ ...prev, source: sourceParam as SessionSource }))
     }
   }, [searchParams])
-
-  // Clear URL param when dialog closes
-  const handleCloseSettingsDialog = () => {
-    setShowSettingsDialog(false)
-    if (searchParams.get('dialog')) {
-      router.replace(`/projects/${projectId}/sessions`)
-    }
-  }
 
   const handleCloseCreateDialog = () => {
     setShowCreateDialog(false)
@@ -252,11 +240,6 @@ export default function ProjectSessionsPage() {
     downloadAsCSV(csv, generateExportFilename('feedback', project?.name))
   }, [sessions, selection, project])
 
-  // Handlers for opening dialogs - updates URL for consistent tracking
-  const handleOpenSettingsDialog = () => {
-    router.push(`/projects/${projectId}/sessions?dialog=settings`)
-  }
-
   const handleOpenCreateDialog = () => {
     router.push(`/projects/${projectId}/sessions?dialog=create`)
   }
@@ -283,7 +266,7 @@ export default function ProjectSessionsPage() {
             <Button
               variant="secondary"
               size="md"
-              onClick={handleOpenSettingsDialog}
+              onClick={() => router.push(`/projects/${projectId}/agents?tab=feedback`)}
             >
               Settings
             </Button>
@@ -405,12 +388,6 @@ export default function ProjectSessionsPage() {
         onClose={handleCloseCreateDialog}
         projects={[project]}
         onCreateSession={createSession}
-      />
-
-      <SessionsSettingsDialog
-        open={showSettingsDialog}
-        onClose={handleCloseSettingsDialog}
-        projectId={projectId}
       />
 
       <ContactPickerDialog

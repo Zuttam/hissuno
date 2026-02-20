@@ -102,7 +102,7 @@ const PROJECT_NAV_ITEMS: NavItemConfig[] = [
   { href: '/projects/[id]/sessions', label: 'Feedback', icon: <SessionsIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/issues', label: 'Issues', icon: <IssuesIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/customers', label: 'Customers', icon: <CustomersIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/agents', label: 'Agents', icon: <AgentsIcon className="h-4 w-4" /> },
+  { href: '/projects/[id]/agents', label: 'Agents & Settings', icon: <AgentsIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/integrations', label: 'Integrations', icon: <IntegrationsIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/access', label: 'Access', icon: <AccessIcon className="h-4 w-4" /> },
 ]

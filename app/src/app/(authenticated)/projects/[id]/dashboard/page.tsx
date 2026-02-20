@@ -1,10 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useProject } from '@/components/providers/project-provider'
 import { ProjectAnalytics } from '@/components/analytics/project-analytics'
-import { ProjectDetailsDialog } from '@/components/projects/edit-dialogs/project-details-dialog'
 import { Card } from '@/components/ui/card'
 import { SectionHeader } from '@/components/ui/section-header'
 import { Button, PageHeader, Spinner } from '@/components/ui'
@@ -15,42 +13,10 @@ import { PendingReviews } from '@/components/dashboard/pending-reviews'
 
 export default function DashboardPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const { project, projectId, isLoading, refreshProject, refreshProjects } = useProject()
-  const [showEditDialog, setShowEditDialog] = useState(false)
-  const hasPendingSave = useRef(false)
+  const { project, projectId, isLoading } = useProject()
   const { data: dashboardData, isLoading: dashboardLoading } = useDashboardData({
     projectId: projectId ?? '',
   })
-
-  // Auto-open dialog based on URL param
-  useEffect(() => {
-    const dialog = searchParams.get('dialog')
-    if (dialog === 'edit') {
-      setShowEditDialog(true)
-    }
-  }, [searchParams])
-
-  // Clear URL param when dialog closes
-  const handleCloseEditDialog = () => {
-    setShowEditDialog(false)
-    if (searchParams.get('dialog')) {
-      router.replace(`/projects/${projectId}/dashboard`)
-    }
-    if (hasPendingSave.current) {
-      hasPendingSave.current = false
-      void refreshProject()
-      void refreshProjects()
-    }
-  }
-
-  const handleProjectSaved = () => {
-    hasPendingSave.current = true
-  }
-
-  const handleOpenEditDialog = () => {
-    router.push(`/projects/${projectId}/dashboard?dialog=edit`)
-  }
 
   // Show loading state while project is being fetched
   if (isLoading || !project || !projectId) {
@@ -72,7 +38,7 @@ export default function DashboardPage() {
           <Button
             variant="secondary"
             size="md"
-            onClick={handleOpenEditDialog}
+            onClick={() => router.push(`/projects/${projectId}/agents?tab=general`)}
           >
             Edit Project
           </Button>
@@ -107,15 +73,6 @@ export default function DashboardPage() {
           velocityData={dashboardData?.velocity}
         />
       </Card>
-
-      <ProjectDetailsDialog
-        open={showEditDialog}
-        onClose={handleCloseEditDialog}
-        projectId={projectId}
-        initialName={project.name}
-        initialDescription={project.description || ''}
-        onSaved={handleProjectSaved}
-      />
     </>
   )
 }
