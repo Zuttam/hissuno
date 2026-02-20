@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { Button, WizardStepHeader } from '@/components/ui'
 import { cn } from '@/lib/utils/class'
 import type { Plan } from '@/types/billing'
@@ -270,10 +270,8 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
             const isLoadingThis = checkoutLoading === plan.id
 
             return (
-              <FloatingCard
+              <Card
                 key={plan.id}
-                floating="gentle"
-                variant="elevated"
                 className={cn(
                   'relative flex flex-col border-2 p-6',
                   isSelected
@@ -348,7 +346,7 @@ export function BillingStep({ context, onValidationChange, onCheckoutComplete, t
                 >
                   {getButtonLabel(plan)}
                 </Button>
-              </FloatingCard>
+              </Card>
             )
           })}
         </div>

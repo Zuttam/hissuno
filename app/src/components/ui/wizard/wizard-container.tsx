@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import type { WizardStepMetadata } from './types'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils/class'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 
 export type WizardContainerProps = {
   currentStep: number
@@ -82,9 +82,7 @@ export function WizardContainer({
   const isOnboarding = mode === 'onboarding'
 
   const wizardContent = (
-    <FloatingCard
-      floating="none"
-      variant="elevated"
+    <Card
       className={cn(
         'flex flex-col overflow-hidden bg-[var(--background)]',
         isOnboarding
@@ -289,7 +287,7 @@ export function WizardContainer({
           </div>
         </div>
       </div>
-    </FloatingCard>
+    </Card>
   )
 
   // Overlay mode: portal to body with backdrop blur (same pattern as Dialog)

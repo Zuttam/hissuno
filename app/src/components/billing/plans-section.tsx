@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { Plan } from '@/types/billing'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { Button, Heading, Input } from '@/components/ui'
 import { cn } from '@/lib/utils/class'
 
@@ -105,10 +105,8 @@ export function PlansSection({ plans, currentPlanId, onPlanChange }: PlansSectio
           const isLoadingThis = isLoading === plan.id
 
           return (
-            <FloatingCard
+            <Card
               key={plan.id}
-              floating="gentle"
-              variant="elevated"
               className={cn(
                 'relative flex flex-col border-2 p-6',
                 isCurrent
@@ -169,7 +167,7 @@ export function PlansSection({ plans, currentPlanId, onPlanChange }: PlansSectio
                     ? 'Contact Support to Downgrade'
                     : 'Upgrade'}
               </Button>
-            </FloatingCard>
+            </Card>
           )
         })}
       </div>

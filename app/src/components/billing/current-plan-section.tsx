@@ -1,7 +1,7 @@
 'use client'
 
 import type { Subscription, Plan } from '@/types/billing'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { Heading } from '@/components/ui'
 
 interface CurrentPlanSectionProps {
@@ -46,9 +46,7 @@ export function CurrentPlanSection({
   }
 
   return (
-    <FloatingCard
-      floating="gentle"
-      variant="elevated"
+    <Card
       className="space-y-4 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
     >
       <div>
@@ -149,6 +147,6 @@ export function CurrentPlanSection({
           </p>
         </div>
       )}
-    </FloatingCard>
+    </Card>
   )
 }

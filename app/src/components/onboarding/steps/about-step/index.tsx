@@ -6,9 +6,9 @@ import { Checkbox, Input, WizardStepHeader } from '@/components/ui'
 import type { StepProps, OnboardingFormData, CommunicationChannel } from '../types'
 import { COMMUNICATION_CHANNELS } from '../types'
 
-const CHANNEL_LOGOS: Record<string, { src: string; alt: string }> = {
+const CHANNEL_LOGOS: Record<string, { src: string; darkSrc?: string; alt: string }> = {
   intercom: { src: '/logos/intercom.svg', alt: 'Intercom' },
-  zendesk: { src: '/logos/zendesk.svg', alt: 'Zendesk' },
+  zendesk: { src: '/logos/zendesk.svg', darkSrc: '/logos/zendesk-dark.svg', alt: 'Zendesk' },
   gong: { src: '/logos/gong.svg', alt: 'Gong' },
   slack: { src: '/logos/slack.svg', alt: 'Slack' },
 }
@@ -115,7 +115,14 @@ export function AboutStep({ context, onValidationChange, title, description }: S
 
               {/* Logo or emoji fallback */}
               {logo ? (
-                <Image src={logo.src} alt={logo.alt} width={28} height={28} />
+                logo.darkSrc ? (
+                  <>
+                    <Image src={logo.src} alt={logo.alt} width={28} height={28} className="dark:hidden" />
+                    <Image src={logo.darkSrc} alt={logo.alt} width={28} height={28} className="hidden dark:block" />
+                  </>
+                ) : (
+                  <Image src={logo.src} alt={logo.alt} width={28} height={28} />
+                )
               ) : (
                 <span className="text-2xl">{channel.emoji}</span>
               )}

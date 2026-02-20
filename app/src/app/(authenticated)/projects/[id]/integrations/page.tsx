@@ -15,7 +15,7 @@ import { IntercomConfigDialog } from '@/components/projects/edit-dialogs/interco
 import { GongConfigDialog } from '@/components/projects/edit-dialogs/gong-config-dialog'
 import { ZendeskConfigDialog } from '@/components/projects/edit-dialogs/zendesk-config-dialog'
 import { JiraConfigDialog } from '@/components/projects/edit-dialogs/jira-config-dialog'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { Badge, Button, Spinner, PageHeader } from '@/components/ui'
 
 type IntegrationStatus = 'active' | 'idle' | 'not_connected'
@@ -76,7 +76,12 @@ function IntercomIcon() {
 }
 
 function ZendeskIcon() {
-  return <Image src="/logos/zendesk.svg" alt="Zendesk" width={32} height={32} />
+  return (
+    <>
+      <Image src="/logos/zendesk.svg" alt="Zendesk" width={32} height={32} className="dark:hidden" />
+      <Image src="/logos/zendesk-dark.svg" alt="Zendesk" width={32} height={32} className="hidden dark:block" />
+    </>
+  )
 }
 
 function GmailIcon() {
@@ -666,7 +671,7 @@ interface IntegrationCardProps {
 
 function IntegrationCard({ integration, onConfigure, onRequestAccess, accessRequested, isRequestingAccess }: IntegrationCardProps) {
   return (
-    <FloatingCard floating="gentle" className="p-0">
+    <Card className="p-0">
       <div className="p-4">
         <div className="flex items-start gap-4">
           <div className="flex-shrink-0 text-[color:var(--foreground)]">
@@ -709,6 +714,6 @@ function IntegrationCard({ integration, onConfigure, onRequestAccess, accessRequ
           )}
         </div>
       </div>
-    </FloatingCard>
+    </Card>
   )
 }

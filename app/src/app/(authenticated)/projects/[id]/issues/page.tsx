@@ -13,7 +13,7 @@ import { IssueSidebar } from '@/components/issues/issue-sidebar'
 import { CreateIssueDialog } from '@/components/issues/create-issue-dialog'
 import { IssuesSettingsDialog } from '@/components/projects/edit-dialogs/issues-settings-dialog'
 import { Button, PageHeader, Pagination, Spinner } from '@/components/ui'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { BatchActionBar } from '@/components/ui/batch-action-bar'
 import { BatchProgressBar } from '@/components/ui/batch-progress-bar'
 import { AnalyticsStrip } from '@/components/analytics'
@@ -321,7 +321,7 @@ export default function ProjectIssuesPage() {
 
       <AnalyticsStrip type="issues" projectId={projectId} />
 
-      <FloatingCard floating="gentle" variant="default" className="relative flex flex-col gap-6">
+      <Card className="relative flex flex-col gap-6">
         <IssuesFilters
           projects={[project]} // Single project only
           filters={filters}
@@ -405,7 +405,7 @@ export default function ProjectIssuesPage() {
             />
           </>
         )}
-      </FloatingCard>
+      </Card>
 
       {selectedIssueId && projectId && (
         <IssueSidebar

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useProject } from '@/components/providers/project-provider'
 import { ProjectAnalytics } from '@/components/analytics/project-analytics'
 import { ProjectDetailsDialog } from '@/components/projects/edit-dialogs/project-details-dialog'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { SectionHeader } from '@/components/ui/section-header'
 import { Button, PageHeader, Spinner } from '@/components/ui'
 import { useDashboardData } from '@/hooks/use-dashboard-data'
@@ -80,7 +80,7 @@ export default function DashboardPage() {
       />
 
       {/* Actionable Section */}
-      <FloatingCard floating="gentle">
+      <Card>
         <SectionHeader title="In a Glance" titleAs="h3" />
         {dashboardLoading ? (
           <div className="flex min-h-[150px] items-center justify-center">
@@ -97,16 +97,16 @@ export default function DashboardPage() {
             />
           </div>
         ) : null}
-      </FloatingCard>
+      </Card>
 
       {/* Analytics Section */}
-      <FloatingCard floating="gentle" className="mt-6">
+      <Card className="mt-6">
         <SectionHeader title="Analytics" titleAs="h3" />
         <ProjectAnalytics
           projectId={projectId}
           velocityData={dashboardData?.velocity}
         />
-      </FloatingCard>
+      </Card>
 
       <ProjectDetailsDialog
         open={showEditDialog}

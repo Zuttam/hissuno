@@ -15,7 +15,12 @@ const SOURCE_ICONS: Record<SessionSource, React.ReactNode> = {
   widget: <MessageSquare size={ICON_SIZE} />,
   slack: <Image src="/logos/slack.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
   intercom: <Image src="/logos/intercom.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
-  zendesk: <Image src="/logos/zendesk.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
+  zendesk: (
+    <>
+      <Image src="/logos/zendesk.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} className="dark:hidden" />
+      <Image src="/logos/zendesk-dark.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} className="hidden dark:block" />
+    </>
+  ),
   gong: <Image src="/logos/gong.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
   api: <Code2 size={ICON_SIZE} />,
   manual: <PenLine size={ICON_SIZE} />,

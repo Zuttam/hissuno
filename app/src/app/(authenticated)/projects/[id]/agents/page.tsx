@@ -10,7 +10,7 @@ import { AgentCard, buildSupportChannels, buildPmSources, buildPmDestinations } 
 import { SupportAgentDialog } from '@/components/projects/agents/support-agent-dialog'
 import { PmAgentDialog } from '@/components/projects/agents/pm-agent-dialog'
 import { KnowledgeDetailDialog } from '@/components/projects/agents/knowledge-detail-dialog'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { Button, Heading, Spinner, PageHeader, Badge } from '@/components/ui'
 import { formatRelativeTime } from '@/lib/utils/format-time'
 import type { KnowledgeSourceRecord, NamedPackageWithSources } from '@/lib/knowledge/types'
@@ -196,7 +196,7 @@ export default function AgentsPage() {
       <PageHeader title="Agents" />
 
       {/* Connected Resources */}
-      <FloatingCard floating="gentle">
+      <Card>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Heading as="h3" size="subsection">Connected Knowledge Resources</Heading>
@@ -211,7 +211,7 @@ export default function AgentsPage() {
           isLoading={isLoadingSources}
           onConfigure={() => setShowSourcesDialog(true)}
         />
-      </FloatingCard>
+      </Card>
 
       {/* Agent Cards */}
       <div className="grid gap-4 md:grid-cols-2">

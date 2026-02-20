@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button, Spinner } from '@/components/ui'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { KeyField } from '@/components/ui/key-field'
 import { CreateApiKeyDialog } from '@/components/access/create-api-key-dialog'
 import type { ApiKeyRecord } from '@/types/project-members'
@@ -62,13 +62,13 @@ export function ApiKeysSection({ projectId, apiKeys, isLoading, onRefresh, isOwn
           <Spinner size="md" />
         </div>
       ) : activeKeys.length === 0 ? (
-        <FloatingCard floating="gentle" className="p-6">
+        <Card className="p-6">
           <p className="text-sm text-[color:var(--text-secondary)] text-center">
             No API keys yet. Create one to access the API programmatically.
           </p>
-        </FloatingCard>
+        </Card>
       ) : (
-        <FloatingCard floating="gentle" className="p-0 overflow-hidden">
+        <Card className="p-0 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[color:var(--border-subtle)]">
@@ -131,7 +131,7 @@ export function ApiKeysSection({ projectId, apiKeys, isLoading, onRefresh, isOwn
               })}
             </tbody>
           </table>
-        </FloatingCard>
+        </Card>
       )}
 
       <CreateApiKeyDialog

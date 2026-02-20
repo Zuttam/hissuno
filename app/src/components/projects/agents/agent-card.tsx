@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { Heading, Button } from '@/components/ui'
 import type { IntegrationStatuses } from '@/hooks/use-integration-statuses'
 
@@ -80,8 +80,7 @@ export function AgentCard({
   knowledgeRow,
 }: AgentCardProps) {
   return (
-    <FloatingCard
-      floating="gentle"
+    <Card
       className="cursor-pointer transition hover:border-[color:var(--accent-selected)]"
     >
       <div onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}>
@@ -125,7 +124,7 @@ export function AgentCard({
           )}
         </div>
       </div>
-    </FloatingCard>
+    </Card>
   )
 }
 

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useSessionsStripAnalytics, useIssuesStripAnalytics, useAnalytics } from '@/hooks/use-analytics'
 import { useCustomerAnalytics } from '@/hooks/use-customer-analytics'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { MiniBar } from './charts/sparkline'
 import { LineChart } from './charts/line-chart'
 import { BarChart } from './charts/bar-chart'
@@ -122,7 +122,7 @@ function SessionsStrip({ projectId, isExpanded, onToggle, className }: StripCont
   }
 
   return (
-    <FloatingCard floating="gentle" variant="default" className={className}>
+    <Card className={className}>
       {/* Header - always visible */}
       <button
         onClick={onToggle}
@@ -235,7 +235,7 @@ function SessionsStrip({ projectId, isExpanded, onToggle, className }: StripCont
           </div>
         </div>
       )}
-    </FloatingCard>
+    </Card>
   )
 }
 
@@ -260,7 +260,7 @@ function IssuesStrip({ projectId, isExpanded, onToggle, className }: StripConten
   const openCount = byStatus.find((s) => s.label === 'open')?.value ?? 0
 
   return (
-    <FloatingCard floating="gentle" variant="default" className={className}>
+    <Card className={className}>
       {/* Header - always visible */}
       <button
         onClick={onToggle}
@@ -390,7 +390,7 @@ function IssuesStrip({ projectId, isExpanded, onToggle, className }: StripConten
           </div>
         </div>
       )}
-    </FloatingCard>
+    </Card>
   )
 }
 
@@ -417,7 +417,7 @@ function CustomersStrip({ projectId, isExpanded, onToggle, className }: StripCon
   }
 
   return (
-    <FloatingCard floating="gentle" variant="default" className={className}>
+    <Card className={className}>
       {/* Header - always visible */}
       <button
         onClick={onToggle}
@@ -528,6 +528,6 @@ function CustomersStrip({ projectId, isExpanded, onToggle, className }: StripCon
           </div>
         </div>
       )}
-    </FloatingCard>
+    </Card>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Badge, Button, Spinner } from '@/components/ui'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { AddMemberDialog } from '@/components/access/add-member-dialog'
 import type { ProjectMemberWithProfile } from '@/types/project-members'
 
@@ -76,13 +76,13 @@ export function MembersSection({ projectId, members, isLoading, onRefresh, isOwn
           <Spinner size="md" />
         </div>
       ) : members.length === 0 ? (
-        <FloatingCard floating="gentle" className="p-6">
+        <Card className="p-6">
           <p className="text-sm text-[color:var(--text-secondary)] text-center">
             No members yet.
           </p>
-        </FloatingCard>
+        </Card>
       ) : (
-        <FloatingCard floating="gentle" className="p-0 overflow-hidden">
+        <Card className="p-0 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[color:var(--border-subtle)]">
@@ -145,7 +145,7 @@ export function MembersSection({ projectId, members, isLoading, onRefresh, isOwn
               })}
             </tbody>
           </table>
-        </FloatingCard>
+        </Card>
       )}
 
       <AddMemberDialog

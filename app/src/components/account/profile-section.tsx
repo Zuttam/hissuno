@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { FormField, Input, Select, Button, Heading } from '@/components/ui'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 
 type CompanySize = '1-10' | '11-50' | '51-200' | '201-500' | '500+' | ''
 
@@ -107,9 +107,7 @@ export function ProfileSection({ email }: ProfileSectionProps) {
 
   if (isLoading) {
     return (
-      <FloatingCard
-        floating="gentle"
-        variant="elevated"
+      <Card
         className="space-y-4 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
       >
         <Heading as="h2" size="section">Profile</Heading>
@@ -118,14 +116,12 @@ export function ProfileSection({ email }: ProfileSectionProps) {
             <div key={i} className="h-16 rounded-lg bg-slate-200 dark:bg-slate-700" />
           ))}
         </div>
-      </FloatingCard>
+      </Card>
     )
   }
 
   return (
-    <FloatingCard
-      floating="gentle"
-      variant="elevated"
+    <Card
       className="space-y-6 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
     >
       <div className="flex items-start justify-between gap-4">
@@ -208,6 +204,6 @@ export function ProfileSection({ email }: ProfileSectionProps) {
           {successMessage}
         </div>
       )}
-    </FloatingCard>
+    </Card>
   )
 }

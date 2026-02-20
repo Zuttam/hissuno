@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { Checkbox, Badge, Divider, Heading, Button, Select, FormField } from '@/components/ui'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import {
   NOTIFICATION_TYPE_INFO,
   resolvePreferences,
@@ -118,9 +118,7 @@ export function NotificationPreferencesSection() {
 
   if (isLoading) {
     return (
-      <FloatingCard
-        floating="gentle"
-        variant="elevated"
+      <Card
         className="space-y-4 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
       >
         <Heading as="h2" size="section">Notification Preferences</Heading>
@@ -129,14 +127,12 @@ export function NotificationPreferencesSection() {
             <div key={i} className="h-12 rounded-lg bg-slate-200 dark:bg-slate-700" />
           ))}
         </div>
-      </FloatingCard>
+      </Card>
     )
   }
 
   return (
-    <FloatingCard
-      floating="gentle"
-      variant="elevated"
+    <Card
       className="space-y-6 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
     >
       <div className="flex items-start justify-between gap-4">
@@ -284,6 +280,6 @@ export function NotificationPreferencesSection() {
           {successMessage}
         </div>
       )}
-    </FloatingCard>
+    </Card>
   )
 }

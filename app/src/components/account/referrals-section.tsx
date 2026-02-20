@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { Button, Heading, Dialog, Input } from '@/components/ui'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { useInvites } from '@/hooks/use-invites'
 import type { InviteWithClaimInfo } from '@/types/invites'
 
@@ -356,9 +356,7 @@ export function ReferralsSection() {
 
   if (isLoading) {
     return (
-      <FloatingCard
-        floating="gentle"
-        variant="elevated"
+      <Card
         className="space-y-4 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
       >
         <Heading as="h2" size="section">Invites</Heading>
@@ -367,14 +365,12 @@ export function ReferralsSection() {
             <div key={i} className="h-8 rounded bg-slate-200 dark:bg-slate-700" />
           ))}
         </div>
-      </FloatingCard>
+      </Card>
     )
   }
 
   return (
-    <FloatingCard
-      floating="gentle"
-      variant="elevated"
+    <Card
       className="space-y-6 border border-slate-200 bg-white/70 p-8 dark:border-slate-800 dark:bg-slate-900/60"
     >
       <div>
@@ -443,6 +439,6 @@ export function ReferralsSection() {
       ) : (
         <p className="text-sm text-[--text-secondary]">No invites available at this time. Check in later to help spread the word.</p>
       )}
-    </FloatingCard>
+    </Card>
   )
 }

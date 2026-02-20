@@ -15,7 +15,7 @@ import { ContactSidebar } from '@/components/customers/contact-sidebar'
 import { AddDataDialog } from '@/components/customers/add-data-dialog'
 import { CustomFieldsSettingsDialog } from '@/components/customers/custom-fields-settings-dialog'
 import { Button, PageHeader, Pagination, Spinner, Tabs, TabsList, Tab, TabsPanel } from '@/components/ui'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { AnalyticsStrip } from '@/components/analytics'
 
 const PAGE_SIZE = 25
@@ -252,7 +252,7 @@ export default function ProjectCustomersPage() {
         </TabsList>
 
         <TabsPanel value="companies" className="px-0 py-0">
-          <FloatingCard floating="gentle" variant="default" className="mt-4 flex flex-col gap-6">
+          <Card className="mt-4 flex flex-col gap-6">
             <CompaniesFilters filters={companyFilters} onFilterChange={handleCompanyFilterChange} />
 
             {companyError && (
@@ -285,11 +285,11 @@ export default function ProjectCustomersPage() {
                 />
               </>
             )}
-          </FloatingCard>
+          </Card>
         </TabsPanel>
 
         <TabsPanel value="contacts" className="px-0 py-0">
-          <FloatingCard floating="gentle" variant="default" className="mt-4 flex flex-col gap-6">
+          <Card className="mt-4 flex flex-col gap-6">
             <ContactsFilters
               filters={contactFilters}
               onFilterChange={handleContactFilterChange}
@@ -326,7 +326,7 @@ export default function ProjectCustomersPage() {
                 />
               </>
             )}
-          </FloatingCard>
+          </Card>
         </TabsPanel>
       </Tabs>
 

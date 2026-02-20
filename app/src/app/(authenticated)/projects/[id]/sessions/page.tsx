@@ -16,7 +16,7 @@ import { CreateSessionDialog } from '@/components/sessions/create-session-dialog
 import { ContactPickerDialog } from '@/components/sessions/contact-picker-dialog'
 import { SessionsSettingsDialog } from '@/components/projects/edit-dialogs/sessions-settings-dialog'
 import { Button, PageHeader, Pagination, Spinner } from '@/components/ui'
-import { FloatingCard } from '@/components/ui/floating-card'
+import { Card } from '@/components/ui/card'
 import { BatchActionBar } from '@/components/ui/batch-action-bar'
 import { BatchProgressBar } from '@/components/ui/batch-progress-bar'
 import { AnalyticsStrip } from '@/components/analytics'
@@ -300,7 +300,7 @@ export default function ProjectSessionsPage() {
 
       <AnalyticsStrip type="sessions" projectId={projectId} />
 
-      <FloatingCard floating="gentle" variant="default" className="relative flex flex-col gap-6">
+      <Card className="relative flex flex-col gap-6">
         <SessionsFilters
           projects={[project]} // Single project only
           filters={filters}
@@ -386,7 +386,7 @@ export default function ProjectSessionsPage() {
             />
           </>
         )}
-      </FloatingCard>
+      </Card>
 
       {selectedSessionId && (
         <SessionSidebar
