@@ -1,12 +1,17 @@
 'use client'
 
-import { useState, useEffect, useCallback, type ChangeEvent } from 'react'
+import { useState, useEffect, useCallback, useMemo, type ChangeEvent } from 'react'
+import type { CustomerEntityType } from '@/types/customer'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useProject } from '@/components/providers/project-provider'
+import { useUser } from '@/components/providers/auth-provider'
 import { useIntegrationStatuses } from '@/hooks/use-integration-statuses'
+import { useProjectMembers } from '@/hooks/use-project-members'
+import { useProjectApiKeys } from '@/hooks/use-project-api-keys'
+import { MembersSection } from '@/components/access/members-section'
+import { ApiKeysSection } from '@/components/access/api-keys-section'
 import { TestAgentDialog } from '@/components/projects/test-agent-dialog'
-import { KnowledgeSourcesList } from '@/components/projects/knowledge/knowledge-sources-list'
-import { KnowledgeSourcesDialog } from '@/components/projects/edit-dialogs/knowledge-sources-dialog'
+import { KnowledgeSourcesPanel } from '@/components/projects/edit-dialogs/knowledge-sources-dialog'
 import { AgentCard, buildSupportChannels, buildPmSources, buildPmDestinations } from '@/components/projects/agents/agent-card'
 import { SupportAgentDialog } from '@/components/projects/agents/support-agent-dialog'
 import { PmAgentDialog } from '@/components/projects/agents/pm-agent-dialog'
@@ -14,13 +19,13 @@ import { KnowledgeDetailDialog } from '@/components/projects/agents/knowledge-de
 import { ProjectInfoSection } from '@/components/projects/edit-dialogs/project-details-dialog'
 import { CustomTagsSection, type LocalCustomTag } from '@/components/projects/edit-dialogs/sessions-settings-dialog'
 import { TrackingToggle, type IssuesSettings } from '@/components/projects/edit-dialogs/issues-settings-dialog'
-import { Card } from '@/components/ui/card'
+import { FieldsEditor } from '@/components/customers/custom-fields-settings-dialog'
 import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
-import { Button, Heading, Spinner, PageHeader, Badge } from '@/components/ui'
+import { Button, Heading, Spinner, PageHeader } from '@/components/ui'
 import { formatRelativeTime } from '@/lib/utils/format-time'
-import type { KnowledgeSourceRecord, NamedPackageWithSources } from '@/lib/knowledge/types'
+import type { NamedPackageWithSources } from '@/lib/knowledge/types'
 
-const VALID_TABS = ['general', 'knowledge', 'agents', 'feedback', 'issues'] as const
+const VALID_TABS = ['general', 'access', 'customers', 'knowledge', 'agents', 'feedback'] as const
 type SettingsTab = (typeof VALID_TABS)[number]
 
 const MAX_TAGS = 10
@@ -55,28 +60,35 @@ export default function AgentsSettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { project, projectId, isLoading: isLoadingProject, refreshProject, refreshProjects } = useProject()
+  const { user } = useUser()
   const { statuses: integrationStatuses } = useIntegrationStatuses(projectId)
 
-  // Active tab from URL
-  const tabParam = searchParams.get('tab') as SettingsTab | null
-  const activeTab: SettingsTab = tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'general'
+  // --- Access tab ---
+  const { members, isLoading: isLoadingMembers, refresh: refreshMembers } = useProjectMembers(projectId ?? undefined)
+  const { apiKeys, isLoading: isLoadingApiKeys, refresh: refreshApiKeys } = useProjectApiKeys(projectId ?? undefined)
+  const isOwner = useMemo(() => {
+    if (!user) return false
+    return members.some((m) => m.user_id === user.id && m.role === 'owner' && m.status === 'active')
+  }, [members, user])
+
+  // Active tab from URL — map legacy "issues" param to "feedback"
+  const tabParam = searchParams.get('tab')
+  const resolvedTab = tabParam === 'issues' ? 'feedback' : tabParam
+  const activeTab: SettingsTab = resolvedTab && VALID_TABS.includes(resolvedTab as SettingsTab) ? (resolvedTab as SettingsTab) : 'general'
 
   const handleTabChange = useCallback((value: string) => {
-    router.replace(`/projects/${projectId}/agents?tab=${value}`)
+    router.replace(`/projects/${projectId}/configuration?tab=${value}`)
   }, [router, projectId])
 
   // --- Agent dialog visibility ---
   const [showSupportDialog, setShowSupportDialog] = useState(false)
   const [showPmDialog, setShowPmDialog] = useState(false)
   const [showTestAgent, setShowTestAgent] = useState(false)
-  const [showSourcesDialog, setShowSourcesDialog] = useState(false)
   const [showKnowledgeDetail, setShowKnowledgeDetail] = useState(false)
 
   // --- Agent data ---
   const [settings, setSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
   const [isLoading, setIsLoading] = useState(true)
-  const [sources, setSources] = useState<KnowledgeSourceRecord[]>([])
-  const [isLoadingSources, setIsLoadingSources] = useState(true)
   const [packages, setPackages] = useState<NamedPackageWithSources[]>([])
 
   // --- General tab state ---
@@ -86,18 +98,20 @@ export default function AgentsSettingsPage() {
   const [generalError, setGeneralError] = useState<string | null>(null)
   const [generalSaved, setGeneralSaved] = useState(false)
 
+  // --- Customers tab state ---
+  const [customerEntityTab, setCustomerEntityTab] = useState<CustomerEntityType>('company')
+
   // --- Feedback tab state ---
   const [customTags, setCustomTags] = useState<LocalCustomTag[]>([])
   const [isLoadingTags, setIsLoadingTags] = useState(true)
-  const [isSavingTags, setIsSavingTags] = useState(false)
-  const [tagsError, setTagsError] = useState<string | null>(null)
-  const [tagsSaved, setTagsSaved] = useState(false)
 
-  // --- Issues tab state ---
+  // --- Issues state (rendered under Feedback tab) ---
   const [issuesSettings, setIssuesSettings] = useState<IssuesSettings>({ issue_tracking_enabled: true })
   const [isLoadingIssues, setIsLoadingIssues] = useState(true)
-  const [isSavingIssues, setIsSavingIssues] = useState(false)
-  const [issuesError, setIssuesError] = useState<string | null>(null)
+
+  // --- Feedback auto-save state ---
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
+  const [tagsSaved, setTagsSaved] = useState(false)
   const [issuesSaved, setIssuesSaved] = useState(false)
 
   // Initialize general tab fields from project
@@ -165,22 +179,6 @@ export default function AgentsSettingsPage() {
     }
   }, [projectId])
 
-  const fetchSources = useCallback(async () => {
-    if (!projectId) return
-    setIsLoadingSources(true)
-    try {
-      const response = await fetch(`/api/projects/${projectId}/settings/knowledge-sources`)
-      if (response.ok) {
-        const data = await response.json()
-        setSources(data.sources ?? [])
-      }
-    } catch (err) {
-      console.error('[agents] Failed to fetch sources:', err)
-    } finally {
-      setIsLoadingSources(false)
-    }
-  }, [projectId])
-
   const fetchPackages = useCallback(async () => {
     if (!projectId) return
     try {
@@ -198,7 +196,6 @@ export default function AgentsSettingsPage() {
   const fetchCustomTags = useCallback(async () => {
     if (!projectId) return
     setIsLoadingTags(true)
-    setTagsError(null)
     try {
       const response = await fetch(`/api/projects/${projectId}/settings/custom-tags`)
       if (!response.ok) throw new Error('Failed to load custom tags')
@@ -214,17 +211,16 @@ export default function AgentsSettingsPage() {
         })))
       }
     } catch (err) {
-      setTagsError(err instanceof Error ? err.message : 'Failed to load custom tags')
+      setFeedbackError(err instanceof Error ? err.message : 'Failed to load custom tags')
     } finally {
       setIsLoadingTags(false)
     }
   }, [projectId])
 
-  // --- Issues tab fetcher ---
+  // --- Issues fetcher ---
   const fetchIssuesSettings = useCallback(async () => {
     if (!projectId) return
     setIsLoadingIssues(true)
-    setIssuesError(null)
     try {
       const response = await fetch(`/api/projects/${projectId}/settings/issues`)
       if (!response.ok) throw new Error('Failed to load settings')
@@ -233,7 +229,7 @@ export default function AgentsSettingsPage() {
         setIssuesSettings(data.settings)
       }
     } catch (err) {
-      setIssuesError(err instanceof Error ? err.message : 'Failed to load settings')
+      setFeedbackError(err instanceof Error ? err.message : 'Failed to load settings')
     } finally {
       setIsLoadingIssues(false)
     }
@@ -242,11 +238,10 @@ export default function AgentsSettingsPage() {
   // Fetch all data on mount
   useEffect(() => {
     void fetchSettings()
-    void fetchSources()
     void fetchPackages()
     void fetchCustomTags()
     void fetchIssuesSettings()
-  }, [fetchSettings, fetchSources, fetchPackages, fetchCustomTags, fetchIssuesSettings])
+  }, [fetchSettings, fetchPackages, fetchCustomTags, fetchIssuesSettings])
 
   // --- Agent event handlers ---
   const activePackage = packages.find((p) => p.id === settings.supportAgent.packageId)
@@ -254,10 +249,6 @@ export default function AgentsSettingsPage() {
   const handleSettingsSaved = () => {
     void fetchSettings()
     void fetchPackages()
-  }
-
-  const handleSourcesSaved = () => {
-    void fetchSources()
   }
 
   const handlePackagesChange = () => {
@@ -306,16 +297,14 @@ export default function AgentsSettingsPage() {
     }
   }
 
-  // --- Feedback tab save ---
-  const handleSaveTags = async () => {
-    setIsSavingTags(true)
-    setTagsError(null)
-    setTagsSaved(false)
+  // --- Auto-save custom tags ---
+  const handleSaveTags = useCallback(async (tags: LocalCustomTag[]) => {
+    setFeedbackError(null)
     try {
       const response = await fetch(`/api/projects/${projectId}/settings/sessions`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ custom_tags: customTags }),
+        body: JSON.stringify({ custom_tags: tags }),
       })
       if (!response.ok) {
         const data = await response.json()
@@ -324,41 +313,38 @@ export default function AgentsSettingsPage() {
       setTagsSaved(true)
       setTimeout(() => setTagsSaved(false), 3000)
     } catch (err) {
-      setTagsError(err instanceof Error ? err.message : 'Failed to save custom tags')
-    } finally {
-      setIsSavingTags(false)
+      setFeedbackError(err instanceof Error ? err.message : 'Failed to save custom tags')
     }
-  }
+  }, [projectId])
 
-  // --- Issues tab save ---
-  const handleSaveIssues = async () => {
-    setIsSavingIssues(true)
-    setIssuesError(null)
-    setIssuesSaved(false)
+  // --- Auto-save issue tracking toggle ---
+  const handleTrackingEnabledChange = useCallback(async (enabled: boolean) => {
+    const previous = issuesSettings.issue_tracking_enabled
+    setIssuesSettings({ issue_tracking_enabled: enabled })
+    setFeedbackError(null)
     try {
       const response = await fetch(`/api/projects/${projectId}/settings/issues`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(issuesSettings),
+        body: JSON.stringify({ issue_tracking_enabled: enabled }),
       })
       if (!response.ok) {
         const data = await response.json()
-        throw new Error(data.error || 'Failed to save settings')
+        throw new Error(data.error || 'Failed to save issue settings')
       }
       setIssuesSaved(true)
       setTimeout(() => setIssuesSaved(false), 3000)
     } catch (err) {
-      setIssuesError(err instanceof Error ? err.message : 'Failed to save settings')
-    } finally {
-      setIsSavingIssues(false)
+      setIssuesSettings({ issue_tracking_enabled: previous })
+      setFeedbackError(err instanceof Error ? err.message : 'Failed to save issue settings')
     }
-  }
+  }, [projectId, issuesSettings.issue_tracking_enabled])
 
   // Loading state
   if (isLoadingProject || !project || !projectId || isLoading) {
     return (
       <>
-        <PageHeader title="Agents & Settings" />
+        <PageHeader title="Configuration" />
         <div className="flex-1 flex items-center justify-center">
           <Spinner size="lg" />
         </div>
@@ -368,68 +354,100 @@ export default function AgentsSettingsPage() {
 
   return (
     <>
-      <PageHeader title="Agents & Settings" />
+      <PageHeader title="Configuration" />
 
       <Tabs value={activeTab} onChange={handleTabChange} className="flex-1">
         <TabsList>
           <Tab value="general">General</Tab>
+          <Tab value="access">Access</Tab>
+          <Tab value="customers">Customers</Tab>
           <Tab value="knowledge">Knowledge</Tab>
           <Tab value="agents">Agents</Tab>
-          <Tab value="feedback">Feedback</Tab>
-          <Tab value="issues">Issues</Tab>
+          <Tab value="feedback">Feedback & Issues</Tab>
         </TabsList>
 
         {/* General Tab */}
         <TabsPanel value="general">
-          <div className="mx-auto max-w-2xl space-y-6">
-            <Card>
-              <Heading as="h3" size="subsection" className="mb-4">Project Details</Heading>
-              <ProjectInfoSection
-                name={projectName}
-                description={projectDescription}
-                onNameChange={(e: ChangeEvent<HTMLInputElement>) => setProjectName(e.target.value)}
-                onDescriptionChange={(e: ChangeEvent<HTMLTextAreaElement>) => setProjectDescription(e.target.value)}
-              />
-              {generalError && (
-                <div className="mt-4 rounded-[4px] border border-[color:var(--accent-danger)] p-3 text-sm text-[color:var(--accent-danger)]">
-                  {generalError}
-                </div>
-              )}
-              <div className="mt-6 flex items-center gap-3">
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => void handleSaveGeneral()}
-                  disabled={isSavingGeneral}
-                >
-                  {isSavingGeneral ? 'Saving...' : 'Save'}
-                </Button>
-                {generalSaved && (
-                  <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
-                )}
+          <div className="max-w-2xl flex flex-col gap-6">
+            <Heading as="h3" size="subsection">Project Details</Heading>
+            <ProjectInfoSection
+              name={projectName}
+              description={projectDescription}
+              onNameChange={(e: ChangeEvent<HTMLInputElement>) => setProjectName(e.target.value)}
+              onDescriptionChange={(e: ChangeEvent<HTMLTextAreaElement>) => setProjectDescription(e.target.value)}
+            />
+            {generalError && (
+              <div className="rounded-[4px] border border-[color:var(--accent-danger)] p-3 text-sm text-[color:var(--accent-danger)]">
+                {generalError}
               </div>
-            </Card>
+            )}
+            <div className="flex items-center gap-3">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => void handleSaveGeneral()}
+                disabled={isSavingGeneral}
+              >
+                {isSavingGeneral ? 'Saving...' : 'Save'}
+              </Button>
+              {generalSaved && (
+                <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
+              )}
+            </div>
+          </div>
+        </TabsPanel>
+
+        {/* Access Tab */}
+        <TabsPanel value="access">
+          <div className="max-w-3xl flex flex-col gap-6">
+            <MembersSection
+              projectId={projectId}
+              members={members}
+              isLoading={isLoadingMembers}
+              onRefresh={refreshMembers}
+              isOwner={isOwner}
+            />
+            <ApiKeysSection
+              projectId={projectId}
+              apiKeys={apiKeys}
+              isLoading={isLoadingApiKeys}
+              onRefresh={refreshApiKeys}
+              isOwner={isOwner}
+            />
+          </div>
+        </TabsPanel>
+
+        {/* Customers Tab */}
+        <TabsPanel value="customers">
+          <div className="max-w-2xl flex flex-col gap-6">
+            <Heading as="h3" size="subsection">Custom Fields</Heading>
+            <p className="text-sm text-[color:var(--text-secondary)]">
+              Define custom fields to capture additional information about your companies and contacts.
+            </p>
+            <Tabs value={customerEntityTab} onChange={(v) => setCustomerEntityTab(v as CustomerEntityType)}>
+              <TabsList className="px-0 py-0 mb-4">
+                <Tab value="company">Company Fields</Tab>
+                <Tab value="contact">Contact Fields</Tab>
+              </TabsList>
+              <TabsPanel value="company" className="px-0 py-0">
+                <FieldsEditor projectId={projectId} entityType="company" />
+              </TabsPanel>
+              <TabsPanel value="contact" className="px-0 py-0">
+                <FieldsEditor projectId={projectId} entityType="contact" />
+              </TabsPanel>
+            </Tabs>
           </div>
         </TabsPanel>
 
         {/* Knowledge Tab */}
         <TabsPanel value="knowledge">
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Heading as="h3" size="subsection">Connected Knowledge Resources</Heading>
-                {sources.length > 0 && <Badge variant="default">{sources.length}</Badge>}
-              </div>
-              <Button variant="ghost" size="md" onClick={() => setShowSourcesDialog(true)}>
-                Configure
-              </Button>
-            </div>
-            <KnowledgeSourcesList
-              sources={sources}
-              isLoading={isLoadingSources}
-              onConfigure={() => setShowSourcesDialog(true)}
-            />
-          </Card>
+          <div className="max-w-2xl flex flex-col gap-6">
+            <Heading as="h3" size="subsection">Knowledge Sources</Heading>
+            <p className="text-sm text-[color:var(--text-secondary)]">
+              Connect codebases, websites, documentation, and custom text to give your agents context about your product.
+            </p>
+            <KnowledgeSourcesPanel projectId={projectId} onSourcesChange={handleSettingsSaved} />
+          </div>
         </TabsPanel>
 
         {/* Agents Tab */}
@@ -461,79 +479,61 @@ export default function AgentsSettingsPage() {
           </div>
         </TabsPanel>
 
-        {/* Feedback Tab */}
+        {/* Feedback & Issues Tab */}
         <TabsPanel value="feedback">
-          <div className="mx-auto max-w-2xl space-y-6">
-            <Card>
-              <Heading as="h3" size="subsection" className="mb-4">Custom Tags</Heading>
+          <div className="max-w-2xl flex flex-col gap-6">
+            {/* Custom Tags Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Heading as="h3" size="subsection">Custom Tags</Heading>
+                {tagsSaved && (
+                  <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
+                )}
+              </div>
               {isLoadingTags ? (
                 <div className="flex items-center justify-center py-8">
                   <Spinner size="md" />
                 </div>
               ) : (
-                <>
-                  <CustomTagsSection
-                    tags={customTags}
-                    onTagsChange={setCustomTags}
-                    canAddMore={customTags.length < MAX_TAGS}
-                    isLoading={isSavingTags}
-                    error={tagsError}
-                  />
-                  <div className="mt-6 flex items-center gap-3">
-                    <Button
-                      variant="primary"
-                      size="md"
-                      onClick={() => void handleSaveTags()}
-                      disabled={isSavingTags}
-                    >
-                      {isSavingTags ? 'Saving...' : 'Save'}
-                    </Button>
-                    {tagsSaved && (
-                      <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
-                    )}
-                  </div>
-                </>
+                <CustomTagsSection
+                  tags={customTags}
+                  onTagsChange={setCustomTags}
+                  onCommit={handleSaveTags}
+                  canAddMore={customTags.length < MAX_TAGS}
+                  error={null}
+                />
               )}
-            </Card>
-          </div>
-        </TabsPanel>
+            </div>
 
-        {/* Issues Tab */}
-        <TabsPanel value="issues">
-          <div className="mx-auto max-w-2xl space-y-6">
-            <Card>
-              <Heading as="h3" size="subsection" className="mb-4">Issue Settings</Heading>
+            {/* Divider */}
+            <div className="border-t border-[color:var(--border-subtle)]" />
+
+            {/* Issue Tracking Section */}
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <Heading as="h3" size="subsection">Issue Tracking</Heading>
+                {issuesSaved && (
+                  <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
+                )}
+              </div>
               {isLoadingIssues ? (
                 <div className="flex items-center justify-center py-8">
                   <Spinner size="md" />
                 </div>
               ) : (
-                <>
-                  <TrackingToggle
-                    trackingEnabled={issuesSettings.issue_tracking_enabled}
-                    onTrackingEnabledChange={(enabled) => setIssuesSettings({ issue_tracking_enabled: enabled })}
-                  />
-                  {issuesError && (
-                    <div className="mt-4 rounded-[4px] border border-[color:var(--accent-danger)] p-3 text-sm text-[color:var(--accent-danger)]">
-                      {issuesError}
-                    </div>
-                  )}
-                  <div className="mt-6 flex items-center gap-3">
-                    <Button
-                      variant="primary"
-                      size="md"
-                      onClick={() => void handleSaveIssues()}
-                      disabled={isSavingIssues}
-                    >
-                      {isSavingIssues ? 'Saving...' : 'Save'}
-                    </Button>
-                    {issuesSaved && (
-                      <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
-                    )}
-                  </div>
-                </>
+                <TrackingToggle
+                  trackingEnabled={issuesSettings.issue_tracking_enabled}
+                  onTrackingEnabledChange={(enabled) => void handleTrackingEnabledChange(enabled)}
+                />
               )}
-            </Card>
+            </div>
+
+            {/* Inline error */}
+            {feedbackError && (
+              <div className="rounded-[4px] border border-[color:var(--accent-danger)] p-3 text-sm text-[color:var(--accent-danger)]">
+                {feedbackError}
+              </div>
+            )}
           </div>
         </TabsPanel>
       </Tabs>
@@ -565,14 +565,7 @@ export default function AgentsSettingsPage() {
         projectId={projectId}
         activePackageId={settings.supportAgent.packageId}
         onPackagesChange={handlePackagesChange}
-        hasResources={sources.length > 0}
-      />
-
-      <KnowledgeSourcesDialog
-        open={showSourcesDialog}
-        onClose={() => setShowSourcesDialog(false)}
-        projectId={projectId}
-        onSaved={handleSourcesSaved}
+        hasResources
       />
 
       {showTestAgent && (

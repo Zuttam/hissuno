@@ -262,22 +262,13 @@ export default function ProjectSessionsPage() {
         title="Feedback"
         onRefresh={() => void refresh()}
         actions={
-          <>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => router.push(`/projects/${projectId}/agents?tab=feedback`)}
-            >
-              Settings
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handleOpenCreateDialog}
-            >
-              Create
-            </Button>
-          </>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handleOpenCreateDialog}
+          >
+            Create
+          </Button>
         }
       />
 

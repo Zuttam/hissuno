@@ -67,6 +67,8 @@ export function HissunoWidget({
   onOpen,
   onClose,
   onControlsReady,
+  onWidthChange,
+  layout = 'overlay',
   className,
   headers = {},
 }: HissunoWidgetProps) {
@@ -237,6 +239,9 @@ export function HissunoWidget({
         from { transform: translateX(100%); }
         to { transform: translateX(0); }
       }
+      .hissuno-resize-handle:hover .hissuno-resize-indicator {
+        background-color: #9ca3af !important;
+      }
     `;
     document.head.appendChild(style);
   }, []);
@@ -355,7 +360,7 @@ export function HissunoWidget({
         );
       case 'sidepanel':
       default:
-        return <ChatSidepanel {...displayProps} />;
+        return <ChatSidepanel {...displayProps} layout={layout} onWidthChange={onWidthChange} />;
     }
   };
 

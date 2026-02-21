@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Button, Spinner } from '@/components/ui'
+import { Button, Heading, Spinner } from '@/components/ui'
 import { Card } from '@/components/ui/card'
 import { KeyField } from '@/components/ui/key-field'
 import { CreateApiKeyDialog } from '@/components/access/create-api-key-dialog'
@@ -47,9 +47,7 @@ export function ApiKeysSection({ projectId, apiKeys, isLoading, onRefresh, isOwn
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-          API Keys
-        </h3>
+        <Heading as="h3" size="subsection">API Keys</Heading>
         {isOwner && (
           <Button variant="secondary" size="sm" onClick={() => setShowCreateDialog(true)}>
             Create API Key

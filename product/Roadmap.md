@@ -162,7 +162,6 @@
 
 ### Marketing
 [] Run SDR agent
-[] Improve landing pages | remove ai support and fde | focus on pm | add pricing
 
 ### Feedback (f.k.a sessions)
 [x] Support Zendesk in early access
@@ -170,20 +169,23 @@
 ### Platform
 [] Enable additional notifications 
 [] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
-[] Delete project
+[] Enable expanded view of feedbacks and issues in left panel and ability to search
+[] fix alerts in integration settings
+ 
 
 ### Issues
 [] Lieaner Integration
 [] Move priority analysis on RICE methodology 
-[] Unify linkedin feedback and customer into one tree 
 [] Enable manual edit of RICE scores 
-[] Enable manual edit of linked feedback - detach and attach
+[x] Unify linkedin feedback and customer into one tree 
+[x] Enable manual edit of linked feedback - detach and attach
 [] Make it easier to search for linked feedback -> both attach and create 
 [] notify issue resolution to user
 
 ## Phase 11
 
 ### Marketing 
+[] Improve landing pages | remove ai support and fde | focus on pm | add pricing
 [] Support referral promotions
 
 ### Integrations
@@ -203,9 +205,9 @@
 
 
 ### Issues 
-
 [] Draft email response to users
 [] Jira Integration 
+[] Delete project
 [] Add product area to the issue analysis - Classify on product area
 
 

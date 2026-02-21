@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Badge, Button, Spinner } from '@/components/ui'
+import { Badge, Button, Heading, Spinner } from '@/components/ui'
 import { Card } from '@/components/ui/card'
 import { AddMemberDialog } from '@/components/access/add-member-dialog'
 import type { ProjectMemberWithProfile } from '@/types/project-members'
@@ -61,9 +61,7 @@ export function MembersSection({ projectId, members, isLoading, onRefresh, isOwn
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">
-          Members
-        </h3>
+        <Heading as="h3" size="subsection">Members</Heading>
         {isOwner && (
           <Button variant="secondary" size="sm" onClick={() => setShowAddDialog(true)}>
             Add Member

@@ -1,17 +1,10 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Dialog, Button, Input, Select } from '@/components/ui'
-import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
+import { Button, Input, Select } from '@/components/ui'
 import { useCustomFields } from '@/hooks/use-custom-fields'
 import type { CustomerEntityType, CustomFieldType, CustomFieldDefinition } from '@/types/customer'
 import { CUSTOM_FIELD_TYPES } from '@/types/customer'
-
-interface CustomFieldsSettingsDialogProps {
-  open: boolean
-  onClose: () => void
-  projectId: string
-}
 
 const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   text: 'Text',
@@ -21,39 +14,12 @@ const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   select: 'Select',
 }
 
-export function CustomFieldsSettingsDialog({
-  open,
-  onClose,
-  projectId,
-}: CustomFieldsSettingsDialogProps) {
-  const [entityTab, setEntityTab] = useState<CustomerEntityType>('company')
-
-  return (
-    <Dialog open={open} onClose={onClose} title="Custom Fields Settings" size="xxl">
-      <Tabs value={entityTab} onChange={(v) => setEntityTab(v as CustomerEntityType)}>
-        <TabsList className="px-0 py-0 mb-4">
-          <Tab value="company">Company Fields</Tab>
-          <Tab value="contact">Contact Fields</Tab>
-        </TabsList>
-
-        <TabsPanel value="company" className="px-0 py-0">
-          <FieldsEditor projectId={projectId} entityType="company" />
-        </TabsPanel>
-
-        <TabsPanel value="contact" className="px-0 py-0">
-          <FieldsEditor projectId={projectId} entityType="contact" />
-        </TabsPanel>
-      </Tabs>
-    </Dialog>
-  )
-}
-
 interface FieldsEditorProps {
   projectId: string
   entityType: CustomerEntityType
 }
 
-function FieldsEditor({ projectId, entityType }: FieldsEditorProps) {
+export function FieldsEditor({ projectId, entityType }: FieldsEditorProps) {
   const { fields, isLoading, createField, updateField, deleteField } = useCustomFields({
     projectId,
     entityType,
@@ -261,9 +227,23 @@ function FieldsEditor({ projectId, entityType }: FieldsEditorProps) {
                     <button
                       type="button"
                       onClick={() => void handleDelete(field.id)}
-                      className="rounded-[4px] px-2 py-1 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
+                      className="rounded-[4px] p-1 text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--accent-danger)]"
+                      aria-label={`Delete ${field.field_label}`}
                     >
-                      Delete
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
                     </button>
                   </td>
                 </tr>

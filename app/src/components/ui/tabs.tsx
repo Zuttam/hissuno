@@ -42,7 +42,7 @@ export function TabsList({ children, className }: TabsListProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-1 border-b border-[--border-subtle] px-6 py-2',
+        'flex items-center gap-1 border-b border-[--border-subtle] px-6 py-2 overflow-x-auto scrollbar-hide',
         className
       )}
     >
@@ -66,7 +66,7 @@ export function Tab({ value, children, className }: TabProps) {
       type="button"
       onClick={() => onChange(value)}
       className={cn(
-        'relative px-4 py-2 text-sm font-medium transition-all duration-200',
+        'relative shrink-0 px-4 py-2 text-sm font-medium transition-all duration-200',
         isActive
           ? 'text-(--foreground)'
           : 'text-(--text-tertiary) hover:text-(--text-secondary)',

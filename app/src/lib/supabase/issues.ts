@@ -212,6 +212,26 @@ export async function linkSessionToIssue(
 }
 
 /**
+ * Unlink a session from an issue
+ */
+export async function unlinkSessionFromIssue(
+  supabase: SupabaseClient,
+  issueId: string,
+  sessionId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('issue_sessions')
+    .delete()
+    .eq('issue_id', issueId)
+    .eq('session_id', sessionId)
+
+  if (error) {
+    console.error('[supabase.issues.unlinkSessionFromIssue] Failed', { issueId, sessionId }, error)
+    throw new Error(`Failed to unlink session: ${error.message}`)
+  }
+}
+
+/**
  * Mark a session as PM reviewed
  */
 export async function markSessionPMReviewed(

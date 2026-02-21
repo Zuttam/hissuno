@@ -13,7 +13,6 @@ import { ContactsTable } from '@/components/customers/contacts-table'
 import { CompanySidebar } from '@/components/customers/company-sidebar'
 import { ContactSidebar } from '@/components/customers/contact-sidebar'
 import { AddDataDialog } from '@/components/customers/add-data-dialog'
-import { CustomFieldsSettingsDialog } from '@/components/customers/custom-fields-settings-dialog'
 import { Button, PageHeader, Pagination, Spinner, Tabs, TabsList, Tab, TabsPanel } from '@/components/ui'
 import { Card } from '@/components/ui/card'
 import { AnalyticsStrip } from '@/components/analytics'
@@ -49,13 +48,11 @@ export default function ProjectCustomersPage() {
 
   // Dialog state
   const [showAddDataDialog, setShowAddDataDialog] = useState(false)
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
 
   // URL-driven state
   useEffect(() => {
     const dialog = searchParams.get('dialog')
-    if (dialog === 'settings') setShowSettingsDialog(true)
-    else if (dialog === 'add-data' || dialog === 'import' || dialog === 'create-company' || dialog === 'create-contact') setShowAddDataDialog(true)
+    if (dialog === 'add-data' || dialog === 'import' || dialog === 'create-company' || dialog === 'create-contact') setShowAddDataDialog(true)
 
     // Backward compat: redirect old ?company=X / ?contact=X to new path format
     const companyParam = searchParams.get('company')
@@ -204,11 +201,6 @@ export default function ProjectCustomersPage() {
     }
   }, [searchParams, router, projectId])
 
-  const handleCloseSettingsDialog = () => {
-    setShowSettingsDialog(false)
-    clearDialogParam()
-  }
-
   const handleCloseAddDataDialog = () => {
     setShowAddDataDialog(false)
     clearDialogParam()
@@ -232,14 +224,9 @@ export default function ProjectCustomersPage() {
         title="Customers"
         onRefresh={handleRefresh}
         actions={
-          <>
-            <Button variant="secondary" size="md" onClick={() => setShowSettingsDialog(true)}>
-              Settings
-            </Button>
-            <Button variant="primary" size="md" onClick={() => setShowAddDataDialog(true)}>
-              Add Customers
-            </Button>
-          </>
+          <Button variant="primary" size="md" onClick={() => setShowAddDataDialog(true)}>
+            Add Customers
+          </Button>
         }
       />
 
@@ -360,11 +347,6 @@ export default function ProjectCustomersPage() {
         onCreateContact={createContact}
       />
 
-      <CustomFieldsSettingsDialog
-        open={showSettingsDialog}
-        onClose={handleCloseSettingsDialog}
-        projectId={projectId}
-      />
     </>
   )
 }

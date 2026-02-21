@@ -2,10 +2,9 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { Dialog, Button, Select, Input, Textarea } from '@/components/ui'
-import { SessionTagList } from '@/components/sessions/session-tags'
+import { SessionPicker } from '@/components/sessions/session-picker'
 import type { ProjectRecord } from '@/lib/supabase/projects'
 import type { CreateIssueInput, IssueType, IssuePriority } from '@/types/issue'
-import type { SessionWithProject } from '@/types/session'
 
 interface CreateIssueDialogProps {
   open: boolean
@@ -26,36 +25,8 @@ export function CreateIssueDialog({
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<IssuePriority>('low')
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([])
-  const [availableSessions, setAvailableSessions] = useState<SessionWithProject[]>([])
-  const [isLoadingSessions, setIsLoadingSessions] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Fetch sessions when project changes
-  useEffect(() => {
-    if (!projectId || !open) {
-      setAvailableSessions([])
-      setSelectedSessionIds([])
-      return
-    }
-
-    const fetchSessions = async () => {
-      setIsLoadingSessions(true)
-      try {
-        const response = await fetch(`/api/projects/${projectId}/sessions?limit=50`)
-        if (response.ok) {
-          const data = await response.json()
-          setAvailableSessions(data.sessions ?? [])
-        }
-      } catch {
-        console.error('[CreateIssueDialog] Failed to fetch sessions')
-      } finally {
-        setIsLoadingSessions(false)
-      }
-    }
-
-    void fetchSessions()
-  }, [projectId, open])
 
   // Clear selected sessions when project changes
   useEffect(() => {
@@ -124,61 +95,8 @@ export function CreateIssueDialog({
       priority,
       selectedSessionIds,
       onCreateIssue,
-      onClose,
-      projects,
     ]
   )
-
-  const formatSessionId = (id: string) => {
-    return id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id
-  }
-
-  const getPathFromUrl = (url: string | null): string => {
-    if (!url) return ''
-    try {
-      const parsedUrl = new URL(url)
-      return parsedUrl.pathname.length > 40
-        ? `${parsedUrl.pathname.slice(0, 40)}...`
-        : parsedUrl.pathname
-    } catch {
-      return url.length > 40 ? `${url.slice(0, 40)}...` : url
-    }
-  }
-
-  const formatRelativeTime = (dateString: string): string => {
-    const date = new Date(dateString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffSecs = Math.floor(diffMs / 1000)
-    const diffMins = Math.floor(diffSecs / 60)
-    const diffHours = Math.floor(diffMins / 60)
-    const diffDays = Math.floor(diffHours / 24)
-
-    if (diffSecs < 60) {
-      return 'Just now'
-    } else if (diffMins < 60) {
-      return `${diffMins}m ago`
-    } else if (diffHours < 24) {
-      return `${diffHours}h ago`
-    } else if (diffDays < 7) {
-      return `${diffDays}d ago`
-    } else {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    }
-  }
-
-  const getSessionDisplayTitle = (session: SessionWithProject): string => {
-    if (session.page_title) {
-      return session.page_title.length > 35
-        ? `${session.page_title.slice(0, 35)}...`
-        : session.page_title
-    }
-    const pathFromUrl = getPathFromUrl(session.page_url)
-    if (pathFromUrl && pathFromUrl !== '/') {
-      return pathFromUrl
-    }
-    return formatSessionId(session.id)
-  }
 
   return (
     <Dialog open={open} onClose={onClose} title="Create Issue" size="xxl">
@@ -264,55 +182,12 @@ export function CreateIssueDialog({
           <label className="text-xs font-medium text-[color:var(--text-secondary)]">
             Linked feedback
           </label>
-          {isLoadingSessions ? (
-            <div className="flex items-center gap-2 text-xs text-[color:var(--text-tertiary)]">
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              Loading feedback...
-            </div>
-          ) : availableSessions.length === 0 ? (
-            <p className="text-xs text-[color:var(--text-tertiary)]">
-              No feedback found for this project.
-            </p>
-          ) : (
-            <div className="max-h-48 overflow-y-auto rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)]">
-              {availableSessions.map((session) => (
-                <label
-                  key={session.id}
-                  className="flex cursor-pointer items-start gap-3 border-b border-[color:var(--border-subtle)] px-3 py-2 last:border-b-0 hover:bg-[color:var(--surface-hover)]"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedSessionIds.includes(session.id)}
-                    onChange={() => handleToggleSession(session.id)}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-[color:var(--border)] accent-[color:var(--accent-selected)]"
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="truncate text-xs font-medium text-[color:var(--foreground)]"
-                        title={session.page_title || session.page_url || session.id}
-                      >
-                        {getSessionDisplayTitle(session)}
-                      </span>
-                      {session.tags && session.tags.length > 0 && (
-                        <div className="shrink-0">
-                          <SessionTagList tags={session.tags} size="sm" emptyText="" />
-                        </div>
-                      )}
-                    </div>
-                    {session.page_title && session.page_url && (
-                      <span className="truncate text-[10px] text-[color:var(--text-tertiary)]">
-                        {getPathFromUrl(session.page_url)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2 text-[10px] text-[color:var(--text-tertiary)]">
-                    <span>{session.message_count} msg{session.message_count !== 1 ? 's' : ''}</span>
-                    <span>{formatRelativeTime(session.last_activity_at)}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
+          {open && projectId && (
+            <SessionPicker
+              projectId={projectId}
+              selectedSessionIds={selectedSessionIds}
+              onToggleSession={handleToggleSession}
+            />
           )}
           {selectedSessionIds.length > 0 && (
             <p className="text-xs text-[color:var(--accent-success)]">

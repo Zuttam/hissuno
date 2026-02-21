@@ -178,6 +178,8 @@ interface UseIssueDetailState {
   updateIssue: (updates: Partial<IssueWithSessions>) => Promise<boolean>
   deleteIssue: () => Promise<boolean>
   generateSpec: () => Promise<{ success: boolean; spec?: string }>
+  linkSession: (sessionId: string) => Promise<boolean>
+  unlinkSession: (sessionId: string) => Promise<boolean>
 }
 
 export function useIssueDetail({
@@ -255,6 +257,52 @@ export function useIssueDetail({
     }
   }, [projectId, issueId])
 
+  const linkSessionFn = useCallback(async (sessionId: string): Promise<boolean> => {
+    if (!projectId || !issueId) return false
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/issues/${issueId}/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+
+      if (!response.ok) return false
+
+      await fetchIssue()
+      return true
+    } catch {
+      return false
+    }
+  }, [projectId, issueId, fetchIssue])
+
+  const unlinkSessionFn = useCallback(async (sessionId: string): Promise<boolean> => {
+    if (!projectId || !issueId) return false
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/issues/${issueId}/sessions`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+
+      if (!response.ok) return false
+
+      // Optimistic removal from local state
+      setIssue((prev) =>
+        prev
+          ? {
+              ...prev,
+              sessions: prev.sessions.filter((s) => s.id !== sessionId),
+            }
+          : null
+      )
+      return true
+    } catch {
+      return false
+    }
+  }, [projectId, issueId])
+
   const generateSpecFn = useCallback(async (): Promise<{ success: boolean; spec?: string }> => {
     if (!projectId || !issueId) return { success: false }
 
@@ -298,8 +346,10 @@ export function useIssueDetail({
       updateIssue: updateIssueFn,
       deleteIssue: deleteIssueFn,
       generateSpec: generateSpecFn,
+      linkSession: linkSessionFn,
+      unlinkSession: unlinkSessionFn,
     }),
-    [issue, isLoading, error, fetchIssue, updateIssueFn, deleteIssueFn, generateSpecFn]
+    [issue, isLoading, error, fetchIssue, updateIssueFn, deleteIssueFn, generateSpecFn, linkSessionFn, unlinkSessionFn]
   )
 }
 

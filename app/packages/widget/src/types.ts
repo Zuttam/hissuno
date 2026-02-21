@@ -197,6 +197,21 @@ export interface HissunoWidgetProps {
   onControlsReady?: (controls: { setInput: (value: string) => void }) => void;
 
   /**
+   * Layout mode for the sidepanel display
+   * - 'overlay': Opens on top of content with a dimming backdrop (default)
+   * - 'push': Opens alongside content without backdrop — host app should adjust its layout
+   * @default "overlay"
+   */
+  layout?: 'overlay' | 'push';
+
+  /**
+   * Callback fired when the sidepanel width changes (during drag resize)
+   * Only applies when display='sidepanel'
+   * Use this to adjust host app layout (e.g., content margin)
+   */
+  onWidthChange?: (width: number) => void;
+
+  /**
    * Additional CSS class name for custom styling
    */
   className?: string;

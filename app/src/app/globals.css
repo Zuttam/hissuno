@@ -207,6 +207,15 @@ body {
   animation: ripple-ring 1.8s ease-out 0.3s both;
 }
 
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Auto-hide scrollbars - show only when scrolling */
 * {
   scrollbar-width: thin;

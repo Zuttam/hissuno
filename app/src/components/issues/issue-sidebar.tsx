@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef, type JSX } from 'react'
 import Link from 'next/link'
 import { Spinner, MarkdownContent, Badge, CollapsibleSection } from '@/components/ui'
-import type { IssueWithSessions, IssueStatus, IssuePriority, IssueType, IssueCustomerImpact } from '@/types/issue'
+import type { IssueStatus, IssuePriority, IssueType } from '@/types/issue'
 import type { JiraIssueSyncStatus } from '@/types/jira'
 import { useIssueDetail } from '@/hooks/use-issues'
 import { useSpecGeneration, type SpecGenerationEvent } from '@/hooks/use-spec-generation'
@@ -11,6 +11,7 @@ import { useIssueAnalysis } from '@/hooks/use-issue-analysis'
 import { useJiraSyncStatus } from '@/hooks/use-jira-sync'
 import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
+import { LinkedFeedbackTree } from './linked-feedback-tree'
 
 // ============================================================================
 // Constants
@@ -89,6 +90,8 @@ export function IssueSidebar({
     isLoading,
     updateIssue,
     refresh: refreshIssue,
+    linkSession,
+    unlinkSession,
   } = useIssueDetail({ projectId, issueId })
   const { status: jiraStatus, isRetrying: isJiraRetrying, retrySync: retryJiraSync } = useJiraSyncStatus(projectId, issueId)
   const [isArchiving, setIsArchiving] = useState(false)
@@ -519,44 +522,13 @@ export function IssueSidebar({
                     />
                   )}
 
-                  {/* Linked Sessions (lean list) */}
-                  <div className="flex flex-col gap-1">
-                    <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                      Linked Feedback ({issue.sessions?.length || 0})
-                    </span>
-                    {issue.sessions && issue.sessions.length > 0 ? (
-                      <div className="flex flex-col gap-1 mt-1">
-                        {issue.sessions.map((session) => {
-                          const sourceVariant = SOURCE_BADGE_VARIANTS[session.source] || 'default'
-                          const sourceLabel = session.source.charAt(0).toUpperCase() + session.source.slice(1)
-                          return (
-                            <Link
-                              key={session.id}
-                              href={`/projects/${projectId}/sessions?session=${session.id}`}
-                              className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm transition hover:bg-[color:var(--surface-hover)]"
-                            >
-                              <Badge variant={sourceVariant}>
-                                {sourceLabel}
-                              </Badge>
-                              <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)] hover:underline">
-                                {session.name || 'Unnamed Feedback'}
-                              </span>
-                              <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
-                                {formatRelativeDate(session.created_at)}
-                              </span>
-                            </Link>
-                          )
-                        })}
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-                        No linked feedback
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Customer Impact */}
-                  <CustomerImpactInline sessions={issue.sessions ?? []} projectId={projectId} />
+                  {/* Linked Feedback (grouped by customer) */}
+                  <LinkedFeedbackTree
+                    sessions={issue.sessions ?? []}
+                    projectId={projectId}
+                    onLinkSession={linkSession}
+                    onUnlinkSession={unlinkSession}
+                  />
 
                   {/* Product Spec */}
                   <div className="flex flex-col gap-2">
@@ -692,140 +664,6 @@ function ScoreRow({ icon, label, score, reasoning }: { icon: string; label: stri
             <path d="M12 8h.01" />
           </svg>
         </span>
-      )}
-    </div>
-  )
-}
-
-// ============================================================================
-// Customer Impact Section
-// ============================================================================
-
-const STAGE_COLORS: Record<string, string> = {
-  prospect: 'var(--text-tertiary)',
-  onboarding: 'var(--accent-info)',
-  active: 'var(--accent-success)',
-  expansion: 'var(--accent-warning)',
-  churned: 'var(--accent-danger)',
-}
-
-function computeCustomerImpact(sessions: IssueWithSessions['sessions']): IssueCustomerImpact {
-  const contactMap = new Map<string, { companyId?: string }>()
-  const companyMap = new Map<string, { id: string; name: string; arr: number | null; stage: string; contacts: Set<string> }>()
-
-  for (const session of sessions) {
-    if (!session.contact) continue
-    contactMap.set(session.contact.id, { companyId: session.contact.company?.id })
-    if (session.contact.company) {
-      const existing = companyMap.get(session.contact.company.id)
-      if (existing) {
-        existing.contacts.add(session.contact.id)
-      } else {
-        companyMap.set(session.contact.company.id, {
-          id: session.contact.company.id,
-          name: session.contact.company.name,
-          arr: session.contact.company.arr,
-          stage: session.contact.company.stage,
-          contacts: new Set([session.contact.id]),
-        })
-      }
-    }
-  }
-
-  const companies = Array.from(companyMap.values()).map((c) => ({
-    id: c.id,
-    name: c.name,
-    arr: c.arr,
-    stage: c.stage,
-    contactCount: c.contacts.size,
-  }))
-
-  const totalARR = companies.reduce((sum, c) => sum + (c.arr ?? 0), 0)
-
-  return {
-    contactCount: contactMap.size,
-    companyCount: companyMap.size,
-    totalARR,
-    companies,
-  }
-}
-
-function formatARR(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
-  return `$${value}`
-}
-
-function CustomerImpactInline({ sessions, projectId }: { sessions: IssueWithSessions['sessions']; projectId: string }) {
-  const impact = computeCustomerImpact(sessions ?? [])
-
-  // Deduplicate contacts across sessions
-  const contactMap = new Map<string, { id: string; name: string; company: { id: string; name: string; arr: number | null } | null }>()
-  for (const session of sessions ?? []) {
-    if (session.contact && !contactMap.has(session.contact.id)) {
-      contactMap.set(session.contact.id, {
-        id: session.contact.id,
-        name: session.contact.name,
-        company: session.contact.company ? { id: session.contact.company.id, name: session.contact.company.name, arr: session.contact.company.arr } : null,
-      })
-    }
-  }
-  const contacts = Array.from(contactMap.values())
-
-  const summaryParts: string[] = []
-  if (impact.contactCount > 0) {
-    summaryParts.push(`${impact.contactCount} contact${impact.contactCount !== 1 ? 's' : ''}`)
-  }
-  if (impact.companyCount > 0) {
-    summaryParts.push(`${impact.companyCount} compan${impact.companyCount !== 1 ? 'ies' : 'y'}`)
-  }
-  if (impact.totalARR > 0) {
-    summaryParts.push(`${formatARR(impact.totalARR)} ARR affected`)
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-        Related Customers
-        {impact.contactCount > 0 && (
-          <span className="ml-1 text-[10px] normal-case tracking-normal text-[color:var(--text-tertiary)]">
-            ({summaryParts.join(' / ')})
-          </span>
-        )}
-      </span>
-      {contacts.length > 0 ? (
-        <div className="flex flex-col gap-1 mt-1">
-          {contacts.map((contact) => (
-            <div
-              key={contact.id}
-              className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm"
-            >
-              {/* <span className="text-[color:var(--text-secondary)]">Contact:</span> */}
-              <Link
-                href={`/projects/${projectId}/customers/contacts/${contact.id}`}
-                className="truncate text-[color:var(--foreground)] hover:underline"
-              >
-                {contact.name}
-              </Link>
-              <span className="text-[color:var(--text-tertiary)]">&middot;</span>
-              {/* <span className="text-[color:var(--text-secondary)]">Company:</span> */}
-              {contact.company ? (
-                <Link
-                  href={`/projects/${projectId}/customers/companies/${contact.company.id}`}
-                  className="truncate text-[color:var(--foreground)] hover:underline"
-                >
-                  {contact.company.name}{contact.company.arr != null && contact.company.arr > 0 ? ` (${formatARR(contact.company.arr)})` : ''}
-                </Link>
-              ) : (
-                <span className="text-[color:var(--text-tertiary)]">External</span>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
-          No identified customers
-        </p>
       )}
     </div>
   )

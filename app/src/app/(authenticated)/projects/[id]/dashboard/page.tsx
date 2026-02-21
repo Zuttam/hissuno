@@ -1,18 +1,16 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useProject } from '@/components/providers/project-provider'
 import { ProjectAnalytics } from '@/components/analytics/project-analytics'
 import { Card } from '@/components/ui/card'
 import { SectionHeader } from '@/components/ui/section-header'
-import { Button, PageHeader, Spinner } from '@/components/ui'
+import { PageHeader, Spinner } from '@/components/ui'
 import { useDashboardData } from '@/hooks/use-dashboard-data'
 import { IssuePipeline } from '@/components/dashboard/issue-pipeline'
 import { TopIssuesList } from '@/components/dashboard/top-issues-list'
 import { PendingReviews } from '@/components/dashboard/pending-reviews'
 
 export default function DashboardPage() {
-  const router = useRouter()
   const { project, projectId, isLoading } = useProject()
   const { data: dashboardData, isLoading: dashboardLoading } = useDashboardData({
     projectId: projectId ?? '',
@@ -32,18 +30,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        actions={
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => router.push(`/projects/${projectId}/agents?tab=general`)}
-          >
-            Edit Project
-          </Button>
-        }
-      />
+      <PageHeader title="Dashboard" />
 
       {/* Actionable Section */}
       <Card>

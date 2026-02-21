@@ -50,6 +50,14 @@ function BillingIcon({ className }: { className?: string }) {
   )
 }
 
+function NotificationIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75v-.7V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+    </svg>
+  )
+}
+
 function GiftIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -58,15 +66,20 @@ function GiftIcon({ className }: { className?: string }) {
   )
 }
 
+const ACCOUNT_LINKS = [
+  { href: '/account/settings', label: 'Settings', icon: SettingsIcon },
+  { href: '/account/notifications', label: 'Notifications', icon: NotificationIcon },
+  { href: '/account/referrals', label: 'Referral', icon: GiftIcon },
+  { href: '/account/billing', label: 'Billing', icon: BillingIcon },
+] as const
+
 export function SidebarAccountSection({ user, isCollapsed, onNavigate }: SidebarAccountSectionProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const pathname = usePathname()
   const { theme, setThemePreference } = useThemePreference()
 
-  const isSettingsActive = pathname.startsWith('/account/settings')
-  const isInvitesActive = pathname.startsWith('/account/referrals')
-  const isBillingActive = pathname.startsWith('/account/billing')
+  const isAccountActive = ACCOUNT_LINKS.some((link) => pathname.startsWith(link.href))
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -100,49 +113,20 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
 
   const label = user?.name ?? user?.email ?? 'Account'
 
+  const handleLinkClick = () => {
+    setMenuOpen(false)
+    onNavigate?.()
+  }
+
   if (isCollapsed) {
     return (
       <div className="relative flex flex-col items-center space-y-0.5" ref={containerRef}>
-        <Link
-          href="/account/settings"
-          onClick={onNavigate}
-          className={`flex h-8 w-8 items-center justify-center rounded-[4px] transition ${
-            isSettingsActive
-              ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
-              : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
-          }`}
-          title="Settings"
-        >
-          <SettingsIcon className="h-4 w-4" />
-        </Link>
-        <Link
-          href="/account/referrals"
-          onClick={onNavigate}
-          className={`flex h-8 w-8 items-center justify-center rounded-[4px] transition ${
-            isInvitesActive
-              ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
-              : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
-          }`}
-          title="Referral"
-        >
-          <GiftIcon className="h-4 w-4" />
-        </Link>
-        <Link
-          href="/account/billing"
-          onClick={onNavigate}
-          className={`flex h-8 w-8 items-center justify-center rounded-[4px] transition ${
-            isBillingActive
-              ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
-              : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
-          }`}
-          title="Billing"
-        >
-          <BillingIcon className="h-4 w-4" />
-        </Link>
         <button
           type="button"
           onClick={() => setMenuOpen(!menuOpen)}
-          className="flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] text-[color:var(--foreground)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)]"
+          className={`flex h-8 w-8 items-center justify-center rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] text-[color:var(--foreground)] transition hover:border-[color:var(--border)] hover:bg-[color:var(--surface-hover)] ${
+            isAccountActive ? 'border-[color:var(--foreground)]' : ''
+          }`}
           title={label}
         >
           <span className="font-mono text-xs font-bold uppercase">
@@ -156,7 +140,28 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
               <p className="truncate font-mono font-bold uppercase text-[color:var(--foreground)]">{label}</p>
               <p className="font-mono text-xs text-[color:var(--text-secondary)]">Signed in</p>
             </div>
-            <div className="mt-3 space-y-2">
+            <div className="mt-3 space-y-1">
+              {ACCOUNT_LINKS.map((link) => {
+                const Icon = link.icon
+                const active = pathname.startsWith(link.href)
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={handleLinkClick}
+                    className={`flex items-center gap-2 rounded-[4px] px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide transition ${
+                      active
+                        ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
+                        : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span>{link.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+            <div className="mt-3 border-t border-[color:var(--border-subtle)] pt-3 space-y-2">
               <div>
                 <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-tertiary)]">
                   Theme
@@ -188,50 +193,15 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
   }
 
   return (
-    <div className="space-y-0.5 px-2" ref={containerRef}>
-      <Link
-        href="/account/settings"
-        onClick={onNavigate}
-        className={`flex items-center gap-2 rounded-[4px] px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide transition ${
-          isSettingsActive
-            ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
-            : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
-        }`}
-      >
-        <SettingsIcon className="h-4 w-4 flex-shrink-0" />
-        <span>Settings</span>
-      </Link>
-      <Link
-        href="/account/referrals"
-        onClick={onNavigate}
-        className={`flex items-center gap-2 rounded-[4px] px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide transition ${
-          isInvitesActive
-            ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
-            : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
-        }`}
-      >
-        <GiftIcon className="h-4 w-4 flex-shrink-0" />
-        <span>Referral</span>
-      </Link>
-      <Link
-        href="/account/billing"
-        onClick={onNavigate}
-        className={`flex items-center gap-2 rounded-[4px] px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide transition ${
-          isBillingActive
-            ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
-            : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
-        }`}
-      >
-        <BillingIcon className="h-4 w-4 flex-shrink-0" />
-        <span>Billing</span>
-      </Link>
-
-      {/* User info and sign out */}
-      <div className="relative mt-2 pt-2 border-t border-[color:var(--border-subtle)]">
+    <div className="px-2" ref={containerRef}>
+      {/* User info and dropdown trigger */}
+      <div className="relative">
         <button
           type="button"
           onClick={() => setMenuOpen(!menuOpen)}
-          className="flex w-full items-center gap-2 rounded-[4px] px-2 py-1.5 transition hover:bg-[color:var(--surface-hover)]"
+          className={`flex w-full items-center gap-2 rounded-[4px] px-2 py-1.5 transition hover:bg-[color:var(--surface-hover)] ${
+            isAccountActive ? 'bg-[color:var(--surface-hover)]' : ''
+          }`}
         >
           <div className="flex h-7 w-7 items-center justify-center rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] text-[color:var(--foreground)]">
             <span className="font-mono text-xs font-bold uppercase">
@@ -256,7 +226,31 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
 
         {menuOpen && (
           <div className="absolute bottom-full left-0 right-0 z-50 mb-1 rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--background)] p-3 shadow-lg">
-            <div>
+            {/* Account links */}
+            <div className="space-y-1">
+              {ACCOUNT_LINKS.map((link) => {
+                const Icon = link.icon
+                const active = pathname.startsWith(link.href)
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={handleLinkClick}
+                    className={`flex items-center gap-2 rounded-[4px] px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide transition ${
+                      active
+                        ? 'bg-[color:var(--foreground)] text-[color:var(--background)]'
+                        : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]'
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span>{link.label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* Theme */}
+            <div className="mt-3 border-t border-[color:var(--border-subtle)] pt-3">
               <p className="font-mono text-[10px] font-bold uppercase tracking-wider text-[color:var(--text-tertiary)]">
                 Theme
               </p>
@@ -276,7 +270,9 @@ export function SidebarAccountSection({ user, isCollapsed, onNavigate }: Sidebar
                 ))}
               </div>
             </div>
-            <div className="mt-3">
+
+            {/* Sign out */}
+            <div className="mt-3 border-t border-[color:var(--border-subtle)] pt-3">
               <form action={signOutAction}>
                 <SignOutButton />
               </form>

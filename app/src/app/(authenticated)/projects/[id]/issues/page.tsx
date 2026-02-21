@@ -283,22 +283,13 @@ export default function ProjectIssuesPage() {
         title="Issues"
         onRefresh={() => void refresh()}
         actions={
-          <>
-            <Button
-              variant="secondary"
-              size="md"
-              onClick={() => router.push(`/projects/${projectId}/agents?tab=issues`)}
-            >
-              Settings
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handleOpenCreateDialog}
-            >
-              Create
-            </Button>
-          </>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handleOpenCreateDialog}
+          >
+            Create
+          </Button>
         }
       />
 

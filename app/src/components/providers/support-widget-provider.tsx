@@ -8,10 +8,12 @@ interface SupportWidgetControls {
 
 interface SupportWidgetContextValue {
   isOpen: boolean
+  panelWidth: number
   open: () => void
   close: () => void
   openWithPrompt: (prompt: string) => void
   registerControls: (controls: SupportWidgetControls) => void
+  setPanelWidth: (width: number) => void
 }
 
 const SupportWidgetContext = createContext<SupportWidgetContextValue | null>(null)
@@ -26,6 +28,7 @@ export function useSupportWidget() {
 
 export function SupportWidgetProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [panelWidth, setPanelWidth] = useState(480)
   const controlsRef = useRef<SupportWidgetControls | null>(null)
   const pendingPromptRef = useRef<string | null>(null)
 
@@ -51,7 +54,7 @@ export function SupportWidgetProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <SupportWidgetContext.Provider value={{ isOpen, open, close, openWithPrompt, registerControls }}>
+    <SupportWidgetContext.Provider value={{ isOpen, panelWidth, open, close, openWithPrompt, registerControls, setPanelWidth }}>
       {children}
     </SupportWidgetContext.Provider>
   )

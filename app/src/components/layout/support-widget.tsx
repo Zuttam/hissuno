@@ -40,7 +40,7 @@ function cacheToken(userId: string, token: string): void {
 
 export function SupportWidget() {
   const { user, isLoading } = useUser()
-  const { isOpen, open, close, registerControls } = useSupportWidget()
+  const { isOpen, open, close, registerControls, setPanelWidth } = useSupportWidget()
   const [widgetToken, setWidgetToken] = useState<string | undefined>()
 
   // Fetch widget token for authenticated users (with localStorage caching)
@@ -87,6 +87,8 @@ export function SupportWidget() {
       onOpen={open}
       onClose={close}
       onControlsReady={registerControls}
+      onWidthChange={setPanelWidth}
+      layout="push"
     />
   )
 }

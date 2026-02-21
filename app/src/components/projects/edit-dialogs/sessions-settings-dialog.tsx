@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, type ChangeEvent  } from 'react'
-import { EditDialog } from './edit-dialog'
+import { useState, useCallback, type ChangeEvent  } from 'react'
 import { Button, Input, Textarea, Badge, IconButton, FormField } from '@/components/ui'
 import type { TagColorVariant } from '@/types/session'
 import { generateSlugFromName } from '@/lib/security/sanitize'
@@ -34,6 +33,7 @@ export interface LocalCustomTag {
 interface CustomTagsSectionProps {
   tags: LocalCustomTag[]
   onTagsChange: (tags: LocalCustomTag[]) => void
+  onCommit?: (tags: LocalCustomTag[]) => void
   canAddMore: boolean
   isLoading?: boolean
   error?: string | null
@@ -54,6 +54,7 @@ const EMPTY_FORM: TagFormState = {
 export function CustomTagsSection({
   tags,
   onTagsChange,
+  onCommit,
   canAddMore,
   isLoading,
   error,
@@ -157,7 +158,9 @@ export function CustomTagsSection({
         color: formState.color,
         position: tags.length,
       }
-      onTagsChange([...tags, newTag])
+      const updatedTags = [...tags, newTag]
+      onTagsChange(updatedTags)
+      onCommit?.(updatedTags)
       handleCancel()
     } else if (editingId) {
       // Update existing tag
@@ -173,9 +176,10 @@ export function CustomTagsSection({
           : tag
       )
       onTagsChange(updatedTags)
+      onCommit?.(updatedTags)
       handleCancel()
     }
-  }, [validateForm, isAdding, editingId, formState, generatedSlug, tags, onTagsChange, handleCancel])
+  }, [validateForm, isAdding, editingId, formState, generatedSlug, tags, onTagsChange, onCommit, handleCancel])
 
   // Handle delete
   const handleDelete = useCallback(
@@ -194,8 +198,9 @@ export function CustomTagsSection({
         position: index,
       }))
       onTagsChange(repositionedTags)
+      onCommit?.(repositionedTags)
     },
-    [tags, onTagsChange]
+    [tags, onTagsChange, onCommit]
   )
 
   const isEditing = isAdding || editingId !== null
@@ -421,124 +426,3 @@ function TagForm({
   )
 }
 
-interface SessionsSettingsDialogProps {
-  open: boolean
-  onClose: () => void
-  projectId: string
-  onSaved?: () => void
-}
-
-export function SessionsSettingsDialog({
-  open,
-  onClose,
-  projectId,
-  onSaved,
-}: SessionsSettingsDialogProps) {
-  const [tags, setTags] = useState<LocalCustomTag[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Fetch current custom tags when dialog opens
-  useEffect(() => {
-    if (!open) return
-
-    const fetchTags = async () => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await fetch(`/api/projects/${projectId}/settings/custom-tags`)
-        if (!response.ok) {
-          throw new Error('Failed to load custom tags')
-        }
-        const data = await response.json()
-        if (data.tags) {
-          // Convert API tags to LocalCustomTag format
-          const localTags: LocalCustomTag[] = data.tags.map((tag: {
-            id: string
-            name: string
-            slug: string
-            description: string
-            color: string
-            position: number
-          }) => ({
-            id: tag.id,
-            name: tag.name,
-            slug: tag.slug,
-            description: tag.description,
-            color: tag.color,
-            position: tag.position,
-          }))
-          setTags(localTags)
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load custom tags')
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    void fetchTags()
-  }, [open, projectId])
-
-  const handleTagsChange = useCallback((newTags: LocalCustomTag[]) => {
-    setTags(newTags)
-  }, [])
-
-  const handleSave = async () => {
-    setIsSaving(true)
-    setError(null)
-
-    try {
-      const response = await fetch(`/api/projects/${projectId}/settings/sessions`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          custom_tags: tags,
-        }),
-      })
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to save custom tags')
-      }
-
-      onSaved?.()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save custom tags')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  return (
-    <EditDialog
-      open={open}
-      onClose={onClose}
-      onSave={handleSave}
-      title="Feedback Settings"
-      isSaving={isSaving}
-      error={error}
-      size="xl"
-    >
-      {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--foreground)] border-t-transparent" />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <div>
-            <h3 className="font-mono text-sm font-semibold uppercase tracking-wide text-[color:var(--foreground)] mb-2">
-              Custom Tags
-            </h3>
-            <CustomTagsSection
-              tags={tags}
-              onTagsChange={handleTagsChange}
-              canAddMore={tags.length < MAX_TAGS}
-            />
-          </div>
-        </div>
-      )}
-    </EditDialog>
-  )
-}
