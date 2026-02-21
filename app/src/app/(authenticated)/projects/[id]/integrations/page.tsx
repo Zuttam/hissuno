@@ -15,6 +15,7 @@ import { IntercomConfigDialog } from '@/components/projects/edit-dialogs/interco
 import { GongConfigDialog } from '@/components/projects/edit-dialogs/gong-config-dialog'
 import { ZendeskConfigDialog } from '@/components/projects/edit-dialogs/zendesk-config-dialog'
 import { JiraConfigDialog } from '@/components/projects/edit-dialogs/jira-config-dialog'
+import { LinearConfigDialog } from '@/components/projects/edit-dialogs/linear-config-dialog'
 import { Card } from '@/components/ui/card'
 import { Badge, Button, Spinner, PageHeader } from '@/components/ui'
 
@@ -78,8 +79,8 @@ function IntercomIcon() {
 function ZendeskIcon() {
   return (
     <>
-      <Image src="/logos/zendesk.svg" alt="Zendesk" width={32} height={32} className="dark:hidden" />
-      <Image src="/logos/zendesk-dark.svg" alt="Zendesk" width={32} height={32} className="hidden dark:block" />
+      <Image src="/logos/zendesk.svg" alt="Zendesk" width={24} height={24} className="dark:hidden" />
+      <Image src="/logos/zendesk-dark.svg" alt="Zendesk" width={24} height={24} className="hidden dark:block" />
     </>
   )
 }
@@ -113,6 +114,8 @@ export default function IntegrationsPage() {
   
   const [gongAccessRequested, setGongAccessRequested] = useState(false)
   const [isRequestingGongAccess, setIsRequestingGongAccess] = useState(false)
+  const [zendeskAccessRequested, setZendeskAccessRequested] = useState(false)
+  const [isRequestingZendeskAccess, setIsRequestingZendeskAccess] = useState(false)
   const [jiraAccessRequested, setJiraAccessRequested] = useState(false)
   const [isRequestingJiraAccess, setIsRequestingJiraAccess] = useState(false)
   const [showWidgetDialog, setShowWidgetDialog] = useState(false)
@@ -122,6 +125,7 @@ export default function IntegrationsPage() {
   const [showZendeskDialog, setShowZendeskDialog] = useState(false)
   const [showGongDialog, setShowGongDialog] = useState(false)
   const [showJiraDialog, setShowJiraDialog] = useState(false)
+  const [showLinearDialog, setShowLinearDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [integrations, setIntegrations] = useState<Integration[]>([])
   const [widgetStats, setWidgetStats] = useState<{ isActive: boolean; hasAnySessions: boolean } | null>(null)
@@ -131,7 +135,9 @@ export default function IntegrationsPage() {
   const [zendeskConnected, setZendeskConnected] = useState(false)
   const [gongConnected, setGongConnected] = useState(false)
   const [jiraConnected, setJiraConnected] = useState(false)
+  const [linearConnected, setLinearConnected] = useState(false)
   const {enabled: gongEnabled, isLoading: isGongLoading}  = useFeatureFlag('gong-integration')
+  const {enabled: zendeskEnabled, isLoading: isZendeskLoading}  = useFeatureFlag('zendesk-integration')
   const {enabled: jiraEnabled, isLoading: isJiraLoading}  = useFeatureFlag('jira-integration')
 
   const handleRequestAccess = async (feature: string, setRequested: (v: boolean) => void, setRequesting: (v: boolean) => void) => {
@@ -157,6 +163,7 @@ export default function IntegrationsPage() {
   }
 
   const handleRequestGongAccess = () => void handleRequestAccess('gong_integration', setGongAccessRequested, setIsRequestingGongAccess)
+  const handleRequestZendeskAccess = () => void handleRequestAccess('zendesk_integration', setZendeskAccessRequested, setIsRequestingZendeskAccess)
   const handleRequestJiraAccess = () => void handleRequestAccess('jira_integration', setJiraAccessRequested, setIsRequestingJiraAccess)
 
   // Refresh integration statuses - defined early so it can be used in useEffect
@@ -164,7 +171,7 @@ export default function IntegrationsPage() {
     if (!projectId) return
 
     try {
-      const [widgetRes, slackRes, githubRes, intercomRes, zendeskRes, gongRes, jiraRes] = await Promise.all([
+      const [widgetRes, slackRes, githubRes, intercomRes, zendeskRes, gongRes, jiraRes, linearRes] = await Promise.all([
         fetch(`/api/projects/${projectId}/sessions?stats=true`),
         fetch(`/api/integrations/slack?projectId=${projectId}`),
         fetch(`/api/integrations/github?projectId=${projectId}`),
@@ -172,6 +179,7 @@ export default function IntegrationsPage() {
         fetch(`/api/integrations/zendesk?projectId=${projectId}`),
         fetch(`/api/integrations/gong?projectId=${projectId}`),
         fetch(`/api/integrations/jira?projectId=${projectId}`),
+        fetch(`/api/integrations/linear?projectId=${projectId}`),
       ])
 
       if (widgetRes.ok) {
@@ -208,6 +216,11 @@ export default function IntegrationsPage() {
         const data = await jiraRes.json()
         setJiraConnected(data.connected)
       }
+
+      if (linearRes.ok) {
+        const data = await linearRes.json()
+        setLinearConnected(data.connected)
+      }
     } catch (err) {
       console.error('[integrations] Failed to refresh statuses:', err)
     }
@@ -227,25 +240,28 @@ export default function IntegrationsPage() {
       setShowGithubDialog(true)
     } else if (dialog === 'intercom') {
       setShowIntercomDialog(true)
-    } else if (dialog === 'zendesk') {
+    } else if (dialog === 'zendesk' && zendeskEnabled) {
       setShowZendeskDialog(true)
     } else if (dialog === 'gong' && gongEnabled) {
       setShowGongDialog(true)
     } else if (dialog === 'jira' && jiraEnabled) {
       setShowJiraDialog(true)
+    } else if (dialog === 'linear') {
+      setShowLinearDialog(true)
     }
 
     // Handle OAuth return - clean up URL and refresh status
     const jiraJustConnected = searchParams.get('jira') === 'connected'
+    const linearJustConnected = searchParams.get('linear') === 'connected'
     const intercomJustConnected = searchParams.get('intercom') === 'connected'
-    if ((githubJustConnected || slackJustConnected || jiraJustConnected || intercomJustConnected) && projectId) {
+    if ((githubJustConnected || slackJustConnected || jiraJustConnected || linearJustConnected || intercomJustConnected) && projectId) {
       void refreshStatuses()
       if (intercomJustConnected) {
         setShowIntercomDialog(true)
       }
       router.replace(`/projects/${projectId}/integrations`)
     }
-  }, [searchParams, projectId, router, refreshStatuses, gongEnabled, jiraEnabled])
+  }, [searchParams, projectId, router, refreshStatuses, gongEnabled, zendeskEnabled, jiraEnabled])
 
   // Clear URL param when dialog closes
   const handleCloseWidgetDialog = () => {
@@ -297,13 +313,20 @@ export default function IntegrationsPage() {
     }
   }
 
+  const handleCloseLinearDialog = () => {
+    setShowLinearDialog(false)
+    if (searchParams.get('dialog')) {
+      router.replace(`/projects/${projectId}/integrations`)
+    }
+  }
+
   // Fetch integration statuses
   useEffect(() => {
     if (!projectId) return
 
     const fetchStatuses = async () => {
       try {
-        const [widgetRes, slackRes, githubRes, intercomRes, zendeskRes, gongRes, jiraRes] = await Promise.all([
+        const [widgetRes, slackRes, githubRes, intercomRes, zendeskRes, gongRes, jiraRes, linearRes] = await Promise.all([
           fetch(`/api/projects/${projectId}/sessions?stats=true`),
           fetch(`/api/integrations/slack?projectId=${projectId}`),
           fetch(`/api/integrations/github?projectId=${projectId}`),
@@ -311,6 +334,7 @@ export default function IntegrationsPage() {
           fetch(`/api/integrations/zendesk?projectId=${projectId}`),
           fetch(`/api/integrations/gong?projectId=${projectId}`),
           fetch(`/api/integrations/jira?projectId=${projectId}`),
+          fetch(`/api/integrations/linear?projectId=${projectId}`),
         ])
 
         if (widgetRes.ok) {
@@ -346,6 +370,11 @@ export default function IntegrationsPage() {
         if (jiraRes.ok) {
           const data = await jiraRes.json()
           setJiraConnected(data.connected)
+        }
+
+        if (linearRes.ok) {
+          const data = await linearRes.json()
+          setLinearConnected(data.connected)
         }
       } catch (err) {
         console.error('[integrations] Failed to fetch statuses:', err)
@@ -400,6 +429,7 @@ export default function IntegrationsPage() {
         status: zendeskConnected ? 'active' : 'not_connected',
         icon: <ZendeskIcon />,
         category: 'sessions',
+        requestAccess: !zendeskEnabled,
       },
       {
         id: 'gmail',
@@ -431,10 +461,9 @@ export default function IntegrationsPage() {
         id: 'linear',
         name: 'Linear',
         description: 'Sync issues to Linear for modern project management',
-        status: 'not_connected',
+        status: linearConnected ? 'active' : 'not_connected',
         icon: <LinearIcon />,
         category: 'issues',
-        comingSoon: true,
       },
       {
         id: 'amplitude',
@@ -473,7 +502,7 @@ export default function IntegrationsPage() {
         comingSoon: true,
       },
     ])
-  }, [widgetStats, slackConnected, githubConnected, intercomConnected, zendeskConnected, gongConnected, jiraConnected, gongEnabled, jiraEnabled])
+  }, [widgetStats, slackConnected, githubConnected, intercomConnected, zendeskConnected, gongConnected, jiraConnected, linearConnected, gongEnabled, zendeskEnabled, jiraEnabled])
 
   const sessionIntegrations = integrations.filter(i => i.category === 'sessions')
   const issueIntegrations = integrations.filter(i => i.category === 'issues')
@@ -484,8 +513,9 @@ export default function IntegrationsPage() {
   // Handler for opening integration dialogs - updates URL for consistent tracking
   const handleConfigureIntegration = (integrationId: string) => {
     if (integrationId === 'gong' && !gongEnabled) return
+    if (integrationId === 'zendesk' && !zendeskEnabled) return
     if (integrationId === 'jira' && !jiraEnabled) return
-    if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github' || integrationId === 'intercom' || integrationId === 'zendesk' || integrationId === 'gong' || integrationId === 'jira') {
+    if (integrationId === 'widget' || integrationId === 'slack' || integrationId === 'github' || integrationId === 'intercom' || integrationId === 'zendesk' || integrationId === 'gong' || integrationId === 'jira' || integrationId === 'linear') {
       router.push(`/projects/${projectId}/integrations?dialog=${integrationId}`)
     }
   }
@@ -532,9 +562,9 @@ export default function IntegrationsPage() {
               key={integration.id}
               integration={integration}
               onConfigure={() => handleConfigureIntegration(integration.id)}
-              onRequestAccess={integration.id === 'gong' ? handleRequestGongAccess : undefined}
-              accessRequested={integration.id === 'gong' ? gongAccessRequested : undefined}
-              isRequestingAccess={integration.id === 'gong' ? isRequestingGongAccess : undefined}
+              onRequestAccess={integration.id === 'gong' ? handleRequestGongAccess : integration.id === 'zendesk' ? handleRequestZendeskAccess : undefined}
+              accessRequested={integration.id === 'gong' ? gongAccessRequested : integration.id === 'zendesk' ? zendeskAccessRequested : undefined}
+              isRequestingAccess={integration.id === 'gong' ? isRequestingGongAccess : integration.id === 'zendesk' ? isRequestingZendeskAccess : undefined}
             />
           ))}
         </div>
@@ -654,6 +684,13 @@ export default function IntegrationsPage() {
       <JiraConfigDialog
         open={showJiraDialog}
         onClose={handleCloseJiraDialog}
+        projectId={projectId}
+        onStatusChanged={refreshStatuses}
+      />
+
+      <LinearConfigDialog
+        open={showLinearDialog}
+        onClose={handleCloseLinearDialog}
         projectId={projectId}
         onStatusChanged={refreshStatuses}
       />

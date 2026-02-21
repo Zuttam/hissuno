@@ -44,8 +44,9 @@ export function useIssues({
       if (filters.status) params.set('status', filters.status)
       if (filters.search) params.set('search', filters.search)
       if (filters.showArchived) params.set('showArchived', 'true')
-      if (filters.velocityLevel) params.set('velocityLevel', filters.velocityLevel)
+      if (filters.reachLevel) params.set('reachLevel', filters.reachLevel)
       if (filters.impactLevel) params.set('impactLevel', filters.impactLevel)
+      if (filters.confidenceLevel) params.set('confidenceLevel', filters.confidenceLevel)
       if (filters.effortLevel) params.set('effortLevel', filters.effortLevel)
       if (filters.limit) params.set('limit', String(filters.limit))
       if (filters.offset) params.set('offset', String(filters.offset))
@@ -68,7 +69,7 @@ export function useIssues({
     } finally {
       setIsLoading(false)
     }
-  }, [filters.projectId, filters.type, filters.priority, filters.status, filters.search, filters.showArchived, filters.velocityLevel, filters.impactLevel, filters.effortLevel, filters.limit, filters.offset])
+  }, [filters.projectId, filters.type, filters.priority, filters.status, filters.search, filters.showArchived, filters.reachLevel, filters.impactLevel, filters.confidenceLevel, filters.effortLevel, filters.limit, filters.offset])
 
   const createIssue = useCallback(async (input: CreateIssueInput): Promise<IssueWithProject | null> => {
     if (!filters.projectId) return null

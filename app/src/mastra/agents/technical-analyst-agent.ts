@@ -82,9 +82,20 @@ You MUST return a JSON object in this exact format:
     "reasoning": "Brief explanation of effort estimate",
     "affectedFiles": ["relative/path/to/file.ts"],
     "confidence": 0.0-1.0
-  }
+  },
+  "confidenceScore": 1-5,
+  "confidenceReasoning": "Brief explanation of your overall confidence in this analysis"
 }
 \`\`\`
+
+## Confidence Score (confidenceScore)
+
+Rate your overall confidence in the entire analysis (impact + effort + affected areas) from 1-5:
+- **1**: Very low confidence - vague issue, no codebase access, many unknowns
+- **2**: Low confidence - limited information, rough estimates
+- **3**: Medium confidence - reasonable understanding but some assumptions
+- **4**: High confidence - clear issue, good codebase understanding, solid assessment
+- **5**: Very high confidence - obvious issue, fully explored codebase, certain assessment
 
 ## Effort Categories
 

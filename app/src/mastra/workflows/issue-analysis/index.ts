@@ -1,7 +1,7 @@
 /**
  * Issue Analysis Workflow
  *
- * Computes velocity, impact, and effort scores for an issue using a
+ * Computes reach, impact, confidence, and effort scores for an issue using a
  * combination of deterministic algorithms and AI-powered technical analysis.
  *
  * Steps:
@@ -10,7 +10,7 @@
  *    data, session timestamps, and knowledge packages
  * 3. Analyze Impact & Effort - Uses Technical Analyst agent to assess
  *    technical impact and implementation effort
- * 4. Compute Scores - Deterministic step that computes velocity from
+ * 4. Compute Scores - Deterministic step that computes reach from
  *    timestamps, blends impact scores, maps effort, calculates priority,
  *    and persists results to the database
  * 5. Cleanup Codebase - Releases codebase lease and cleans up if no other

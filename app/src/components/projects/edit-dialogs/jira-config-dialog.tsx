@@ -29,6 +29,7 @@ export function JiraConfigDialog({
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [selectedIssueTypeId, setSelectedIssueTypeId] = useState('')
   const [selectedIssueTypeName, setSelectedIssueTypeName] = useState('')
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true)
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [isLoadingIssueTypes, setIsLoadingIssueTypes] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -48,6 +49,7 @@ export function JiraConfigDialog({
         setSelectedProjectKey(data.jiraProjectKey)
         setSelectedProjectId(data.jiraProjectId || '')
       }
+      setAutoSyncEnabled(data.autoSyncEnabled !== false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load Jira status')
     } finally {
@@ -158,6 +160,40 @@ export function JiraConfigDialog({
     }
   }
 
+  const handleUpdateAutoSync = async () => {
+    if (!status?.jiraProjectKey || !status?.jiraProjectId || !status?.issueTypeName) return
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      const newAutoSync = !autoSyncEnabled
+      const response = await fetch('/api/integrations/jira/configure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          jiraProjectKey: selectedProjectKey || status.jiraProjectKey,
+          jiraProjectId: selectedProjectId || status.jiraProjectId,
+          issueTypeId: selectedIssueTypeId || status.issueTypeName,
+          issueTypeName: selectedIssueTypeName || status.issueTypeName,
+          autoSyncEnabled: newAutoSync,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to update configuration')
+      }
+
+      setAutoSyncEnabled(newAutoSync)
+      onStatusChanged?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update configuration')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleDisconnect = async () => {
     setIsDisconnecting(true)
     setError(null)
@@ -222,15 +258,34 @@ export function JiraConfigDialog({
                       <span className="text-[color:var(--text-secondary)]">Issue Type:</span>{' '}
                       <span className="font-medium">{status.issueTypeName}</span>
                     </div>
+                    <div>
+                      <span className="text-[color:var(--text-secondary)]">Auto-sync:</span>{' '}
+                      <span className="font-medium">{autoSyncEnabled ? 'Enabled' : 'Disabled'}</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
                   <p className="text-sm text-[color:var(--text-secondary)]">
-                    New issues created in Hissuno will automatically be synced to Jira as{' '}
-                    <strong>{status.issueTypeName}</strong> tickets in the{' '}
-                    <strong>{status.jiraProjectKey}</strong> project.
+                    {autoSyncEnabled
+                      ? <>New issues created in Hissuno will automatically be synced to Jira as{' '}
+                        <strong>{status.issueTypeName}</strong> tickets in the{' '}
+                        <strong>{status.jiraProjectKey}</strong> project.</>
+                      : <>Auto-sync is disabled. Use &ldquo;Send to Jira&rdquo; on individual issues to sync manually.</>
+                    }
                   </p>
+                </div>
+
+                {/* Auto-sync toggle */}
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleUpdateAutoSync()}
+                    loading={isSaving}
+                  >
+                    {autoSyncEnabled ? 'Disable Auto-Sync' : 'Enable Auto-Sync'}
+                  </Button>
                 </div>
 
                 {/* Reconfigure */}

@@ -31,7 +31,7 @@ export function useSessions({
 
   // Debounce search filter to avoid firing on every keystroke
   const [debouncedSearch, setDebouncedSearch] = useState(filters.search)
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     if (filters.search === debouncedSearch) return

@@ -77,16 +77,22 @@ export function IssuesTable({
               Upvotes
             </th>
             <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Velocity
-            </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Priority
+              Reach
             </th>
             <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Impact
             </th>
-            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+            <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+              Confidence
+            </th>
+            <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Effort
+            </th>
+            <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+              RICE
+            </th>
+            <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
+              Priority
             </th>
             <th className="px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Status
@@ -173,16 +179,22 @@ function IssueRow({ issue, isSelected, onSelect, onArchive, isChecked, onToggleC
         </span>
       </td>
       <td className="px-3 py-2 text-center">
-        <VelocityBadge score={issue.velocity_score} reasoning={issue.velocity_reasoning} />
-      </td>
-      <td className="px-3 py-2">
-        <PriorityBadge priority={issue.priority} isManual={issue.priority_manual_override} />
+        <ReachBadge score={issue.reach_score} reasoning={issue.reach_reasoning} />
       </td>
       <td className="px-3 py-2 text-center">
         <ImpactBadge score={issue.impact_score} reasoning={issue.impact_analysis?.reasoning} />
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-2 text-center">
+        <ConfidenceBadge score={issue.confidence_score} reasoning={issue.confidence_reasoning} />
+      </td>
+      <td className="px-3 py-2 text-center">
         <EffortBadge effort={issue.effort_estimate} effortScore={issue.effort_score} />
+      </td>
+      <td className="px-3 py-2 text-center">
+        <RICEBadge score={issue.rice_score} />
+      </td>
+      <td className="px-3 py-2">
+        <PriorityBadge priority={issue.priority} isManual={issue.priority_manual_override} />
       </td>
       <td className="px-3 py-2">
         <StatusBadge status={issue.status} />
@@ -290,7 +302,7 @@ function PriorityBadge({ priority, isManual }: { priority: IssuePriority; isManu
   )
 }
 
-function VelocityBadge({ score, reasoning }: { score: number | null; reasoning: string | null }) {
+function ReachBadge({ score, reasoning }: { score: number | null; reasoning?: string | null }) {
   if (score === null) {
     return <span className="text-[color:var(--text-secondary)]">-</span>
   }
@@ -302,8 +314,45 @@ function VelocityBadge({ score, reasoning }: { score: number | null; reasoning: 
   }
 
   return (
-    <span className={`font-bold ${getColor(score)}`} title={reasoning ?? `Velocity score: ${score}/5`}>
+    <span className={`font-bold ${getColor(score)}`} title={reasoning ?? `Reach score: ${score}/5`}>
       {score}/5
+    </span>
+  )
+}
+
+function ConfidenceBadge({ score, reasoning }: { score: number | null; reasoning?: string | null }) {
+  if (score === null) {
+    return <span className="text-[color:var(--text-secondary)]">-</span>
+  }
+
+  const getColor = (s: number) => {
+    if (s >= 4) return 'text-[color:var(--accent-success)]'
+    if (s >= 3) return 'text-[color:var(--accent-warning)]'
+    return 'text-[color:var(--text-secondary)]'
+  }
+
+  return (
+    <span className={`font-bold ${getColor(score)}`} title={reasoning ?? `Confidence score: ${score}/5`}>
+      {score}/5
+    </span>
+  )
+}
+
+function RICEBadge({ score }: { score: number | null }) {
+  if (score === null) {
+    return <span className="text-[color:var(--text-secondary)]">-</span>
+  }
+
+  const numScore = Number(score)
+  const getColor = (s: number) => {
+    if (s >= 20) return 'text-[color:var(--accent-danger)]'
+    if (s >= 5) return 'text-[color:var(--accent-warning)]'
+    return 'text-[color:var(--text-secondary)]'
+  }
+
+  return (
+    <span className={`font-bold ${getColor(numScore)}`} title={`RICE score: ${numScore.toFixed(1)}`}>
+      {numScore.toFixed(1)}
     </span>
   )
 }

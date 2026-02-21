@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef, type JSX } from 'react'
-import Link from 'next/link'
-import { Spinner, MarkdownContent, Badge, CollapsibleSection } from '@/components/ui'
+import { Spinner, MarkdownContent, CollapsibleSection } from '@/components/ui'
 import type { IssueStatus, IssuePriority, IssueType } from '@/types/issue'
-import type { JiraIssueSyncStatus } from '@/types/jira'
 import { useIssueDetail } from '@/hooks/use-issues'
 import { useSpecGeneration, type SpecGenerationEvent } from '@/hooks/use-spec-generation'
 import { useIssueAnalysis } from '@/hooks/use-issue-analysis'
-import { useJiraSyncStatus } from '@/hooks/use-jira-sync'
+import { useTrackerSyncStatuses } from '@/hooks/use-tracker-sync'
+import { TrackerSyncBadgeInline } from './tracker-sync-badge'
 import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
 import { LinkedFeedbackTree } from './linked-feedback-tree'
@@ -93,7 +92,7 @@ export function IssueSidebar({
     linkSession,
     unlinkSession,
   } = useIssueDetail({ projectId, issueId })
-  const { status: jiraStatus, isRetrying: isJiraRetrying, retrySync: retryJiraSync } = useJiraSyncStatus(projectId, issueId)
+  const { statuses: trackerStatuses, isRetrying: isTrackerRetrying, retrySync: retryTrackerSync } = useTrackerSyncStatuses(projectId, issueId)
   const [isArchiving, setIsArchiving] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<DropdownId | null>(null)
@@ -254,12 +253,16 @@ export function IssueSidebar({
               <span>Created {formatRelativeDate(issue.created_at)}</span>
               <span>&middot;</span>
               <span>Updated {formatRelativeDate(issue.updated_at)}</span>
-              {jiraStatus.synced && (
-                <>
+              {trackerStatuses.filter(s => s.synced).map((s) => (
+                <span key={s.provider} className="inline-flex items-center gap-1">
                   <span>&middot;</span>
-                  <JiraSyncBadgeInline status={jiraStatus} isRetrying={isJiraRetrying} onRetry={retryJiraSync} />
-                </>
-              )}
+                  <TrackerSyncBadgeInline
+                    status={s}
+                    isRetrying={isTrackerRetrying}
+                    onRetry={() => retryTrackerSync(s.provider)}
+                  />
+                </span>
+              ))}
             </div>
           )}
 
@@ -495,16 +498,26 @@ export function IssueSidebar({
                 defaultExpanded
               >
                 <div className="flex flex-col gap-4">
-                  {/* Analysis Scores */}
+                  {/* Analysis Scores (RICE) */}
                   <div className="flex flex-col gap-1">
                     <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                      Scores
+                      RICE Scores
                     </span>
-                    {issue.velocity_score != null || issue.impact_score != null || issue.effort_score != null ? (
+                    {issue.reach_score != null || issue.impact_score != null || issue.effort_score != null ? (
                       <div className="flex flex-col gap-0.5 mt-1">
-                        <ScoreRow icon="velocity" label="Velocity" score={issue.velocity_score} reasoning={issue.velocity_reasoning} />
-                        <ScoreRow icon="impact" label="Impact" score={issue.impact_score} reasoning={issue.impact_analysis?.reasoning} />
-                        <ScoreRow icon="effort" label="Effort" score={issue.effort_score} reasoning={issue.effort_reasoning} />
+                        <EditableScoreRow icon="reach" label="Reach" score={issue.reach_score} reasoning={issue.reach_reasoning} fieldKey="reach_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
+                        <EditableScoreRow icon="impact" label="Impact" score={issue.impact_score} reasoning={issue.impact_analysis?.reasoning} fieldKey="impact_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
+                        <EditableScoreRow icon="confidence" label="Confidence" score={issue.confidence_score} reasoning={issue.confidence_reasoning} fieldKey="confidence_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
+                        <EditableScoreRow icon="effort" label="Effort" score={issue.effort_score} reasoning={issue.effort_reasoning} fieldKey="effort_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
+                        {issue.rice_score != null && (
+                          <div className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
+                            <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS.rice}</span>
+                            <span className="w-16 text-[color:var(--text-secondary)]">RICE</span>
+                            <span className="font-mono font-bold text-[color:var(--accent-primary)]">
+                              {Number(issue.rice_score).toFixed(1)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
@@ -626,7 +639,7 @@ function truncateText(text: string, maxLength: number): string {
 // ============================================================================
 
 const SCORE_ICONS: Record<string, JSX.Element> = {
-  velocity: (
+  reach: (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
     </svg>
@@ -638,16 +651,108 @@ const SCORE_ICONS: Record<string, JSX.Element> = {
       <circle cx="12" cy="12" r="2" />
     </svg>
   ),
+  confidence: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  ),
   effort: (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2v4" /><path d="M12 18v4" /><path d="m4.93 4.93 2.83 2.83" /><path d="m16.24 16.24 2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="m4.93 19.07 2.83-2.83" /><path d="m16.24 7.76 2.83-2.83" />
     </svg>
   ),
+  rice: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" />
+    </svg>
+  ),
 }
 
-function ScoreRow({ icon, label, score, reasoning }: { icon: string; label: string; score: number | null; reasoning?: string | null }) {
+function EditableScoreRow({
+  icon,
+  label,
+  score,
+  reasoning,
+  fieldKey,
+  onSave,
+  onIssueUpdated,
+}: {
+  icon: string
+  label: string
+  score: number | null
+  reasoning?: string | null
+  fieldKey: string
+  onSave: (updates: Record<string, unknown>) => Promise<boolean>
+  onIssueUpdated?: () => void
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState<string>(score != null ? String(score) : '')
+  const [isSavingScore, setIsSavingScore] = useState(false)
+
+  const handleStartEdit = useCallback(() => {
+    setEditValue(score != null ? String(score) : '')
+    setIsEditing(true)
+  }, [score])
+
+  const handleCancel = useCallback(() => {
+    setIsEditing(false)
+  }, [])
+
+  const handleSaveScore = useCallback(async () => {
+    const numValue = parseInt(editValue, 10)
+    if (isNaN(numValue) || numValue < 1 || numValue > 5) return
+    setIsSavingScore(true)
+    await onSave({ [fieldKey]: numValue, priority_manual_override: false })
+    setIsSavingScore(false)
+    setIsEditing(false)
+    onIssueUpdated?.()
+  }, [editValue, fieldKey, onSave, onIssueUpdated])
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
+        <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS[icon]}</span>
+        <span className="w-16 text-[color:var(--text-secondary)]">{label}</span>
+        <input
+          type="number"
+          min={1}
+          max={5}
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void handleSaveScore()
+            if (e.key === 'Escape') handleCancel()
+          }}
+          autoFocus
+          className="w-12 rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-1.5 py-0.5 font-mono text-sm text-[color:var(--foreground)] focus:border-[color:var(--accent-primary)] focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => void handleSaveScore()}
+          disabled={isSavingScore}
+          className="rounded-[4px] p-0.5 text-[color:var(--accent-success)] transition hover:bg-[color:var(--surface-hover)]"
+          aria-label="Save"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="rounded-[4px] p-0.5 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
+          aria-label="Cancel"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
+    <div className="group flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
       <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS[icon]}</span>
       <span className="w-16 text-[color:var(--text-secondary)]">{label}</span>
       <span className="font-mono font-medium text-[color:var(--foreground)]">
@@ -665,106 +770,18 @@ function ScoreRow({ icon, label, score, reasoning }: { icon: string; label: stri
           </svg>
         </span>
       )}
-    </div>
-  )
-}
-
-// ============================================================================
-// Jira Sync Badge
-// ============================================================================
-
-interface JiraSyncBadgeProps {
-  status: JiraIssueSyncStatus
-  isRetrying: boolean
-  onRetry: () => void
-}
-
-function JiraSyncBadge({ status, isRetrying, onRetry }: JiraSyncBadgeProps) {
-  const syncStatusLabel =
-    status.lastSyncStatus === 'success'
-      ? 'Synced'
-      : status.lastSyncStatus === 'failed'
-        ? 'Sync Failed'
-        : 'Pending'
-
-  const syncStatusVariant: 'success' | 'danger' | 'warning' =
-    status.lastSyncStatus === 'success'
-      ? 'success'
-      : status.lastSyncStatus === 'failed'
-        ? 'danger'
-        : 'warning'
-
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        {/* Jira icon */}
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M11.53 2c0 4.97 3.86 9 8.47 9H22v1.67C22 17.73 17.73 22 12.67 22H12c-5.52 0-10-4.48-10-10v-.67C2 6.27 6.27 2 11.33 2h.2z"
-            fill="currentColor"
-            className="text-[color:var(--text-secondary)]"
-          />
+      <button
+        type="button"
+        onClick={handleStartEdit}
+        className="rounded-[4px] p-0.5 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+        aria-label={`Edit ${label}`}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+          <path d="m15 5 4 4" />
         </svg>
-
-        {status.jiraIssueUrl ? (
-          <a
-            href={status.jiraIssueUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-sm font-medium text-[color:var(--accent-selected)] hover:underline"
-          >
-            {status.jiraIssueKey}
-          </a>
-        ) : (
-          <span className="font-mono text-sm text-[color:var(--text-secondary)]">
-            {status.jiraIssueKey || 'Jira'}
-          </span>
-        )}
-
-        <Badge variant={syncStatusVariant}>
-          {syncStatusLabel}
-        </Badge>
-      </div>
-
-      {status.lastSyncStatus === 'failed' && (
-        <button
-          type="button"
-          onClick={onRetry}
-          disabled={isRetrying}
-          className="rounded-[4px] border border-[color:var(--border)] px-2 py-1 font-mono text-xs text-[color:var(--text-secondary)] transition hover:border-[color:var(--accent-primary)] hover:text-[color:var(--accent-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isRetrying ? 'Retrying...' : 'Retry Sync'}
-        </button>
-      )}
+      </button>
     </div>
   )
 }
 
-function JiraSyncBadgeInline({ status, isRetrying, onRetry }: JiraSyncBadgeProps) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      {status.jiraIssueUrl ? (
-        <a
-          href={status.jiraIssueUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[color:var(--accent-selected)] hover:underline"
-        >
-          {status.jiraIssueKey}
-        </a>
-      ) : (
-        <span>{status.jiraIssueKey || 'Jira'}</span>
-      )}
-      {status.lastSyncStatus === 'failed' && (
-        <button
-          type="button"
-          onClick={onRetry}
-          disabled={isRetrying}
-          className="text-[color:var(--accent-danger)] hover:underline disabled:opacity-50"
-        >
-          {isRetrying ? '...' : '(retry)'}
-        </button>
-      )}
-    </span>
-  )
-}

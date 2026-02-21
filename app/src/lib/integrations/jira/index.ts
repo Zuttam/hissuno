@@ -17,7 +17,7 @@ export async function hasJiraConnection(
 ): Promise<JiraIntegrationStatus> {
   const { data, error } = await supabase
     .from('jira_connections')
-    .select('site_url, cloud_id, installed_by_email, jira_project_key, jira_project_id, issue_type_name, is_enabled')
+    .select('site_url, cloud_id, installed_by_email, jira_project_key, jira_project_id, issue_type_name, is_enabled, auto_sync_enabled')
     .eq('project_id', projectId)
     .single()
 
@@ -32,6 +32,7 @@ export async function hasJiraConnection(
       issueTypeName: null,
       isEnabled: false,
       isConfigured: false,
+      autoSyncEnabled: true,
     }
   }
 
@@ -45,6 +46,7 @@ export async function hasJiraConnection(
     issueTypeName: data.issue_type_name,
     isEnabled: data.is_enabled,
     isConfigured: Boolean(data.jira_project_key && data.issue_type_name),
+    autoSyncEnabled: data.auto_sync_enabled !== false,
   }
 }
 
@@ -138,16 +140,21 @@ export async function configureJiraConnection(
     jiraProjectId: string
     issueTypeId: string
     issueTypeName: string
+    autoSyncEnabled?: boolean
   }
 ): Promise<{ success: boolean; error?: string }> {
+  const updateData: Record<string, unknown> = {
+    jira_project_key: config.jiraProjectKey,
+    jira_project_id: config.jiraProjectId,
+    issue_type_id: config.issueTypeId,
+    issue_type_name: config.issueTypeName,
+  }
+  if (config.autoSyncEnabled !== undefined) {
+    updateData.auto_sync_enabled = config.autoSyncEnabled
+  }
   const { error } = await supabase
     .from('jira_connections')
-    .update({
-      jira_project_key: config.jiraProjectKey,
-      jira_project_id: config.jiraProjectId,
-      issue_type_id: config.issueTypeId,
-      issue_type_name: config.issueTypeName,
-    })
+    .update(updateData)
     .eq('project_id', projectId)
 
   if (error) {

@@ -30,7 +30,7 @@ import {
   type InsertIssueData,
 } from '@/lib/supabase/issues'
 import { upsertIssueEmbedding } from './embedding-service'
-import { triggerJiraSyncForIssue } from '@/lib/integrations/jira/sync'
+import { triggerTrackerSyncForIssue } from '@/lib/integrations/issue-tracker'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -54,36 +54,33 @@ export function calculatePriority(upvoteCount: number): IssuePriority {
 }
 
 /**
- * Calculate multi-factor priority from velocity, impact, and effort scores.
+ * Calculate RICE score from Reach, Impact, Confidence, and Effort.
  *
- * With effort: composite = velocity * 0.3 + impact * 0.5 + effortInverse * 0.2
- * Without effort: composite = velocity * 0.35 + impact * 0.65
- * Where effortInverse = 6 - effortScore (higher effort = lower priority boost)
- *
- * Mapping: >= 3.5 = high, >= 2.0 = medium, else low
+ * Formula: (Reach * Impact * Confidence) / Effort
+ * All scores are 1-5. Confidence defaults to 3 (medium) if not provided.
+ * Returns null if insufficient data.
  */
-export function calculateMultiFactorPriority(
-  velocityScore: number | null,
+export function calculateRICEScore(
+  reachScore: number | null,
   impactScore: number | null,
+  confidenceScore: number | null,
   effortScore: number | null
-): IssuePriority | null {
-  if (velocityScore == null && impactScore == null) {
-    return null // No scores available, cannot calculate
-  }
+): number | null {
+  if (reachScore == null || impactScore == null || effortScore == null) return null
+  const confidence = confidenceScore ?? 3
+  const effort = Math.max(effortScore, 1)
+  return (reachScore * impactScore * confidence) / effort
+}
 
-  const velocity = velocityScore ?? 1
-  const impact = impactScore ?? 1
-
-  let composite: number
-  if (effortScore != null) {
-    const effortInverse = 6 - effortScore
-    composite = velocity * 0.3 + impact * 0.5 + effortInverse * 0.2
-  } else {
-    composite = velocity * 0.35 + impact * 0.65
-  }
-
-  if (composite >= 3.5) return 'high'
-  if (composite >= 2.0) return 'medium'
+/**
+ * Map a RICE score to a priority level.
+ *
+ * Thresholds: >= 20 = high, >= 5 = medium, else low
+ */
+export function riceScoreToPriority(riceScore: number | null): IssuePriority | null {
+  if (riceScore == null) return null
+  if (riceScore >= 20) return 'high'
+  if (riceScore >= 5) return 'medium'
   return 'low'
 }
 
@@ -181,7 +178,7 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
   )
 
   // Trigger Jira sync (fire-and-forget)
-  triggerJiraSyncForIssue(issue.id, input.project_id, 'create')
+  triggerTrackerSyncForIssue(issue.id, input.project_id, 'create')
 
   return {
     ...issue,
@@ -348,7 +345,7 @@ export async function createIssueAdmin(
   )
 
   // Trigger Jira sync (fire-and-forget)
-  triggerJiraSyncForIssue(issue.id, input.projectId, 'create')
+  triggerTrackerSyncForIssue(issue.id, input.projectId, 'create')
 
   return { issue, embeddingCreated }
 }

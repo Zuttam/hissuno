@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json()
-    const { projectId, jiraProjectKey, jiraProjectId, issueTypeId, issueTypeName } = body
+    const { projectId, jiraProjectKey, jiraProjectId, issueTypeId, issueTypeName, autoSyncEnabled } = body
 
     if (!projectId || !jiraProjectKey || !jiraProjectId || !issueTypeId || !issueTypeName) {
       return NextResponse.json({ error: 'All fields are required.' }, { status: 400 })
@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
       jiraProjectId,
       issueTypeId,
       issueTypeName,
+      autoSyncEnabled: typeof autoSyncEnabled === 'boolean' ? autoSyncEnabled : undefined,
     })
 
     if (!result.success) {

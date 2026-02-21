@@ -74,6 +74,8 @@ export const analyzeOutputSchema = preparedContextSchema.extend({
     category: z.string(),
     relevance: z.number(),
   })),
+  technicalConfidenceScore: z.number().min(1).max(5).nullable(),
+  technicalConfidenceReasoning: z.string().nullable(),
 })
 
 export type AnalyzeOutput = z.infer<typeof analyzeOutputSchema>
@@ -86,9 +88,11 @@ export const workflowOutputSchema = z.object({
   issueId: z.string(),
   projectId: z.string(),
   success: z.boolean(),
-  velocityScore: z.number().nullable(),
+  reachScore: z.number().nullable(),
   impactScore: z.number().nullable(),
+  confidenceScore: z.number().nullable(),
   effortScore: z.number().nullable(),
+  riceScore: z.number().nullable(),
   priority: z.string().nullable(),
   error: z.string().optional(),
   // Codebase cleanup status

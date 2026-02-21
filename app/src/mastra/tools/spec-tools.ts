@@ -8,7 +8,7 @@
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/server'
-import { triggerJiraSyncForIssue } from '@/lib/integrations/jira/sync'
+import { triggerTrackerSyncForIssue } from '@/lib/integrations/issue-tracker'
 import { getSessionMessages } from '@/lib/supabase/session-messages'
 import { downloadKnowledgePackage } from '@/lib/knowledge/storage'
 import type { IssueType, IssuePriority } from '@/types/issue'
@@ -239,7 +239,7 @@ Call this after generating the spec content.`,
         .eq('id', issueId)
         .single()
       if (issueData?.project_id) {
-        triggerJiraSyncForIssue(issueId, issueData.project_id, 'update_spec')
+        triggerTrackerSyncForIssue(issueId, issueData.project_id, 'update_spec')
       }
 
       return { success: true }

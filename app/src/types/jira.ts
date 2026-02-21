@@ -19,6 +19,7 @@ export interface JiraConnectionRecord {
   issue_type_id: string | null
   issue_type_name: string | null
   is_enabled: boolean
+  auto_sync_enabled: boolean
   installed_by_user_id: string | null
   installed_by_email: string | null
   webhook_id: string | null
@@ -58,6 +59,7 @@ export interface JiraIntegrationStatus {
   issueTypeName: string | null
   isEnabled: boolean
   isConfigured: boolean
+  autoSyncEnabled: boolean
 }
 
 export interface JiraProject {

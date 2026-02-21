@@ -2,26 +2,26 @@
  * Step: Compute Scores
  *
  * Deterministic step that:
- * 1. Computes velocity score from session timestamps
+ * 1. Computes reach score from session timestamps
  * 2. Blends technical impact with customer data
  * 3. Maps effort estimate to numeric score
- * 4. Calculates multi-factor priority (unless manually overridden)
+ * 4. Calculates RICE priority (unless manually overridden)
  * 5. Persists all results to the database
  */
 
 import { createStep } from '@mastra/core/workflows'
 import { createAdminClient } from '@/lib/supabase/server'
 import { updateIssueAnalysis } from '@/lib/supabase/issues'
-import { computeVelocity } from '@/lib/issues/velocity'
+import { computeReach } from '@/lib/issues/reach'
 import { computeImpact } from '@/lib/issues/impact'
 import { mapEffortToScore } from '@/lib/issues/effort'
-import { calculateMultiFactorPriority } from '@/lib/issues/issues-service'
+import { calculateRICEScore, riceScoreToPriority } from '@/lib/issues/issues-service'
 import { analyzeOutputSchema, workflowOutputSchema } from '../schemas'
 import type { EffortEstimate, IssueImpactAnalysis } from '@/types/issue'
 
 export const computeScores = createStep({
   id: 'compute-scores',
-  description: 'Compute velocity, blend impact, map effort, calculate priority, and persist',
+  description: 'Compute reach, blend impact, map effort, calculate RICE priority, and persist',
   inputSchema: analyzeOutputSchema,
   outputSchema: workflowOutputSchema,
   execute: async ({ inputData, mastra, writer }) => {
@@ -36,18 +36,19 @@ export const computeScores = createStep({
       technicalImpactScore,
       technicalEffortEstimate, technicalEffortReasoning,
       technicalAffectedFiles, technicalAffectedAreas,
+      technicalConfidenceScore, technicalConfidenceReasoning,
       codebaseLeaseId,
     } = inputData
 
     logger?.info('[compute-scores] Starting', { issueId })
     await writer?.write({ type: 'progress', message: 'Computing scores...' })
 
-    // 1. Compute velocity
-    const velocity = computeVelocity({
+    // 1. Compute reach
+    const reach = computeReach({
       sessionTimestamps: sessionTimestamps.map((t) => new Date(t)),
       upvoteCount: issue.upvoteCount,
     })
-    logger?.info('[compute-scores] Velocity computed', { score: velocity.score })
+    logger?.info('[compute-scores] Reach computed', { score: reach.score })
 
     // 2. Compute blended impact
     const impact = computeImpact({
@@ -67,13 +68,18 @@ export const computeScores = createStep({
     )
     logger?.info('[compute-scores] Effort mapped', { score: effortScore })
 
-    // 4. Calculate priority (only when not manually overridden)
+    // 4. Use agent-provided confidence, default to 3 (medium) when not provided
+    const confidenceScore = technicalConfidenceScore ?? 3
+    const confidenceReasoning = technicalConfidenceReasoning ?? 'Default medium confidence (agent did not provide score)'
+
+    // 5. Calculate RICE score and priority (only when not manually overridden)
+    const riceScore = calculateRICEScore(reach.score, impact.score, confidenceScore, effortScore)
     let priority: string | null = null
     if (!issue.priorityManualOverride) {
-      priority = calculateMultiFactorPriority(velocity.score, impact.score, effortScore)
+      priority = riceScoreToPriority(riceScore)
     }
 
-    // 5. Persist to DB
+    // 6. Persist to DB
     await writer?.write({ type: 'progress', message: 'Saving analysis results...' })
     const supabase = createAdminClient()
 
@@ -84,10 +90,13 @@ export const computeScores = createStep({
     } : null
 
     const updateData: Record<string, unknown> = {
-      velocityScore: velocity.score,
-      velocityReasoning: velocity.reasoning,
+      reachScore: reach.score,
+      reachReasoning: reach.reasoning,
       impactScore: impact.score,
+      confidenceScore,
+      confidenceReasoning,
       effortScore,
+      riceScore,
       analysisComputedAt: new Date().toISOString(),
     }
 
@@ -110,13 +119,15 @@ export const computeScores = createStep({
 
     await writer?.write({
       type: 'progress',
-      message: `Analysis complete: V=${velocity.score} I=${impact.score} E=${effortScore ?? '-'}`,
+      message: `Analysis complete: R=${reach.score} I=${impact.score} C=${confidenceScore} E=${effortScore ?? '-'} RICE=${riceScore?.toFixed(1) ?? '-'}`,
     })
 
     logger?.info('[compute-scores] Completed', {
-      velocity: velocity.score,
+      reach: reach.score,
       impact: impact.score,
+      confidence: confidenceScore,
       effort: effortScore,
+      riceScore,
       priority,
     })
 
@@ -124,9 +135,11 @@ export const computeScores = createStep({
       issueId,
       projectId,
       success: true,
-      velocityScore: velocity.score,
+      reachScore: reach.score,
       impactScore: impact.score,
+      confidenceScore,
       effortScore,
+      riceScore,
       priority,
       codebaseLeaseId,
       codebaseCleanedUp: false, // cleanup step handles this

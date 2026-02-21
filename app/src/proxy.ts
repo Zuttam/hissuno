@@ -84,6 +84,7 @@ const PUBLIC_PATHS = [
   '/api/webhooks/lemon-squeezy',
   '/api/webhooks/slack',
   '/api/webhooks/jira',
+  '/api/webhooks/linear',
   '/api/healthz',
 ]
 

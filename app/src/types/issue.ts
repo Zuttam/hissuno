@@ -61,9 +61,12 @@ export interface IssueRecord {
   effort_reasoning: string | null
   affected_files: string[]
   // Analysis metrics
-  velocity_score: number | null
-  velocity_reasoning: string | null
+  reach_score: number | null
+  reach_reasoning: string | null
   effort_score: number | null
+  confidence_score: number | null
+  confidence_reasoning: string | null
+  rice_score: number | null
   analysis_computed_at: string | null
   // Timestamps
   created_at: string
@@ -203,6 +206,10 @@ export interface UpdateIssueInput {
   priority?: IssuePriority
   priority_manual_override?: boolean
   status?: IssueStatus
+  reach_score?: number
+  impact_score?: number
+  confidence_score?: number
+  effort_score?: number
 }
 
 /**
@@ -220,8 +227,9 @@ export interface IssueFilters {
   status?: IssueStatus
   search?: string
   showArchived?: boolean
-  velocityLevel?: MetricLevel
+  reachLevel?: MetricLevel
   impactLevel?: MetricLevel
+  confidenceLevel?: MetricLevel
   effortLevel?: MetricLevel
   limit?: number
   offset?: number
@@ -338,12 +346,15 @@ export interface PMReviewSSEEvent {
  * Result of issue analysis workflow
  */
 export interface IssueAnalysisResult {
-  velocityScore: number | null
-  velocityReasoning: string | null
+  reachScore: number | null
+  reachReasoning: string | null
   impactScore: number | null
   impactReasoning: string | null
+  confidenceScore: number | null
+  confidenceReasoning: string | null
   effortScore: number | null
   effortReasoning: string | null
+  riceScore: number | null
   priority: IssuePriority | null
   analysisComputedAt: string
 }

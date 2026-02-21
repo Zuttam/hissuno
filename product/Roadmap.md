@@ -160,32 +160,41 @@
 
 ## Phase 10
 
-### Marketing
-[] Run SDR agent
-
 ### Feedback (f.k.a sessions)
 [x] Support Zendesk in early access
 
-### Platform
-[] Enable additional notifications 
-[] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
-
+### Platform 
 [x] fix alerts in integration settings
  
-
 ### Issues
-[] Lieaner Integration
-[] Move priority analysis on RICE methodology 
-[] Enable manual edit of RICE scores 
+[x] Lieaner Integration
+[x] Move priority analysis on RICE methodology and enable manual edits (of scores)
 [x] Unify linkedin feedback and customer into one tree 
 [x] Enable manual edit of linked feedback - detach and attach
-[] Make it easier to search for linked feedback -> both attach and create 
-[] notify issue resolution to user
+[x] Make it easier to search for linked feedback -> both attach and create 
 
-## Phase 11
+
+### Phase 11
+
+### Platform
+[] Support Product Areas
+[] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
+
+### Issues
+[] Classify Issues into product areas
+[] Notify issue resolution to user (notifications)
+
+### Marketing
+[] Run SDR agent
+[] Improve landing pages | remove ai support and fde | focus on pm | add pricing
+
+### Analytics 
+[] segmentation by product area
+
+
+## Phase 12
 
 ### Marketing 
-[] Improve landing pages | remove ai support and fde | focus on pm | add pricing
 [] Support referral promotions
 
 ### Integrations
@@ -204,16 +213,10 @@
 [] MCP Apps
 [] Enable expanded view of feedbacks and issues in left panel and ability to search
 
-
 ### Issues 
-[] Draft email response to users
+[] Draft email response to customers
 [] Jira Integration 
 [] Delete project
-[] Add product area to the issue analysis - Classify on product area
-
-
-### Analytics 
-[] segmentation by product area
 
 ### Customers
 [] Implement CRM integration

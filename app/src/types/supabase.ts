@@ -915,6 +915,8 @@ export type Database = {
           affected_areas: string[] | null
           affected_files: string[] | null
           analysis_computed_at: string | null
+          confidence_reasoning: string | null
+          confidence_score: number | null
           created_at: string
           description: string
           effort_estimate: string | null
@@ -929,18 +931,21 @@ export type Database = {
           product_spec: string | null
           product_spec_generated_at: string | null
           project_id: string
+          reach_reasoning: string | null
+          reach_score: number | null
+          rice_score: number | null
           status: string | null
           title: string
           type: string
           updated_at: string
           upvote_count: number | null
-          velocity_reasoning: string | null
-          velocity_score: number | null
         }
         Insert: {
           affected_areas?: string[] | null
           affected_files?: string[] | null
           analysis_computed_at?: string | null
+          confidence_reasoning?: string | null
+          confidence_score?: number | null
           created_at?: string
           description: string
           effort_estimate?: string | null
@@ -955,18 +960,21 @@ export type Database = {
           product_spec?: string | null
           product_spec_generated_at?: string | null
           project_id: string
+          reach_reasoning?: string | null
+          reach_score?: number | null
+          rice_score?: number | null
           status?: string | null
           title: string
           type: string
           updated_at?: string
           upvote_count?: number | null
-          velocity_reasoning?: string | null
-          velocity_score?: number | null
         }
         Update: {
           affected_areas?: string[] | null
           affected_files?: string[] | null
           analysis_computed_at?: string | null
+          confidence_reasoning?: string | null
+          confidence_score?: number | null
           created_at?: string
           description?: string
           effort_estimate?: string | null
@@ -981,13 +989,14 @@ export type Database = {
           product_spec?: string | null
           product_spec_generated_at?: string | null
           project_id?: string
+          reach_reasoning?: string | null
+          reach_score?: number | null
+          rice_score?: number | null
           status?: string | null
           title?: string
           type?: string
           updated_at?: string
           upvote_count?: number | null
-          velocity_reasoning?: string | null
-          velocity_score?: number | null
         }
         Relationships: [
           {
@@ -1002,6 +1011,7 @@ export type Database = {
       jira_connections: {
         Row: {
           access_token: string
+          auto_sync_enabled: boolean
           cloud_id: string
           created_at: string
           id: string
@@ -1022,6 +1032,7 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          auto_sync_enabled?: boolean
           cloud_id: string
           created_at?: string
           id?: string
@@ -1042,6 +1053,7 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          auto_sync_enabled?: boolean
           cloud_id?: string
           created_at?: string
           id?: string
@@ -1325,6 +1337,146 @@ export type Database = {
             columns: ["source_code_id"]
             isOneToOne: false
             referencedRelation: "source_codes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      linear_connections: {
+        Row: {
+          access_token: string
+          auto_sync_enabled: boolean
+          created_at: string
+          id: string
+          installed_by_email: string | null
+          installed_by_user_id: string | null
+          is_enabled: boolean
+          organization_id: string
+          organization_name: string
+          project_id: string
+          refresh_token: string
+          team_id: string | null
+          team_key: string | null
+          team_name: string | null
+          token_expires_at: string
+          updated_at: string
+          webhook_id: string | null
+          webhook_secret: string | null
+        }
+        Insert: {
+          access_token: string
+          auto_sync_enabled?: boolean
+          created_at?: string
+          id?: string
+          installed_by_email?: string | null
+          installed_by_user_id?: string | null
+          is_enabled?: boolean
+          organization_id: string
+          organization_name: string
+          project_id: string
+          refresh_token: string
+          team_id?: string | null
+          team_key?: string | null
+          team_name?: string | null
+          token_expires_at: string
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_secret?: string | null
+        }
+        Update: {
+          access_token?: string
+          auto_sync_enabled?: boolean
+          created_at?: string
+          id?: string
+          installed_by_email?: string | null
+          installed_by_user_id?: string | null
+          is_enabled?: boolean
+          organization_id?: string
+          organization_name?: string
+          project_id?: string
+          refresh_token?: string
+          team_id?: string | null
+          team_key?: string | null
+          team_name?: string | null
+          token_expires_at?: string
+          updated_at?: string
+          webhook_id?: string | null
+          webhook_secret?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "linear_connections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      linear_issue_syncs: {
+        Row: {
+          connection_id: string
+          created_at: string
+          id: string
+          issue_id: string
+          last_linear_state: string | null
+          last_linear_state_type: string | null
+          last_sync_action: string | null
+          last_sync_error: string | null
+          last_sync_status: string
+          last_synced_at: string | null
+          last_webhook_received_at: string | null
+          linear_issue_id: string | null
+          linear_issue_identifier: string | null
+          linear_issue_url: string | null
+          retry_count: number
+        }
+        Insert: {
+          connection_id: string
+          created_at?: string
+          id?: string
+          issue_id: string
+          last_linear_state?: string | null
+          last_linear_state_type?: string | null
+          last_sync_action?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string
+          last_synced_at?: string | null
+          last_webhook_received_at?: string | null
+          linear_issue_id?: string | null
+          linear_issue_identifier?: string | null
+          linear_issue_url?: string | null
+          retry_count?: number
+        }
+        Update: {
+          connection_id?: string
+          created_at?: string
+          id?: string
+          issue_id?: string
+          last_linear_state?: string | null
+          last_linear_state_type?: string | null
+          last_sync_action?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string
+          last_synced_at?: string | null
+          last_webhook_received_at?: string | null
+          linear_issue_id?: string | null
+          linear_issue_identifier?: string | null
+          linear_issue_url?: string | null
+          retry_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "linear_issue_syncs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "linear_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "linear_issue_syncs_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: true
+            referencedRelation: "issues"
             referencedColumns: ["id"]
           },
         ]

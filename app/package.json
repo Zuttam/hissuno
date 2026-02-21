@@ -24,6 +24,7 @@
     "@ai-sdk/react": "^1.2.12",
     "@hissuno/widget": "file:./packages/widget",
     "@lemonsqueezy/lemonsqueezy.js": "^4.0.0",
+    "@linear/sdk": "^75.0.0",
     "@mastra/core": "^0.23.3",
     "@mastra/libsql": "^0.16.3",
     "@mastra/memory": "^0.15.12",

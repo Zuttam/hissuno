@@ -18,6 +18,7 @@ import { BatchProgressBar } from '@/components/ui/batch-progress-bar'
 import { AnalyticsStrip } from '@/components/analytics'
 import { generateCSV, formatDateForCSV, type CSVColumn } from '@/lib/utils/csv'
 import { downloadAsCSV, generateExportFilename } from '@/lib/utils/download'
+import type { IssueTrackerProvider } from '@/types/issue-tracker'
 
 const PAGE_SIZE = 25
 
@@ -29,6 +30,7 @@ export default function ProjectIssuesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [connectedTrackers, setConnectedTrackers] = useState<IssueTrackerProvider[]>([])
 
   // Auto-open dialog or sidebar based on URL params
   useEffect(() => {
@@ -102,6 +104,32 @@ export default function ProjectIssuesPage() {
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [issues])
+
+  // Fetch connected trackers for bulk sync
+  useEffect(() => {
+    if (!projectId) return
+    const fetchTrackers = async () => {
+      try {
+        const [jiraRes, linearRes] = await Promise.all([
+          fetch(`/api/integrations/jira?projectId=${projectId}`),
+          fetch(`/api/integrations/linear?projectId=${projectId}`),
+        ])
+        const trackers: IssueTrackerProvider[] = []
+        if (jiraRes.ok) {
+          const data = await jiraRes.json()
+          if (data.connected && data.isConfigured) trackers.push('jira')
+        }
+        if (linearRes.ok) {
+          const data = await linearRes.json()
+          if (data.connected && data.isConfigured) trackers.push('linear')
+        }
+        setConnectedTrackers(trackers)
+      } catch {
+        // Silently fail - trackers just won't show
+      }
+    }
+    void fetchTrackers()
+  }, [projectId])
 
   const handleFilterChange = useCallback((newFilters: IssueFilters) => {
     // Keep project filter fixed
@@ -249,9 +277,11 @@ export default function ProjectIssuesPage() {
       { key: 'priority', header: 'Priority' },
       { key: 'status', header: 'Status' },
       { key: 'upvote_count', header: 'Upvotes' },
-      { key: 'velocity_score', header: 'Velocity' },
+      { key: 'reach_score', header: 'Reach' },
       { key: 'impact_score', header: 'Impact' },
+      { key: 'confidence_score', header: 'Confidence' },
       { key: 'effort_score', header: 'Effort' },
+      { key: 'rice_score', header: 'RICE' },
       { key: 'is_archived', header: 'Archived', transform: (v) => (v ? 'Yes' : 'No') },
       { key: 'product_spec', header: 'Has Spec', transform: (v) => (v ? 'Yes' : 'No') },
       { key: 'created_at', header: 'Created', transform: (v) => formatDateForCSV(v as string) },
@@ -260,6 +290,24 @@ export default function ProjectIssuesPage() {
     const csv = generateCSV(itemsToExport, columns)
     downloadAsCSV(csv, generateExportFilename('issues', project?.name))
   }, [issues, selection, project])
+
+  const handleBatchTrackerSync = useCallback(async (provider: IssueTrackerProvider) => {
+    const ids = [...selection.selectedIds]
+    if (!projectId || ids.length === 0) return
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/issues/bulk-tracker-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueIds: ids, provider }),
+      })
+      if (response.ok) {
+        selection.clearSelection()
+      }
+    } catch (err) {
+      console.error('[issues] Failed to bulk sync:', err)
+    }
+  }, [projectId, selection])
 
   const handleOpenCreateDialog = () => {
     router.push(`/projects/${projectId}/issues?dialog=create`)
@@ -343,6 +391,19 @@ export default function ProjectIssuesPage() {
               icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>,
               onClick: handleExportCSV,
             },
+            ...(connectedTrackers.length > 0 ? [{
+              label: 'Send to Tracker',
+              icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>,
+              ...(connectedTrackers.length === 1
+                ? { onClick: () => void handleBatchTrackerSync(connectedTrackers[0]) }
+                : {
+                    dropdown: connectedTrackers.map((provider) => ({
+                      label: provider === 'jira' ? 'Jira' : 'Linear',
+                      onClick: () => void handleBatchTrackerSync(provider),
+                    })),
+                  }
+              ),
+            }] : []),
             {
               label: 'Archive',
               icon: <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="5" rx="2" /><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9" /><path d="M10 13h4" /></svg>,

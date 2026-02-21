@@ -1,25 +1,25 @@
 /**
- * Velocity Score Computation
+ * Reach Score Computation
  *
- * Pure algorithm, no AI. Computes velocity from session timestamps and upvote count.
- * Measures how quickly an issue is gaining traction.
+ * Pure algorithm, no AI. Computes reach from session timestamps and upvote count.
+ * Measures how many users/customers an issue is affecting and how quickly it spreads.
  */
 
 const DEFAULT_WINDOW_DAYS = 14
 
-interface VelocityInput {
+interface ReachInput {
   sessionTimestamps: Date[]
   upvoteCount: number
   windowDays?: number
 }
 
-interface VelocityResult {
+interface ReachResult {
   score: number // 1-5
   reasoning: string
 }
 
 /**
- * Compute velocity score from session timestamps and upvote count.
+ * Compute reach score from session timestamps and upvote count.
  *
  * Score 1-5:
  * - 5: density >= 1.0/day with positive acceleration
@@ -28,7 +28,7 @@ interface VelocityResult {
  * - 2: 2+ sessions in window
  * - 1: single mention or stale
  */
-export function computeVelocity(input: VelocityInput): VelocityResult {
+export function computeReach(input: ReachInput): ReachResult {
   const { sessionTimestamps, upvoteCount, windowDays = DEFAULT_WINDOW_DAYS } = input
 
   if (sessionTimestamps.length === 0) {

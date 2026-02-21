@@ -19,7 +19,8 @@ import { describe, it, expect } from 'vitest'
 
 import {
   calculatePriority,
-  calculateMultiFactorPriority,
+  calculateRICEScore,
+  riceScoreToPriority,
 } from '@/lib/issues/issues-service'
 
 describe('calculatePriority', () => {
@@ -44,59 +45,51 @@ describe('calculatePriority', () => {
   })
 })
 
-describe('calculateMultiFactorPriority', () => {
-  it('returns null when both velocity and impact are null', () => {
-    expect(calculateMultiFactorPriority(null, null, null)).toBe(null)
-    expect(calculateMultiFactorPriority(null, null, 3)).toBe(null)
+describe('calculateRICEScore', () => {
+  it('returns null when reach, impact, or effort is null', () => {
+    expect(calculateRICEScore(null, 3, 3, 3)).toBe(null)
+    expect(calculateRICEScore(3, null, 3, 3)).toBe(null)
+    expect(calculateRICEScore(3, 3, 3, null)).toBe(null)
   })
 
-  it('returns high for high velocity and high impact', () => {
-    expect(calculateMultiFactorPriority(5, 5, null)).toBe('high')
-    expect(calculateMultiFactorPriority(5, 5, 1)).toBe('high')
+  it('defaults confidence to 3 when null', () => {
+    // (5 * 5 * 3) / 1 = 75
+    expect(calculateRICEScore(5, 5, null, 1)).toBe(75)
   })
 
-  it('returns low for low scores', () => {
-    expect(calculateMultiFactorPriority(1, 1, null)).toBe('low')
-    expect(calculateMultiFactorPriority(1, 1, 5)).toBe('low')
+  it('calculates RICE correctly with all scores', () => {
+    // (5 * 5 * 5) / 1 = 125
+    expect(calculateRICEScore(5, 5, 5, 1)).toBe(125)
+    // (1 * 1 * 1) / 5 = 0.2
+    expect(calculateRICEScore(1, 1, 1, 5)).toBeCloseTo(0.2)
+    // (3 * 4 * 3) / 2 = 18
+    expect(calculateRICEScore(3, 4, 3, 2)).toBe(18)
   })
 
-  it('returns medium for moderate scores', () => {
-    expect(calculateMultiFactorPriority(3, 3, null)).toBe('medium')
+  it('prevents division by zero (effort clamped to 1)', () => {
+    // Even with effort=0, it should use 1: (3 * 3 * 3) / 1 = 27
+    expect(calculateRICEScore(3, 3, 3, 0)).toBe(27)
+  })
+})
+
+describe('riceScoreToPriority', () => {
+  it('returns null for null score', () => {
+    expect(riceScoreToPriority(null)).toBe(null)
   })
 
-  it('uses default velocity=1 when null', () => {
-    // Only impact provided: composite = 1*0.35 + 5*0.65 = 3.6 -> high
-    expect(calculateMultiFactorPriority(null, 5, null)).toBe('high')
+  it('returns high for score >= 20', () => {
+    expect(riceScoreToPriority(20)).toBe('high')
+    expect(riceScoreToPriority(100)).toBe('high')
   })
 
-  it('uses default impact=1 when null', () => {
-    // Only velocity provided: composite = 5*0.35 + 1*0.65 = 2.4 -> medium
-    expect(calculateMultiFactorPriority(5, null, null)).toBe('medium')
+  it('returns medium for score >= 5 and < 20', () => {
+    expect(riceScoreToPriority(5)).toBe('medium')
+    expect(riceScoreToPriority(19.9)).toBe('medium')
   })
 
-  it('accounts for effort inversely (high effort lowers priority)', () => {
-    // With effort=5 (high): effortInverse=1
-    // composite = 3*0.3 + 3*0.5 + 1*0.2 = 0.9+1.5+0.2 = 2.6 -> medium
-    expect(calculateMultiFactorPriority(3, 3, 5)).toBe('medium')
-
-    // With effort=1 (low): effortInverse=5
-    // composite = 3*0.3 + 3*0.5 + 5*0.2 = 0.9+1.5+1.0 = 3.4 -> medium
-    expect(calculateMultiFactorPriority(3, 3, 1)).toBe('medium')
-
-    // High scores with low effort -> high
-    // composite = 5*0.3 + 5*0.5 + 5*0.2 = 1.5+2.5+1.0 = 5.0 -> high
-    expect(calculateMultiFactorPriority(5, 5, 1)).toBe('high')
-  })
-
-  it('handles boundary values for priority thresholds', () => {
-    // composite = 5*0.35 + 4*0.65 = 1.75+2.6 = 4.35 -> high (>= 3.5)
-    expect(calculateMultiFactorPriority(5, 4, null)).toBe('high')
-
-    // composite = 2*0.35 + 2*0.65 = 0.7+1.3 = 2.0 -> medium (>= 2.0)
-    expect(calculateMultiFactorPriority(2, 2, null)).toBe('medium')
-
-    // composite = 1*0.35 + 2*0.65 = 0.35+1.3 = 1.65 -> low (< 2.0)
-    expect(calculateMultiFactorPriority(1, 2, null)).toBe('low')
+  it('returns low for score < 5', () => {
+    expect(riceScoreToPriority(4.9)).toBe('low')
+    expect(riceScoreToPriority(0)).toBe('low')
   })
 })
 

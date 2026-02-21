@@ -121,6 +121,7 @@ export async function GET(request: NextRequest) {
       issue_type_id: null,
       issue_type_name: null,
       is_enabled: true,
+      auto_sync_enabled: true,
       installed_by_user_id: userId,
       installed_by_email: null,
       webhook_id: null,

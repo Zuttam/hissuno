@@ -4,7 +4,7 @@
  * Gathers all context needed for issue analysis:
  * - Issue details (type, title, description, upvote count)
  * - Linked sessions with customer/company data
- * - Session timestamps for velocity computation
+ * - Session timestamps for reach computation
  * - Relevant knowledge from knowledge packages
  */
 
@@ -35,7 +35,7 @@ export const prepareContext = createStep({
       throw new Error(`Issue not found: ${issueId}`)
     }
 
-    // Get session timestamps for velocity computation
+    // Get session timestamps for reach computation
     const supabase = createAdminClient()
     const timestamps = await getIssueSessionTimestamps(supabase, issueId)
 

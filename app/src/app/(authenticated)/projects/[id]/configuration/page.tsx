@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, type ChangeEvent } from 'react'
-import type { CustomerEntityType } from '@/types/customer'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useProject } from '@/components/providers/project-provider'
 import { useUser } from '@/components/providers/auth-provider'
@@ -97,9 +96,6 @@ export default function AgentsSettingsPage() {
   const [isSavingGeneral, setIsSavingGeneral] = useState(false)
   const [generalError, setGeneralError] = useState<string | null>(null)
   const [generalSaved, setGeneralSaved] = useState(false)
-
-  // --- Customers tab state ---
-  const [customerEntityTab, setCustomerEntityTab] = useState<CustomerEntityType>('company')
 
   // --- Feedback tab state ---
   const [customTags, setCustomTags] = useState<LocalCustomTag[]>([])
@@ -420,22 +416,26 @@ export default function AgentsSettingsPage() {
         {/* Customers Tab */}
         <TabsPanel value="customers">
           <div className="max-w-2xl flex flex-col gap-6">
-            <Heading as="h3" size="subsection">Custom Fields</Heading>
-            <p className="text-sm text-[color:var(--text-secondary)]">
-              Define custom fields to capture additional information about your companies and contacts.
-            </p>
-            <Tabs value={customerEntityTab} onChange={(v) => setCustomerEntityTab(v as CustomerEntityType)}>
-              <TabsList className="px-0 py-0 mb-4">
-                <Tab value="company">Company Fields</Tab>
-                <Tab value="contact">Contact Fields</Tab>
-              </TabsList>
-              <TabsPanel value="company" className="px-0 py-0">
-                <FieldsEditor projectId={projectId} entityType="company" />
-              </TabsPanel>
-              <TabsPanel value="contact" className="px-0 py-0">
-                <FieldsEditor projectId={projectId} entityType="contact" />
-              </TabsPanel>
-            </Tabs>
+            {/* Company Fields */}
+            <div className="flex flex-col gap-4">
+              <Heading as="h3" size="subsection">Company Fields</Heading>
+              <p className="text-sm text-[color:var(--text-secondary)]">
+                Define custom fields to capture additional information about your companies.
+              </p>
+              <FieldsEditor projectId={projectId} entityType="company" />
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-[color:var(--border-subtle)]" />
+
+            {/* Contact Fields */}
+            <div className="flex flex-col gap-4">
+              <Heading as="h3" size="subsection">Contact Fields</Heading>
+              <p className="text-sm text-[color:var(--text-secondary)]">
+                Define custom fields to capture additional information about your contacts.
+              </p>
+              <FieldsEditor projectId={projectId} entityType="contact" />
+            </div>
           </div>
         </TabsPanel>
 

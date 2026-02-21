@@ -26,6 +26,8 @@ const agentResponseSchema = z.object({
     affectedFiles: z.array(z.string()),
     confidence: z.number().min(0).max(1),
   }).optional(),
+  confidenceScore: z.number().min(1).max(5).optional(),
+  confidenceReasoning: z.string().optional(),
 })
 
 function buildNullResult(inputData: z.infer<typeof preparedContextSchema>) {
@@ -37,6 +39,8 @@ function buildNullResult(inputData: z.infer<typeof preparedContextSchema>) {
     technicalEffortReasoning: null,
     technicalAffectedFiles: [] as string[],
     technicalAffectedAreas: [] as Array<{ area: string; category: string; relevance: number }>,
+    technicalConfidenceScore: null as number | null,
+    technicalConfidenceReasoning: null as string | null,
   }
 }
 
@@ -131,6 +135,8 @@ ${localCodePath ? 'Use the codebase tools to examine relevant files before makin
         affectedAreas: impactAnalysis.affectedAreas.length,
       })
 
+      const { confidenceScore: agentConfidence, confidenceReasoning: agentConfidenceReasoning } = validated.data
+
       return {
         ...inputData,
         technicalImpactScore: impactAnalysis.impactScore,
@@ -139,6 +145,8 @@ ${localCodePath ? 'Use the codebase tools to examine relevant files before makin
         technicalEffortReasoning: effortEstimation?.reasoning ?? null,
         technicalAffectedFiles: effortEstimation?.affectedFiles ?? [],
         technicalAffectedAreas: impactAnalysis.affectedAreas,
+        technicalConfidenceScore: agentConfidence ?? null,
+        technicalConfidenceReasoning: agentConfidenceReasoning ?? null,
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'

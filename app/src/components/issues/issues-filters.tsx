@@ -84,12 +84,23 @@ export function IssuesFilters({
     [filters, onFilterChange]
   )
 
-  // Velocity handler
-  const handleVelocityToggle = useCallback(
+  // Reach handler
+  const handleReachToggle = useCallback(
     (level: MetricLevel) => {
       onFilterChange({
         ...filters,
-        velocityLevel: filters.velocityLevel === level ? undefined : level,
+        reachLevel: filters.reachLevel === level ? undefined : level,
+      })
+    },
+    [filters, onFilterChange]
+  )
+
+  // Confidence handler
+  const handleConfidenceToggle = useCallback(
+    (level: MetricLevel) => {
+      onFilterChange({
+        ...filters,
+        confidenceLevel: filters.confidenceLevel === level ? undefined : level,
       })
     },
     [filters, onFilterChange]
@@ -149,8 +160,9 @@ export function IssuesFilters({
     if (filters.status) count++
     if (filters.search) count++
     if (filters.showArchived) count++
-    if (filters.velocityLevel) count++
+    if (filters.reachLevel) count++
     if (filters.impactLevel) count++
+    if (filters.confidenceLevel) count++
     if (filters.effortLevel) count++
     return count
   }, [filters])
@@ -231,15 +243,15 @@ export function IssuesFilters({
         />
       </div>
 
-      {/* Row 3: Velocity + Impact + Effort */}
+      {/* Row 3: Reach + Impact + Confidence + Effort */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <FilterLabel>Velocity:</FilterLabel>
+        <FilterLabel>Reach:</FilterLabel>
         {METRIC_LEVEL_OPTIONS.map((opt) => (
           <FilterChip
-            key={`vel-${opt.value}`}
+            key={`reach-${opt.value}`}
             label={opt.label}
-            active={filters.velocityLevel === opt.value}
-            onClick={() => handleVelocityToggle(opt.value)}
+            active={filters.reachLevel === opt.value}
+            onClick={() => handleReachToggle(opt.value)}
           />
         ))}
         <span className="ml-2" />
@@ -250,6 +262,16 @@ export function IssuesFilters({
             label={opt.label}
             active={filters.impactLevel === opt.value}
             onClick={() => handleImpactToggle(opt.value)}
+          />
+        ))}
+        <span className="ml-2" />
+        <FilterLabel>Confidence:</FilterLabel>
+        {METRIC_LEVEL_OPTIONS.map((opt) => (
+          <FilterChip
+            key={`conf-${opt.value}`}
+            label={opt.label}
+            active={filters.confidenceLevel === opt.value}
+            onClick={() => handleConfidenceToggle(opt.value)}
           />
         ))}
         <span className="ml-2" />

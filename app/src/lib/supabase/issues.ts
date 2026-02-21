@@ -127,6 +127,10 @@ export async function updateIssueById(
   if (data.priority_manual_override !== undefined) {
     updates.priority_manual_override = data.priority_manual_override
   }
+  if (data.reach_score !== undefined) updates.reach_score = data.reach_score
+  if (data.impact_score !== undefined) updates.impact_score = data.impact_score
+  if (data.confidence_score !== undefined) updates.confidence_score = data.confidence_score
+  if (data.effort_score !== undefined) updates.effort_score = data.effort_score
 
   const { data: issue, error } = await supabase
     .from('issues')
@@ -395,13 +399,17 @@ export const listIssues = cache(async (filters: IssueFilters = {}): Promise<{ is
       const s = sanitizeSearchInput(filters.search)
       query = query.or(`title.ilike.%${s}%,description.ilike.%${s}%`)
     }
-    if (filters.velocityLevel) {
-      const [min, max] = metricLevelToRange(filters.velocityLevel)
-      query = query.gte('velocity_score', min).lte('velocity_score', max)
+    if (filters.reachLevel) {
+      const [min, max] = metricLevelToRange(filters.reachLevel)
+      query = query.gte('reach_score', min).lte('reach_score', max)
     }
     if (filters.impactLevel) {
       const [min, max] = metricLevelToRange(filters.impactLevel)
       query = query.gte('impact_score', min).lte('impact_score', max)
+    }
+    if (filters.confidenceLevel) {
+      const [min, max] = metricLevelToRange(filters.confidenceLevel)
+      query = query.gte('confidence_score', min).lte('confidence_score', max)
     }
     if (filters.effortLevel) {
       const [min, max] = metricLevelToRange(filters.effortLevel)
@@ -625,7 +633,7 @@ function metricLevelToRange(level: MetricLevel): [number, number] {
 }
 
 /**
- * Get session timestamps linked to an issue (for velocity computation)
+ * Get session timestamps linked to an issue (for reach computation)
  */
 export async function getIssueSessionTimestamps(
   supabase: SupabaseClient,
@@ -731,13 +739,16 @@ export async function updateIssueAnalysis(
   supabase: SupabaseClient,
   issueId: string,
   data: {
-    velocityScore?: number | null
-    velocityReasoning?: string | null
+    reachScore?: number | null
+    reachReasoning?: string | null
     impactScore?: number | null
     impactAnalysis?: IssueImpactAnalysis | null
+    confidenceScore?: number | null
+    confidenceReasoning?: string | null
     effortScore?: number | null
     effortEstimate?: EffortEstimate | null
     effortReasoning?: string | null
+    riceScore?: number | null
     affectedFiles?: string[]
     affectedAreas?: string[]
     priority?: IssuePriority
@@ -748,13 +759,16 @@ export async function updateIssueAnalysis(
     updated_at: new Date().toISOString(),
   }
 
-  if (data.velocityScore !== undefined) updates.velocity_score = data.velocityScore
-  if (data.velocityReasoning !== undefined) updates.velocity_reasoning = data.velocityReasoning
+  if (data.reachScore !== undefined) updates.reach_score = data.reachScore
+  if (data.reachReasoning !== undefined) updates.reach_reasoning = data.reachReasoning
   if (data.impactScore !== undefined) updates.impact_score = data.impactScore
   if (data.impactAnalysis !== undefined) updates.impact_analysis = data.impactAnalysis
+  if (data.confidenceScore !== undefined) updates.confidence_score = data.confidenceScore
+  if (data.confidenceReasoning !== undefined) updates.confidence_reasoning = data.confidenceReasoning
   if (data.effortScore !== undefined) updates.effort_score = data.effortScore
   if (data.effortEstimate !== undefined) updates.effort_estimate = data.effortEstimate
   if (data.effortReasoning !== undefined) updates.effort_reasoning = data.effortReasoning
+  if (data.riceScore !== undefined) updates.rice_score = data.riceScore
   if (data.affectedFiles !== undefined) updates.affected_files = data.affectedFiles
   if (data.affectedAreas !== undefined) updates.affected_areas = data.affectedAreas
   if (data.priority !== undefined) updates.priority = data.priority
