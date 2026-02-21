@@ -169,8 +169,8 @@
 ### Platform
 [] Enable additional notifications 
 [] Move from cron to webhook to handle session analysis as events and create a solution for skipeed sessions when user upgrades/limit increased
-[] Enable expanded view of feedbacks and issues in left panel and ability to search
-[] fix alerts in integration settings
+
+[x] fix alerts in integration settings
  
 
 ### Issues
@@ -202,6 +202,7 @@
 
 ### Platform
 [] MCP Apps
+[] Enable expanded view of feedbacks and issues in left panel and ability to search
 
 
 ### Issues 

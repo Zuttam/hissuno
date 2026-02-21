@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react'
 import Image from 'next/image'
-import { MessageSquare, Code2, PenLine } from 'lucide-react'
+import { MessageSquare, Code2, PenLine, Search } from 'lucide-react'
 import { Input, Select, CollapsibleSection, Button, Combobox, FilterChip, FilterLabel } from '@/components/ui'
 import type { SessionFilters, SessionSource } from '@/types/session'
 import { SESSION_SOURCE_INFO, SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
@@ -133,6 +133,13 @@ export function SessionsFilters({
     [filters, onFilterChange]
   )
 
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onFilterChange({ ...filters, search: e.target.value || undefined })
+    },
+    [filters, onFilterChange]
+  )
+
   const handleCompanySelect = useCallback(
     (companyId: string | undefined) => {
       onFilterChange({ ...filters, companyId })
@@ -156,6 +163,7 @@ export function SessionsFilters({
     if (filters.userId) count++
     if (filters.sessionId) count++
     if (filters.name) count++
+    if (filters.search) count++
     if (filters.status) count++
     if (filters.source) count++
     if (filters.dateFrom) count++
@@ -191,6 +199,16 @@ export function SessionsFilters({
   // Quick filters (collapsed state)
   const quickFilters = (
     <div className="flex flex-wrap items-center gap-1.5">
+      <div className="relative flex items-center">
+        <Search size={10} className="pointer-events-none absolute left-2 text-[color:var(--text-tertiary)]" />
+        <Input
+          type="text"
+          placeholder="Search messages..."
+          value={filters.search || ''}
+          onChange={handleSearchChange}
+          className="h-6 w-48 rounded-full border border-[color:var(--border-subtle)] bg-transparent py-0 pl-6 pr-2 text-[10px]"
+        />
+      </div>
       <FilterLabel>Status:</FilterLabel>
       <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
       <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />
@@ -212,8 +230,18 @@ export function SessionsFilters({
   // Expanded filters (same style, more options)
   const expandedFilters = (
     <div className="flex flex-col gap-3">
-      {/* Row 1: Status + Type */}
+      {/* Row 1: Search + Status + Type */}
       <div className="flex flex-wrap items-center gap-1.5">
+        <div className="relative flex items-center">
+          <Search size={10} className="pointer-events-none absolute left-2 text-[color:var(--text-tertiary)]" />
+          <Input
+            type="text"
+            placeholder="Search messages..."
+            value={filters.search || ''}
+            onChange={handleSearchChange}
+            className="h-6 w-48 rounded-full border border-[color:var(--border-subtle)] bg-transparent py-0 pl-6 pr-2 text-[10px]"
+          />
+        </div>
         <FilterLabel>Status:</FilterLabel>
         <FilterChip label="Active" active={filters.status === 'active'} onClick={() => handleStatusToggle('active')} />
         <FilterChip label="Closed" active={filters.status === 'closed'} onClick={() => handleStatusToggle('closed')} />

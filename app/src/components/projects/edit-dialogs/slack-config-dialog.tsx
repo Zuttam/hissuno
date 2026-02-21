@@ -49,6 +49,7 @@ export function SlackConfigDialog({
   const [isLoading, setIsLoading] = useState(true)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [channels, setChannels] = useState<SlackChannel[]>([])
   const [isLoadingChannels, setIsLoadingChannels] = useState(false)
   const [updatingChannelId, setUpdatingChannelId] = useState<string | null>(null)
@@ -176,6 +177,7 @@ export function SlackConfigDialog({
             : ch
         )
       )
+      setSuccessMessage(`Channel mode updated to ${mode}.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update channel mode')
     } finally {
@@ -206,6 +208,7 @@ export function SlackConfigDialog({
       // Refresh both channel lists
       setSelectedChannelToJoin('')
       await Promise.all([fetchChannels(), fetchAvailableChannels()])
+      setSuccessMessage('Channel added successfully.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join channel')
     } finally {
@@ -233,6 +236,7 @@ export function SlackConfigDialog({
 
       // Refresh both channel lists
       await Promise.all([fetchChannels(), fetchAvailableChannels()])
+      setSuccessMessage('Channel removed successfully.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to leave channel')
     } finally {
@@ -263,6 +267,7 @@ export function SlackConfigDialog({
 
       // Update local state
       setChannels((prev) => prev.map((ch) => ({ ...ch, channelMode: mode })))
+      setSuccessMessage(`All channels set to ${mode} mode.`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update channels')
     } finally {
@@ -305,11 +310,8 @@ export function SlackConfigDialog({
   return (
     <Dialog open={open} onClose={onClose} title="Slack Integration" size="xxl">
       <div className="flex flex-col gap-6">
-        {error && (
-          <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-3 font-mono text-sm text-[color:var(--accent-danger)]">
-            {error}
-          </div>
-        )}
+        {error && <Alert variant="danger">{error}</Alert>}
+        {successMessage && <Alert variant="success">{successMessage}</Alert>}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">

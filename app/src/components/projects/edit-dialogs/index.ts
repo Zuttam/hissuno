@@ -1,4 +1,3 @@
-export { EditDialog, type EditDialogProps } from './edit-dialog'
 export { type IssuesSettings } from './issues-settings-dialog'
 export { WidgetConfigDialog } from './widget-config-dialog'
 export { SlackConfigDialog } from './slack-config-dialog'

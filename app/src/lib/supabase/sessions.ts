@@ -11,6 +11,32 @@ function sanitizeSearchInput(input: string): string {
   return input.replace(/[%_.,()]/g, '\\$&')
 }
 
+/**
+ * Searches session messages by content using PostgreSQL full-text search.
+ * Returns matching session IDs ranked by relevance.
+ */
+async function searchSessionsByContent(
+  supabase: Awaited<ReturnType<typeof createRequestScopedClient>>['supabase'],
+  projectId: string,
+  query: string,
+  limit = 50,
+  offset = 0
+): Promise<{ sessionIds: string[] }> {
+  const { data, error } = await supabase.rpc('search_sessions_by_content', {
+    p_project_id: projectId,
+    p_query: query,
+    p_limit: limit,
+    p_offset: offset,
+  })
+
+  if (error) {
+    console.error('[supabase.sessions] full-text search failed', error)
+    return { sessionIds: [] }
+  }
+
+  return { sessionIds: (data ?? []).map((r: { session_id: string }) => r.session_id) }
+}
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const selectSessionWithProject = '*, project:projects(id, name), contact:contacts(id, name, email, company:companies(id, name, domain, arr, stage)), issue_sessions(count)'
@@ -250,6 +276,15 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
         return { sessions: [], total: 0 }
       }
       query = query.in('contact_id', contactIds)
+    }
+
+    // Full-text search against message content
+    if (filters.search && filters.search.trim().length >= 2 && filters.projectId) {
+      const { sessionIds } = await searchSessionsByContent(supabase, filters.projectId, filters.search.trim())
+      if (sessionIds.length === 0) {
+        return { sessions: [], total: 0 }
+      }
+      query = query.in('id', sessionIds)
     }
 
     // Apply pagination via .range() (handles both limit and offset in one call)

@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect, type ChangeEvent } from 'react'
-import { EditDialog } from './edit-dialog'
 import {
+  Dialog,
+  Button,
+  Alert,
   FormField,
   Input,
   Textarea,
@@ -81,7 +83,7 @@ export function WidgetConfigDialog({
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   // Fetch current settings when dialog opens
   useEffect(() => {
@@ -207,8 +209,7 @@ export function WidgetConfigDialog({
       }
 
       onSaved?.()
-      setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
+      setSuccessMessage('Settings saved successfully.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save settings')
     } finally {
@@ -231,207 +232,216 @@ import '@hissuno/widget/styles.css';
   const showDrawerLabel = settings.widget_trigger_type === 'drawer-badge'
 
   return (
-    <EditDialog
-      open={open}
-      onClose={onClose}
-      onSave={handleSave}
-      title="Widget Configuration"
-      isSaving={isSaving}
-      error={error}
-      saved={saved}
-    >
-      {isLoading ? (
-        <div className="flex items-center justify-center py-8">
-          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--foreground)] border-t-transparent" />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {/* Installation Snippet */}
-          <div>
-            <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
-              Installation Snippet
-            </label>
-            <div className="relative">
-              <pre className="overflow-x-auto rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 font-mono text-xs text-[color:var(--foreground)]">
-                {installSnippet}
-              </pre>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard.writeText(installSnippet)}
-                className="absolute top-2 right-2 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] px-2 py-1 font-mono text-[10px] uppercase text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
-              >
-                Copy
-              </button>
-            </div>
+    <Dialog open={open} onClose={onClose} title="Widget Configuration" size="xxl">
+      <div className="flex flex-col gap-6">
+        {error && <Alert variant="danger">{error}</Alert>}
+        {successMessage && <Alert variant="success">{successMessage}</Alert>}
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <span className="h-6 w-6 animate-spin rounded-full border-2 border-[color:var(--foreground)] border-t-transparent" />
           </div>
+        ) : (
+          <div className="max-h-[60vh] overflow-y-auto pr-1">
+            <div className="flex flex-col gap-6">
+              {/* Installation Snippet */}
+              <div>
+                <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
+                  Installation Snippet
+                </label>
+                <div className="relative">
+                  <pre className="overflow-x-auto rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3 font-mono text-xs text-[color:var(--foreground)]">
+                    {installSnippet}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(installSnippet)}
+                    className="absolute top-2 right-2 rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] px-2 py-1 font-mono text-[10px] uppercase text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-            <KeyField label="Project ID" value={projectId} compact />
-            <KeyField
-              label="Secret Key"
-              labelTooltip="Used to sign JWT tokens that verify end-user identity in the widget. Your backend signs tokens with this key, and the widget sends them to authenticate users. This is not an API key — for programmatic API access, use project API keys in the Access tab."
-              value={secretKey ?? 'Not generated'}
-              disabled={!secretKey}
-              isSecret
-              compact
-            />
-          </div>
-
-          {/* Trigger & Display */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-              Trigger & Display
-            </h4>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField label="Trigger" description="How the widget is activated">
-                <Select value={settings.widget_trigger_type} onChange={handleTriggerChange}>
-                  {TRIGGER_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-
-              <FormField label="Display" description="How the chat appears">
-                <Select value={settings.widget_display_type} onChange={handleDisplayChange}>
-                  {DISPLAY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-            </div>
-
-            {showDrawerLabel && (
-              <FormField label="Drawer Badge Label" description="Text shown on the side tab">
-                <Input
-                  value={settings.widget_drawer_badge_label}
-                  onChange={handleDrawerBadgeLabelChange}
-                  placeholder="Support"
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <KeyField label="Project ID" value={projectId} compact />
+                <KeyField
+                  label="Secret Key"
+                  labelTooltip="Used to sign JWT tokens that verify end-user identity in the widget. Your backend signs tokens with this key, and the widget sends them to authenticate users. This is not an API key — for programmatic API access, use project API keys in the Access tab."
+                  value={secretKey ?? 'Not generated'}
+                  disabled={!secretKey}
+                  isSecret
+                  compact
                 />
-              </FormField>
-            )}
+              </div>
 
-            <FormField
-              label="Keyboard Shortcut"
-              description="Press a key combination to set. Leave empty to disable."
-            >
-              <ShortcutInput
-                value={settings.widget_shortcut || ''}
-                onChange={handleShortcutChange}
-                placeholder="None"
-              />
-            </FormField>
+              {/* Trigger & Display */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                  Trigger & Display
+                </h4>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField label="Trigger" description="How the widget is activated">
+                    <Select value={settings.widget_trigger_type} onChange={handleTriggerChange}>
+                      {TRIGGER_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+
+                  <FormField label="Display" description="How the chat appears">
+                    <Select value={settings.widget_display_type} onChange={handleDisplayChange}>
+                      {DISPLAY_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                </div>
+
+                {showDrawerLabel && (
+                  <FormField label="Drawer Badge Label" description="Text shown on the side tab">
+                    <Input
+                      value={settings.widget_drawer_badge_label}
+                      onChange={handleDrawerBadgeLabelChange}
+                      placeholder="Support"
+                    />
+                  </FormField>
+                )}
+
+                <FormField
+                  label="Keyboard Shortcut"
+                  description="Press a key combination to set. Leave empty to disable."
+                >
+                  <ShortcutInput
+                    value={settings.widget_shortcut || ''}
+                    onChange={handleShortcutChange}
+                    placeholder="None"
+                  />
+                </FormField>
+              </div>
+
+              {/* Appearance */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                  Appearance
+                </h4>
+
+                <FormField label="Theme">
+                  <Select value={settings.widget_theme} onChange={handleThemeChange}>
+                    {THEME_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </Select>
+                </FormField>
+
+                <FormField label="Widget Title">
+                  <Input
+                    value={settings.widget_title}
+                    onChange={handleTitleChange}
+                    placeholder="Support"
+                  />
+                </FormField>
+
+                <FormField label="Initial Message">
+                  <Textarea
+                    value={settings.widget_initial_message}
+                    onChange={handleInitialMessageChange}
+                    placeholder="Hi! How can I help you today?"
+                    rows={2}
+                  />
+                </FormField>
+              </div>
+
+              {/* Integration */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                  Integration
+                </h4>
+
+                <FormField
+                  label="Allowed Origins"
+                  description="Domains where the widget can be embedded. Leave empty to allow all in development."
+                >
+                  <ChipInput
+                    values={settings.allowed_origins}
+                    onChange={handleAllowedOriginsChange}
+                    placeholder="Add domain (e.g., example.com)"
+                  />
+                </FormField>
+
+                <Checkbox
+                  checked={settings.widget_token_required}
+                  onChange={handleTokenRequiredChange}
+                  label="Require JWT token for widget requests"
+                />
+              </div>
+
+              {/* Lifecycle */}
+              <div className="space-y-4">
+                <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                  Lifecycle
+                </h4>
+
+                <FormField
+                  label="Idle Timeout"
+                  description="Minutes before conversation ends (1-60)"
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={settings.session_idle_timeout_minutes}
+                    onChange={handleIdleTimeoutChange}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Goodbye Delay"
+                  description="Seconds after goodbye (30-300)"
+                >
+                  <Input
+                    type="number"
+                    min={30}
+                    max={300}
+                    value={settings.session_goodbye_delay_seconds}
+                    onChange={handleGoodbyeDelayChange}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Response Timeout"
+                  description="Seconds to wait for response (30-180)"
+                >
+                  <Input
+                    type="number"
+                    min={30}
+                    max={180}
+                    value={settings.session_idle_response_timeout_seconds}
+                    onChange={handleResponseTimeoutChange}
+                  />
+                </FormField>
+              </div>
+            </div>
           </div>
+        )}
 
-          {/* Appearance */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-              Appearance
-            </h4>
-
-            <FormField label="Theme">
-              <Select value={settings.widget_theme} onChange={handleThemeChange}>
-                {THEME_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-
-            <FormField label="Widget Title">
-              <Input
-                value={settings.widget_title}
-                onChange={handleTitleChange}
-                placeholder="Support"
-              />
-            </FormField>
-
-            <FormField label="Initial Message">
-              <Textarea
-                value={settings.widget_initial_message}
-                onChange={handleInitialMessageChange}
-                placeholder="Hi! How can I help you today?"
-                rows={2}
-              />
-            </FormField>
-          </div>
-
-          {/* Integration */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-              Integration
-            </h4>
-
-            <FormField
-              label="Allowed Origins"
-              description="Domains where the widget can be embedded. Leave empty to allow all in development."
-            >
-              <ChipInput
-                values={settings.allowed_origins}
-                onChange={handleAllowedOriginsChange}
-                placeholder="Add domain (e.g., example.com)"
-              />
-            </FormField>
-
-            <Checkbox
-              checked={settings.widget_token_required}
-              onChange={handleTokenRequiredChange}
-              label="Require JWT token for widget requests"
-            />
-          </div>
-
-          {/* Lifecycle */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-              Lifecycle
-            </h4>
-
-            <FormField
-              label="Idle Timeout"
-              description="Minutes before conversation ends (1-60)"
-            >
-              <Input
-                type="number"
-                min={1}
-                max={60}
-                value={settings.session_idle_timeout_minutes}
-                onChange={handleIdleTimeoutChange}
-              />
-            </FormField>
-
-            <FormField
-              label="Goodbye Delay"
-              description="Seconds after goodbye (30-300)"
-            >
-              <Input
-                type="number"
-                min={30}
-                max={300}
-                value={settings.session_goodbye_delay_seconds}
-                onChange={handleGoodbyeDelayChange}
-              />
-            </FormField>
-
-            <FormField
-              label="Response Timeout"
-              description="Seconds to wait for response (30-180)"
-            >
-              <Input
-                type="number"
-                min={30}
-                max={180}
-                value={settings.session_idle_response_timeout_seconds}
-                onChange={handleResponseTimeoutChange}
-              />
-            </FormField>
-          </div>
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 border-t border-[color:var(--border-subtle)] pt-4">
+          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSave} loading={isSaving} disabled={isSaving}>
+            Save
+          </Button>
         </div>
-      )}
-    </EditDialog>
+      </div>
+    </Dialog>
   )
 }

@@ -207,6 +207,7 @@ export interface SessionFilters {
   userId?: string
   sessionId?: string
   name?: string
+  search?: string
   status?: SessionStatus
   source?: SessionSource
   sessionType?: SessionType

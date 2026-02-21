@@ -25,6 +25,7 @@ export function GitHubConfigDialog({
   const [isLoading, setIsLoading] = useState(true)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   // Fetch current GitHub connection status
   useEffect(() => {
@@ -100,6 +101,7 @@ export function GitHubConfigDialog({
         accountLogin: data.accountLogin,
       })
       if (data.connected) {
+        setSuccessMessage('GitHub connection verified.')
         onStatusChanged?.()
       }
     } catch (err) {
@@ -112,11 +114,8 @@ export function GitHubConfigDialog({
   return (
     <Dialog open={open} onClose={onClose} title="GitHub Integration" size="md">
       <div className="flex flex-col gap-6">
-        {error && (
-          <div className="rounded-[4px] border-2 border-[color:var(--accent-danger)] bg-transparent p-3 font-mono text-sm text-[color:var(--accent-danger)]">
-            {error}
-          </div>
-        )}
+        {error && <Alert variant="danger">{error}</Alert>}
+        {successMessage && <Alert variant="success">{successMessage}</Alert>}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">

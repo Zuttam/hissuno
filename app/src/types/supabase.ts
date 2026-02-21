@@ -2247,6 +2247,166 @@ export type Database = {
         }
         Relationships: []
       }
+      zendesk_connections: {
+        Row: {
+          account_name: string | null
+          admin_email: string
+          api_token: string
+          created_at: string
+          filter_config: Json | null
+          id: string
+          last_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          last_sync_tickets_count: number | null
+          next_sync_at: string | null
+          project_id: string
+          subdomain: string
+          sync_enabled: boolean
+          sync_frequency: string
+          updated_at: string
+        }
+        Insert: {
+          account_name?: string | null
+          admin_email: string
+          api_token: string
+          created_at?: string
+          filter_config?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_sync_tickets_count?: number | null
+          next_sync_at?: string | null
+          project_id: string
+          subdomain: string
+          sync_enabled?: boolean
+          sync_frequency?: string
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string | null
+          admin_email?: string
+          api_token?: string
+          created_at?: string
+          filter_config?: Json | null
+          id?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_sync_tickets_count?: number | null
+          next_sync_at?: string | null
+          project_id?: string
+          subdomain?: string
+          sync_enabled?: boolean
+          sync_frequency?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zendesk_connections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zendesk_sync_runs: {
+        Row: {
+          completed_at: string | null
+          connection_id: string
+          error_message: string | null
+          id: string
+          started_at: string
+          status: string
+          tickets_found: number | null
+          tickets_skipped: number | null
+          tickets_synced: number | null
+          triggered_by: string
+        }
+        Insert: {
+          completed_at?: string | null
+          connection_id: string
+          error_message?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          tickets_found?: number | null
+          tickets_skipped?: number | null
+          tickets_synced?: number | null
+          triggered_by: string
+        }
+        Update: {
+          completed_at?: string | null
+          connection_id?: string
+          error_message?: string | null
+          id?: string
+          started_at?: string
+          status?: string
+          tickets_found?: number | null
+          tickets_skipped?: number | null
+          tickets_synced?: number | null
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zendesk_sync_runs_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "zendesk_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zendesk_synced_tickets: {
+        Row: {
+          comments_count: number | null
+          connection_id: string
+          id: string
+          session_id: string
+          synced_at: string
+          ticket_created_at: string | null
+          ticket_updated_at: string | null
+          zendesk_ticket_id: number
+        }
+        Insert: {
+          comments_count?: number | null
+          connection_id: string
+          id?: string
+          session_id: string
+          synced_at?: string
+          ticket_created_at?: string | null
+          ticket_updated_at?: string | null
+          zendesk_ticket_id: number
+        }
+        Update: {
+          comments_count?: number | null
+          connection_id?: string
+          id?: string
+          session_id?: string
+          synced_at?: string
+          ticket_created_at?: string | null
+          ticket_updated_at?: string | null
+          zendesk_ticket_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zendesk_synced_tickets_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "zendesk_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "zendesk_synced_tickets_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -2276,6 +2436,19 @@ export type Database = {
           parent_headings: string[]
           section_heading: string
           similarity: number
+        }[]
+      }
+      search_sessions_by_content: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_project_id: string
+          p_query: string
+        }
+        Returns: {
+          match_count: number
+          rank: number
+          session_id: string
         }[]
       }
       search_similar_issues: {

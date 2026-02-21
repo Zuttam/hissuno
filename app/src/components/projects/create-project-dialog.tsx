@@ -2,10 +2,9 @@
 
 import { useState, useCallback, useEffect, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { EditDialog } from './edit-dialogs/edit-dialog'
 import { ProjectInfoSection } from '@/components/projects/edit-dialogs/project-details-dialog'
 import { LimitReachedDialog } from '@/components/billing/limit-reached-dialog'
-import { Dialog, Button, Spinner } from '@/components/ui'
+import { Dialog, Button, Alert, Spinner } from '@/components/ui'
 
 interface LimitError {
   current: number
@@ -191,21 +190,27 @@ export function CreateProjectDialog({
   }
 
   return (
-    <EditDialog
-      open={open}
-      onClose={onClose}
-      onSave={handleCreate}
-      title="Create Project"
-      isSaving={isCreating}
-      saveLabel="Create"
-      error={error}
-    >
-      <ProjectInfoSection
-        name={name}
-        description={description}
-        onNameChange={handleNameChange}
-        onDescriptionChange={handleDescriptionChange}
-      />
-    </EditDialog>
+    <Dialog open={open} onClose={onClose} title="Create Project" size="xxl">
+      <div className="flex flex-col gap-6">
+        {error && <Alert variant="danger">{error}</Alert>}
+
+        <ProjectInfoSection
+          name={name}
+          description={description}
+          onNameChange={handleNameChange}
+          onDescriptionChange={handleDescriptionChange}
+        />
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 border-t border-[color:var(--border-subtle)] pt-4">
+          <Button variant="secondary" onClick={onClose} disabled={isCreating}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleCreate} loading={isCreating} disabled={isCreating}>
+            Create
+          </Button>
+        </div>
+      </div>
+    </Dialog>
   )
 }

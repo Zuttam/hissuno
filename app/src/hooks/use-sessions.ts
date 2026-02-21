@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { SessionWithProject, SessionWithMessages, SessionFilters, ChatMessage, CreateSessionInput, UpdateSessionInput } from '@/types/session'
 
 interface UseSessionsState {
@@ -29,6 +29,19 @@ export function useSessions({
   const [isLoading, setIsLoading] = useState<boolean>(initialSessions.length === 0)
   const [error, setError] = useState<string | null>(null)
 
+  // Debounce search filter to avoid firing on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState(filters.search)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    if (filters.search === debouncedSearch) return
+    clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearch(filters.search)
+    }, 300)
+    return () => clearTimeout(debounceTimerRef.current)
+  }, [filters.search, debouncedSearch])
+
   const fetchSessions = useCallback(async () => {
     if (!filters.projectId) {
       setSessions([])
@@ -43,6 +56,7 @@ export function useSessions({
       if (filters.userId) params.set('userId', filters.userId)
       if (filters.sessionId) params.set('sessionId', filters.sessionId)
       if (filters.name) params.set('name', filters.name)
+      if (debouncedSearch) params.set('search', debouncedSearch)
       if (filters.status) params.set('status', filters.status)
       if (filters.source) params.set('source', filters.source)
       if (filters.tags && filters.tags.length > 0) params.set('tags', filters.tags.join(','))
@@ -74,7 +88,7 @@ export function useSessions({
     } finally {
       setIsLoading(false)
     }
-  }, [filters.projectId, filters.userId, filters.sessionId, filters.name, filters.status, filters.source, filters.tags, filters.dateFrom, filters.dateTo, filters.showArchived, filters.isHumanTakeover, filters.isAnalyzed, filters.companyId, filters.contactId, filters.limit, filters.offset])
+  }, [filters.projectId, filters.userId, filters.sessionId, filters.name, debouncedSearch, filters.status, filters.source, filters.tags, filters.dateFrom, filters.dateTo, filters.showArchived, filters.isHumanTakeover, filters.isAnalyzed, filters.companyId, filters.contactId, filters.limit, filters.offset])
 
   const createSession = useCallback(async (input: CreateSessionInput): Promise<SessionWithProject | null> => {
     if (!filters.projectId) return null

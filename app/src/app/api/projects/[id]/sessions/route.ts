@@ -47,6 +47,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       userId: searchParams.get('userId') || undefined,
       sessionId: searchParams.get('sessionId') || undefined,
       name: searchParams.get('name') || undefined,
+      search: searchParams.get('search') || undefined,
       status: (searchParams.get('status') as 'active' | 'closed') || undefined,
       source: (searchParams.get('source') as SessionFilters['source']) || undefined,
       tags: tagsParam ? tagsParam.split(',').filter(Boolean) : undefined,

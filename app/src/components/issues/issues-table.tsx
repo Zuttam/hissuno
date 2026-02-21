@@ -54,7 +54,7 @@ export function IssuesTable({
   const hasSelection = Boolean(selectedIds && onToggleSelect && onToggleAll)
 
   return (
-    <div className="overflow-hidden rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)]">
+    <div className="overflow-hidden overflow-x-auto rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)]">
       <table className="w-full font-mono text-sm">
         <thead>
           <tr className="border-b border-[color:var(--border-subtle)]">

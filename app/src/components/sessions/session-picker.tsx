@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Search } from 'lucide-react'
+import { Input } from '@/components/ui'
 import { SessionTagList } from '@/components/sessions/session-tags'
 import type { SessionWithProject } from '@/types/session'
 
@@ -19,6 +21,19 @@ export function SessionPicker({
 }: SessionPickerProps) {
   const [sessions, setSessions] = useState<SessionWithProject[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  // Debounce search input
+  useEffect(() => {
+    if (searchQuery === debouncedQuery) return
+    clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 300)
+    return () => clearTimeout(debounceTimerRef.current)
+  }, [searchQuery, debouncedQuery])
 
   useEffect(() => {
     if (!projectId) {
@@ -29,7 +44,11 @@ export function SessionPicker({
     const fetchSessions = async () => {
       setIsLoading(true)
       try {
-        const response = await fetch(`/api/projects/${projectId}/sessions?limit=50`)
+        const params = new URLSearchParams({ limit: '50' })
+        if (debouncedQuery.trim().length >= 2) {
+          params.set('search', debouncedQuery.trim())
+        }
+        const response = await fetch(`/api/projects/${projectId}/sessions?${params.toString()}`)
         if (response.ok) {
           const data = await response.json()
           setSessions(data.sessions ?? [])
@@ -42,29 +61,52 @@ export function SessionPicker({
     }
 
     void fetchSessions()
-  }, [projectId])
+  }, [projectId, debouncedQuery])
 
   const excludeSet = new Set(excludeSessionIds)
   const filteredSessions = sessions.filter((s) => !excludeSet.has(s.id))
 
+  const searchInput = (
+    <div className="relative mb-2">
+      <Search size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[color:var(--text-tertiary)]" />
+      <Input
+        type="text"
+        placeholder="Search messages..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        className="h-7 w-full rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent pl-7 pr-2 text-xs"
+      />
+    </div>
+  )
+
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-xs text-[color:var(--text-tertiary)]">
-        <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-        Loading feedback...
-      </div>
+      <>
+        {searchInput}
+        <div className="flex items-center gap-2 text-xs text-[color:var(--text-tertiary)]">
+          <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          Loading feedback...
+        </div>
+      </>
     )
   }
 
   if (filteredSessions.length === 0) {
     return (
-      <p className="text-xs text-[color:var(--text-tertiary)]">
-        No feedback found for this project.
-      </p>
+      <>
+        {searchInput}
+        <p className="text-xs text-[color:var(--text-tertiary)]">
+          {debouncedQuery.trim().length >= 2
+            ? 'No feedback matching your search.'
+            : 'No feedback found for this project.'}
+        </p>
+      </>
     )
   }
 
   return (
+    <>
+    {searchInput}
     <div className="max-h-48 overflow-y-auto rounded-[4px] border-2 border-[color:var(--border-subtle)] bg-[color:var(--surface)]">
       {filteredSessions.map((session) => (
         <label
@@ -104,6 +146,7 @@ export function SessionPicker({
         </label>
       ))}
     </div>
+    </>
   )
 }
 
