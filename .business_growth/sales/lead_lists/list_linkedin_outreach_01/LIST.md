@@ -40,7 +40,7 @@
 - **Company Size**: ~80-100 employees
 - **Funding**: Series B ($33M, 2024)
 - **Location**: Skopje (remote-first company)
-- **LinkedIn**: https://www.linkedin.com/in/sanjazakovska
+- **LinkedIn**: https://www.linkedin.com/in/zakovska
 - **Why They Fit**: Modern CRM for growth-stage companies, rapid growth, product-led, customer feedback from diverse user personas. Small product team that needs efficient triage.
 - **Fit Score**: A
 - **Status**: Verified
@@ -67,7 +67,7 @@
 - **Company Size**: ~100 employees
 - **Funding**: Series B
 - **Location**: San Francisco, CA
-- **LinkedIn**: https://www.linkedin.com/in/emilybrody
+- **LinkedIn**: https://www.linkedin.com/in/embrody
 - **Why They Fit**: Developer tools company, deeply understands PM workflows, product-led growth. Linear itself is the kind of tool Hissuno integrates with - strong meta-fit.
 - **Fit Score**: A
 - **Status**: Verified (from previous list)
@@ -93,7 +93,7 @@
 - **Industry**: Developer Tools / Cloud Platform
 - **Company Size**: Growth-stage startup
 - **Location**: United States
-- **LinkedIn**: To be confirmed (found in search results)
+- **LinkedIn**: https://www.linkedin.com/in/george-rolston
 - **Why They Fit**: Cloud/platform company, VP-level product leader, AWS ecosystem, likely dealing with developer feedback at scale.
 - **Fit Score**: B
 - **Status**: Found in search, needs profile visit

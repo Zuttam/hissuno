@@ -1,6 +1,8 @@
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { LinearClient } from '@linear/sdk'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { getSafeRedirectPath } from '@/lib/auth/server'
 import { hasProjectAccess } from '@/lib/auth/project-members'
 import { exchangeCodeForTokens } from '@/lib/integrations/linear/oauth'
 import { storeLinearConnection } from '@/lib/integrations/linear'
@@ -41,10 +43,20 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Missing authorization code or state.')
     }
 
-    // Decode and validate state
+    // Verify HMAC signature and decode state
+    const [statePayload, stateSignature] = state.split('.')
+    if (!statePayload || !stateSignature) {
+      return redirectWithError('Invalid state parameter.')
+    }
+
+    const expectedSig = crypto.createHmac('sha256', clientSecret).update(statePayload).digest('base64url')
+    if (!crypto.timingSafeEqual(Buffer.from(stateSignature), Buffer.from(expectedSig))) {
+      return redirectWithError('Invalid state signature.')
+    }
+
     let stateData: LinearOAuthState
     try {
-      stateData = JSON.parse(Buffer.from(state, 'base64url').toString('utf-8'))
+      stateData = JSON.parse(Buffer.from(statePayload, 'base64url').toString('utf-8'))
     } catch {
       return redirectWithError('Invalid state parameter.')
     }
@@ -103,9 +115,10 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Failed to save Linear connection.')
     }
 
-    // Redirect back to integrations page
-    const successUrl = redirectUrl || `${appUrl}/projects/${projectId}/integrations?linear=connected`
-    return NextResponse.redirect(successUrl)
+    // Redirect back to integrations page (validate redirect path to prevent open redirects)
+    const defaultPath = `/projects/${projectId}/integrations?linear=connected`
+    const safePath = getSafeRedirectPath(redirectUrl, defaultPath)
+    return NextResponse.redirect(`${appUrl}${safePath}`)
   } catch (error) {
     console.error('[integrations.linear.callback] unexpected error', error)
     return redirectWithError('An unexpected error occurred.')

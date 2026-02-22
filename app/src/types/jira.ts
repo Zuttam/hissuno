@@ -99,7 +99,6 @@ export interface JiraTokens {
 export interface JiraOAuthState {
   projectId: string
   userId: string
-  nonce: string
   redirectUrl?: string
 }
 

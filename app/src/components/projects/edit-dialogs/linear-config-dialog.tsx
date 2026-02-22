@@ -105,8 +105,8 @@ export function LinearConfigDialog({
     setError(null)
 
     try {
-      const response = await fetch('/api/integrations/linear/configure', {
-        method: 'POST',
+      const response = await fetch('/api/integrations/linear', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
@@ -138,8 +138,8 @@ export function LinearConfigDialog({
 
     try {
       const newAutoSync = !autoSyncEnabled
-      const response = await fetch('/api/integrations/linear/configure', {
-        method: 'POST',
+      const response = await fetch('/api/integrations/linear', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,

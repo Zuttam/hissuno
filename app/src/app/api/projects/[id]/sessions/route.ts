@@ -74,7 +74,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     console.error('[sessions.get] unexpected error', error)
-    return NextResponse.json({ error: 'Unable to load sessions.' }, { status: 500 })
+    return NextResponse.json({ error: 'Unable to load feedback sessions.' }, { status: 500 })
   }
 }
 

@@ -278,13 +278,59 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
       query = query.in('contact_id', contactIds)
     }
 
-    // Full-text search against message content
+    // Search across message content, session name, and contact name via database RPC
     if (filters.search && filters.search.trim().length >= 2 && filters.projectId) {
-      const { sessionIds } = await searchSessionsByContent(supabase, filters.projectId, filters.search.trim())
-      if (sessionIds.length === 0) {
+      const searchTerm = filters.search.trim()
+      const sanitized = sanitizeSearchInput(searchTerm)
+      const limit = filters.limit ?? 50
+      const offset = filters.offset ?? 0
+
+      // Phase 1: RPC handles search + filters + pagination
+      const { data: searchResults, error: searchError } = await supabase.rpc('search_sessions_multi', {
+        p_project_id: filters.projectId,
+        p_query: searchTerm,
+        p_query_like: sanitized,
+        p_status: filters.status ?? null,
+        p_source: filters.source ?? null,
+        p_session_type: filters.sessionType ?? null,
+        p_is_human_takeover: filters.isHumanTakeover ?? null,
+        p_is_archived: filters.showArchived ?? false,
+        p_is_analyzed: filters.isAnalyzed ?? null,
+        p_tags: filters.tags ?? null,
+        p_date_from: filters.dateFrom ?? null,
+        p_date_to: filters.dateTo ?? null,
+        p_contact_id: filters.contactId ?? null,
+        p_company_id: filters.companyId ?? null,
+        p_limit: limit,
+        p_offset: offset,
+      })
+
+      if (searchError) {
+        console.error('[supabase.sessions] search RPC failed', searchError)
+        throw new Error('Unable to search sessions.')
+      }
+
+      if (!searchResults || searchResults.length === 0) {
         return { sessions: [], total: 0 }
       }
-      query = query.in('id', sessionIds)
+
+      const matchedIds = searchResults.map((r: { session_id: string }) => r.session_id)
+      const totalCount = (searchResults[0] as { total_count: number }).total_count
+
+      // Phase 2: Fetch full session data for this page of IDs
+      const { data, error } = await supabase
+        .from('sessions')
+        .select(selectSessionWithProject)
+        .in('id', matchedIds)
+        .order('last_activity_at', { ascending: false })
+
+      if (error) {
+        console.error('[supabase.sessions] failed to fetch search results', error)
+        throw new Error('Unable to load sessions.')
+      }
+
+      const sessions = await enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[], supabase)
+      return { sessions, total: Number(totalCount) }
     }
 
     // Apply pagination via .range() (handles both limit and offset in one call)
@@ -296,7 +342,7 @@ export const listSessions = cache(async (filters: SessionFilters = {}): Promise<
 
     if (error) {
       console.error('[supabase.sessions] failed to list sessions', error)
-      throw new Error('Unable to load sessions from Supabase.')
+      throw new Error('Unable to load feedbacksessions from DB.')
     }
 
     const sessions = await enrichSessionsWithUserProfiles((data ?? []) as SessionWithProject[], supabase)

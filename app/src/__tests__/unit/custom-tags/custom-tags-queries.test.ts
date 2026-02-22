@@ -9,14 +9,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { UnauthorizedError } from '@/lib/auth/server'
 
 // Mock Supabase server module before imports
-const mockCreateClient = vi.fn()
 const mockCreateAdminClient = vi.fn()
+const mockCreateRequestScopedClient = vi.fn()
 const mockIsSupabaseConfigured = vi.fn()
 const mockIsServiceRoleConfigured = vi.fn()
 
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: () => mockCreateClient(),
   createAdminClient: () => mockCreateAdminClient(),
+  createRequestScopedClient: () => mockCreateRequestScopedClient(),
   isSupabaseConfigured: () => mockIsSupabaseConfigured(),
   isServiceRoleConfigured: () => mockIsServiceRoleConfigured(),
 }))
@@ -27,11 +27,6 @@ import {
   syncCustomTags,
   type SyncTagInput,
 } from '@/lib/supabase/custom-tags'
-
-// Helper to create mock user
-function createMockUser(id: string = 'user-123') {
-  return { id, email: 'test@example.com' }
-}
 
 // Helper to create mock custom tag record
 function createMockTagRecord(overrides: Record<string, unknown> = {}) {
@@ -120,10 +115,17 @@ describe('getProjectCustomTags', () => {
 // syncCustomTags
 
 describe('syncCustomTags', () => {
+  // Helper to set up mockCreateRequestScopedClient to resolve with a mock supabase client
+  function setupMockRequestScopedClient(supabaseClient: Record<string, unknown>) {
+    mockCreateRequestScopedClient.mockResolvedValue({
+      supabase: supabaseClient,
+      userId: 'user-123',
+      apiKeyProjectId: null,
+    })
+  }
+
   // Helper to create a mock Supabase client with chainable methods
   function createMockSupabaseClient(options: {
-    user?: { id: string } | null
-    userError?: { message: string } | null
     project?: { id: string } | null
     existingTags?: Array<ReturnType<typeof createMockTagRecord>>
     fetchError?: { message: string; code?: string } | null
@@ -132,8 +134,6 @@ describe('syncCustomTags', () => {
     deleteError?: { message: string } | null
   }) {
     const {
-      user = createMockUser(),
-      userError = null,
       project = { id: 'project-123' },
       existingTags = [],
       fetchError = null,
@@ -143,20 +143,12 @@ describe('syncCustomTags', () => {
     } = options
 
     return {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user },
-          error: userError,
-        }),
-      },
       from: vi.fn((table: string) => {
         if (table === 'projects') {
           return {
             select: () => ({
               eq: () => ({
-                eq: () => ({
-                  single: () => Promise.resolve({ data: project, error: null }),
-                }),
+                single: () => Promise.resolve({ data: project, error: null }),
               }),
             }),
           }
@@ -197,23 +189,14 @@ describe('syncCustomTags', () => {
 
     it('throws UnauthorizedError when user cannot be resolved', async () => {
       mockIsSupabaseConfigured.mockReturnValue(true)
-      mockCreateClient.mockReturnValue(
-        createMockSupabaseClient({ userError: { message: 'Auth error' } })
-      )
-
-      await expect(syncCustomTags('project-123', [])).rejects.toThrow(UnauthorizedError)
-    })
-
-    it('throws UnauthorizedError when user is null', async () => {
-      mockIsSupabaseConfigured.mockReturnValue(true)
-      mockCreateClient.mockReturnValue(createMockSupabaseClient({ user: null }))
+      mockCreateRequestScopedClient.mockRejectedValue(new UnauthorizedError())
 
       await expect(syncCustomTags('project-123', [])).rejects.toThrow(UnauthorizedError)
     })
 
     it('throws UnauthorizedError when project not found', async () => {
       mockIsSupabaseConfigured.mockReturnValue(true)
-      mockCreateClient.mockReturnValue(createMockSupabaseClient({ project: null }))
+      setupMockRequestScopedClient(createMockSupabaseClient({ project: null }))
 
       await expect(syncCustomTags('project-123', [])).rejects.toThrow(
         'Project not found or access denied.'
@@ -230,7 +213,7 @@ describe('syncCustomTags', () => {
         existingTags: [],
         insertResult: { data: newTagRecord, error: null },
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       const result = await syncCustomTags('project-123', [
         createMockSyncTagInput({ id: 'temp_123456789', name: 'New Tag', slug: 'new_tag' }),
@@ -249,7 +232,7 @@ describe('syncCustomTags', () => {
         existingTags: [],
         insertResult: { data: null, error: { message: 'Duplicate', code: '23505' } },
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       await expect(
         syncCustomTags('project-123', [
@@ -270,7 +253,7 @@ describe('syncCustomTags', () => {
         existingTags: [existingTag],
         updateResult: { data: updatedTag, error: null },
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       const result = await syncCustomTags('project-123', [
         createMockSyncTagInput({ id: 'existing-tag-123', name: 'New Name' }),
@@ -297,7 +280,7 @@ describe('syncCustomTags', () => {
       const mockClient = createMockSupabaseClient({
         existingTags: [existingTag],
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       const result = await syncCustomTags('project-123', [
         createMockSyncTagInput({
@@ -324,7 +307,7 @@ describe('syncCustomTags', () => {
         existingTags: [existingTag],
         updateResult: { data: null, error: { message: 'Duplicate', code: '23505' } },
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       await expect(
         syncCustomTags('project-123', [
@@ -343,7 +326,7 @@ describe('syncCustomTags', () => {
       const mockClient = createMockSupabaseClient({
         existingTags: [existingTag],
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       const result = await syncCustomTags('project-123', [])
 
@@ -362,7 +345,7 @@ describe('syncCustomTags', () => {
         existingTags: [existingTag],
         deleteError: { message: 'Delete failed' },
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       await expect(syncCustomTags('project-123', [])).rejects.toThrow('Unable to delete tag.')
     })
@@ -380,7 +363,7 @@ describe('syncCustomTags', () => {
       const mockClient = createMockSupabaseClient({
         existingTags,
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       // Try to add one more
       const incomingTags: SyncTagInput[] = [
@@ -406,7 +389,7 @@ describe('syncCustomTags', () => {
         existingTags,
         insertResult: { data: newTagRecord, error: null },
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       // Delete one, add one (keeps it at 10)
       const incomingTags: SyncTagInput[] = [
@@ -439,7 +422,7 @@ describe('syncCustomTags', () => {
         updateResult: { data: updatedTag, error: null },
         insertResult: { data: createdTag, error: null },
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       const incomingTags: SyncTagInput[] = [
         // Keep unchanged
@@ -466,7 +449,7 @@ describe('syncCustomTags', () => {
       const mockClient = createMockSupabaseClient({
         fetchError: { message: 'Database error' },
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       await expect(syncCustomTags('project-123', [])).rejects.toThrow('Unable to load existing tags.')
     })
@@ -478,7 +461,7 @@ describe('syncCustomTags', () => {
       const mockClient = createMockSupabaseClient({
         existingTags: [],
       })
-      mockCreateClient.mockReturnValue(mockClient)
+      setupMockRequestScopedClient(mockClient)
 
       // Try to update a tag that doesn't exist (non-temp ID)
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})

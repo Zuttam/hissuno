@@ -1,9 +1,16 @@
+/**
+ * Linear integration API routes.
+ * GET - Check connection status
+ * PATCH - Update team selection and sync settings
+ * DELETE - Disconnect integration
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireUserIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
-import { hasLinearConnection, disconnectLinear } from '@/lib/integrations/linear'
+import { hasLinearConnection, disconnectLinear, configureLinearConnection } from '@/lib/integrations/linear'
 
 export const runtime = 'nodejs'
 
@@ -75,5 +82,50 @@ export async function DELETE(request: NextRequest) {
     }
     console.error('[integrations.linear.delete] unexpected error', error)
     return NextResponse.json({ error: 'Failed to disconnect Linear.' }, { status: 500 })
+  }
+}
+
+/**
+ * PATCH /api/integrations/linear
+ * Update team selection and sync settings
+ */
+export async function PATCH(request: NextRequest) {
+  if (!isSupabaseConfigured()) {
+    return NextResponse.json({ error: 'Supabase must be configured.' }, { status: 500 })
+  }
+
+  try {
+    const body = await request.json()
+    const { projectId, teamId, teamName, teamKey, autoSyncEnabled } = body
+
+    if (!projectId || !teamId || !teamName || !teamKey) {
+      return NextResponse.json({ error: 'projectId, teamId, teamName, and teamKey are required.' }, { status: 400 })
+    }
+
+    const identity = await requireUserIdentity()
+    await assertProjectAccess(identity, projectId)
+    const supabase = await getClientForIdentity(identity)
+
+    const result = await configureLinearConnection(supabase, projectId, {
+      teamId,
+      teamName,
+      teamKey,
+      autoSyncEnabled: autoSyncEnabled !== undefined ? autoSyncEnabled : true,
+    })
+
+    if (!result.success) {
+      return NextResponse.json({ error: result.error }, { status: 500 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ error: error.message }, { status: 403 })
+    }
+    console.error('[integrations.linear.patch] unexpected error', error)
+    return NextResponse.json({ error: 'Failed to configure Linear integration.' }, { status: 500 })
   }
 }

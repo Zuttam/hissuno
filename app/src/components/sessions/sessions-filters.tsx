@@ -203,7 +203,7 @@ export function SessionsFilters({
         <Search size={10} className="pointer-events-none absolute left-2 text-[color:var(--text-tertiary)]" />
         <Input
           type="text"
-          placeholder="Search messages..."
+          placeholder="Search..."
           value={filters.search || ''}
           onChange={handleSearchChange}
           className="h-6 w-48 rounded-full border border-[color:var(--border-subtle)] bg-transparent py-0 pl-6 pr-2 text-[10px]"
@@ -236,7 +236,7 @@ export function SessionsFilters({
           <Search size={10} className="pointer-events-none absolute left-2 text-[color:var(--text-tertiary)]" />
           <Input
             type="text"
-            placeholder="Search messages..."
+            placeholder="Search..."
             value={filters.search || ''}
             onChange={handleSearchChange}
             className="h-6 w-48 rounded-full border border-[color:var(--border-subtle)] bg-transparent py-0 pl-6 pr-2 text-[10px]"

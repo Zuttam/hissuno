@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { ZendeskClient, ZendeskApiError } from '@/lib/integrations/zendesk/client'
+import { requireRequestIdentity } from '@/lib/auth/identity'
+import { UnauthorizedError } from '@/lib/auth/server'
 
 export const runtime = 'nodejs'
 
@@ -14,6 +16,8 @@ export const runtime = 'nodejs'
  */
 export async function POST(request: NextRequest) {
   try {
+    await requireRequestIdentity()
+
     const body = await request.json()
     const { subdomain, email, apiToken } = body as {
       subdomain: string
@@ -46,6 +50,9 @@ export async function POST(request: NextRequest) {
       throw error
     }
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
     console.error('[integrations.zendesk.test] unexpected error', error)
     return NextResponse.json({ error: 'Failed to test connection.' }, { status: 500 })
   }

@@ -13,6 +13,7 @@ import { generateWidgetJWT } from '@/lib/utils/widget-auth'
 import { mastra } from '@/mastra'
 import type { SupportAgentContext } from '@/types/agent'
 import { buildDataToolset } from '@/mastra/tools/data-tools'
+import { buildFeedbackToolset } from '@/mastra/tools/feedback-tools'
 import { SlackClient, type SlackMessage } from './client'
 import {
   getOrCreateThreadSession,
@@ -84,6 +85,85 @@ function convertSlackMessages(
         content: isBot ? msg.text : removeBotMention(msg.text, botUserId),
       } as ChatMessage
     })
+}
+
+/**
+ * Resolve Slack user mentions (<@U12345>) to readable names.
+ * Replaces mentions with "@RealName (email)" or "@RealName" if no email.
+ * Skips the bot's own mention (already handled by removeBotMention).
+ */
+async function resolveUserMentions(
+  text: string,
+  botUserId: string,
+  slackClient: SlackClient
+): Promise<string> {
+  const mentionPattern = /<@(U[A-Z0-9]+)>/g
+  const matches = [...text.matchAll(mentionPattern)]
+  if (matches.length === 0) return text
+
+  const cache = new Map<string, string>()
+  let resolved = text
+
+  for (const match of matches) {
+    const mentionUserId = match[1]
+    if (mentionUserId === botUserId) continue
+    if (cache.has(mentionUserId)) {
+      resolved = resolved.replace(match[0], cache.get(mentionUserId)!)
+      continue
+    }
+
+    const userInfo = await slackClient.getUserInfo(mentionUserId)
+    let replacement: string
+    if (userInfo) {
+      const name = userInfo.real_name || userInfo.name || mentionUserId
+      const email = userInfo.profile.email || userInfo.email || null
+      replacement = email ? `@${name} (${email})` : `@${name}`
+    } else {
+      replacement = `@${mentionUserId}`
+    }
+    cache.set(mentionUserId, replacement)
+    resolved = resolved.replace(match[0], replacement)
+  }
+
+  return resolved
+}
+
+/**
+ * Schedule session close after goodbye detection.
+ * Matches the widget behavior in widget/chat/stream/route.ts.
+ */
+async function scheduleSessionClose(
+  sessionId: string,
+  projectId: string,
+  supabase: ReturnType<typeof createAdminClient>
+): Promise<void> {
+  // Get project goodbye delay (default 90s)
+  let goodbyeDelaySeconds = 90
+  const { data: settings } = await supabase
+    .from('project_settings')
+    .select('session_goodbye_delay_seconds')
+    .eq('project_id', projectId)
+    .single()
+
+  if (settings?.session_goodbye_delay_seconds) {
+    goodbyeDelaySeconds = settings.session_goodbye_delay_seconds
+  }
+
+  const scheduledCloseAt = new Date(Date.now() + goodbyeDelaySeconds * 1000).toISOString()
+  await supabase
+    .from('sessions')
+    .update({
+      status: 'closing_soon',
+      goodbye_detected_at: new Date().toISOString(),
+      scheduled_close_at: scheduledCloseAt,
+    })
+    .eq('id', sessionId)
+
+  console.log(`${LOG_PREFIX} Session goodbye scheduled`, {
+    sessionId,
+    goodbyeDelaySeconds,
+    scheduledCloseAt,
+  })
 }
 
 /**
@@ -173,6 +253,24 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
     })
   }
 
+  // Resolve @user mentions to readable names in user messages
+  for (const msg of chatMessages) {
+    if (msg.role === 'user') {
+      msg.content = await resolveUserMentions(msg.content, botUserId, slackClient)
+    }
+  }
+
+  // Save the latest user message to session_messages
+  const lastUserMessage = chatMessages[chatMessages.length - 1]
+  if (lastUserMessage?.role === 'user') {
+    void saveSessionMessage({
+      sessionId,
+      projectId,
+      senderType: 'user',
+      content: lastUserMessage.content,
+    })
+  }
+
   // Trigger chat run
   const chatRunResult = await triggerChatRun({
     projectId,
@@ -218,6 +316,19 @@ export async function processSlackMention(params: ProcessMentionParams): Promise
   if (response) {
     // Remove the [SESSION_GOODBYE] marker if present (internal use only)
     const cleanResponse = response.replace(/\[SESSION_GOODBYE\]/g, '').trim()
+
+    // Save AI response to session_messages (before posting to Slack)
+    void saveSessionMessage({
+      sessionId,
+      projectId,
+      senderType: 'ai',
+      content: cleanResponse,
+    })
+
+    // Handle goodbye marker: schedule session close (matching widget behavior)
+    if (response.includes('[SESSION_GOODBYE]')) {
+      void scheduleSessionClose(sessionId, projectId, supabase)
+    }
 
     const postResult = await slackClient.postMessage({
       channel: channelId,
@@ -307,7 +418,10 @@ async function executeAgentSync(params: {
     // Generate response (non-streaming) — Slack is always user mode
     const result = await agent.generate(mastraMessages, {
       runtimeContext,
-      toolsets: { dataTools: buildDataToolset(null) },
+      toolsets: {
+        dataTools: buildDataToolset(null),
+        feedbackTools: buildFeedbackToolset(),
+      },
       memory: {
         thread: sessionId,
         resource: userId || 'anonymous',
@@ -647,6 +761,24 @@ export async function processSlackThreadResponse(
     })
   }
 
+  // Resolve @user mentions to readable names in user messages
+  for (const msg of chatMessages) {
+    if (msg.role === 'user') {
+      msg.content = await resolveUserMentions(msg.content, botUserId, slackClient)
+    }
+  }
+
+  // Save the latest user message to session_messages
+  const lastUserMessage = chatMessages[chatMessages.length - 1]
+  if (lastUserMessage?.role === 'user') {
+    void saveSessionMessage({
+      sessionId,
+      projectId,
+      senderType: 'user',
+      content: lastUserMessage.content,
+    })
+  }
+
   // Trigger chat run
   const chatRunResult = await triggerChatRun({
     projectId,
@@ -690,6 +822,19 @@ export async function processSlackThreadResponse(
   // Post response to Slack
   if (response) {
     const cleanResponse = response.replace(/\[SESSION_GOODBYE\]/g, '').trim()
+
+    // Save AI response to session_messages
+    void saveSessionMessage({
+      sessionId,
+      projectId,
+      senderType: 'ai',
+      content: cleanResponse,
+    })
+
+    // Handle goodbye marker: schedule session close (matching widget behavior)
+    if (response.includes('[SESSION_GOODBYE]')) {
+      void scheduleSessionClose(sessionId, projectId, supabase)
+    }
 
     const postResult = await slackClient.postMessage({
       channel: channelId,

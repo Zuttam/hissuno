@@ -1356,8 +1356,6 @@ export type Database = {
           team_name: string | null
           token_expires_at: string
           updated_at: string
-          webhook_id: string | null
-          webhook_secret: string | null
         }
         Insert: {
           access_token: string
@@ -1376,8 +1374,6 @@ export type Database = {
           team_name?: string | null
           token_expires_at: string
           updated_at?: string
-          webhook_id?: string | null
-          webhook_secret?: string | null
         }
         Update: {
           access_token?: string
@@ -1396,8 +1392,6 @@ export type Database = {
           team_name?: string | null
           token_expires_at?: string
           updated_at?: string
-          webhook_id?: string | null
-          webhook_secret?: string | null
         }
         Relationships: [
           {
@@ -2598,6 +2592,30 @@ export type Database = {
           match_count: number
           rank: number
           session_id: string
+        }[]
+      }
+      search_sessions_multi: {
+        Args: {
+          p_company_id?: string
+          p_contact_id?: string
+          p_date_from?: string
+          p_date_to?: string
+          p_is_analyzed?: boolean
+          p_is_archived?: boolean
+          p_is_human_takeover?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_project_id: string
+          p_query: string
+          p_query_like: string
+          p_session_type?: string
+          p_source?: string
+          p_status?: string
+          p_tags?: string[]
+        }
+        Returns: {
+          session_id: string
+          total_count: number
         }[]
       }
       search_similar_issues: {

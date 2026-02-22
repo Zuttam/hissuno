@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef, type JSX } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef, type JSX } from 'react'
 import { Spinner, MarkdownContent, CollapsibleSection } from '@/components/ui'
 import type { IssueStatus, IssuePriority, IssueType } from '@/types/issue'
 import { useIssueDetail } from '@/hooks/use-issues'
@@ -11,7 +11,7 @@ import { TrackerSyncBadgeInline } from './tracker-sync-badge'
 import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
 import { LinkedFeedbackTree } from './linked-feedback-tree'
-import { calculateRICEScore } from '@/lib/issues/rice'
+import { calculateRICEScore, riceScoreToPriority } from '@/lib/issues/rice'
 
 // ============================================================================
 // Constants
@@ -203,6 +203,28 @@ export function IssueSidebar({
 
   const hasSpec = Boolean(issue?.product_spec)
   const hasAnalysis = Boolean(issue?.analysis_computed_at)
+
+  // Compute RICE score inline from component scores
+  const riceScore = useMemo(() => {
+    if (!issue) return null
+    return calculateRICEScore(issue.reach_score, issue.impact_score, issue.confidence_score, issue.effort_score)
+  }, [issue?.reach_score, issue?.impact_score, issue?.confidence_score, issue?.effort_score])
+
+  // When a RICE component score is edited, also derive and persist the new priority
+  const handleScoreSave = useCallback(async (updates: Record<string, unknown>): Promise<boolean> => {
+    if (!issue) return false
+    const newReach = (updates.reach_score as number | undefined) ?? issue.reach_score
+    const newImpact = (updates.impact_score as number | undefined) ?? issue.impact_score
+    const newConfidence = (updates.confidence_score as number | undefined) ?? issue.confidence_score
+    const newEffort = (updates.effort_score as number | undefined) ?? issue.effort_score
+    const newRice = calculateRICEScore(newReach, newImpact, newConfidence, newEffort)
+    const newPriority = riceScoreToPriority(newRice)
+    if (newPriority) {
+      updates.priority = newPriority
+      updates.priority_manual_override = false
+    }
+    return updateIssue(updates)
+  }, [issue, updateIssue])
 
   return (
     <>
@@ -502,26 +524,14 @@ export function IssueSidebar({
                   {/* Analysis Scores (RICE) */}
                   <div className="flex flex-col gap-1">
                     <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                      Scores (RICE)
+                      Scores (RICE){riceScore != null && <span className="ml-1.5 font-bold text-[color:var(--accent-primary)]">{riceScore.toFixed(1)}</span>}
                     </span>
                     {issue.reach_score != null || issue.impact_score != null || issue.effort_score != null ? (
                       <div className="flex flex-col gap-1 mt-1">
-                        <EditableScoreRow icon="reach" label="Reach" score={issue.reach_score} reasoning={issue.reach_reasoning} fieldKey="reach_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
-                        <EditableScoreRow icon="impact" label="Impact" score={issue.impact_score} reasoning={issue.impact_analysis?.reasoning} fieldKey="impact_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
-                        <EditableScoreRow icon="confidence" label="Confidence" score={issue.confidence_score} reasoning={issue.confidence_reasoning} fieldKey="confidence_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
-                        <EditableScoreRow icon="effort" label="Effort" score={issue.effort_score} reasoning={issue.effort_reasoning} fieldKey="effort_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
-                        {(() => {
-                          const riceScore = calculateRICEScore(issue.reach_score, issue.impact_score, issue.confidence_score, issue.effort_score)
-                          return riceScore != null ? (
-                            <div className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
-                              <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS.rice}</span>
-                              <span className="w-16 text-[color:var(--text-secondary)]">RICE</span>
-                              <span className="font-mono font-bold text-[color:var(--accent-primary)]">
-                                {riceScore.toFixed(1)}
-                              </span>
-                            </div>
-                          ) : null
-                        })()}
+                        <EditableScoreRow icon="reach" label="Reach" score={issue.reach_score} reasoning={issue.reach_reasoning} fieldKey="reach_score" onSave={handleScoreSave} onIssueUpdated={onIssueUpdated} />
+                        <EditableScoreRow icon="impact" label="Impact" score={issue.impact_score} reasoning={issue.impact_analysis?.reasoning} fieldKey="impact_score" onSave={handleScoreSave} onIssueUpdated={onIssueUpdated} />
+                        <EditableScoreRow icon="confidence" label="Confidence" score={issue.confidence_score} reasoning={issue.confidence_reasoning} fieldKey="confidence_score" onSave={handleScoreSave} onIssueUpdated={onIssueUpdated} />
+                        <EditableScoreRow icon="effort" label="Effort" score={issue.effort_score} reasoning={issue.effort_reasoning} fieldKey="effort_score" onSave={handleScoreSave} onIssueUpdated={onIssueUpdated} />
                       </div>
                     ) : (
                       <p className="mt-1 text-sm text-[color:var(--text-secondary)]">

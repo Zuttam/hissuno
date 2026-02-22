@@ -137,6 +137,9 @@ export class ZendeskClient {
     private email: string,
     private apiToken: string
   ) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(subdomain)) {
+      throw new Error('Invalid Zendesk subdomain format.')
+    }
     this.baseUrl = `https://${subdomain}.zendesk.com/api/v2`
     this.authHeader = `Basic ${Buffer.from(`${email}/token:${apiToken}`).toString('base64')}`
   }
@@ -199,44 +202,36 @@ export class ZendeskClient {
 
   /**
    * Iterate through solved/closed tickets with optional date filtering.
-   * Uses cursor-based pagination via CBP (Cursor-Based Pagination).
+   * Uses the Zendesk Search API which returns offset-based pagination via next_page URLs.
    */
   async *listTickets(options: {
     fromDate?: Date
     toDate?: Date
     onProgress?: (fetched: number) => void
   } = {}): AsyncGenerator<ZendeskTicket, void, unknown> {
-    let cursor: string | undefined
     let fetched = 0
+    const pageSize = 100
+
+    // Build search query for solved/closed tickets with date filters
+    let query = 'type:ticket status:solved status:closed'
+    if (options.fromDate) {
+      query += ` created>${options.fromDate.toISOString().split('T')[0]}`
+    }
+    if (options.toDate) {
+      query += ` created<${options.toDate.toISOString().split('T')[0]}`
+    }
+
+    // First request via the typed client helper
+    let data = await this.request<{
+      results: ZendeskTicket[]
+      next_page: string | null
+      count: number
+    }>('GET', '/search', {
+      params: { query, per_page: pageSize, sort_by: 'created_at', sort_order: 'desc' },
+    })
+
     const maxPages = 500
-
     for (let page = 0; page < maxPages; page++) {
-      const params: Record<string, string | number | boolean | undefined> = {
-        'page[size]': 100,
-        sort_by: 'created_at',
-        sort_order: 'desc',
-      }
-
-      if (cursor) {
-        params['page[after]'] = cursor
-      }
-
-      // Build search query for solved/closed tickets with date filters
-      let query = 'type:ticket status:solved status:closed'
-      if (options.fromDate) {
-        query += ` created>${options.fromDate.toISOString().split('T')[0]}`
-      }
-      if (options.toDate) {
-        query += ` created<${options.toDate.toISOString().split('T')[0]}`
-      }
-
-      const data = await this.request<{
-        results: ZendeskTicket[]
-        meta: { has_more: boolean; after_cursor?: string }
-      }>('GET', '/search', {
-        params: { query, ...params },
-      })
-
       const tickets = data.results ?? []
 
       for (const ticket of tickets) {
@@ -245,11 +240,21 @@ export class ZendeskClient {
         options.onProgress?.(fetched)
       }
 
-      if (!data.meta?.has_more || !data.meta?.after_cursor) {
-        break
+      if (!data.next_page) break
+
+      // Fetch next page using the full next_page URL provided by Zendesk
+      const response = await fetch(data.next_page, {
+        headers: { Authorization: this.authHeader, Accept: 'application/json' },
+      })
+
+      if (response.status === 429) {
+        const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10)
+        throw new ZendeskRateLimitError(retryAfter)
       }
 
-      cursor = data.meta.after_cursor
+      if (!response.ok) break
+
+      data = await response.json()
     }
   }
 

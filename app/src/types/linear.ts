@@ -86,7 +86,6 @@ export interface LinearTokens {
 export interface LinearOAuthState {
   projectId: string
   userId: string
-  nonce: string
   redirectUrl?: string
 }
 

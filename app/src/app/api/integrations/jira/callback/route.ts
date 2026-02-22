@@ -1,5 +1,7 @@
+import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
+import { getSafeRedirectPath } from '@/lib/auth/server'
 import { hasProjectAccess } from '@/lib/auth/project-members'
 import { exchangeCodeForTokens, getAccessibleResources } from '@/lib/integrations/jira/oauth'
 import { storeJiraConnection } from '@/lib/integrations/jira'
@@ -41,10 +43,20 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Missing authorization code or state.')
     }
 
-    // Decode and validate state
+    // Verify HMAC signature and decode state
+    const [statePayload, stateSignature] = state.split('.')
+    if (!statePayload || !stateSignature) {
+      return redirectWithError('Invalid state parameter.')
+    }
+
+    const expectedSig = crypto.createHmac('sha256', clientSecret).update(statePayload).digest('base64url')
+    if (!crypto.timingSafeEqual(Buffer.from(stateSignature), Buffer.from(expectedSig))) {
+      return redirectWithError('Invalid state signature.')
+    }
+
     let stateData: JiraOAuthState
     try {
-      stateData = JSON.parse(Buffer.from(state, 'base64url').toString('utf-8'))
+      stateData = JSON.parse(Buffer.from(statePayload, 'base64url').toString('utf-8'))
     } catch {
       return redirectWithError('Invalid state parameter.')
     }
@@ -142,9 +154,10 @@ export async function GET(request: NextRequest) {
         .eq('project_id', projectId)
     }
 
-    // Redirect back to integrations page
-    const successUrl = redirectUrl || `${appUrl}/projects/${projectId}/integrations?jira=connected`
-    return NextResponse.redirect(successUrl)
+    // Redirect back to integrations page (validate redirect path to prevent open redirects)
+    const defaultPath = `/projects/${projectId}/integrations?jira=connected`
+    const safePath = getSafeRedirectPath(redirectUrl, defaultPath)
+    return NextResponse.redirect(`${appUrl}${safePath}`)
   } catch (error) {
     console.error('[integrations.jira.callback] unexpected error', error)
     return redirectWithError('An unexpected error occurred.')
