@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import type { LinearWebhookPayload, LinearConnectionRecord } from '@/types/linear'
+import type { LinearWebhookPayload } from '@/types/linear'
 import type { IssueStatus } from '@/types/issue'
 
 /**
@@ -81,109 +81,17 @@ export async function handleLinearWebhookEvent(
 }
 
 /**
- * Register a Linear webhook for issue state change notifications
- * Uses the Linear GraphQL API directly
- */
-export async function registerLinearWebhook(
-  connection: LinearConnectionRecord
-): Promise<{ webhookId: string; webhookSecret: string } | null> {
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/linear`
-  const crypto = await import('crypto')
-  const webhookSecret = crypto.randomBytes(32).toString('hex')
-
-  try {
-    const response = await fetch('https://api.linear.app/graphql', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${connection.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: `
-          mutation WebhookCreate($input: WebhookCreateInput!) {
-            webhookCreate(input: $input) {
-              success
-              webhook {
-                id
-              }
-            }
-          }
-        `,
-        variables: {
-          input: {
-            url: webhookUrl,
-            resourceTypes: ['Issue'],
-            secret: webhookSecret,
-            ...(connection.team_id ? { teamId: connection.team_id } : {}),
-          },
-        },
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      console.warn('[linear.webhook] Failed to register webhook (non-blocking):', error)
-      return null
-    }
-
-    const data = await response.json()
-    const webhookId = data.data?.webhookCreate?.webhook?.id
-
-    if (!webhookId) {
-      console.warn('[linear.webhook] No webhook ID returned:', JSON.stringify(data.errors ?? data))
-      return null
-    }
-
-    return { webhookId, webhookSecret }
-  } catch (error) {
-    console.warn('[linear.webhook] Webhook registration failed (non-blocking):', error)
-    return null
-  }
-}
-
-/**
- * Delete a Linear webhook when disconnecting
- */
-export async function deleteLinearWebhook(
-  connection: LinearConnectionRecord
-): Promise<void> {
-  if (!connection.webhook_id) return
-
-  try {
-    await fetch('https://api.linear.app/graphql', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${connection.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query: `
-          mutation WebhookDelete($id: String!) {
-            webhookDelete(id: $id) {
-              success
-            }
-          }
-        `,
-        variables: {
-          id: connection.webhook_id,
-        },
-      }),
-    })
-  } catch (error) {
-    // Best-effort cleanup
-    console.warn('[linear.webhook] Failed to delete webhook (non-blocking):', error)
-  }
-}
-
-/**
- * Verify a Linear webhook signature
- * Linear sends an HMAC-SHA256 signature in the `Linear-Signature` header
+ * Verify a Linear webhook signature.
+ * Uses the app-level LINEAR_WEBHOOK_SIGNING_SECRET env var.
+ * Linear sends an HMAC-SHA256 signature in the `Linear-Signature` header.
  */
 export function verifyLinearWebhookSignature(
   body: string,
-  signature: string,
-  secret: string
+  signature: string
 ): boolean {
+  const secret = process.env.LINEAR_WEBHOOK_SIGNING_SECRET
+  if (!secret) return false
+
   try {
     const crypto = require('crypto') as typeof import('crypto')
     const hmac = crypto.createHmac('sha256', secret)

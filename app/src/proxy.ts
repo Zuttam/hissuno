@@ -80,6 +80,7 @@ const PUBLIC_PATHS = [
   '/api/integrations/github/callback',
   '/api/integrations/slack/callback',
   '/api/integrations/intercom/callback',
+  '/api/integrations/linear/callback',
   '/api/integrations/widget',
   '/api/webhooks/lemon-squeezy',
   '/api/webhooks/slack',

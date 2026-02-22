@@ -11,6 +11,7 @@ import { TrackerSyncBadgeInline } from './tracker-sync-badge'
 import { ProductSpecView } from './product-spec-view'
 import { SpecGenerationProgress } from './spec-generation-progress'
 import { LinkedFeedbackTree } from './linked-feedback-tree'
+import { calculateRICEScore } from '@/lib/issues/rice'
 
 // ============================================================================
 // Constants
@@ -501,23 +502,26 @@ export function IssueSidebar({
                   {/* Analysis Scores (RICE) */}
                   <div className="flex flex-col gap-1">
                     <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-                      RICE Scores
+                      Scores (RICE)
                     </span>
                     {issue.reach_score != null || issue.impact_score != null || issue.effort_score != null ? (
-                      <div className="flex flex-col gap-0.5 mt-1">
+                      <div className="flex flex-col gap-1 mt-1">
                         <EditableScoreRow icon="reach" label="Reach" score={issue.reach_score} reasoning={issue.reach_reasoning} fieldKey="reach_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
                         <EditableScoreRow icon="impact" label="Impact" score={issue.impact_score} reasoning={issue.impact_analysis?.reasoning} fieldKey="impact_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
                         <EditableScoreRow icon="confidence" label="Confidence" score={issue.confidence_score} reasoning={issue.confidence_reasoning} fieldKey="confidence_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
                         <EditableScoreRow icon="effort" label="Effort" score={issue.effort_score} reasoning={issue.effort_reasoning} fieldKey="effort_score" onSave={updateIssue} onIssueUpdated={onIssueUpdated} />
-                        {issue.rice_score != null && (
-                          <div className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
-                            <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS.rice}</span>
-                            <span className="w-16 text-[color:var(--text-secondary)]">RICE</span>
-                            <span className="font-mono font-bold text-[color:var(--accent-primary)]">
-                              {Number(issue.rice_score).toFixed(1)}
-                            </span>
-                          </div>
-                        )}
+                        {(() => {
+                          const riceScore = calculateRICEScore(issue.reach_score, issue.impact_score, issue.confidence_score, issue.effort_score)
+                          return riceScore != null ? (
+                            <div className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
+                              <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS.rice}</span>
+                              <span className="w-16 text-[color:var(--text-secondary)]">RICE</span>
+                              <span className="font-mono font-bold text-[color:var(--accent-primary)]">
+                                {riceScore.toFixed(1)}
+                              </span>
+                            </div>
+                          ) : null
+                        })()}
                       </div>
                     ) : (
                       <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
@@ -710,77 +714,85 @@ function EditableScoreRow({
 
   if (isEditing) {
     return (
-      <div className="flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
-        <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS[icon]}</span>
-        <span className="w-16 text-[color:var(--text-secondary)]">{label}</span>
-        <input
-          type="number"
-          min={1}
-          max={5}
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') void handleSaveScore()
-            if (e.key === 'Escape') handleCancel()
-          }}
-          autoFocus
-          className="w-12 rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-1.5 py-0.5 font-mono text-sm text-[color:var(--foreground)] focus:border-[color:var(--accent-primary)] focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={() => void handleSaveScore()}
-          disabled={isSavingScore}
-          className="rounded-[4px] p-0.5 text-[color:var(--accent-success)] transition hover:bg-[color:var(--surface-hover)]"
-          aria-label="Save"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="rounded-[4px] p-0.5 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
-          aria-label="Cancel"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+      <div className="flex items-center gap-5 rounded-[4px] px-1 py-1 text-sm">
+        <div className='flex items-center gap-2'>
+          <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS[icon]}</span>
+          <span className="w-16 text-[color:var(--text-secondary)]">{label}</span>
+        </div>
+        <div className='flex items-center gap-2'>
+          <input
+            type="number"
+            min={1}
+            max={5}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') void handleSaveScore()
+              if (e.key === 'Escape') handleCancel()
+            }}
+            autoFocus
+            className="w-12 rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-1.5 py-0.5 font-mono text-sm text-[color:var(--foreground)] focus:border-[color:var(--accent-primary)] focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => void handleSaveScore()}
+            disabled={isSavingScore}
+            className="rounded-[4px] p-0.5 text-[color:var(--accent-success)] transition hover:bg-[color:var(--surface-hover)]"
+            aria-label="Save"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="rounded-[4px] p-0.5 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
+            aria-label="Cancel"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="group flex items-center gap-2 rounded-[4px] px-1 py-1 text-sm">
-      <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS[icon]}</span>
-      <span className="w-16 text-[color:var(--text-secondary)]">{label}</span>
-      <span className="font-mono font-medium text-[color:var(--foreground)]">
-        {score != null ? `${score}/5` : '-'}
-      </span>
-      {reasoning && (
-        <span
-          title={reasoning}
-          className="cursor-help text-[color:var(--text-tertiary)] hover:text-[color:var(--text-secondary)]"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 16v-4" />
-            <path d="M12 8h.01" />
-          </svg>
+    <div className="group flex items-center gap-5 rounded-[4px] px-1 py-1 text-sm">
+      <div className='flex items-center gap-2'>
+        <span className="text-[color:var(--text-secondary)]">{SCORE_ICONS[icon]}</span>
+        <span className="w-16 text-[color:var(--text-secondary)]">{label}</span>
+      </div>
+      <div className='flex items-center gap-2'> 
+        <span className="font-mono font-medium text-[color:var(--foreground)]">
+          {score != null ? `${score}/5` : '-'}
         </span>
-      )}
-      <button
-        type="button"
-        onClick={handleStartEdit}
-        className="rounded-[4px] p-0.5 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
-        aria-label={`Edit ${label}`}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-          <path d="m15 5 4 4" />
-        </svg>
-      </button>
+        {reasoning && (
+          <span
+            title={reasoning}
+            className="cursor-help text-[color:var(--text-tertiary)] hover:text-[color:var(--text-secondary)]"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={handleStartEdit}
+          className="rounded-[4px] p-0.5 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+          aria-label={`Edit ${label}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            <path d="m15 5 4 4" />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 }

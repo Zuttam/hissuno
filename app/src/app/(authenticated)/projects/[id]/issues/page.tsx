@@ -18,6 +18,7 @@ import { BatchProgressBar } from '@/components/ui/batch-progress-bar'
 import { AnalyticsStrip } from '@/components/analytics'
 import { generateCSV, formatDateForCSV, type CSVColumn } from '@/lib/utils/csv'
 import { downloadAsCSV, generateExportFilename } from '@/lib/utils/download'
+import { calculateRICEScore } from '@/lib/issues/rice'
 import type { IssueTrackerProvider } from '@/types/issue-tracker'
 
 const PAGE_SIZE = 25
@@ -281,7 +282,10 @@ export default function ProjectIssuesPage() {
       { key: 'impact_score', header: 'Impact' },
       { key: 'confidence_score', header: 'Confidence' },
       { key: 'effort_score', header: 'Effort' },
-      { key: 'rice_score', header: 'RICE' },
+      { key: 'reach_score', header: 'RICE', transform: (_v, row) => {
+        const score = calculateRICEScore(row.reach_score, row.impact_score, row.confidence_score, row.effort_score)
+        return score != null ? score.toFixed(1) : ''
+      } },
       { key: 'is_archived', header: 'Archived', transform: (v) => (v ? 'Yes' : 'No') },
       { key: 'product_spec', header: 'Has Spec', transform: (v) => (v ? 'Yes' : 'No') },
       { key: 'created_at', header: 'Created', transform: (v) => formatDateForCSV(v as string) },

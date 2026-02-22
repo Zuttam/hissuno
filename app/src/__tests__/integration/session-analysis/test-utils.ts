@@ -157,7 +157,6 @@ export function createMockIssue(
     effort_score: null,
     confidence_score: null,
     confidence_reasoning: null,
-    rice_score: null,
     analysis_computed_at: null,
   }
 }

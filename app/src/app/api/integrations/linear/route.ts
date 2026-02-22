@@ -3,8 +3,7 @@ import { isSupabaseConfigured } from '@/lib/supabase/server'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireUserIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError, getClientForIdentity } from '@/lib/auth/authorization'
-import { hasLinearConnection, disconnectLinear, getLinearConnection } from '@/lib/integrations/linear'
-import { deleteLinearWebhook } from '@/lib/integrations/linear/webhook'
+import { hasLinearConnection, disconnectLinear } from '@/lib/integrations/linear'
 
 export const runtime = 'nodejs'
 
@@ -59,12 +58,6 @@ export async function DELETE(request: NextRequest) {
     const identity = await requireUserIdentity()
     await assertProjectAccess(identity, projectId)
     const supabase = await getClientForIdentity(identity)
-
-    // Try to clean up the webhook before disconnecting
-    const connection = await getLinearConnection(supabase, projectId)
-    if (connection) {
-      await deleteLinearWebhook(connection)
-    }
 
     const result = await disconnectLinear(supabase, projectId)
 

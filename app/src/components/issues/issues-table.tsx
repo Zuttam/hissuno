@@ -3,6 +3,7 @@
 import { useRef, useEffect } from 'react'
 import { Badge, Checkbox } from '@/components/ui'
 import type { IssueWithProject, IssueType, IssuePriority, IssueStatus, EffortEstimate } from '@/types/issue'
+import { calculateRICEScore } from '@/lib/issues/rice'
 
 interface IssuesTableProps {
   issues: IssueWithProject[]
@@ -191,7 +192,7 @@ function IssueRow({ issue, isSelected, onSelect, onArchive, isChecked, onToggleC
         <EffortBadge effort={issue.effort_estimate} effortScore={issue.effort_score} />
       </td>
       <td className="px-3 py-2 text-center">
-        <RICEBadge score={issue.rice_score} />
+        <RICEBadge score={calculateRICEScore(issue.reach_score, issue.impact_score, issue.confidence_score, issue.effort_score)} />
       </td>
       <td className="px-3 py-2">
         <PriorityBadge priority={issue.priority} isManual={issue.priority_manual_override} />

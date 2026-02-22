@@ -4,8 +4,7 @@ import { createAdminClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { hasProjectAccess } from '@/lib/auth/project-members'
 import { exchangeCodeForTokens } from '@/lib/integrations/linear/oauth'
 import { storeLinearConnection } from '@/lib/integrations/linear'
-import { registerLinearWebhook } from '@/lib/integrations/linear/webhook'
-import type { LinearOAuthState, LinearConnectionRecord } from '@/types/linear'
+import type { LinearOAuthState } from '@/types/linear'
 
 export const runtime = 'nodejs'
 
@@ -102,41 +101,6 @@ export async function GET(request: NextRequest) {
 
     if (!storeResult.success) {
       return redirectWithError('Failed to save Linear connection.')
-    }
-
-    // Try to register webhook (non-blocking - failure is OK)
-    // We'll register the webhook once a team is configured
-    // For now, create a temporary connection object for the webhook
-    const tempConnection: LinearConnectionRecord = {
-      id: '',
-      project_id: projectId,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      token_expires_at: tokenExpiresAt,
-      organization_id: org.id,
-      organization_name: org.name,
-      team_id: null,
-      team_name: null,
-      team_key: null,
-      is_enabled: true,
-      auto_sync_enabled: true,
-      installed_by_user_id: userId,
-      installed_by_email: viewer.email ?? null,
-      webhook_id: null,
-      webhook_secret: null,
-      created_at: '',
-      updated_at: '',
-    }
-
-    const webhookResult = await registerLinearWebhook(tempConnection)
-    if (webhookResult) {
-      await adminSupabase
-        .from('linear_connections')
-        .update({
-          webhook_id: webhookResult.webhookId,
-          webhook_secret: webhookResult.webhookSecret,
-        })
-        .eq('project_id', projectId)
     }
 
     // Redirect back to integrations page

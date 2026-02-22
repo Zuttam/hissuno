@@ -66,7 +66,6 @@ export interface IssueRecord {
   effort_score: number | null
   confidence_score: number | null
   confidence_reasoning: string | null
-  rice_score: number | null
   analysis_computed_at: string | null
   // Timestamps
   created_at: string

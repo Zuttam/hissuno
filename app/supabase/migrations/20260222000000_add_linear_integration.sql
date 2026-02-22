@@ -34,10 +34,6 @@ CREATE TABLE IF NOT EXISTS public.linear_connections (
   created_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
   updated_at timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
 
-  -- Webhook configuration
-  webhook_id text,
-  webhook_secret text,
-
   -- Ensure one connection per project
   UNIQUE(project_id)
 );

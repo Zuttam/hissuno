@@ -21,8 +21,6 @@ export interface LinearConnectionRecord {
   auto_sync_enabled: boolean
   installed_by_user_id: string | null
   installed_by_email: string | null
-  webhook_id: string | null
-  webhook_secret: string | null
   created_at: string
   updated_at: string
 }

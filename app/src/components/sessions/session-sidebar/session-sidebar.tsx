@@ -2,7 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Spinner, Badge, CollapsibleSection } from '@/components/ui'
+import Image from 'next/image'
+import { MessageSquare, Code2, PenLine } from 'lucide-react'
+import { Spinner, CollapsibleSection } from '@/components/ui'
 import { LimitReachedDialog } from '@/components/billing'
 import type { SessionWithProject, ChatMessage, UpdateSessionInput, SessionStatus, SessionType, SessionSource } from '@/types/session'
 import { SESSION_TYPE_INFO, SESSION_SOURCE_INFO, getSessionUserDisplay } from '@/types/session'
@@ -11,6 +13,23 @@ import { SessionDetails } from './session-details'
 import { SessionContentView } from './session-content-view'
 import { SessionTagEditor } from '../session-tags'
 import { SessionReviewSection } from '../session-review'
+
+const SOURCE_ICON_SIZE = 14
+
+const SOURCE_ICONS: Record<SessionSource, React.ReactNode> = {
+  widget: <MessageSquare size={SOURCE_ICON_SIZE} />,
+  slack: <Image src="/logos/slack.svg" alt="Slack" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} />,
+  intercom: <Image src="/logos/intercom.svg" alt="Intercom" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} />,
+  zendesk: (
+    <>
+      <Image src="/logos/zendesk.svg" alt="Zendesk" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} className="dark:hidden" />
+      <Image src="/logos/zendesk-dark.svg" alt="Zendesk" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} className="hidden dark:block" />
+    </>
+  ),
+  gong: <Image src="/logos/gong.svg" alt="Gong" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} />,
+  api: <Code2 size={SOURCE_ICON_SIZE} />,
+  manual: <PenLine size={SOURCE_ICON_SIZE} />,
+}
 
 type DropdownId = 'status'
 
@@ -277,9 +296,9 @@ export function SessionSidebar({
                       {session.name || 'Unnamed Feedback'}
                     </h3>
                     {session.source && (
-                      <Badge variant={SESSION_SOURCE_INFO[session.source as SessionSource]?.variant ?? 'default'}>
-                        {SESSION_SOURCE_INFO[session.source as SessionSource]?.label ?? session.source}
-                      </Badge>
+                      <span className="flex shrink-0 items-center text-[color:var(--text-secondary)]" title={SESSION_SOURCE_INFO[session.source as SessionSource]?.label ?? session.source}>
+                        {SOURCE_ICONS[session.source as SessionSource]}
+                      </span>
                     )}
                     {onUpdateSession && (
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[color:var(--text-tertiary)] opacity-0 transition group-hover:opacity-100">

@@ -11,6 +11,7 @@ export const LINEAR_OAUTH_SCOPES = [
   'read',
   'write',
   'issues:create',
+  'comments:create',
 ]
 
 /**

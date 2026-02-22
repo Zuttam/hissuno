@@ -2,17 +2,27 @@
 
 import { useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Badge } from '@/components/ui'
+import Image from 'next/image'
+import { MessageSquare, Code2, PenLine } from 'lucide-react'
 import type { IssueWithSessions } from '@/types/issue'
+import type { SessionSource } from '@/types/session'
 import { AddFeedbackDialog } from './add-feedback-dialog'
 
-const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
-  widget: 'info',
-  slack: 'warning',
-  intercom: 'success',
-  gong: 'default',
-  api: 'default',
-  manual: 'default',
+const ICON_SIZE = 12
+
+const SOURCE_ICONS: Record<SessionSource, React.ReactNode> = {
+  widget: <MessageSquare size={ICON_SIZE} />,
+  slack: <Image src="/logos/slack.svg" alt="Slack" width={ICON_SIZE} height={ICON_SIZE} />,
+  intercom: <Image src="/logos/intercom.svg" alt="Intercom" width={ICON_SIZE} height={ICON_SIZE} />,
+  zendesk: (
+    <>
+      <Image src="/logos/zendesk.svg" alt="Zendesk" width={ICON_SIZE} height={ICON_SIZE} className="dark:hidden" />
+      <Image src="/logos/zendesk-dark.svg" alt="Zendesk" width={ICON_SIZE} height={ICON_SIZE} className="hidden dark:block" />
+    </>
+  ),
+  gong: <Image src="/logos/gong.svg" alt="Gong" width={ICON_SIZE} height={ICON_SIZE} />,
+  api: <Code2 size={ICON_SIZE} />,
+  manual: <PenLine size={ICON_SIZE} />,
 }
 
 function formatRelativeDate(dateString: string): string {
@@ -135,8 +145,7 @@ export function LinkedFeedbackTree({ sessions, projectId, onLinkSession, onUnlin
   }
 
   const renderSession = (session: SessionItem) => {
-    const sourceVariant = SOURCE_BADGE_VARIANTS[session.source] || 'default'
-    const sourceLabel = session.source.charAt(0).toUpperCase() + session.source.slice(1)
+    const sourceIcon = SOURCE_ICONS[session.source as SessionSource]
     return (
       <div
         key={session.id}
@@ -146,9 +155,9 @@ export function LinkedFeedbackTree({ sessions, projectId, onLinkSession, onUnlin
           href={`/projects/${projectId}/sessions?session=${session.id}`}
           className="flex min-w-0 flex-1 items-center gap-2"
         >
-          <Badge variant={sourceVariant}>
-            {sourceLabel}
-          </Badge>
+          <span className="flex shrink-0 items-center text-[color:var(--text-secondary)]">
+            {sourceIcon}
+          </span>
           <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)] hover:underline">
             {session.name || 'Unnamed Feedback'}
           </span>

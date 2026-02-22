@@ -748,7 +748,6 @@ export async function updateIssueAnalysis(
     effortScore?: number | null
     effortEstimate?: EffortEstimate | null
     effortReasoning?: string | null
-    riceScore?: number | null
     affectedFiles?: string[]
     affectedAreas?: string[]
     priority?: IssuePriority
@@ -768,7 +767,6 @@ export async function updateIssueAnalysis(
   if (data.effortScore !== undefined) updates.effort_score = data.effortScore
   if (data.effortEstimate !== undefined) updates.effort_estimate = data.effortEstimate
   if (data.effortReasoning !== undefined) updates.effort_reasoning = data.effortReasoning
-  if (data.riceScore !== undefined) updates.rice_score = data.riceScore
   if (data.affectedFiles !== undefined) updates.affected_files = data.affectedFiles
   if (data.affectedAreas !== undefined) updates.affected_areas = data.affectedAreas
   if (data.priority !== undefined) updates.priority = data.priority

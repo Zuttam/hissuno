@@ -1,5 +1,4 @@
 import { after } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
 import { handleLinearWebhookEvent, verifyLinearWebhookSignature } from '@/lib/integrations/linear/webhook'
 import type { LinearWebhookPayload } from '@/types/linear'
 
@@ -7,49 +6,34 @@ export const runtime = 'nodejs'
 
 /**
  * POST /api/webhooks/linear
- * Handles Linear webhook events for issue state changes
+ * Handles Linear webhook events for issue state changes.
+ * Signature is verified immediately using the app-level signing secret.
  */
 export async function POST(request: Request) {
   try {
     const body = await request.text()
+
+    // Verify signature immediately, before any processing
+    const signature = request.headers.get('linear-signature') || ''
+    if (!signature || !verifyLinearWebhookSignature(body, signature)) {
+      console.warn('[webhook.linear] Invalid or missing signature')
+      return new Response('Unauthorized', { status: 401 })
+    }
+
     const payload: LinearWebhookPayload = JSON.parse(body)
+
+    // Verify timestamp is within 60 seconds to guard against replay attacks
+    if (payload.webhookTimestamp) {
+      const ageMs = Date.now() - payload.webhookTimestamp
+      if (Math.abs(ageMs) > 60_000) {
+        console.warn('[webhook.linear] Webhook timestamp too old:', ageMs, 'ms')
+        return new Response('Unauthorized', { status: 401 })
+      }
+    }
 
     // Only process Issue events
     if (payload.type !== 'Issue') {
       return new Response('OK', { status: 200 })
-    }
-
-    const linearIssueId = payload.data?.id
-    if (!linearIssueId) {
-      return new Response('OK', { status: 200 })
-    }
-
-    // Find the sync record to get the connection for signature verification
-    const supabase = createAdminClient()
-    const { data: sync } = await supabase
-      .from('linear_issue_syncs')
-      .select('connection_id')
-      .eq('linear_issue_id', linearIssueId)
-      .single()
-
-    if (!sync) {
-      // Not our issue or not synced yet
-      return new Response('OK', { status: 200 })
-    }
-
-    // Verify signature if we have the secret
-    const { data: connection } = await supabase
-      .from('linear_connections')
-      .select('webhook_secret')
-      .eq('id', sync.connection_id)
-      .single()
-
-    if (connection?.webhook_secret) {
-      const signature = request.headers.get('linear-signature') || ''
-      if (signature && !verifyLinearWebhookSignature(body, signature, connection.webhook_secret)) {
-        console.warn('[webhook.linear] Invalid signature')
-        return new Response('Unauthorized', { status: 401 })
-      }
     }
 
     // Process asynchronously

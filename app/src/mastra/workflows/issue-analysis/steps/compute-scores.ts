@@ -15,7 +15,7 @@ import { updateIssueAnalysis } from '@/lib/supabase/issues'
 import { computeReach } from '@/lib/issues/reach'
 import { computeImpact } from '@/lib/issues/impact'
 import { mapEffortToScore } from '@/lib/issues/effort'
-import { calculateRICEScore, riceScoreToPriority } from '@/lib/issues/issues-service'
+import { calculateRICEScore, riceScoreToPriority } from '@/lib/issues/rice'
 import { analyzeOutputSchema, workflowOutputSchema } from '../schemas'
 import type { EffortEstimate, IssueImpactAnalysis } from '@/types/issue'
 
@@ -96,7 +96,6 @@ export const computeScores = createStep({
       confidenceScore,
       confidenceReasoning,
       effortScore,
-      riceScore,
       analysisComputedAt: new Date().toISOString(),
     }
 

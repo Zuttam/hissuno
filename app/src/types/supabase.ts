@@ -933,7 +933,6 @@ export type Database = {
           project_id: string
           reach_reasoning: string | null
           reach_score: number | null
-          rice_score: number | null
           status: string | null
           title: string
           type: string
@@ -962,7 +961,6 @@ export type Database = {
           project_id: string
           reach_reasoning?: string | null
           reach_score?: number | null
-          rice_score?: number | null
           status?: string | null
           title: string
           type: string
@@ -991,7 +989,6 @@ export type Database = {
           project_id?: string
           reach_reasoning?: string | null
           reach_score?: number | null
-          rice_score?: number | null
           status?: string | null
           title?: string
           type?: string
