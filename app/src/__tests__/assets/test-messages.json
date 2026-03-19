@@ -1,0 +1,26 @@
+[
+  {
+    "role": "user",
+    "content": "Hi, I'm having trouble with the checkout process. The payment button doesn't seem to work."
+  },
+  {
+    "role": "assistant",
+    "content": "I'm sorry to hear you're experiencing issues with checkout. Can you tell me what happens when you click the payment button? Does it show any error message?"
+  },
+  {
+    "role": "user",
+    "content": "Nothing happens at all. I click it and it just stays on the same page. I'm using Chrome on Mac."
+  },
+  {
+    "role": "assistant",
+    "content": "Thank you for those details. This sounds like it could be a JavaScript error. Could you try opening your browser's developer console (Cmd+Option+J) and see if there are any red error messages when you click the button?"
+  },
+  {
+    "role": "user",
+    "content": "Yes! It says 'Uncaught TypeError: Cannot read property submit of undefined'"
+  },
+  {
+    "role": "assistant",
+    "content": "That's very helpful! This confirms there's a bug in our checkout form. I've logged this issue and our engineering team will investigate. In the meantime, could you try using Safari or Firefox? The issue might be browser-specific."
+  }
+]

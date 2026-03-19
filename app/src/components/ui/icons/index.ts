@@ -1,0 +1,5 @@
+export { SettingsIcon } from './settings-icon'
+export { ChevronRightIcon } from './chevron-right-icon'
+export { CheckIcon } from './check-icon'
+export { WarningIcon } from './warning-icon'
+export { RefreshIcon } from './refresh-icon'

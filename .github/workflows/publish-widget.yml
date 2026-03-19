@@ -1,0 +1,56 @@
+name: Publish Widget to NPM
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/packages/widget/**'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/packages/widget
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check if version changed
+        id: version-check
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          NPM_VERSION=$(npm view @hissuno/widget version 2>/dev/null || echo "0.0.0")
+          echo "local=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "npm=$NPM_VERSION" >> $GITHUB_OUTPUT
+          if [ "$PACKAGE_VERSION" = "$NPM_VERSION" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        if: steps.version-check.outputs.changed == 'true'
+        run: npm ci
+
+      - name: Build
+        if: steps.version-check.outputs.changed == 'true'
+        run: npm run build
+
+      - name: Publish to NPM
+        if: steps.version-check.outputs.changed == 'true'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Fail if version not bumped
+        if: steps.version-check.outputs.changed == 'false'
+        run: |
+          echo "::error::Widget code changed but version (${{ steps.version-check.outputs.local }}) was not bumped. Please update package.json version."
+          exit 1

@@ -1,0 +1,266 @@
+@import "tailwindcss";
+@import "@hissuno/widget/styles.css";
+@import "@xyflow/react/dist/style.css";
+@plugin "@tailwindcss/typography";
+@custom-variant dark (&:where(.dark &));
+
+:root {
+  color-scheme: light;
+  /* Light wireframe palette - soft gray background */
+  --background: #fafafa;
+  --foreground: #1a1a1a;
+  --border: #2f2f2f;
+  --border-subtle: #d5d5d5;
+  --surface: #f0f0f0;
+  --surface-hover: #e5e5e5;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+
+  /* Accent colors */
+  --accent-primary: #2f2f2f;
+  --accent-primary-hover: #1a1a1a;
+  --accent-selected: #2563eb;
+  --accent-selected-hover: #1d4ed8;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  --accent-info: #3b82f6;
+
+  /* Marketing-only accent colors - use ONLY in (marketing) routes and landing components */
+  --accent-teal: #14b8a6;
+  --accent-teal-hover: #0d9488;
+  --accent-warm: #f59e0b;
+  --accent-coral: #fb7185;
+
+  /* Chat message colors */
+  --user-message-bg: #2f2f2f;
+
+  /* Water colors - subtle for light wireframe */
+  --water-base: #f5f5f5;
+  --water-deep: #f0f0f0;
+  --water-ripple: #ffffff;
+  --water-opacity: 0.5;
+  --water-ripple-intensity: 3.0;
+  --water-caustic: #e5e5e5;
+  --water-caustic-intensity: 1.2;
+  --water-caustic-sharpness: 0.4;
+  --water-background: #fafafa;
+
+  /* Card styling */
+  --card-bg: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(0, 0, 0, 0.1);
+  --card-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.dark {
+  color-scheme: dark;
+  /* Dark mode wireframe palette */
+  --background: #0f0f0f;
+  --foreground: #e5e5e5;
+  --border: #d0d0d0;
+  --border-subtle: #2a2a2a;
+  --surface: #1a1a1a;
+  --surface-hover: #252525;
+  --text-secondary: #999999;
+  --text-tertiary: #666666;
+  
+  /* Accent colors (slightly adjusted for dark mode) */
+  --accent-primary: #d0d0d0;
+  --accent-primary-hover: #e5e5e5;
+  --accent-selected: #3b82f6;
+  --accent-selected-hover: #60a5fa;
+  --accent-success: #34d399;
+  --accent-warning: #ffaa33;
+  --accent-danger: #ff5555;
+  --accent-info: #60a5fa;
+
+  /* Marketing-only accent colors - brighter for dark mode */
+  --accent-teal: #2dd4bf;
+  --accent-teal-hover: #5eead4;
+  --accent-warm: #fbbf24;
+  --accent-coral: #f472b6;
+
+  /* Chat message colors */
+  --user-message-bg: #3a3a3a;
+
+  /* Water colors */
+  --water-base: #08090f;
+  --water-deep: #0c0e18;
+  --water-ripple: #1a2030;
+  --water-ripple-intensity: 1.0;
+  --water-opacity: 1.0;
+  --water-caustic: #1a4060;
+  --water-caustic-intensity: 0.55;
+  --water-caustic-sharpness: 1;
+  --water-background: #0f0f0f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  background: var(--background);
+}
+
+body {
+  background: transparent;
+  color: var(--foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Water theme animations */
+@keyframes water-float {
+  0%, 100% {
+    transform: translate3d(var(--nudge-x, 0), var(--nudge-y, 0), 0) translateY(0);
+  }
+  50% {
+    transform: translate3d(var(--nudge-x, 0), var(--nudge-y, 0), 0) translateY(-3px);
+  }
+}
+
+
+@keyframes water-blob-drift {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(20px, -15px) scale(1.02);
+  }
+  50% {
+    transform: translate(-10px, 10px) scale(0.98);
+  }
+  75% {
+    transform: translate(15px, 5px) scale(1.01);
+  }
+}
+
+/* Simple expanding ripple */
+@keyframes ripple-simple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* 3D ripple rings with perspective effect */
+@keyframes ripple-ring {
+  0% {
+    transform: rotateX(60deg) scale(0);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: rotateX(60deg) scale(1);
+    opacity: 0;
+  }
+}
+
+.water-float {
+  animation: water-float 3.5s ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.3s ease;
+}
+
+.water-float:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.06);
+}
+
+.water-blob {
+  animation: water-blob-drift 20s ease-in-out infinite;
+}
+
+.animate-ripple-ring-1 {
+  animation: ripple-ring 1.8s ease-out both;
+}
+
+.animate-ripple-ring-2 {
+  animation: ripple-ring 1.8s ease-out 0.15s both;
+}
+
+.animate-ripple-ring-3 {
+  animation: ripple-ring 1.8s ease-out 0.3s both;
+}
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Auto-hide scrollbars - show only when scrolling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--text-tertiary) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+}
+
+/* Slider thumb styling */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--foreground) !important;
+  cursor: pointer;
+  border: none;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--foreground) !important;
+  cursor: pointer;
+  border: none;
+}

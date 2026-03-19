@@ -1,0 +1,37 @@
+import { ComponentPropsWithoutRef, ReactNode } from 'react'
+
+type HeadingLevel = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+
+type SectionHeaderProps = {
+  title: ReactNode
+  description?: ReactNode
+  titleAs?: HeadingLevel
+  className?: string
+  titleClassName?: string
+  descriptionClassName?: string
+} & Omit<ComponentPropsWithoutRef<'header'>, 'title'>
+
+export function SectionHeader({
+  title,
+  description,
+  titleAs: TitleTag = 'h2',
+  className,
+  titleClassName,
+  descriptionClassName,
+  ...props
+}: SectionHeaderProps) {
+  const containerClasses = className ? `flex flex-col gap-2 ${className}` : 'flex flex-col gap-2'
+  const titleClasses =
+    titleClassName ??
+    'text-xl font-mono font-bold uppercase tracking-tight text-[--foreground]'
+  const descriptionClasses =
+    descriptionClassName ?? 'text-sm text-[--text-secondary]'
+
+  return (
+    <header {...props} className={containerClasses}>
+      <TitleTag className={titleClasses}>{title}</TitleTag>
+      {description ? <p className={descriptionClasses}>{description}</p> : null}
+    </header>
+  )
+}
+

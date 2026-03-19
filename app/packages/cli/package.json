@@ -1,0 +1,54 @@
+{
+  "name": "hissuno",
+  "version": "0.2.2",
+  "description": "Hissuno CLI — set up, connect, and query your product intelligence platform",
+  "type": "module",
+  "bin": {
+    "hissuno": "./bin/hissuno.mjs"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "bin",
+    "skills",
+    "README.md"
+  ],
+  "scripts": {
+    "prebuild": "rm -rf skills && cp -r ../skills/hissuno skills",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "hissuno",
+    "cli",
+    "product-intelligence",
+    "customer-feedback",
+    "api",
+    "rest"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hissuno/hissuno.git",
+    "directory": "app/packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/hissuno/hissuno/issues"
+  },
+  "homepage": "https://github.com/hissuno/hissuno/tree/main/app/packages/cli#readme"
+}

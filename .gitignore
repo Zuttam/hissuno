@@ -1,0 +1,68 @@
+# Node modules across all projects
+**/node_modules/
+**/.pnp
+**/.pnp.*
+**/.yarn/*
+!**/.yarn/patches
+!**/.yarn/plugins
+!**/.yarn/releases
+!**/.yarn/versions
+
+# Build outputs
+**/.next/
+**/out/
+**/build/
+**/dist/
+
+# Testing
+**/coverage/
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment files
+.env*
+!.env.example
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+**/next-env.d.ts
+
+# Database dev artifacts
+.branches
+.temp
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local
+
+.vscode
+.mastra
+_bmad
+.cursor/debug.log
+
+.agents.worktrees
+
+# Local file storage (used by local storage provider)
+app/data/storage/
+
+# Business growth (private marketing content)
+.business_growth/
+
+
+.agents/
+
+skills-lock.json
+
+.claude/
