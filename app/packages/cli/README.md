@@ -302,64 +302,73 @@ hissuno --json add issues
 
 **feedback** - one or more conversation messages (role + content), name (optional), tags (optional)
 
-### `hissuno integrate [platform] [action]`
+### `hissuno integrations`
 
-Manage third-party integrations. Supported platforms: `intercom`, `gong`, `zendesk`, `slack`, `github`, `jira`, `linear`.
+Manage third-party integrations. Supported platforms: `intercom`, `gong`, `zendesk`, `slack`, `github`, `jira`, `linear`, `fathom`, `hubspot`, `notion`.
 
 ```bash
 # List all integrations with their connection status
-hissuno integrate
+hissuno integrations list
 
 # Interactive wizard for a specific platform
-hissuno integrate intercom
+hissuno integrations intercom
 
 # Check detailed status
-hissuno integrate gong status
+hissuno integrations status gong
 
 # Connect a platform
-hissuno integrate slack connect
+hissuno integrations add slack
 
 # Connect Gong with inline credentials (non-interactive)
-hissuno integrate gong connect \
+hissuno integrations add gong \
   --access-key YOUR_KEY \
   --access-key-secret YOUR_SECRET \
   --sync-frequency 24h
 
 # Connect Zendesk
-hissuno integrate zendesk connect \
+hissuno integrations add zendesk \
   --subdomain mycompany \
   --email admin@mycompany.com \
   --api-token YOUR_TOKEN
 
 # Connect Intercom with an API token
-hissuno integrate intercom connect --access-token YOUR_TOKEN
+hissuno integrations add intercom --access-token YOUR_TOKEN
+
+# Connect Fathom with an API key
+hissuno integrations add fathom --api-key YOUR_KEY --sync-frequency 24h
+
+# Connect HubSpot with a private app token
+hissuno integrations add hubspot --access-token YOUR_TOKEN --overwrite-policy fill_nulls
+
+# Connect Notion with an internal integration token
+hissuno integrations add notion --access-token YOUR_TOKEN
 
 # Update sync settings
-hissuno integrate intercom configure
+hissuno integrations configure intercom
 
 # Trigger a manual sync
-hissuno integrate gong sync
-hissuno integrate zendesk sync --mode full
+hissuno integrations sync gong
+hissuno integrations sync zendesk --mode full
 
 # Disconnect an integration
-hissuno integrate github disconnect
+hissuno integrations disconnect github
 
 # JSON output
-hissuno --json integrate
+hissuno --json integrations list
 ```
 
-#### Actions
+#### Subcommands
 
-| Action | Description |
-|--------|-------------|
-| _(none)_ | Interactive wizard - shows status and prompts for next steps |
-| `status` | Show detailed connection status |
-| `connect` | Connect the platform (OAuth or token-based) |
-| `configure` | Update settings (sync frequency, auto-sync toggle) |
-| `sync` | Trigger a manual sync (Intercom, Gong, Zendesk only) |
-| `disconnect` | Disconnect the integration |
+| Subcommand | Args | Description |
+|------------|------|-------------|
+| `list` | | List all integrations with connection status |
+| `add` | `<platform>` | Connect a platform (OAuth or token-based) |
+| `status` | `<platform>` | Show detailed connection status |
+| `configure` | `<platform>` | Update settings (sync frequency, auto-sync toggle) |
+| `sync` | `<platform>` | Trigger a manual sync (Intercom, Gong, Zendesk, Fathom, HubSpot) |
+| `disconnect` | `<platform>` | Disconnect the integration |
 
-#### Connection options
+#### Connection options (for `add`)
 
 | Option | Platform | Description |
 |--------|----------|-------------|
@@ -369,11 +378,13 @@ hissuno --json integrate
 | `--subdomain <subdomain>` | Zendesk | Zendesk subdomain |
 | `--email <email>` | Zendesk | Admin email |
 | `--api-token <token>` | Zendesk | API token |
-| `--access-token <token>` | Intercom | Access token |
-| `--sync-frequency <freq>` | Gong, Zendesk, Intercom | Sync frequency: `manual`, `1h`, `6h`, `24h` |
-| `--mode <mode>` | sync action | Sync mode: `incremental` (default), `full` |
+| `--access-token <token>` | Intercom, HubSpot, Notion | Access token |
+| `--api-key <key>` | Fathom | API key |
+| `--overwrite-policy <policy>` | HubSpot | `fill_nulls`, `hubspot_wins`, `never_overwrite` |
+| `--sync-frequency <freq>` | Gong, Zendesk, Intercom, Fathom, HubSpot | Sync frequency: `manual`, `1h`, `6h`, `24h` |
+| `--mode <mode>` | `sync` subcommand | Sync mode: `incremental` (default), `full` |
 
-OAuth-based platforms (Slack, GitHub, Jira, Linear) open your browser to complete authorization.
+OAuth-based platforms (Slack, GitHub, Jira, Linear) open your browser to complete authorization. HubSpot, Intercom, and Notion support both OAuth and token-based authentication.
 
 ### `hissuno types`
 

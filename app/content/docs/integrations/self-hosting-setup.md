@@ -7,7 +7,7 @@ description: "How to configure OAuth integrations for your self-hosted Hissuno i
 
 Hissuno integrations that use OAuth require you to create your own app/credentials with each provider. This guide walks through creating the required OAuth apps for each integration.
 
-**API-key integrations** (Gong, Zendesk, PostHog) work without any server-side configuration - just enter your API key in the Hissuno UI.
+**API-key integrations** (Gong, Zendesk, Fathom, PostHog) work without any server-side configuration - just enter your API key in the Hissuno UI.
 
 **Widget** works out of the box with no external app or credentials needed.
 
@@ -175,4 +175,49 @@ JIRA_CLIENT_SECRET=your-jira-client-secret
 LINEAR_CLIENT_ID=your-linear-client-id
 LINEAR_CLIENT_SECRET=your-linear-client-secret
 LINEAR_WEBHOOK_SIGNING_SECRET=your-linear-webhook-secret  # optional
+```
+
+---
+
+## HubSpot
+
+HubSpot supports both OAuth and Private App Token connections. Private App Tokens require no environment variables.
+
+### Creating a HubSpot OAuth App
+
+1. Go to your [HubSpot developer account](https://developers.hubspot.com) and create an app
+2. Set the **Redirect URL** to:
+   ```
+   {NEXT_PUBLIC_APP_URL}/api/integrations/hubspot/callback
+   ```
+3. Under **Scopes**, add: `crm.objects.contacts.read`, `crm.objects.companies.read`
+4. Note the **Client ID** and **Client Secret** from the Auth tab
+
+### Environment Variables (OAuth only)
+
+```bash
+HUBSPOT_CLIENT_ID=your-hubspot-client-id
+HUBSPOT_CLIENT_SECRET=your-hubspot-client-secret
+```
+
+---
+
+## Notion
+
+Notion supports both OAuth and Internal Integration Token connections. Tokens require no environment variables.
+
+### Creating a Notion Public Integration (OAuth)
+
+1. Go to [notion.so/profile/integrations](https://www.notion.so/profile/integrations) and create a **Public integration**
+2. Set the **Redirect URI** to:
+   ```
+   {NEXT_PUBLIC_APP_URL}/api/integrations/notion/callback
+   ```
+3. Note the **OAuth client ID** and **OAuth client secret**
+
+### Environment Variables (OAuth only)
+
+```bash
+NOTION_CLIENT_ID=your-notion-client-id
+NOTION_CLIENT_SECRET=your-notion-client-secret
 ```

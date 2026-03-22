@@ -10,6 +10,7 @@ import { db } from '@/lib/db'
 import { companies } from '@/lib/db/schema/app'
 import { resolveRequestContext, getUserProjectIds, sanitizeSearchInput } from '@/lib/db/server'
 import { hasProjectAccess } from '@/lib/auth/project-members'
+import { fireGraphEval } from '@/lib/graph-eval'
 import { ForbiddenError } from '@/lib/auth/authorization'
 import type {
   CompanyRecord,
@@ -70,16 +71,7 @@ export async function insertCompany(
     throw new Error('Failed to insert company: Unknown error')
   }
 
-  // Fire-and-forget: trigger graph evaluation for the new company
-  void (async () => {
-    try {
-      const { triggerGraphEvaluation } = await import('@/mastra/workflows/graph-evaluation')
-      const { mastra } = await import('@/mastra')
-      void triggerGraphEvaluation(mastra, { projectId: data.projectId, entityType: 'company', entityId: company.id })
-    } catch {
-      // Non-blocking
-    }
-  })()
+  fireGraphEval(data.projectId, 'company', company.id)
 
   return company as unknown as CompanyRecord
 }
@@ -113,6 +105,8 @@ export async function updateCompanyById(
   if (!company) {
     throw new Error(`Failed to update company: Not found`)
   }
+
+  fireGraphEval(company.project_id, 'company', company.id)
 
   return company as unknown as CompanyRecord
 }

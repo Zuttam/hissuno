@@ -78,9 +78,9 @@ export const log = {
 
   _integrationHint() {
     console.log(`  ${BOLD}Connect your data sources:${RESET}`)
-    console.log(`    ${CYAN}hissuno integrate${RESET}          ${DIM}# see all integrations${RESET}`)
-    console.log(`    ${CYAN}hissuno integrate slack${RESET}    ${DIM}# connect Slack${RESET}`)
-    console.log(`    ${CYAN}hissuno integrate intercom${RESET} ${DIM}# connect Intercom${RESET}`)
+    console.log(`    ${CYAN}hissuno integrations list${RESET}      ${DIM}# see all integrations${RESET}`)
+    console.log(`    ${CYAN}hissuno integrations add slack${RESET} ${DIM}# connect Slack${RESET}`)
+    console.log(`    ${CYAN}hissuno integrations add intercom${RESET} ${DIM}# connect Intercom${RESET}`)
     console.log()
   },
 }

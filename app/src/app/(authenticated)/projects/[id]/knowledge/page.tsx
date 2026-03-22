@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useProject } from '@/components/providers/project-provider'
 import { useProductScopes } from '@/hooks/use-product-scopes'
 import { useKnowledgeSources } from '@/hooks/use-knowledge-sources'
 import { useSourceAnalysis } from '@/hooks/use-source-analysis'
-import { KnowledgeSourceGroupedList } from '@/components/projects/knowledge/knowledge-source-grouped-list'
+import { KnowledgeSourceGroupedList, SOURCE_TYPE_CONFIG, ALL_TYPES } from '@/components/projects/knowledge/knowledge-source-grouped-list'
 import { KnowledgeSourceSidebar } from '@/components/projects/knowledge/knowledge-source-sidebar'
 import { fetchGithubStatus } from '@/lib/api/integrations'
 import { PageHeader, Spinner, FilterChip, FilterLabel, Input } from '@/components/ui'
@@ -21,6 +21,8 @@ export default function KnowledgePage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [addingType, setAddingType] = useState<KnowledgeSourceType | null>(null)
+  const [addDropdownOpen, setAddDropdownOpen] = useState(false)
+  const addDropdownRef = useRef<HTMLDivElement | null>(null)
   const [githubConnected, setGithubConnected] = useState(false)
 
   const { sources, isLoading, updateSource, deleteSource, addSource, refresh } = useKnowledgeSources({
@@ -37,6 +39,25 @@ export default function KnowledgePage() {
     projectId: projectId ?? '',
     onComplete: () => void refresh(),
   })
+
+  // Close add dropdown on outside click / escape
+  useEffect(() => {
+    if (!addDropdownOpen) return
+    function handlePointerDown(event: PointerEvent) {
+      if (!addDropdownRef.current?.contains(event.target as Node)) {
+        setAddDropdownOpen(false)
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setAddDropdownOpen(false)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [addDropdownOpen])
 
   // Check GitHub status on mount
   useEffect(() => {
@@ -144,7 +165,42 @@ export default function KnowledgePage() {
 
   return (
     <>
-      <PageHeader title="Knowledge" />
+      <PageHeader
+        title="Knowledge"
+        actions={
+          <div className="relative" ref={addDropdownRef}>
+            <button
+              type="button"
+              onClick={() => setAddDropdownOpen(prev => !prev)}
+              className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
+            >
+              <Plus size={14} />
+              Add Knowledge
+            </button>
+            {addDropdownOpen && (
+              <div className="absolute right-0 z-50 mt-1 min-w-[180px] rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] p-1 shadow-lg">
+                {ALL_TYPES.map(type => {
+                  const config = SOURCE_TYPE_CONFIG[type]
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => {
+                        setAddDropdownOpen(false)
+                        handleAdd(type)
+                      }}
+                      className="flex w-full items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-xs text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-hover)]"
+                    >
+                      <span className="flex items-center shrink-0">{config.icon}</span>
+                      {config.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        }
+      />
 
       <div className="flex flex-1 flex-col gap-4">
         {/* Filters */}
@@ -200,14 +256,13 @@ export default function KnowledgePage() {
                 setAddingType(null)
                 setSelectedSourceId(id)
               }}
-              onAdd={handleAdd}
               productScopes={productScopes}
               githubConnected={githubConnected}
             />
 
             {sources.length === 0 && (
               <p className="text-sm text-[color:var(--text-tertiary)] py-4 text-center">
-                No sources configured yet. Click the + button on any section above to add a knowledge source.
+                No sources configured yet. Click &quot;Add Knowledge&quot; above to get started.
               </p>
             )}
           </>
@@ -235,7 +290,6 @@ export default function KnowledgePage() {
           projectId={projectId}
           onClose={() => setAddingType(null)}
           onAdd={handleAddSource}
-          productScopes={productScopes}
         />
       )}
     </>

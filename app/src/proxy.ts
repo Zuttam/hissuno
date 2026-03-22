@@ -86,7 +86,7 @@ const PUBLIC_PATHS = [
   '/api/integrations/linear/callback',
   '/api/integrations/hubspot/callback',
   '/api/integrations/notion/callback',
-  '/api/integrations/widget',
+  '/api/integrations/widget/chat',
   '/api/webhooks/slack',
   '/api/webhooks/jira',
   '/api/webhooks/linear',

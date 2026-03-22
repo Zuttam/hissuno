@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import { Check, Unplug, Shield, KeyRound, Plug, Zap } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import {
   fetchIntercomStatus,
@@ -94,11 +95,8 @@ export function IntercomConfigDialog({
   const [toDate, setToDate] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
 
-  // Test connection state
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
-
-  // Connected state
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -345,12 +343,12 @@ export function IntercomConfigDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Intercom Integration" size="xxl">
+    <Dialog open={open} onClose={onClose} title="Intercom Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
         {successMessage && (
-          <Alert variant="success">
+          <InlineAlert variant="success">
             {successMessage}
             {showSessionsLink && (
               <>
@@ -364,7 +362,7 @@ export function IntercomConfigDialog({
                 </Link>
               </>
             )}
-          </Alert>
+          </InlineAlert>
         )}
 
         {isLoading ? (
@@ -374,9 +372,7 @@ export function IntercomConfigDialog({
         ) : status.connected ? (
           // Connected state
           <div className="space-y-6">
-            <Alert variant="success">
-              &#10003; Connected to workspace: <strong>{status.workspaceName || 'Unknown'}</strong>
-            </Alert>
+            <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to {status.workspaceName || 'Unknown'}</p>
 
             {/* Sync Stats */}
             <div className="space-y-2">
@@ -559,44 +555,47 @@ export function IntercomConfigDialog({
             </div>
 
             {/* Danger Zone */}
-            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">Danger Zone</h4>
-              <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
-                Disconnect
-              </Button>
-              <p className="text-xs text-[color:var(--text-tertiary)]">
+            <div className="border-t border-[color:var(--accent-danger)] pt-4">
+              <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
+              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                 This will remove the Intercom connection. Previously synced sessions will remain.
               </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="mt-3"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                loading={isDisconnecting}
+              >
+                <Unplug size={14} />
+                Disconnect
+              </Button>
             </div>
           </div>
         ) : (
           // Not connected state
           <div className="space-y-6">
-            <Alert variant="info">
+            <InlineAlert variant="info">
               Connect your Intercom workspace to sync conversations into Hissuno.
-            </Alert>
+            </InlineAlert>
 
             {/* Connection Method Toggle */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[color:var(--foreground)]">
-                Connection Method
-              </label>
-              <ToggleGroup
-                value={connectionMethod}
-                onChange={setConnectionMethod}
-                options={[
-                  { value: 'oauth' as const, label: 'OAuth' },
-                  { value: 'token' as const, label: 'Access Token' },
-                ]}
-              />
-            </div>
+            <ToggleGroup
+              value={connectionMethod}
+              onChange={setConnectionMethod}
+              options={[
+                { value: 'oauth' as const, label: 'OAuth', icon: <Shield size={14} /> },
+                { value: 'token' as const, label: 'Access Token', icon: <KeyRound size={14} /> },
+              ]}
+            />
 
             {connectionMethod === 'oauth' ? (
               <div className="space-y-4">
                 {oauthAvailable === false ? (
-                  <Alert variant="warning">
+                  <InlineAlert variant="attention">
                     OAuth is not configured on this instance. {oauthUnavailableReason} Use the Access Token method instead.
-                  </Alert>
+                  </InlineAlert>
                 ) : (
                   <>
                     <p className="text-sm text-[color:var(--text-secondary)]">
@@ -604,10 +603,12 @@ export function IntercomConfigDialog({
                     </p>
                     <Button
                       variant="primary"
+                      size="sm"
                       onClick={() => {
                         window.location.href = intercomOAuthConnectUrl(projectId)
                       }}
                     >
+                      <Plug size={14} />
                       Connect with Intercom
                     </Button>
                   </>
@@ -633,26 +634,16 @@ export function IntercomConfigDialog({
                   <label className="text-sm font-medium text-[color:var(--foreground)]">
                     Access Token
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={accessToken}
-                      onChange={(e) => {
-                        setAccessToken(e.target.value)
-                        setTestResult(null)
-                      }}
-                      placeholder="Enter your Intercom access token"
-                      className="flex-1 rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                    <Button
-                      variant="secondary"
-                      onClick={handleTestConnection}
-                      loading={isTesting}
-                      disabled={isTesting}
-                    >
-                      Test
-                    </Button>
-                  </div>
+                  <input
+                    type="password"
+                    value={accessToken}
+                    onChange={(e) => {
+                      setAccessToken(e.target.value)
+                      setTestResult(null)
+                    }}
+                    placeholder="Enter your Intercom access token"
+                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                  />
                   {testResult && (
                     <p
                       className={`text-xs ${
@@ -669,68 +660,27 @@ export function IntercomConfigDialog({
                   </p>
                 </div>
 
-                {/* Sync Frequency */}
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    Sync Frequency
-                  </label>
-                  <select
-                    value={syncFrequency}
-                    onChange={(e) => setSyncFrequency(e.target.value as SyncFrequency)}
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    loading={isTesting}
+                    disabled={isTesting}
                   >
-                    {FREQUENCY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                    <Zap size={14} />
+                    Test
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={handleConnect} loading={isConnecting}>
+                    <Plug size={14} />
+                    Connect Intercom
+                  </Button>
                 </div>
-
-                {/* Date Range (optional) */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    Date Range (optional)
-                  </label>
-                  <p className="text-xs text-[color:var(--text-tertiary)]">
-                    Only sync conversations within this date range. Leave empty to sync all.
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs text-[color:var(--text-secondary)]">From</label>
-                      <input
-                        type="date"
-                        value={fromDate}
-                        onChange={(e) => setFromDate(e.target.value)}
-                        className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-[color:var(--text-secondary)]">To</label>
-                      <input
-                        type="date"
-                        value={toDate}
-                        onChange={(e) => setToDate(e.target.value)}
-                        className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <Button variant="primary" onClick={handleConnect} loading={isConnecting}>
-                  Connect Intercom
-                </Button>
               </div>
             )}
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
       </div>
     </Dialog>
   )

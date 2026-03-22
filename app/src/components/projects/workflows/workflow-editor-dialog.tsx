@@ -10,6 +10,7 @@ export interface WorkflowStepConfig {
   guidelineKey?: string
   placeholder?: string
   rows?: number
+  toggleKey?: string
 }
 
 interface WorkflowEditorDialogProps {
@@ -19,7 +20,7 @@ interface WorkflowEditorDialogProps {
   subtitle: string
   projectId: string
   steps: WorkflowStepConfig[]
-  initialValues: Record<string, string>
+  initialValues: Record<string, string | boolean>
   onSaved: () => void
   saveFn: (projectId: string, values: Record<string, unknown>) => Promise<unknown>
 }
@@ -35,7 +36,7 @@ export function WorkflowEditorDialog({
   onSaved,
   saveFn,
 }: WorkflowEditorDialogProps) {
-  const [values, setValues] = useState<Record<string, string>>(initialValues)
+  const [values, setValues] = useState<Record<string, string | boolean>>(initialValues)
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -81,6 +82,8 @@ export function WorkflowEditorDialog({
             const isConfigurable = !!step.guidelineKey
             const isExpanded = expandedStepId === step.id
             const isLast = index === steps.length - 1
+            const hasToggle = !!step.toggleKey
+            const isToggleEnabled = hasToggle ? values[step.toggleKey!] !== false : true
 
             return (
               <div key={step.id} className="flex gap-3">
@@ -88,9 +91,11 @@ export function WorkflowEditorDialog({
                 <div className="flex flex-col items-center">
                   <div
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
-                      isConfigurable
-                        ? 'border-[color:var(--accent-selected)] text-[color:var(--accent-selected)]'
-                        : 'border-[color:var(--border-subtle)] text-[color:var(--text-tertiary)]'
+                      !isToggleEnabled
+                        ? 'border-[color:var(--border-subtle)] text-[color:var(--text-tertiary)]'
+                        : isConfigurable
+                          ? 'border-[color:var(--accent-selected)] text-[color:var(--accent-selected)]'
+                          : 'border-[color:var(--border-subtle)] text-[color:var(--text-tertiary)]'
                     }`}
                   >
                     {index + 1}
@@ -103,53 +108,101 @@ export function WorkflowEditorDialog({
                 {/* Right: step content */}
                 <div className={`flex-1 ${isLast ? '' : 'pb-3'}`}>
                   {/* Step header */}
-                  {isConfigurable ? (
-                    <button
-                      type="button"
-                      onClick={() => handleToggleStep(step.id)}
-                      className="group flex w-full items-center gap-2 text-left"
-                    >
+                  {isConfigurable && isToggleEnabled ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStep(step.id)}
+                        className="group flex flex-1 items-center gap-2 text-left"
+                      >
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-[color:var(--foreground)]">
+                            {step.name}
+                          </span>
+                          <p className="text-xs text-[color:var(--text-tertiary)] mt-0.5">
+                            {step.description}
+                          </p>
+                        </div>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className={`shrink-0 text-[color:var(--text-tertiary)] transition-transform group-hover:text-[color:var(--foreground)] ${
+                            isExpanded ? 'rotate-90' : ''
+                          }`}
+                        >
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </button>
+                      {hasToggle && (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isToggleEnabled}
+                          onClick={() =>
+                            setValues((prev) => ({
+                              ...prev,
+                              [step.toggleKey!]: !prev[step.toggleKey!],
+                            }))
+                          }
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-primary)] focus:ring-offset-2 ${
+                            isToggleEnabled ? 'bg-[color:var(--accent-primary)]' : 'bg-[color:var(--surface-hover)]'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              isToggleEnabled ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
                       <div className="flex-1">
-                        <span className="text-sm font-medium text-[color:var(--foreground)]">
+                        <span className={`text-sm ${isToggleEnabled ? 'text-[color:var(--text-tertiary)]' : 'text-[color:var(--text-tertiary)] opacity-60'}`}>
                           {step.name}
                         </span>
-                        <p className="text-xs text-[color:var(--text-tertiary)] mt-0.5">
-                          {step.description}
+                        <p className={`text-xs mt-0.5 ${isToggleEnabled ? 'text-[color:var(--text-tertiary)]' : 'text-[color:var(--text-tertiary)] opacity-60'}`}>
+                          {isToggleEnabled ? step.description : 'Disabled'}
                         </p>
                       </div>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className={`shrink-0 text-[color:var(--text-tertiary)] transition-transform group-hover:text-[color:var(--foreground)] ${
-                          isExpanded ? 'rotate-90' : ''
-                        }`}
-                      >
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </button>
-                  ) : (
-                    <div>
-                      <span className="text-sm text-[color:var(--text-tertiary)]">
-                        {step.name}
-                      </span>
-                      <p className="text-xs text-[color:var(--text-tertiary)] mt-0.5">
-                        {step.description}
-                      </p>
+                      {hasToggle && (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isToggleEnabled}
+                          onClick={() =>
+                            setValues((prev) => ({
+                              ...prev,
+                              [step.toggleKey!]: !prev[step.toggleKey!],
+                            }))
+                          }
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-primary)] focus:ring-offset-2 ${
+                            isToggleEnabled ? 'bg-[color:var(--accent-primary)]' : 'bg-[color:var(--surface-hover)]'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                              isToggleEnabled ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      )}
                     </div>
                   )}
 
                   {/* Expanded textarea */}
-                  {isConfigurable && isExpanded && step.guidelineKey && (
+                  {isConfigurable && isExpanded && isToggleEnabled && step.guidelineKey && (
                     <div className="mt-3 rounded-[4px]">
                       <textarea
-                        value={values[step.guidelineKey] ?? ''}
+                        value={(values[step.guidelineKey] as string) ?? ''}
                         onChange={(e) =>
                           setValues((prev) => ({
                             ...prev,

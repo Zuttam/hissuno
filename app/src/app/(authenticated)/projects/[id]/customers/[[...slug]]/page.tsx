@@ -13,6 +13,7 @@ import { ContactsTable } from '@/components/customers/contacts-table'
 import { CompanySidebar } from '@/components/customers/company-sidebar'
 import { ContactSidebar } from '@/components/customers/contact-sidebar'
 import { AddDataDialog } from '@/components/customers/add-data-dialog'
+import { Plus } from 'lucide-react'
 import { Button, PageHeader, Pagination, Spinner, Tabs, TabsList, Tab, TabsPanel } from '@/components/ui'
 import { Card } from '@/components/ui/card'
 import { AnalyticsStrip } from '@/components/analytics'
@@ -224,9 +225,14 @@ export default function ProjectCustomersPage() {
         title="Customers"
         onRefresh={handleRefresh}
         actions={
-          <Button variant="primary" size="md" onClick={() => setShowAddDataDialog(true)}>
+          <button
+            type="button"
+            onClick={() => setShowAddDataDialog(true)}
+            className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
+          >
+            <Plus size={14} />
             Add Customers
-          </Button>
+          </button>
         }
       />
 

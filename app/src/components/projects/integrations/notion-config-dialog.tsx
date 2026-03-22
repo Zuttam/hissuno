@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import Link from 'next/link'
+import { Check, Unplug, Shield, KeyRound, Plug } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import {
   fetchNotionStatus,
@@ -125,63 +127,85 @@ export function NotionConfigDialog({
   const authMethodLabel = status.authMethod === 'token' ? 'Integration Token' : 'OAuth'
 
   return (
-    <Dialog open={open} onClose={onClose} title="Notion Integration" size="md">
+    <Dialog open={open} onClose={onClose} title="Notion Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Spinner size="md" />
           </div>
         ) : status.connected ? (
-          <div className="space-y-6">
-            <Alert variant="success">
-              Connected to workspace: <strong>{status.workspaceName || 'Unknown'}</strong>
-              <span className="text-xs ml-2 opacity-75">via {authMethodLabel}</span>
-            </Alert>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to {status.workspaceName || 'Unknown'} <span className="text-xs opacity-75">via {authMethodLabel}</span></p>
+              {status.authMethod === 'token' && (
+                <InlineAlert variant="attention">
+                  Internal integrations can only access pages explicitly shared with them.{' '}
+                  <a
+                    href="https://www.notion.so/help/add-and-manage-connections-with-the-api#add-connections-to-pages"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-[color:var(--foreground)]"
+                  >
+                    Learn more
+                  </a>
+                </InlineAlert>
+              )}
+            </div>
 
             <p className="text-sm text-[color:var(--text-secondary)]">
-              You can now import Notion pages as knowledge sources from the Configuration page.
+              You can now import Notion pages as knowledge sources from the{' '}
+              <Link
+                href={`/projects/${projectId}/knowledge#sources`}
+                className="underline hover:text-[color:var(--foreground)]"
+                onClick={onClose}
+              >
+                Knowledge page
+              </Link>.
             </p>
 
             {/* Danger Zone */}
-            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">Danger Zone</h4>
-              <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
-                Disconnect
-              </Button>
-              <p className="text-xs text-[color:var(--text-tertiary)]">
+            <div className="border-t border-[color:var(--accent-danger)] pt-4">
+              <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
+              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                 This will remove the Notion connection. Previously imported pages will remain as knowledge sources.
               </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="mt-3"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                loading={isDisconnecting}
+              >
+                <Unplug size={14} />
+                Disconnect
+              </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
-            <Alert variant="info">
+            <InlineAlert variant="info">
               Connect your Notion workspace to import pages as knowledge sources.
-            </Alert>
+            </InlineAlert>
 
             {/* Connection Method Toggle */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[color:var(--foreground)]">
-                Connection Method
-              </label>
-              <ToggleGroup
-                value={connectionMethod}
-                onChange={setConnectionMethod}
-                options={[
-                  { value: 'oauth' as const, label: 'OAuth' },
-                  { value: 'token' as const, label: 'Integration Token' },
-                ]}
-              />
-            </div>
+            <ToggleGroup
+              value={connectionMethod}
+              onChange={setConnectionMethod}
+              options={[
+                { value: 'oauth' as const, label: 'OAuth', icon: <Shield size={14} /> },
+                { value: 'token' as const, label: 'Integration Token', icon: <KeyRound size={14} /> },
+              ]}
+            />
 
             {connectionMethod === 'oauth' ? (
               <div className="space-y-4">
                 {oauthAvailable === false ? (
-                  <Alert variant="warning">
+                  <InlineAlert variant="attention">
                     OAuth is not configured on this instance. {oauthUnavailableReason} Use the Integration Token method instead.
-                  </Alert>
+                  </InlineAlert>
                 ) : (
                   <>
                     <p className="text-sm text-[color:var(--text-secondary)]">
@@ -189,10 +213,12 @@ export function NotionConfigDialog({
                     </p>
                     <Button
                       variant="primary"
+                      size="sm"
                       onClick={() => {
                         window.location.href = notionConnectUrl(projectId)
                       }}
                     >
+                      <Plug size={14} />
                       Connect with Notion
                     </Button>
                   </>
@@ -233,7 +259,8 @@ export function NotionConfigDialog({
                   </p>
                 </div>
 
-                <Button variant="primary" onClick={handleConnectToken} loading={isConnecting}>
+                <Button variant="primary" size="sm" onClick={handleConnectToken} loading={isConnecting}>
+                  <Plug size={14} />
                   Connect
                 </Button>
               </div>
@@ -241,12 +268,6 @@ export function NotionConfigDialog({
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
       </div>
     </Dialog>
   )

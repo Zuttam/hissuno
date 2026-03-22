@@ -16,14 +16,6 @@ export interface WidgetSettings {
 }
 
 /**
- * Issue tracking settings subset of ProjectSettingsRecord
- */
-export interface IssueSettings {
-  issue_tracking_enabled: boolean
-  pm_dedup_include_closed: boolean
-}
-
-/**
  * Support agent settings subset of ProjectSettingsRecord
  */
 export interface SupportAgentSettings {
@@ -39,11 +31,6 @@ export interface SupportAgentSettings {
  * Input for updating widget settings
  */
 export type WidgetSettingsInput = Partial<WidgetSettings>
-
-/**
- * Input for updating issue settings
- */
-export type IssueSettingsInput = Partial<IssueSettings>
 
 /**
  * Input for updating support agent settings
@@ -66,20 +53,14 @@ export const DEFAULT_WIDGET_SETTINGS: WidgetSettings = {
 }
 
 /**
- * Default issue settings
- */
-export const DEFAULT_ISSUE_SETTINGS: IssueSettings = {
-  issue_tracking_enabled: true,
-  pm_dedup_include_closed: false,
-}
-
-/**
  * PM agent settings subset of ProjectSettingsRecord
  */
 export interface PmAgentSettings {
   classification_guidelines: string | null
   brief_guidelines: string | null
   analysis_guidelines: string | null
+  issue_tracking_enabled: boolean
+  pm_dedup_include_closed: boolean
 }
 
 /**
@@ -106,6 +87,8 @@ export const DEFAULT_PM_AGENT_SETTINGS: PmAgentSettings = {
   classification_guidelines: null,
   brief_guidelines: null,
   analysis_guidelines: null,
+  issue_tracking_enabled: true,
+  pm_dedup_include_closed: false,
 }
 
 /**

@@ -11,18 +11,17 @@ interface KnowledgeSourceGroupedListProps {
   sources: KnowledgeSourceWithCodebase[]
   selectedSourceId: string | null
   onSelect: (sourceId: string) => void
-  onAdd: (type: KnowledgeSourceType) => void
   productScopes?: ProductScopeRecord[]
   githubConnected?: boolean
 }
 
-interface SourceTypeConfig {
+export interface SourceTypeConfig {
   icon: React.ReactNode
   label: string
   order: number
 }
 
-const SOURCE_TYPE_CONFIG: Record<KnowledgeSourceType, SourceTypeConfig> = {
+export const SOURCE_TYPE_CONFIG: Record<KnowledgeSourceType, SourceTypeConfig> = {
   codebase: {
     icon: <Image src="/logos/github.svg" alt="GitHub" width={16} height={16} />,
     label: 'Codebase',
@@ -59,13 +58,12 @@ function getSourceName(source: KnowledgeSourceWithCodebase): string {
   return getSourceDisplayValue(source)
 }
 
-const ALL_TYPES: KnowledgeSourceType[] = ['codebase', 'website', 'docs_portal', 'uploaded_doc', 'raw_text']
+export const ALL_TYPES: KnowledgeSourceType[] = ['codebase', 'website', 'docs_portal', 'uploaded_doc', 'raw_text']
 
 export function KnowledgeSourceGroupedList({
   sources,
   selectedSourceId,
   onSelect,
-  onAdd,
   productScopes,
   githubConnected,
 }: KnowledgeSourceGroupedListProps) {
@@ -127,20 +125,6 @@ export function KnowledgeSourceGroupedList({
                   </span>
                 )}
               </button>
-              <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onAdd(type)
-                  }}
-                  className="rounded-[4px] p-0.5 text-[color:var(--text-tertiary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
-                  aria-label={`Add ${config.label}`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                </button>
             </div>
 
             {/* Source items */}

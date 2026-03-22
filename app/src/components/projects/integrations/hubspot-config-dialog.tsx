@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import { Check, Unplug, Shield, KeyRound, Plug, Zap } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import {
   fetchHubSpotStatus,
@@ -102,11 +103,8 @@ export function HubSpotConfigDialog({
   const [toDate, setToDate] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
 
-  // Test connection state
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
-
-  // Connected state
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -189,15 +187,9 @@ export function HubSpotConfigDialog({
     setError(null)
 
     try {
-      const filterConfig: FilterConfig = { overwritePolicy }
-      if (fromDate) filterConfig.fromDate = fromDate
-      if (toDate) filterConfig.toDate = toDate
-
       const response = await connectHubSpot({
         projectId,
         accessToken: accessToken.trim(),
-        syncFrequency,
-        filterConfig,
       })
 
       const data = await response.json()
@@ -346,12 +338,12 @@ export function HubSpotConfigDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="HubSpot Integration" size="xxl">
+    <Dialog open={open} onClose={onClose} title="HubSpot Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
         {successMessage && (
-          <Alert variant="success">{successMessage}</Alert>
+          <InlineAlert variant="success">{successMessage}</InlineAlert>
         )}
 
         {isLoading ? (
@@ -361,14 +353,7 @@ export function HubSpotConfigDialog({
         ) : status.connected ? (
           // Connected state
           <div className="space-y-6">
-            <Alert variant="success">
-              &#10003; Connected to: <strong>{status.hubName || status.hubId || 'Unknown'}</strong>
-              {status.authMethod && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-[color:var(--background-subtle)] px-2 py-0.5 text-xs font-medium text-[color:var(--text-secondary)]">
-                  {status.authMethod === 'oauth' ? 'OAuth' : 'Private App Token'}
-                </span>
-              )}
-            </Alert>
+            <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to {status.hubName || status.hubId || 'HubSpot'}{status.authMethod && <span className="ml-2 inline-flex items-center rounded-full bg-[color:var(--background-subtle)] px-2 py-0.5 text-xs font-medium text-[color:var(--text-secondary)]">{status.authMethod === 'oauth' ? 'OAuth' : 'Private App Token'}</span>}</p>
 
             {/* Sync Stats */}
             <div className="space-y-2">
@@ -574,44 +559,47 @@ export function HubSpotConfigDialog({
             </div>
 
             {/* Danger Zone */}
-            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">Danger Zone</h4>
-              <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
-                Disconnect
-              </Button>
-              <p className="text-xs text-[color:var(--text-tertiary)]">
+            <div className="border-t border-[color:var(--accent-danger)] pt-4">
+              <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
+              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                 This will remove the HubSpot connection. Previously synced companies and contacts will remain.
               </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="mt-3"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                loading={isDisconnecting}
+              >
+                <Unplug size={14} />
+                Disconnect
+              </Button>
             </div>
           </div>
         ) : (
           // Not connected state
           <div className="space-y-6">
-            <Alert variant="info">
+            <InlineAlert variant="info">
               Connect your HubSpot CRM to sync companies and contacts into Hissuno.
-            </Alert>
+            </InlineAlert>
 
             {/* Connection Method Toggle */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[color:var(--foreground)]">
-                Connection Method
-              </label>
-              <ToggleGroup
-                value={connectionMethod}
-                onChange={setConnectionMethod}
-                options={[
-                  { value: 'oauth' as const, label: 'OAuth' },
-                  { value: 'token' as const, label: 'Private App Token' },
-                ]}
-              />
-            </div>
+            <ToggleGroup
+              value={connectionMethod}
+              onChange={setConnectionMethod}
+              options={[
+                { value: 'oauth' as const, label: 'OAuth', icon: <Shield size={14} /> },
+                { value: 'token' as const, label: 'Private App Token', icon: <KeyRound size={14} /> },
+              ]}
+            />
 
             {connectionMethod === 'oauth' ? (
               <div className="space-y-4">
                 {oauthAvailable === false ? (
-                  <Alert variant="warning">
+                  <InlineAlert variant="attention">
                     OAuth is not configured on this instance. {oauthUnavailableReason} Use the Private App Token method instead.
-                  </Alert>
+                  </InlineAlert>
                 ) : (
                   <>
                     <p className="text-sm text-[color:var(--text-secondary)]">
@@ -619,10 +607,12 @@ export function HubSpotConfigDialog({
                     </p>
                     <Button
                       variant="primary"
+                      size="sm"
                       onClick={() => {
                         window.location.href = hubspotOAuthConnectUrl(projectId)
                       }}
                     >
+                      <Plug size={14} />
                       Connect with HubSpot
                     </Button>
                   </>
@@ -648,26 +638,16 @@ export function HubSpotConfigDialog({
                   <label className="text-sm font-medium text-[color:var(--foreground)]">
                     Access Token
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={accessToken}
-                      onChange={(e) => {
-                        setAccessToken(e.target.value)
-                        setTestResult(null)
-                      }}
-                      placeholder="pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                      className="flex-1 rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                    <Button
-                      variant="secondary"
-                      onClick={handleTestConnection}
-                      loading={isTesting}
-                      disabled={isTesting}
-                    >
-                      Test
-                    </Button>
-                  </div>
+                  <input
+                    type="password"
+                    value={accessToken}
+                    onChange={(e) => {
+                      setAccessToken(e.target.value)
+                      setTestResult(null)
+                    }}
+                    placeholder="pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                  />
                   {testResult && (
                     <p
                       className={`text-xs ${
@@ -681,89 +661,27 @@ export function HubSpotConfigDialog({
                   )}
                 </div>
 
-                {/* Sync Frequency */}
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    Sync Frequency
-                  </label>
-                  <select
-                    value={syncFrequency}
-                    onChange={(e) => setSyncFrequency(e.target.value as SyncFrequency)}
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    loading={isTesting}
+                    disabled={isTesting}
                   >
-                    {FREQUENCY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
+                    <Zap size={14} />
+                    Test
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={handleConnect} loading={isConnecting}>
+                    <Plug size={14} />
+                    Connect HubSpot
+                  </Button>
                 </div>
-
-                {/* Overwrite Policy */}
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    Data Merge Policy
-                  </label>
-                  <select
-                    value={overwritePolicy}
-                    onChange={(e) => setOverwritePolicy(e.target.value as OverwritePolicy)}
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                  >
-                    {OVERWRITE_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-[color:var(--text-tertiary)]">
-                    {OVERWRITE_OPTIONS.find((o) => o.value === overwritePolicy)?.description}
-                  </p>
-                </div>
-
-                {/* Date Range (optional) */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    Date Range (optional)
-                  </label>
-                  <p className="text-xs text-[color:var(--text-tertiary)]">
-                    Only sync records modified within this date range. Leave empty to sync all.
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs text-[color:var(--text-secondary)]">From</label>
-                      <input
-                        type="date"
-                        value={fromDate}
-                        onChange={(e) => setFromDate(e.target.value)}
-                        className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-xs text-[color:var(--text-secondary)]">To</label>
-                      <input
-                        type="date"
-                        value={toDate}
-                        onChange={(e) => setToDate(e.target.value)}
-                        className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <Button variant="primary" onClick={handleConnect} loading={isConnecting}>
-                  Connect HubSpot
-                </Button>
               </div>
             )}
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
       </div>
     </Dialog>
   )

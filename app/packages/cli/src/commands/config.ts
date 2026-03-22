@@ -24,8 +24,11 @@ import {
   connectGong,
   connectZendesk,
   connectIntercom,
+  connectFathom,
+  connectHubspot,
+  connectNotion,
   type Platform,
-} from './integrate.js'
+} from './integrations.js'
 
 const BOLD = '\x1b[1m'
 const DIM = '\x1b[2m'
@@ -144,6 +147,12 @@ export const configCommand = new Command('config')
         await connectZendesk(fullConfig, fullConfig.project_id!, {})
       } else if (platform === 'intercom') {
         await connectIntercom(fullConfig, fullConfig.project_id!, {})
+      } else if (platform === 'fathom') {
+        await connectFathom(fullConfig, fullConfig.project_id!, {})
+      } else if (platform === 'hubspot') {
+        await connectHubspot(fullConfig, fullConfig.project_id!, {})
+      } else if (platform === 'notion') {
+        await connectNotion(fullConfig, fullConfig.project_id!, {})
       }
 
       connectMore = await confirm({
@@ -162,7 +171,7 @@ ${DIM}Next steps:${RESET}
   hissuno status                   Check connection health
   hissuno search "checkout bugs"   Search your intelligence
   hissuno list feedback            List feedback sessions
-  hissuno integrate                Manage integrations
+  hissuno integrations             Manage integrations
 `)
   })
 

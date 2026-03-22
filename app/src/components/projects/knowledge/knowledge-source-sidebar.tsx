@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, type ChangeEvent } from 'react'
 import Image from 'next/image'
-import { CollapsibleSection, Button, Dialog, FormField, Input, Select, Textarea, Alert } from '@/components/ui'
+import { CollapsibleSection, Button, Dialog, Input, Select, Textarea, Alert } from '@/components/ui'
 import { fetchGithubStatus, fetchGithubRepos, fetchGithubBranches, fetchNotionStatus } from '@/lib/api/integrations'
 import { NotionPickerDialog } from '@/components/projects/configuration/notion-picker-dialog'
 import type { KnowledgeSourceType, KnowledgeSourceWithCodebase } from '@/lib/knowledge/types'
@@ -29,7 +29,6 @@ interface KnowledgeSourceSidebarCreateProps {
   projectId: string
   onClose: () => void
   onAdd: (data: FormData | Record<string, unknown>) => Promise<KnowledgeSourceWithCodebase | null>
-  productScopes?: ProductScopeRecord[]
 }
 
 export type KnowledgeSourceSidebarProps = KnowledgeSourceSidebarEditProps | KnowledgeSourceSidebarCreateProps
@@ -318,12 +317,10 @@ function CreateModeSidebar({
   projectId,
   onClose,
   onAdd,
-  productScopes,
 }: KnowledgeSourceSidebarCreateProps) {
   // Shared fields
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [productScopeId, setProductScopeId] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -456,7 +453,6 @@ function CreateModeSidebar({
           analysis_scope: analysisScope || null,
           name: name || null,
           description: description || null,
-          productScopeId: productScopeId || null,
         })
       } else if (createType === 'uploaded_doc' && docOrigin === 'notion' && selectedNotionPage) {
         result = await onAdd({
@@ -465,7 +461,6 @@ function CreateModeSidebar({
           notionPageId: selectedNotionPage.pageId,
           name: name || selectedNotionPage.title || null,
           description: description || null,
-          productScopeId: productScopeId || null,
         })
       } else if (createType === 'uploaded_doc' && file) {
         const formData = new FormData()
@@ -481,7 +476,6 @@ function CreateModeSidebar({
           content: createType === 'raw_text' ? content : undefined,
           name: name || null,
           description: description || null,
-          productScopeId: productScopeId || null,
         })
       }
 
@@ -491,7 +485,7 @@ function CreateModeSidebar({
     } finally {
       setIsSaving(false)
     }
-  }, [createType, name, description, productScopeId, url, content, file, selectedRepo, selectedBranch, analysisScope, docOrigin, selectedNotionPage, onAdd, onClose])
+  }, [createType, name, description, url, content, file, selectedRepo, selectedBranch, analysisScope, docOrigin, selectedNotionPage, onAdd, onClose])
 
   return (
     <>
@@ -526,25 +520,6 @@ function CreateModeSidebar({
           <div className="flex flex-col gap-4">
             {error && <Alert variant="danger">{error}</Alert>}
 
-            {/* Name (required) */}
-            <FormField label="Name" description="Display name for this source" required>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={`e.g., "Product docs" or "API reference"`}
-              />
-            </FormField>
-
-            {/* Description (required) */}
-            <FormField label="Description" description="Help the AI understand what this source contains" required>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g., Contains API reference docs for the REST API..."
-                rows={2}
-              />
-            </FormField>
-
             {/* Type-specific input */}
             {createType === 'codebase' ? (
               !githubConnected ? (
@@ -564,12 +539,14 @@ function CreateModeSidebar({
                 </Alert>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField label="Repository">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Repository</label>
                       <Select
                         value={selectedRepo}
                         onChange={handleRepoChange}
                         disabled={isLoadingRepos}
+                        className="mt-1"
                       >
                         <option value="">
                           {isLoadingRepos ? 'Loading...' : 'Select repository'}
@@ -580,13 +557,15 @@ function CreateModeSidebar({
                           </option>
                         ))}
                       </Select>
-                    </FormField>
+                    </div>
 
-                    <FormField label="Branch">
+                    <div>
+                      <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Branch</label>
                       <Select
                         value={selectedBranch}
                         onChange={(e) => setSelectedBranch(e.target.value)}
                         disabled={isLoadingBranches || !selectedRepo}
+                        className="mt-1"
                       >
                         <option value="">
                           {isLoadingBranches ? 'Loading...' : 'Select branch'}
@@ -597,55 +576,56 @@ function CreateModeSidebar({
                           </option>
                         ))}
                       </Select>
-                    </FormField>
+                    </div>
                   </div>
 
                   {selectedRepo && (
-                    <FormField
-                      label="Analysis Scope (optional)"
-                      description="For monorepos, specify a subdirectory path"
-                    >
+                    <div>
+                      <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Analysis Scope</label>
                       <Input
                         value={analysisScope}
                         onChange={(e) => setAnalysisScope(e.target.value)}
-                        placeholder="e.g., packages/core"
+                        placeholder="e.g., packages/core (optional)"
+                        className="mt-1"
                       />
-                    </FormField>
+                    </div>
                   )}
                 </div>
               )
             ) : createType === 'uploaded_doc' ? (
-              <div className="flex flex-col gap-4">
-                {/* Origin selector */}
-                {notionConnected && (
-                  <div className="flex gap-2">
+              <div className="flex flex-col gap-3">
+                {/* Source selector */}
+                <div>
+                  <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Source</label>
+                  <Select
+                    value={docOrigin}
+                    onChange={(e) => {
+                      const val = e.target.value as 'upload' | 'notion'
+                      setDocOrigin(val)
+                      if (val === 'upload') setSelectedNotionPage(null)
+                      if (val === 'notion') setFile(null)
+                    }}
+                    className="mt-1"
+                  >
+                    <option value="upload">Manual Upload</option>
+                    <option value="notion" disabled={!notionConnected}>
+                      {notionConnected ? 'Notion Page' : 'Notion (not connected)'}
+                    </option>
+                  </Select>
+                  {!notionConnected && (
                     <button
                       type="button"
-                      onClick={() => { setDocOrigin('upload'); setSelectedNotionPage(null) }}
-                      className={`flex-1 rounded-[4px] border-2 px-3 py-2 text-sm transition ${
-                        docOrigin === 'upload'
-                          ? 'border-[color:var(--accent-selected)] bg-[color:var(--accent-selected)]/5 text-[color:var(--foreground)]'
-                          : 'border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:border-[color:var(--text-tertiary)]'
-                      }`}
+                      onClick={() => window.open(`/projects/${projectId}/integrations`, '_blank')}
+                      className="mt-1 text-xs text-[color:var(--accent-primary)] hover:underline"
                     >
-                      Upload File
+                      Connect Notion to import pages
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => { setDocOrigin('notion'); setFile(null) }}
-                      className={`flex-1 rounded-[4px] border-2 px-3 py-2 text-sm transition ${
-                        docOrigin === 'notion'
-                          ? 'border-[color:var(--accent-selected)] bg-[color:var(--accent-selected)]/5 text-[color:var(--foreground)]'
-                          : 'border-[color:var(--border-subtle)] text-[color:var(--text-secondary)] hover:border-[color:var(--text-tertiary)]'
-                      }`}
-                    >
-                      Import from Notion
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {docOrigin === 'upload' ? (
-                  <FormField label="File">
+                  <div>
+                    <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">File</label>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -654,7 +634,7 @@ function CreateModeSidebar({
                       className="hidden"
                     />
                     <div
-                      className="flex items-center gap-3 rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] px-4 py-3 cursor-pointer hover:border-[color:var(--accent-selected)] transition-colors"
+                      className="mt-1 flex items-center gap-3 rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] px-4 py-3 cursor-pointer hover:border-[color:var(--accent-selected)] transition-colors"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <Button
@@ -672,80 +652,114 @@ function CreateModeSidebar({
                         {file ? file.name : 'No file selected'}
                       </span>
                     </div>
-                  </FormField>
+                  </div>
                 ) : (
-                  <FormField label="Notion Page">
+                  <div>
+                    <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Page</label>
                     {selectedNotionPage ? (
-                      <div className="flex items-center gap-2 rounded-[4px] border border-[color:var(--border-subtle)] px-3 py-2">
+                      <div className="mt-1 flex items-center gap-2 rounded-[4px] border border-[color:var(--border-subtle)] px-3 py-2">
+                        <Image src="/logos/notion.svg" alt="Notion" width={14} height={14} className="dark:invert" />
                         <span className="flex-1 text-sm text-[color:var(--foreground)] truncate">
                           {selectedNotionPage.title}
                         </span>
-                        <Button
+                        <button
                           type="button"
-                          variant="ghost"
-                          size="sm"
                           onClick={() => setShowNotionPicker(true)}
+                          className="text-xs text-[color:var(--accent-primary)] hover:underline"
                         >
                           Change
-                        </Button>
+                        </button>
                       </div>
                     ) : (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
+                      <div
+                        className="mt-1 flex items-center gap-3 rounded-[4px] border-2 border-dashed border-[color:var(--border-subtle)] px-4 py-3 cursor-pointer hover:border-[color:var(--accent-selected)] transition-colors"
                         onClick={() => setShowNotionPicker(true)}
                       >
-                        Select Notion Page
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setShowNotionPicker(true)
+                          }}
+                        >
+                          Choose Page
+                        </Button>
+                        <span className="text-sm text-[color:var(--text-secondary)]">
+                          No page selected
+                        </span>
+                      </div>
                     )}
-                    <NotionPickerDialog
-                      open={showNotionPicker}
-                      onClose={() => setShowNotionPicker(false)}
-                      projectId={projectId}
-                      onImported={() => {
-                        // This dialog is for bulk import; for single selection we handle it differently
-                        setShowNotionPicker(false)
-                      }}
-                    />
-                  </FormField>
+                  </div>
                 )}
+
+                <NotionPickerDialog
+                  open={showNotionPicker}
+                  onClose={() => setShowNotionPicker(false)}
+                  projectId={projectId}
+                  mode="single"
+                  onPageSelected={(page) => {
+                    setSelectedNotionPage(page)
+                    if (!name) setName(page.title)
+                    if (!description) setDescription(`Imported from Notion: ${page.title}`)
+                    setShowNotionPicker(false)
+                  }}
+                />
               </div>
             ) : createType === 'raw_text' ? (
-              <FormField label="Content">
+              <div>
+                <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  Content <span className="text-[color:var(--accent-danger)]">*</span>
+                </label>
                 <Textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Enter custom knowledge content..."
                   rows={5}
+                  className="mt-1"
                 />
-              </FormField>
+              </div>
             ) : (
-              <FormField label="URL">
+              <div>
+                <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                  URL <span className="text-[color:var(--accent-danger)]">*</span>
+                </label>
                 <Input
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder={createType === 'docs_portal' ? 'https://docs.example.com' : 'https://example.com'}
+                  className="mt-1"
                 />
-              </FormField>
+              </div>
             )}
 
-            {/* Product scope (optional) */}
-            {productScopes && productScopes.length > 0 && (
-              <FormField label="Product Scope">
-                <Select
-                  value={productScopeId}
-                  onChange={(e) => setProductScopeId(e.target.value)}
-                >
-                  <option value="">Default</option>
-                  {productScopes.filter(a => !a.is_default).map(scope => (
-                    <option key={scope.id} value={scope.id}>
-                      {scope.name}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-            )}
+            {/* Name */}
+            <div>
+              <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                Name <span className="text-[color:var(--accent-danger)]">*</span>
+              </label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={`e.g., "Product docs" or "API reference"`}
+                className="mt-1"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                Description <span className="text-[color:var(--accent-danger)]">*</span>
+              </label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Help the AI understand what this source contains..."
+                rows={2}
+                className="mt-1"
+              />
+            </div>
           </div>
         </div>
 

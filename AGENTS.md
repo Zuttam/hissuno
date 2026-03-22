@@ -163,6 +163,77 @@ import { useProjects } from '@/hooks/use-analytics'
 import type { SessionWithProject } from '@/types/session'
 ```
 
+## UI Design System - Lean Design
+
+The UI follows a **lean, high-density design** with icon+text action buttons and tight spacing. The aesthetic is terminal-inspired: font-mono, uppercase labels, sharp corners (rounded-[4px]), and border-2 accents.
+
+### Action Button Hierarchy
+
+Actions use three tiers of visual weight:
+
+| Tier | Component | Use Case | Example |
+|------|-----------|----------|---------|
+| **Primary** | `<Button>` | Major CTAs, dialog footers (Save, Create, Connect) | `<Button size="sm">Save</Button>` |
+| **Secondary** | Inline icon+text button | Page actions, batch actions, toolbar controls | `<button className="lean-action">...</button>` |
+| **Tertiary** | `<IconButton>` | Row-level actions, close buttons, refresh | `<IconButton aria-label="Edit">...</IconButton>` |
+
+### Lean Action Pattern (Tier 2)
+
+The standard lean action button is an inline icon+text element used throughout page headers, batch bars, sidebars, and list actions:
+
+```tsx
+<button className="inline-flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]">
+  <Plus size={14} />
+  Add Item
+</button>
+```
+
+Key properties:
+- **Icon size**: 14px (lucide-react icons at `size={14}`)
+- **Gap**: gap-1.5 between icon and label
+- **Font**: text-xs, font-medium (NOT uppercase, NOT font-mono - those are for `<Button>`)
+- **Padding**: px-2.5 py-1.5
+- **Border**: border border-[color:var(--border-subtle)] (optional - omit for ghost feel)
+- **Hover**: hover:bg-[color:var(--surface-hover)] + hover:text-[color:var(--foreground)]
+
+### Spacing & Density
+
+Use tight spacing throughout:
+
+| Context | Spacing |
+|---------|---------|
+| Card padding | p-4 (prefer over p-6) |
+| Dialog header/content | p-3 to p-4 |
+| Section gaps | gap-3 to gap-4 |
+| Button groups | gap-1.5 to gap-2 |
+| List item padding | px-2 py-1.5 to px-3 py-2 |
+| Tab lists | px-4 py-1.5 |
+| Individual tabs | px-3 py-1.5 |
+
+### Interaction Patterns
+
+- **Clickable rows**: Entire list items/cards are clickable to open sidebar or dialog - avoid per-row action buttons when sidebar covers the use case
+- **Hover-reveal actions**: For row-level actions (edit, delete), show on hover only to reduce visual noise
+- **Batch actions**: Use `<BatchActionBar>` with icon+label buttons for multi-select operations
+- **Dialogs for creation/editing**: Open dialog on primary actions (create, configure), sidebar for detail views
+- **ToggleGroup for config choices**: Use `<ToggleGroup>` with icon+label options instead of radio groups or multiple buttons
+
+### Icon Usage
+
+- Use `lucide-react` icons exclusively
+- Inline actions: `size={14}`
+- List/card icons: `size={16}` to `size={20}`
+- Navigation icons: `size={16}`
+- Never use raw inline SVGs for standard icons - import from lucide-react
+
+### CSS Variables (Theme)
+
+All colors use CSS variables for light/dark theming:
+- Text: `--foreground`, `--text-secondary`, `--text-tertiary`
+- Surfaces: `--background`, `--surface`, `--surface-hover`
+- Borders: `--border`, `--border-subtle`
+- Accents: `--accent-primary`, `--accent-selected`, `--accent-danger`, `--accent-success`, `--accent-warning`, `--accent-info`
+
 ## Important Notes
 
 1. **No internal HTTP calls**: Never fetch from one API route to another. Use service functions.

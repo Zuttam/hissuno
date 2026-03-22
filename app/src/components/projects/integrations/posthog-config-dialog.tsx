@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import { Check, Unplug, Plug } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
 import {
   fetchPosthogStatus,
   connectPosthog,
@@ -143,17 +144,11 @@ export function PosthogConfigDialog({
     setError(null)
 
     try {
-      const filterConfig: Record<string, unknown> = {}
-      if (fromDate) filterConfig.fromDate = fromDate
-      if (toDate) filterConfig.toDate = toDate
-
       const response = await connectPosthog({
         projectId,
         apiKey: apiKey.trim(),
         host: host.trim() || 'https://app.posthog.com',
         posthogProjectId: posthogProjectId.trim(),
-        syncFrequency,
-        ...(Object.keys(filterConfig).length > 0 ? { filterConfig } : {}),
       })
 
       const data = await response.json()
@@ -307,12 +302,12 @@ export function PosthogConfigDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="PostHog Integration" size="xxl">
+    <Dialog open={open} onClose={onClose} title="PostHog Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
         {successMessage && (
-          <Alert variant="success">
+          <InlineAlert variant="success">
             {successMessage}
             {showContactsLink && (
               <>
@@ -326,7 +321,7 @@ export function PosthogConfigDialog({
                 </Link>
               </>
             )}
-          </Alert>
+          </InlineAlert>
         )}
 
         {isLoading ? (
@@ -336,9 +331,7 @@ export function PosthogConfigDialog({
         ) : status.connected ? (
           // Connected state
           <div className="space-y-6">
-            <Alert variant="success">
-              &#10003; Connected to PostHog
-            </Alert>
+            <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to PostHog</p>
 
             {/* Connection Info */}
             <div className="space-y-2">
@@ -529,20 +522,28 @@ export function PosthogConfigDialog({
             </div>
 
             {/* Danger Zone */}
-            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">Danger Zone</h4>
-              <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
-                Disconnect
-              </Button>
-              <p className="text-xs text-[color:var(--text-tertiary)]">
+            <div className="border-t border-[color:var(--accent-danger)] pt-4">
+              <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
+              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                 This will remove the PostHog connection. Previously synced contacts will remain.
               </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="mt-3"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                loading={isDisconnecting}
+              >
+                <Unplug size={14} />
+                Disconnect
+              </Button>
             </div>
           </div>
         ) : (
           // Not connected state
           <div className="space-y-6">
-            <Alert variant="info">
+            <InlineAlert variant="info">
               Connect your PostHog account to sync user profiles and event data into Hissuno.
               You&apos;ll need a{' '}
               <a
@@ -554,7 +555,7 @@ export function PosthogConfigDialog({
                 PostHog Personal API Key
               </a>
               .
-            </Alert>
+            </InlineAlert>
 
             {/* Connect Form */}
             <div className="space-y-4">
@@ -609,67 +610,14 @@ export function PosthogConfigDialog({
                 </p>
               </div>
 
-              {/* Sync Frequency */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-[color:var(--foreground)]">
-                  Sync Frequency
-                </label>
-                <select
-                  value={syncFrequency}
-                  onChange={(e) => setSyncFrequency(e.target.value as SyncFrequency)}
-                  className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                >
-                  {FREQUENCY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date Range */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-[color:var(--foreground)]">
-                  Date Range <span className="font-normal text-[color:var(--text-tertiary)]">(optional)</span>
-                </label>
-                <p className="text-xs text-[color:var(--text-tertiary)]">
-                  Only sync events within this date range. Leave empty to use the default (last 30 days).
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs text-[color:var(--text-secondary)]">From</label>
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-[color:var(--text-secondary)]">To</label>
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Button variant="primary" onClick={handleConnect} loading={isConnecting}>
+              <Button variant="primary" size="sm" onClick={handleConnect} loading={isConnecting}>
+                <Plug size={14} />
                 Test & Connect
               </Button>
             </div>
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
       </div>
     </Dialog>
   )

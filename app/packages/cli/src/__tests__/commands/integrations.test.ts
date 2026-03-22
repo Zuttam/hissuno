@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatStatus } from '../../commands/integrate.js'
+import { formatStatus } from '../../commands/integrations.js'
 
 describe('formatStatus', () => {
   it('shows disconnected status', () => {
@@ -129,6 +129,68 @@ describe('formatStatus', () => {
       syncEnabled: false,
     })
     expect(result).toContain('**Conversations Synced:** 0')
+  })
+
+  it('shows connected Fathom with sync info', () => {
+    const result = formatStatus('fathom', {
+      connected: true,
+      syncFrequency: '24h',
+      syncEnabled: true,
+      lastSyncAt: '2026-03-01',
+      lastSyncStatus: 'success',
+      lastSyncMeetingsCount: 15,
+    })
+    expect(result).toContain('# Fathom')
+    expect(result).toContain('**Sync Frequency:** 24h')
+    expect(result).toContain('**Sync Enabled:** Yes')
+    expect(result).toContain('**Meetings Synced:** 15')
+  })
+
+  it('defaults Fathom meetings count to 0 when missing', () => {
+    const result = formatStatus('fathom', {
+      connected: true,
+      syncEnabled: false,
+    })
+    expect(result).toContain('**Meetings Synced:** 0')
+  })
+
+  it('shows connected HubSpot with sync info', () => {
+    const result = formatStatus('hubspot', {
+      connected: true,
+      hubName: 'Acme Hub',
+      authMethod: 'token',
+      syncFrequency: '6h',
+      syncEnabled: true,
+      overwritePolicy: 'fill_nulls',
+      lastSyncCompaniesCount: 50,
+      lastSyncContactsCount: 200,
+    })
+    expect(result).toContain('# HubSpot')
+    expect(result).toContain('**Hub:** Acme Hub')
+    expect(result).toContain('**Auth Method:** token')
+    expect(result).toContain('**Overwrite Policy:** fill_nulls')
+    expect(result).toContain('**Companies Synced:** 50')
+    expect(result).toContain('**Contacts Synced:** 200')
+  })
+
+  it('defaults HubSpot counts to 0 when missing', () => {
+    const result = formatStatus('hubspot', {
+      connected: true,
+      syncEnabled: false,
+    })
+    expect(result).toContain('**Companies Synced:** 0')
+    expect(result).toContain('**Contacts Synced:** 0')
+  })
+
+  it('shows connected Notion with workspace', () => {
+    const result = formatStatus('notion', {
+      connected: true,
+      workspaceName: 'My Workspace',
+      authMethod: 'oauth',
+    })
+    expect(result).toContain('# Notion')
+    expect(result).toContain('**Workspace:** My Workspace')
+    expect(result).toContain('**Auth Method:** oauth')
   })
 })
 

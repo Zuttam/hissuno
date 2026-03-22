@@ -1,14 +1,14 @@
 /**
- * hissuno integrate — Manage integrations
+ * hissuno integrations - Manage integrations
  *
  * Commands:
- *   hissuno integrate                     List all integrations with status
- *   hissuno integrate <platform>          Interactive setup/config wizard
- *   hissuno integrate <platform> status   Detailed status
- *   hissuno integrate <platform> connect  Connect (OAuth or token)
- *   hissuno integrate <platform> configure  Update settings
- *   hissuno integrate <platform> sync     Trigger manual sync
- *   hissuno integrate <platform> disconnect  Disconnect
+ *   hissuno integrations list                     List all integrations with status
+ *   hissuno integrations <platform>               Interactive setup/config wizard
+ *   hissuno integrations add <platform>           Connect a platform
+ *   hissuno integrations status <platform>        Detailed status
+ *   hissuno integrations configure <platform>     Update settings
+ *   hissuno integrations sync <platform>          Trigger manual sync
+ *   hissuno integrations disconnect <platform>    Disconnect
  */
 
 import { Command } from 'commander'
@@ -18,13 +18,13 @@ import { apiCall, resolveProjectId, getBaseUrl } from '../lib/api.js'
 import { openBrowser } from '../lib/browser.js'
 import { renderMarkdown, renderJson, success, error, warn } from '../lib/output.js'
 
-export const PLATFORMS = ['intercom', 'gong', 'zendesk', 'slack', 'github', 'jira', 'linear'] as const
+export const PLATFORMS = ['intercom', 'gong', 'zendesk', 'slack', 'github', 'jira', 'linear', 'fathom', 'hubspot', 'notion'] as const
 export type Platform = (typeof PLATFORMS)[number]
 
 export const OAUTH_PLATFORMS: Platform[] = ['slack', 'github', 'jira', 'linear']
-const TOKEN_PLATFORMS: Platform[] = ['gong', 'zendesk']
-const HYBRID_PLATFORMS: Platform[] = ['intercom'] // supports both token and OAuth
-const SYNCABLE_PLATFORMS: Platform[] = ['intercom', 'gong', 'zendesk']
+const TOKEN_PLATFORMS: Platform[] = ['gong', 'zendesk', 'fathom']
+const HYBRID_PLATFORMS: Platform[] = ['intercom', 'hubspot', 'notion'] // support both token and OAuth
+const SYNCABLE_PLATFORMS: Platform[] = ['intercom', 'gong', 'zendesk', 'fathom', 'hubspot']
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   intercom: 'Intercom',
@@ -34,15 +34,25 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   github: 'GitHub',
   jira: 'Jira',
   linear: 'Linear',
+  fathom: 'Fathom',
+  hubspot: 'HubSpot',
+  notion: 'Notion',
+}
+
+const SYNC_FREQUENCY_CHOICES = [
+  { value: 'manual', name: 'Manual' },
+  { value: '1h', name: 'Every hour' },
+  { value: '6h', name: 'Every 6 hours' },
+  { value: '24h', name: 'Every 24 hours' },
+] as const
+
+async function promptSyncFrequency(existing?: string): Promise<string> {
+  return existing || await select({ message: 'Sync frequency:', choices: [...SYNC_FREQUENCY_CHOICES], default: '24h' })
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-async function getProjectId(config: HissunoConfig): Promise<string> {
-  return resolveProjectId(config)
-}
 
 export async function getStatus(config: HissunoConfig, platform: Platform, projectId: string) {
   return apiCall(config, 'GET', `/api/integrations/${platform}?projectId=${projectId}`)
@@ -111,6 +121,31 @@ export function formatStatus(platform: Platform, data: Record<string, unknown>):
     lines.push(`**Tickets Synced:** ${data.lastSyncTicketsCount ?? 0}`)
   }
 
+  if (platform === 'fathom') {
+    if (data.syncFrequency) lines.push(`**Sync Frequency:** ${data.syncFrequency}`)
+    lines.push(`**Sync Enabled:** ${data.syncEnabled ? 'Yes' : 'No'}`)
+    if (data.lastSyncAt) lines.push(`**Last Sync:** ${data.lastSyncAt}`)
+    if (data.lastSyncStatus) lines.push(`**Last Sync Status:** ${data.lastSyncStatus}`)
+    lines.push(`**Meetings Synced:** ${data.lastSyncMeetingsCount ?? 0}`)
+  }
+
+  if (platform === 'hubspot') {
+    if (data.hubName) lines.push(`**Hub:** ${data.hubName}`)
+    if (data.authMethod) lines.push(`**Auth Method:** ${data.authMethod}`)
+    if (data.syncFrequency) lines.push(`**Sync Frequency:** ${data.syncFrequency}`)
+    lines.push(`**Sync Enabled:** ${data.syncEnabled ? 'Yes' : 'No'}`)
+    if (data.overwritePolicy) lines.push(`**Overwrite Policy:** ${data.overwritePolicy}`)
+    if (data.lastSyncAt) lines.push(`**Last Sync:** ${data.lastSyncAt}`)
+    if (data.lastSyncStatus) lines.push(`**Last Sync Status:** ${data.lastSyncStatus}`)
+    lines.push(`**Companies Synced:** ${data.lastSyncCompaniesCount ?? 0}`)
+    lines.push(`**Contacts Synced:** ${data.lastSyncContactsCount ?? 0}`)
+  }
+
+  if (platform === 'notion') {
+    if (data.workspaceName) lines.push(`**Workspace:** ${data.workspaceName}`)
+    if (data.authMethod) lines.push(`**Auth Method:** ${data.authMethod}`)
+  }
+
   // Sync stats if available
   const stats = data.stats as { totalSynced?: number } | null
   if (stats?.totalSynced != null) {
@@ -155,16 +190,7 @@ export async function connectGong(config: HissunoConfig, projectId: string, opts
   const accessKey = opts.accessKey || await input({ message: 'Access Key:', validate: (v) => v.length > 0 || 'Required' })
   const accessKeySecret = opts.accessKeySecret || await password({ message: 'Access Key Secret:', mask: '*', validate: (v) => v.length > 0 || 'Required' })
   const baseUrl = opts.baseUrl || await input({ message: 'Base URL:', default: 'https://api.gong.io' })
-  const syncFrequency = opts.syncFrequency || await select({
-    message: 'Sync frequency:',
-    choices: [
-      { value: 'manual', name: 'Manual' },
-      { value: '1h', name: 'Every hour' },
-      { value: '6h', name: 'Every 6 hours' },
-      { value: '24h', name: 'Every 24 hours' },
-    ],
-    default: '24h',
-  })
+  const syncFrequency = await promptSyncFrequency(opts.syncFrequency)
 
   console.log('\nValidating credentials...')
   const result = await apiCall(config, 'POST', '/api/integrations/gong/connect', {
@@ -189,16 +215,7 @@ export async function connectZendesk(config: HissunoConfig, projectId: string, o
   const subdomain = opts.subdomain || await input({ message: 'Zendesk subdomain (e.g., mycompany):', validate: (v) => v.length > 0 || 'Required' })
   const email = opts.email || await input({ message: 'Admin email:', validate: (v) => v.includes('@') || 'Must be a valid email' })
   const apiToken = opts.apiToken || await password({ message: 'API token:', mask: '*', validate: (v) => v.length > 0 || 'Required' })
-  const syncFrequency = opts.syncFrequency || await select({
-    message: 'Sync frequency:',
-    choices: [
-      { value: 'manual', name: 'Manual' },
-      { value: '1h', name: 'Every hour' },
-      { value: '6h', name: 'Every 6 hours' },
-      { value: '24h', name: 'Every 24 hours' },
-    ],
-    default: '24h',
-  })
+  const syncFrequency = await promptSyncFrequency(opts.syncFrequency)
 
   console.log('\nValidating credentials...')
   const result = await apiCall(config, 'POST', '/api/integrations/zendesk/connect', {
@@ -233,16 +250,7 @@ export async function connectIntercom(config: HissunoConfig, projectId: string, 
   }
 
   const accessToken = opts.accessToken || await password({ message: 'Access Token:', mask: '*', validate: (v) => v.length > 0 || 'Required' })
-  const syncFrequency = opts.syncFrequency || await select({
-    message: 'Sync frequency:',
-    choices: [
-      { value: 'manual', name: 'Manual' },
-      { value: '1h', name: 'Every hour' },
-      { value: '6h', name: 'Every 6 hours' },
-      { value: '24h', name: 'Every 24 hours' },
-    ],
-    default: '24h',
-  })
+  const syncFrequency = await promptSyncFrequency(opts.syncFrequency)
 
   console.log('\nValidating credentials...')
   const result = await apiCall(config, 'POST', '/api/integrations/intercom/connect', {
@@ -261,21 +269,109 @@ export async function connectIntercom(config: HissunoConfig, projectId: string, 
   return false
 }
 
+export async function connectFathom(config: HissunoConfig, projectId: string, opts: Record<string, string>): Promise<boolean> {
+  const apiKey = opts.apiKey || await password({ message: 'Fathom API Key:', mask: '*', validate: (v) => v.length > 0 || 'Required' })
+  const syncFrequency = await promptSyncFrequency(opts.syncFrequency)
+
+  console.log('\nValidating credentials...')
+  const result = await apiCall(config, 'POST', '/api/integrations/fathom/connect', {
+    projectId,
+    apiKey,
+    syncFrequency,
+  })
+
+  if (result.ok) {
+    success('Fathom connected successfully!')
+    return true
+  }
+
+  const data = result.data as { error?: string }
+  error(`Connection failed: ${data.error || 'Unknown error'}`)
+  return false
+}
+
+export async function connectHubspot(config: HissunoConfig, projectId: string, opts: Record<string, string>): Promise<boolean> {
+  const method = opts.accessToken ? 'token' : await select({
+    message: 'Connection method:',
+    choices: [
+      { value: 'token', name: 'Private App Token' },
+      { value: 'oauth', name: 'OAuth (opens browser)' },
+    ],
+  })
+
+  if (method === 'oauth') {
+    return connectOAuth(config, 'hubspot', projectId)
+  }
+
+  const accessToken = opts.accessToken || await password({ message: 'Private App Token:', mask: '*', validate: (v) => v.length > 0 || 'Required' })
+  const syncFrequency = await promptSyncFrequency(opts.syncFrequency)
+
+  const overwritePolicy = opts.overwritePolicy || await select({
+    message: 'Overwrite policy for existing records:',
+    choices: [
+      { value: 'fill_nulls', name: 'Fill nulls only (keep existing data, fill gaps)' },
+      { value: 'hubspot_wins', name: 'HubSpot wins (overwrite with HubSpot data)' },
+      { value: 'never_overwrite', name: 'Never overwrite (only create new records)' },
+    ],
+    default: 'fill_nulls',
+  })
+
+  console.log('\nValidating credentials...')
+  const result = await apiCall(config, 'POST', '/api/integrations/hubspot/connect', {
+    projectId,
+    accessToken,
+    syncFrequency,
+    overwritePolicy,
+  })
+
+  if (result.ok) {
+    success('HubSpot connected successfully!')
+    return true
+  }
+
+  const data = result.data as { error?: string }
+  error(`Connection failed: ${data.error || 'Unknown error'}`)
+  return false
+}
+
+export async function connectNotion(config: HissunoConfig, projectId: string, opts: Record<string, string>): Promise<boolean> {
+  const method = opts.accessToken ? 'token' : await select({
+    message: 'Connection method:',
+    choices: [
+      { value: 'token', name: 'Internal Integration Token' },
+      { value: 'oauth', name: 'OAuth (opens browser)' },
+    ],
+  })
+
+  if (method === 'oauth') {
+    return connectOAuth(config, 'notion', projectId)
+  }
+
+  const accessToken = opts.accessToken || await password({ message: 'Integration Token:', mask: '*', validate: (v) => v.length > 0 || 'Required' })
+
+  console.log('\nValidating credentials...')
+  const result = await apiCall(config, 'POST', '/api/integrations/notion/connect', {
+    projectId,
+    accessToken,
+  })
+
+  if (result.ok) {
+    success('Notion connected successfully!')
+    return true
+  }
+
+  const data = result.data as { error?: string }
+  error(`Connection failed: ${data.error || 'Unknown error'}`)
+  return false
+}
+
 // ---------------------------------------------------------------------------
 // Configure flow
 // ---------------------------------------------------------------------------
 
 async function configureIntegration(config: HissunoConfig, platform: Platform, projectId: string): Promise<void> {
   if (SYNCABLE_PLATFORMS.includes(platform)) {
-    const syncFrequency = await select({
-      message: 'Sync frequency:',
-      choices: [
-        { value: 'manual', name: 'Manual' },
-        { value: '1h', name: 'Every hour' },
-        { value: '6h', name: 'Every 6 hours' },
-        { value: '24h', name: 'Every 24 hours' },
-      ],
-    })
+    const syncFrequency = await promptSyncFrequency()
 
     const result = await apiCall(config, 'PATCH', `/api/integrations/${platform}?projectId=${projectId}`, {
       syncFrequency,
@@ -330,7 +426,7 @@ async function syncIntegration(config: HissunoConfig, platform: Platform, projec
 
   console.log(`\nSyncing ${PLATFORM_LABELS[platform]} (${syncMode})...\n`)
 
-  // The sync endpoint uses SSE — consume the stream for progress
+  // The sync endpoint uses SSE - consume the stream for progress
   const baseUrl = getBaseUrl(config)
   const url = `${baseUrl}/api/integrations/${platform}/sync?projectId=${projectId}&mode=${syncMode}`
 
@@ -448,6 +544,12 @@ async function interactiveWizard(config: HissunoConfig, platform: Platform, proj
         await connectZendesk(config, projectId, {})
       } else if (platform === 'intercom') {
         await connectIntercom(config, projectId, {})
+      } else if (platform === 'fathom') {
+        await connectFathom(config, projectId, {})
+      } else if (platform === 'hubspot') {
+        await connectHubspot(config, projectId, {})
+      } else if (platform === 'notion') {
+        await connectNotion(config, projectId, {})
       }
     }
     return
@@ -478,153 +580,219 @@ async function interactiveWizard(config: HissunoConfig, platform: Platform, proj
 }
 
 // ---------------------------------------------------------------------------
-// Command definition
+// Platform validation helper
 // ---------------------------------------------------------------------------
 
-export const integrateCommand = new Command('integrate')
-  .description('Manage integrations (intercom, gong, zendesk, slack, github, jira, linear)')
-  .argument('[platform]', 'Integration platform')
-  .argument('[action]', 'Action: status, connect, configure, sync, disconnect')
+function validatePlatform(platformArg: string): Platform {
+  const platform = platformArg.toLowerCase() as Platform
+  if (!PLATFORMS.includes(platform)) {
+    error(`Unknown platform "${platformArg}". Supported: ${PLATFORMS.join(', ')}`)
+    process.exit(1)
+  }
+  return platform
+}
+
+// ---------------------------------------------------------------------------
+// Subcommands
+// ---------------------------------------------------------------------------
+
+async function listIntegrations(config: HissunoConfig, projectId: string, jsonMode: boolean | undefined) {
+  const results = await Promise.all(
+    PLATFORMS.map(async (p) => {
+      const result = await getStatus(config, p, projectId)
+      return {
+        platform: p,
+        name: PLATFORM_LABELS[p],
+        connected: result.ok ? (result.data as Record<string, unknown>).connected === true : false,
+        data: result.ok ? result.data : null,
+      }
+    })
+  )
+
+  if (jsonMode) {
+    console.log(renderJson(results))
+    return
+  }
+
+  console.log(renderMarkdown('# Integrations\n'))
+  for (const r of results) {
+    const status = r.connected ? '\x1b[32mConnected\x1b[0m' : '\x1b[2mNot connected\x1b[0m'
+    console.log(`  ${r.name.padEnd(12)} ${status}`)
+  }
+  console.log('\nRun `hissuno integrations <platform>` to manage a specific integration.')
+}
+
+const listSubcommand = new Command('list')
+  .description('List all integrations with connection status')
+  .action(async (_opts, cmd) => {
+    const config = requireConfig()
+    const jsonMode = cmd.parent?.parent?.opts().json
+    const projectId = await resolveProjectId(config)
+    await listIntegrations(config, projectId, jsonMode)
+  })
+
+const addSubcommand = new Command('add')
+  .description('Connect an integration platform')
+  .argument('<platform>', `Platform to connect (${PLATFORMS.join(', ')})`)
   .option('--access-key <key>', 'Gong access key')
   .option('--access-key-secret <secret>', 'Gong access key secret')
   .option('--base-url <url>', 'Gong base URL')
   .option('--subdomain <subdomain>', 'Zendesk subdomain')
   .option('--email <email>', 'Zendesk admin email')
   .option('--api-token <token>', 'Zendesk API token')
-  .option('--access-token <token>', 'Intercom access token')
+  .option('--access-token <token>', 'Intercom/HubSpot/Notion access token')
+  .option('--api-key <key>', 'Fathom API key')
+  .option('--overwrite-policy <policy>', 'HubSpot overwrite policy: fill_nulls, hubspot_wins, never_overwrite')
   .option('--sync-frequency <freq>', 'Sync frequency: manual, 1h, 6h, 24h')
+  .action(async (platformArg, opts, cmd) => {
+    const config = requireConfig()
+    const platform = validatePlatform(platformArg)
+    const projectId = await resolveProjectId(config)
+
+    // Check if already connected
+    const statusResult = await getStatus(config, platform, projectId)
+    if (statusResult.ok && (statusResult.data as Record<string, unknown>).connected) {
+      warn(`${PLATFORM_LABELS[platform]} is already connected.`)
+      return
+    }
+
+    if (OAUTH_PLATFORMS.includes(platform)) {
+      await connectOAuth(config, platform, projectId)
+    } else if (platform === 'gong') {
+      await connectGong(config, projectId, {
+        accessKey: opts.accessKey || '',
+        accessKeySecret: opts.accessKeySecret || '',
+        baseUrl: opts.baseUrl || '',
+        syncFrequency: opts.syncFrequency || '',
+      })
+    } else if (platform === 'zendesk') {
+      await connectZendesk(config, projectId, {
+        subdomain: opts.subdomain || '',
+        email: opts.email || '',
+        apiToken: opts.apiToken || '',
+        syncFrequency: opts.syncFrequency || '',
+      })
+    } else if (platform === 'intercom') {
+      await connectIntercom(config, projectId, {
+        accessToken: opts.accessToken || '',
+        syncFrequency: opts.syncFrequency || '',
+      })
+    } else if (platform === 'fathom') {
+      await connectFathom(config, projectId, {
+        apiKey: opts.apiKey || '',
+        syncFrequency: opts.syncFrequency || '',
+      })
+    } else if (platform === 'hubspot') {
+      await connectHubspot(config, projectId, {
+        accessToken: opts.accessToken || '',
+        syncFrequency: opts.syncFrequency || '',
+        overwritePolicy: opts.overwritePolicy || '',
+      })
+    } else if (platform === 'notion') {
+      await connectNotion(config, projectId, {
+        accessToken: opts.accessToken || '',
+      })
+    }
+  })
+
+const statusSubcommand = new Command('status')
+  .description('Show detailed status of an integration')
+  .argument('<platform>', `Platform to check (${PLATFORMS.join(', ')})`)
+  .action(async (platformArg, _opts, cmd) => {
+    const config = requireConfig()
+    const jsonMode = cmd.parent?.parent?.opts().json
+    const platform = validatePlatform(platformArg)
+    const projectId = await resolveProjectId(config)
+
+    const result = await getStatus(config, platform, projectId)
+    if (!result.ok) {
+      const data = result.data as { error?: string }
+      error(`Failed: ${data.error || `HTTP ${result.status}`}`)
+      process.exit(1)
+    }
+    const data = result.data as Record<string, unknown>
+    if (jsonMode) {
+      console.log(renderJson(data))
+    } else {
+      console.log(renderMarkdown(formatStatus(platform, data)))
+    }
+  })
+
+const configureSubcommand = new Command('configure')
+  .description('Update integration settings')
+  .argument('<platform>', `Platform to configure (${PLATFORMS.join(', ')})`)
+  .action(async (platformArg) => {
+    const config = requireConfig()
+    const platform = validatePlatform(platformArg)
+    const projectId = await resolveProjectId(config)
+
+    const statusResult = await getStatus(config, platform, projectId)
+    if (!statusResult.ok || !(statusResult.data as Record<string, unknown>).connected) {
+      error(`${PLATFORM_LABELS[platform]} is not connected. Run 'hissuno integrations add ${platform}' first.`)
+      process.exit(1)
+    }
+    await configureIntegration(config, platform, projectId)
+  })
+
+const syncSubcommand = new Command('sync')
+  .description('Trigger a manual sync')
+  .argument('<platform>', `Platform to sync (${PLATFORMS.join(', ')})`)
   .option('--mode <mode>', 'Sync mode: incremental, full')
-  .action(async (platformArg, actionArg, opts, cmd) => {
+  .action(async (platformArg, opts) => {
+    const config = requireConfig()
+    const platform = validatePlatform(platformArg)
+    const projectId = await resolveProjectId(config)
+
+    const statusResult = await getStatus(config, platform, projectId)
+    if (!statusResult.ok || !(statusResult.data as Record<string, unknown>).connected) {
+      error(`${PLATFORM_LABELS[platform]} is not connected.`)
+      process.exit(1)
+    }
+    await syncIntegration(config, platform, projectId, opts.mode || '')
+  })
+
+const disconnectSubcommand = new Command('disconnect')
+  .description('Disconnect an integration')
+  .argument('<platform>', `Platform to disconnect (${PLATFORMS.join(', ')})`)
+  .action(async (platformArg) => {
+    const config = requireConfig()
+    const platform = validatePlatform(platformArg)
+    const projectId = await resolveProjectId(config)
+
+    const statusResult = await getStatus(config, platform, projectId)
+    if (!statusResult.ok || !(statusResult.data as Record<string, unknown>).connected) {
+      error(`${PLATFORM_LABELS[platform]} is not connected.`)
+      return
+    }
+    await disconnectIntegration(config, platform, projectId)
+  })
+
+// ---------------------------------------------------------------------------
+// Main command
+// ---------------------------------------------------------------------------
+
+export const integrationsCommand = new Command('integrations')
+  .description('Manage integrations (intercom, gong, zendesk, slack, github, jira, linear, fathom, hubspot, notion)')
+  .argument('[platform]', 'Platform for interactive wizard')
+  .action(async (platformArg, _opts, cmd) => {
     const config = requireConfig()
     const jsonMode = cmd.parent?.opts().json
 
-    const projectId = await getProjectId(config)
-
-    // No platform: list all integrations
     if (!platformArg) {
-      const results = await Promise.all(
-        PLATFORMS.map(async (p) => {
-          const result = await getStatus(config, p, projectId)
-          return {
-            platform: p,
-            name: PLATFORM_LABELS[p],
-            connected: result.ok ? (result.data as Record<string, unknown>).connected === true : false,
-            data: result.ok ? result.data : null,
-          }
-        })
-      )
-
-      if (jsonMode) {
-        console.log(renderJson(results))
-        return
-      }
-
-      console.log(renderMarkdown('# Integrations\n'))
-      for (const r of results) {
-        const status = r.connected ? '\x1b[32mConnected\x1b[0m' : '\x1b[2mNot connected\x1b[0m'
-        console.log(`  ${r.name.padEnd(12)} ${status}`)
-      }
-      console.log('\nRun `hissuno integrate <platform>` to manage a specific integration.')
+      const projectId = await resolveProjectId(config)
+      await listIntegrations(config, projectId, jsonMode)
       return
     }
 
-    // Validate platform
-    const platform = platformArg.toLowerCase() as Platform
-    if (!PLATFORMS.includes(platform)) {
-      error(`Unknown platform "${platformArg}". Supported: ${PLATFORMS.join(', ')}`)
-      process.exit(1)
-    }
-
-    // No action: interactive wizard
-    if (!actionArg) {
-      await interactiveWizard(config, platform, projectId, jsonMode)
-      return
-    }
-
-    const action = actionArg.toLowerCase()
-
-    switch (action) {
-      case 'status': {
-        const result = await getStatus(config, platform, projectId)
-        if (!result.ok) {
-          const data = result.data as { error?: string }
-          error(`Failed: ${data.error || `HTTP ${result.status}`}`)
-          process.exit(1)
-        }
-        const data = result.data as Record<string, unknown>
-        if (jsonMode) {
-          console.log(renderJson(data))
-        } else {
-          console.log(renderMarkdown(formatStatus(platform, data)))
-        }
-        break
-      }
-
-      case 'connect': {
-        // Check if already connected
-        const statusResult = await getStatus(config, platform, projectId)
-        if (statusResult.ok && (statusResult.data as Record<string, unknown>).connected) {
-          warn(`${PLATFORM_LABELS[platform]} is already connected.`)
-          return
-        }
-
-        if (OAUTH_PLATFORMS.includes(platform)) {
-          await connectOAuth(config, platform, projectId)
-        } else if (platform === 'gong') {
-          await connectGong(config, projectId, {
-            accessKey: opts.accessKey || '',
-            accessKeySecret: opts.accessKeySecret || '',
-            baseUrl: opts.baseUrl || '',
-            syncFrequency: opts.syncFrequency || '',
-          })
-        } else if (platform === 'zendesk') {
-          await connectZendesk(config, projectId, {
-            subdomain: opts.subdomain || '',
-            email: opts.email || '',
-            apiToken: opts.apiToken || '',
-            syncFrequency: opts.syncFrequency || '',
-          })
-        } else if (platform === 'intercom') {
-          await connectIntercom(config, projectId, {
-            accessToken: opts.accessToken || '',
-            syncFrequency: opts.syncFrequency || '',
-          })
-        }
-        break
-      }
-
-      case 'configure': {
-        const statusResult = await getStatus(config, platform, projectId)
-        if (!statusResult.ok || !(statusResult.data as Record<string, unknown>).connected) {
-          error(`${PLATFORM_LABELS[platform]} is not connected. Run 'hissuno integrate ${platform} connect' first.`)
-          process.exit(1)
-        }
-        await configureIntegration(config, platform, projectId)
-        break
-      }
-
-      case 'sync': {
-        const statusResult = await getStatus(config, platform, projectId)
-        if (!statusResult.ok || !(statusResult.data as Record<string, unknown>).connected) {
-          error(`${PLATFORM_LABELS[platform]} is not connected.`)
-          process.exit(1)
-        }
-        await syncIntegration(config, platform, projectId, opts.mode || '')
-        break
-      }
-
-      case 'disconnect': {
-        const statusResult = await getStatus(config, platform, projectId)
-        if (!statusResult.ok || !(statusResult.data as Record<string, unknown>).connected) {
-          error(`${PLATFORM_LABELS[platform]} is not connected.`)
-          return
-        }
-        await disconnectIntegration(config, platform, projectId)
-        break
-      }
-
-      default:
-        error(`Unknown action "${action}". Valid actions: status, connect, configure, sync, disconnect`)
-        process.exit(1)
-    }
+    // Platform specified without subcommand: interactive wizard
+    const platform = validatePlatform(platformArg)
+    const projectId = await resolveProjectId(config)
+    await interactiveWizard(config, platform, projectId, jsonMode)
   })
+
+integrationsCommand.addCommand(listSubcommand)
+integrationsCommand.addCommand(addSubcommand)
+integrationsCommand.addCommand(statusSubcommand)
+integrationsCommand.addCommand(configureSubcommand)
+integrationsCommand.addCommand(syncSubcommand)
+integrationsCommand.addCommand(disconnectSubcommand)

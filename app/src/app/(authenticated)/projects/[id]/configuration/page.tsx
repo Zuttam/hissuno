@@ -16,11 +16,9 @@ import { ProductCopilotDialog } from '@/components/projects/agents/product-copil
 import { WorkflowCard } from '@/components/projects/workflows/workflow-card'
 import { FeedbackReviewDialog } from '@/components/projects/workflows/feedback-review-dialog'
 import { IssueAnalysisDialog } from '@/components/projects/workflows/issue-analysis-dialog'
-import { KnowledgeAnalysisDialog } from '@/components/projects/workflows/knowledge-analysis-dialog'
 import { ProjectInfoSection } from '@/components/projects/configuration/project-info-section'
 import { DangerZoneSection } from '@/components/projects/configuration/danger-zone-section'
 import { CustomTagsSection, type LocalCustomTag } from '@/components/projects/configuration/custom-tags-section'
-import { TrackingToggle, type IssuesSettings } from '@/components/projects/configuration/issues-settings'
 import { FieldsEditor } from '@/components/customers/custom-fields-settings-dialog'
 import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
 import { Button, Heading, Spinner, PageHeader } from '@/components/ui'
@@ -31,7 +29,6 @@ import {
   getSupportAgentSettings,
   getFeedbackReviewSettings,
   getIssueAnalysisSettings,
-  getKnowledgeAnalysisSettings,
   getFeedbackIssuesSettings,
   updateFeedbackIssuesSettings,
 } from '@/lib/api/settings'
@@ -54,13 +51,11 @@ interface AgentSettings {
   feedbackReview: {
     classificationGuidelines: string
     analysisGuidelines: string
+    issueTrackingEnabled: boolean
   }
   issueAnalysis: {
     analysisGuidelines: string
     briefGuidelines: string
-  }
-  knowledgeAnalysis: {
-    relationshipGuidelines: string
   }
 }
 
@@ -76,13 +71,11 @@ const DEFAULT_SETTINGS: AgentSettings = {
   feedbackReview: {
     classificationGuidelines: '',
     analysisGuidelines: '',
+    issueTrackingEnabled: true,
   },
   issueAnalysis: {
     analysisGuidelines: '',
     briefGuidelines: '',
-  },
-  knowledgeAnalysis: {
-    relationshipGuidelines: '',
   },
 }
 
@@ -116,7 +109,7 @@ export default function AgentsSettingsPage() {
   const [showTestAgent, setShowTestAgent] = useState(false)
   const [showFeedbackReviewDialog, setShowFeedbackReviewDialog] = useState(false)
   const [showIssueAnalysisDialog, setShowIssueAnalysisDialog] = useState(false)
-  const [showKnowledgeAnalysisDialog, setShowKnowledgeAnalysisDialog] = useState(false)
+
 
   // --- Agent data ---
   const [settings, setSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
@@ -132,13 +125,11 @@ export default function AgentsSettingsPage() {
 
   // --- Feedback tab state ---
   const [customTags, setCustomTags] = useState<LocalCustomTag[]>([])
-  const [issuesSettings, setIssuesSettings] = useState<IssuesSettings>({ issue_tracking_enabled: true })
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(true)
 
   // --- Feedback auto-save state ---
   const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const [tagsSaved, setTagsSaved] = useState(false)
-  const [issuesSaved, setIssuesSaved] = useState(false)
 
   // Initialize general tab fields from project
   useEffect(() => {
@@ -152,11 +143,10 @@ export default function AgentsSettingsPage() {
   const fetchSettings = useCallback(async () => {
     if (!projectId) return
     try {
-      const [supportAgentData, feedbackReviewData, issueAnalysisData, knowledgeAnalysisData] = await Promise.all([
+      const [supportAgentData, feedbackReviewData, issueAnalysisData] = await Promise.all([
         getSupportAgentSettings(projectId).catch(() => null),
         getFeedbackReviewSettings(projectId).catch(() => null),
         getIssueAnalysisSettings(projectId).catch(() => null),
-        getKnowledgeAnalysisSettings(projectId).catch(() => null),
       ])
 
       if (supportAgentData?.settings) {
@@ -182,6 +172,7 @@ export default function AgentsSettingsPage() {
           feedbackReview: {
             classificationGuidelines: (s.classification_guidelines as string) ?? '',
             analysisGuidelines: (s.analysis_guidelines as string) ?? '',
+            issueTrackingEnabled: (s.issue_tracking_enabled as boolean) ?? true,
           },
         }))
       }
@@ -197,15 +188,6 @@ export default function AgentsSettingsPage() {
         }))
       }
 
-      if (knowledgeAnalysisData?.settings) {
-        const s = knowledgeAnalysisData.settings
-        setSettings((prev) => ({
-          ...prev,
-          knowledgeAnalysis: {
-            relationshipGuidelines: (s.knowledge_relationship_guidelines as string) ?? '',
-          },
-        }))
-      }
     } catch (err) {
       console.error('[agents] Failed to fetch settings:', err)
     } finally {
@@ -237,9 +219,6 @@ export default function AgentsSettingsPage() {
         color: tag.color as LocalCustomTag['color'],
         position: tag.position,
       })))
-      if (data.issueSettings) {
-        setIssuesSettings(data.issueSettings as unknown as IssuesSettings)
-      }
     } catch (err) {
       setFeedbackError(err instanceof Error ? err.message : 'Failed to load feedback settings')
     } finally {
@@ -311,21 +290,6 @@ export default function AgentsSettingsPage() {
       setFeedbackError(err instanceof Error ? err.message : 'Failed to save custom tags')
     }
   }, [projectId])
-
-  // --- Auto-save issue tracking toggle ---
-  const handleTrackingEnabledChange = useCallback(async (enabled: boolean) => {
-    const previous = issuesSettings.issue_tracking_enabled
-    setIssuesSettings({ issue_tracking_enabled: enabled })
-    setFeedbackError(null)
-    try {
-      await updateFeedbackIssuesSettings(projectId!, { issue_tracking_enabled: enabled })
-      setIssuesSaved(true)
-      setTimeout(() => setIssuesSaved(false), 3000)
-    } catch (err) {
-      setIssuesSettings({ issue_tracking_enabled: previous })
-      setFeedbackError(err instanceof Error ? err.message : 'Failed to save issue settings')
-    }
-  }, [projectId, issuesSettings.issue_tracking_enabled])
 
   // Loading state
   if (isLoadingProject || !project || !projectId || isLoading) {
@@ -483,13 +447,6 @@ export default function AgentsSettingsPage() {
                 steps={['Analyze Impact & Effort', 'Compute Scores', 'Generate Brief']}
                 onClick={() => setShowIssueAnalysisDialog(true)}
               />
-              <WorkflowCard
-                icon="📚"
-                title="Knowledge Analysis"
-                description="Analyzes sources and finds relationships to existing entities"
-                steps={['Fetch Content', 'Analyze', 'Embed', 'Find Relationships']}
-                onClick={() => setShowKnowledgeAnalysisDialog(true)}
-              />
             </div>
           </div>
         </TabsPanel>
@@ -520,22 +477,6 @@ export default function AgentsSettingsPage() {
                   />
                 </div>
 
-                {/* Divider */}
-                <div className="border-t border-[color:var(--border-subtle)]" />
-
-                {/* Issue Tracking Section */}
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-2">
-                    <Heading as="h3" size="subsection">Issue Tracking</Heading>
-                    {issuesSaved && (
-                      <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
-                    )}
-                  </div>
-                  <TrackingToggle
-                    trackingEnabled={issuesSettings.issue_tracking_enabled}
-                    onTrackingEnabledChange={(enabled) => void handleTrackingEnabledChange(enabled)}
-                  />
-                </div>
               </>
             )}
 
@@ -574,6 +515,7 @@ export default function AgentsSettingsPage() {
         projectId={projectId}
         classificationGuidelines={settings.feedbackReview.classificationGuidelines}
         analysisGuidelines={settings.feedbackReview.analysisGuidelines}
+        issueTrackingEnabled={settings.feedbackReview.issueTrackingEnabled}
         onSaved={handleSettingsSaved}
       />
       <IssueAnalysisDialog
@@ -582,13 +524,6 @@ export default function AgentsSettingsPage() {
         projectId={projectId}
         analysisGuidelines={settings.issueAnalysis.analysisGuidelines}
         briefGuidelines={settings.issueAnalysis.briefGuidelines}
-        onSaved={handleSettingsSaved}
-      />
-      <KnowledgeAnalysisDialog
-        open={showKnowledgeAnalysisDialog}
-        onClose={() => setShowKnowledgeAnalysisDialog(false)}
-        projectId={projectId}
-        relationshipGuidelines={settings.knowledgeAnalysis.relationshipGuidelines}
         onSaved={handleSettingsSaved}
       />
       {showTestAgent && (

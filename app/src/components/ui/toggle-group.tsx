@@ -1,9 +1,9 @@
 import { ReactNode } from 'react'
-import { Button } from './button'
 
 type ToggleOption<T extends string> = {
   value: T
   label: ReactNode
+  icon?: ReactNode
   disabled?: boolean
 }
 
@@ -20,35 +20,33 @@ export function ToggleGroup<T extends string>({
   onChange,
   options,
   className,
-  optionClassName,
 }: ToggleGroupProps<T>) {
-  const containerClasses = className ? `flex gap-3 ${className}` : 'flex gap-3'
-
   return (
-    <div className={containerClasses}>
+    <div className={`flex gap-1 border-b border-[color:var(--border-subtle)] ${className ?? ''}`}>
       {options.map((option) => {
         const isSelected = option.value === value
 
         return (
-          <Button
+          <button
             key={option.value}
             type="button"
-            variant="ghost"
-            size="md"
             disabled={option.disabled}
-            selected={isSelected}
             onClick={() => {
               if (!option.disabled) {
                 onChange(option.value)
               }
             }}
-            className={optionClassName}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+              isSelected
+                ? 'border-b-2 border-[color:var(--accent-primary)] text-[color:var(--foreground)] -mb-px'
+                : 'text-[color:var(--text-tertiary)] hover:text-[color:var(--text-secondary)]'
+            } ${option.disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
           >
+            {option.icon}
             {option.label}
-          </Button>
+          </button>
         )
       })}
     </div>
   )
 }
-

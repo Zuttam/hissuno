@@ -320,23 +320,34 @@ hissuno update scopes <id>
 
 ---
 
-### `hissuno integrate [platform] [action]`
+### `hissuno integrations`
 
 Manage integrations with external platforms.
 
 **Supported platforms:** `intercom`, `gong`, `zendesk`, `slack`, `github`, `jira`, `linear`
 
 ```bash
-hissuno integrate                                # List all integrations with status
-hissuno integrate <platform>                     # Interactive setup wizard
-hissuno integrate <platform> status              # Detailed status
-hissuno integrate <platform> connect             # Connect (OAuth or token)
-hissuno integrate <platform> configure           # Update settings
-hissuno integrate <platform> sync                # Trigger manual sync
-hissuno integrate <platform> disconnect          # Disconnect
+hissuno integrations list                        # List all integrations with status
+hissuno integrations <platform>                  # Interactive setup wizard
+hissuno integrations status <platform>           # Detailed status
+hissuno integrations add <platform>              # Connect (OAuth or token)
+hissuno integrations configure <platform>        # Update settings
+hissuno integrations sync <platform>             # Trigger manual sync
+hissuno integrations disconnect <platform>       # Disconnect
 ```
 
-**Platform-specific connect options:**
+**Subcommands:**
+
+| Subcommand | Args | Description |
+|------------|------|-------------|
+| `list` | | List all integrations with connection status |
+| `add` | `<platform>` | Connect a platform (OAuth or token-based) |
+| `status` | `<platform>` | Show detailed connection status |
+| `configure` | `<platform>` | Update settings (sync frequency, auto-sync toggle) |
+| `sync` | `<platform>` | Trigger a manual sync (Intercom, Gong, Zendesk only) |
+| `disconnect` | `<platform>` | Disconnect the integration |
+
+**Platform-specific add options:**
 
 | Option | Platforms | Description |
 |--------|-----------|-------------|
@@ -346,8 +357,10 @@ hissuno integrate <platform> disconnect          # Disconnect
 | `--subdomain <sub>` | zendesk | Zendesk subdomain |
 | `--email <email>` | zendesk | Admin email |
 | `--api-token <token>` | zendesk | API token |
-| `--access-token <token>` | intercom | Access token |
-| `--sync-frequency <freq>` | gong, zendesk, intercom | `manual`, `1h`, `6h`, `24h` |
-| `--mode <mode>` | sync action | `incremental` (default) or `full` |
+| `--access-token <token>` | intercom, hubspot, notion | Access token |
+| `--api-key <key>` | fathom | API key |
+| `--overwrite-policy <policy>` | hubspot | `fill_nulls`, `hubspot_wins`, `never_overwrite` |
+| `--sync-frequency <freq>` | gong, zendesk, intercom, fathom, hubspot | `manual`, `1h`, `6h`, `24h` |
+| `--mode <mode>` | sync subcommand | `incremental` (default) or `full` |
 
 See `references/INTEGRATIONS.md` for full platform details.

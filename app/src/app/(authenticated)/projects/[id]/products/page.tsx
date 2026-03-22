@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { useProject } from '@/components/providers/project-provider'
 import { useProductScopes } from '@/hooks/use-product-scopes'
 import { ProductScopeList } from '@/components/projects/products/product-scope-list'
@@ -18,6 +18,7 @@ export default function ProductsPage() {
   const { scopes, isLoading, refresh } = useProductScopes({ projectId: projectId ?? undefined })
 
   const [searchQuery, setSearchQuery] = useState('')
+  const [isAddingScope, setIsAddingScope] = useState(false)
   const [selectedScopeId, setSelectedScopeId] = useState<string | null>(
     searchParams.get('area')
   )
@@ -75,7 +76,20 @@ export default function ProductsPage() {
 
   return (
     <>
-      <PageHeader title="Product Areas & Initiatives" />
+      <PageHeader
+        title="Product Areas & Initiatives"
+        actions={
+          <button
+            type="button"
+            onClick={() => setIsAddingScope(true)}
+            disabled={scopes.length >= 20}
+            className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus size={14} />
+            Add Scope
+          </button>
+        }
+      />
 
       <div className="flex flex-1 flex-col gap-4">
         {/* Search */}
@@ -104,6 +118,8 @@ export default function ProductsPage() {
             onSelect={setSelectedScopeId}
             onAdd={handleAdd}
             searchQuery={searchQuery}
+            isAdding={isAddingScope}
+            onAddingChange={setIsAddingScope}
           />
         )}
       </div>

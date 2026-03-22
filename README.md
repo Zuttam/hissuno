@@ -218,7 +218,7 @@ Open your Vercel URL and log in with the seeded credentials, or sign up for a ne
 - **LLM**: OpenAI (GPT-4o, GPT-5)
 - **Storage**: Local filesystem (default) or S3-compatible
 - **Knowledge Graph**: Unified `entity_relationships` table forming a traversable graph across sessions, issues, contacts, product areas, and knowledge sources
-- **Integrations**: GitHub, Slack, Linear, Jira, Intercom, MCP (Model Context Protocol)
+- **Integrations**: Slack, Intercom, Gong, Fathom, Zendesk, GitHub, Notion, Jira, Linear, HubSpot, PostHog, Widget, MCP
 
 ### AI Agents
 
@@ -282,8 +282,18 @@ import { HissunoWidget } from '@hissuno/widget';
 
 ### Integrations
 
-- **GitHub** - Connect repositories for codebase analysis
-- **Slack** - Monitor channels, create sessions from messages
+Connect your tools to feed data into the knowledge graph. 12 integrations available, organized by category:
+
+| Category | Integrations | What It Brings In |
+|----------|-------------|-------------------|
+| **Interactive** | Widget, Slack | Live customer conversations, channel feedback |
+| **Feedback** | Intercom, Gong, Fathom, Zendesk | Support tickets, call transcripts, meeting notes |
+| **Knowledge** | GitHub, Notion | Codebase analysis, documentation pages |
+| **Issues** | Jira, Linear | Two-way issue sync with project management |
+| **Analytics** | PostHog | Behavioral profiles enriching contacts |
+| **CRM** | HubSpot | Companies and contacts sync |
+
+Coming soon: Gmail, Google Drive, Amplitude, Salesforce.
 
 ### MCP Server
 
@@ -355,6 +365,15 @@ app/
 
 /api/integrations/github/      # GitHub OAuth
 /api/integrations/slack/       # Slack integration
+/api/integrations/intercom/    # Intercom sync
+/api/integrations/gong/        # Gong sync
+/api/integrations/fathom/      # Fathom sync
+/api/integrations/zendesk/     # Zendesk sync
+/api/integrations/jira/        # Jira sync
+/api/integrations/linear/      # Linear sync
+/api/integrations/hubspot/     # HubSpot sync
+/api/integrations/notion/      # Notion connection
+/api/integrations/posthog/     # PostHog sync
 ```
 
 ---

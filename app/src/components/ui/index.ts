@@ -1,4 +1,5 @@
 export { Alert } from './alert'
+export { InlineAlert } from './inline-alert'
 export { Badge, getStatusBadgeVariant, getStatusLabel } from './badge'
 export { Button } from './button'
 export { Heading, type HeadingProps, type HeadingSize, type HeadingLevel } from './heading'

@@ -7,7 +7,7 @@ description: "Connect the channels where your customers communicate to automatic
 
 Hissuno captures customer feedback from multiple channels and consolidates it into a single session list. Each source integration creates sessions automatically when conversations occur, so your team does not need to manually log feedback.
 
-Supported source channels are: Widget, Slack, Intercom, Gong, API, and manual entry.
+Supported source channels are: Widget, Slack, Intercom, Gong, Fathom, Zendesk, API, and manual entry.
 
 ## Widget
 
@@ -121,6 +121,71 @@ Gong syncs follow the same pattern as Intercom:
 
 Gong transcripts are stored as session messages with speaker attribution. The session type is automatically set to **meeting**, which changes how the conversation is rendered in the dashboard (transcript view instead of chat bubbles).
 
+## Fathom
+
+The Fathom integration imports AI meeting notes and transcripts as feedback sessions with the **meeting** session type.
+
+### Setup
+
+1. Navigate to **Integrations** in the sidebar
+2. Enter your Fathom API key (found under Settings > API in your Fathom account)
+3. Click **Connect** to validate and save
+
+### Sync Configuration
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| Sync Frequency | Manual, Every 1h, Every 6h, Every 24h | How often meetings are pulled from Fathom |
+| Date Filter | From date, To date | Restrict which meetings are synced based on their date |
+
+### How Sync Works
+
+When a sync runs (manually or on schedule), Hissuno:
+
+1. Fetches meetings from the Fathom API with configured date filters
+2. Deduplicates against previously synced meetings
+3. Creates a feedback session with the **meeting** type for each new meeting
+4. Imports the meeting transcript and AI-generated notes as session messages
+5. Tracks sync results including meeting count
+
+### Sync Modes
+
+- **Incremental**: Only new meetings since the last sync are processed (default behavior)
+- **Full**: Re-scan all meetings from the configured date range. Already imported sessions are skipped.
+
+## Zendesk
+
+The Zendesk integration syncs solved and closed support tickets into Hissuno as feedback sessions.
+
+### Setup
+
+1. Navigate to **Integrations** in the sidebar
+2. Enter your Zendesk subdomain, admin email, and API token
+3. Configure sync settings including frequency and date filters
+4. Click **Connect** to validate and save
+
+### Sync Configuration
+
+| Setting | Options | Description |
+|---------|---------|-------------|
+| Sync Frequency | Manual, Every 1h, Every 6h, Every 24h | How often tickets are pulled from Zendesk |
+| Date Filter | From date, To date | Restrict which tickets are synced based on their solved date |
+
+### How Sync Works
+
+Zendesk syncs follow the same pattern as Intercom and Gong:
+
+1. Fetch solved/closed tickets from the Zendesk API with configured filters
+2. Deduplicate against previously synced tickets
+3. Create feedback sessions for each unseen ticket
+4. Import the ticket comments as session messages with sender attribution
+5. Track sync results including ticket count
+
+### Sync Modes
+
+- **Incremental**: Only new tickets since the last sync are processed (default behavior)
+- **Start from scratch**: Clears sync history and re-imports all matching tickets
+
 ## API
 
 For channels not covered by the built-in integrations, you can use the Hissuno API to create sessions programmatically.
@@ -135,4 +200,4 @@ Sessions can be created manually from the dashboard by clicking **New Session** 
 
 ## Source Badges
 
-Each session displays a source badge in the feedback list: **Widget**, **Slack**, **Intercom**, **Gong**, **API**, or **Manual**. This helps your team quickly identify the originating channel and prioritize accordingly.
+Each session displays a source badge in the feedback list: **Widget**, **Slack**, **Intercom**, **Gong**, **Fathom**, **Zendesk**, **API**, or **Manual**. This helps your team quickly identify the originating channel and prioritize accordingly.

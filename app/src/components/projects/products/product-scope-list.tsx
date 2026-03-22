@@ -29,6 +29,8 @@ interface ProductScopeListProps {
   onSelect: (scopeId: string) => void
   onAdd: (scope: { name: string; slug: string; description: string; color: TagColorVariant; type: ProductScopeType }) => void
   searchQuery: string
+  isAdding?: boolean
+  onAddingChange?: (adding: boolean) => void
 }
 
 export function ProductScopeList({
@@ -37,8 +39,12 @@ export function ProductScopeList({
   onSelect,
   onAdd,
   searchQuery,
+  isAdding: isAddingProp,
+  onAddingChange,
 }: ProductScopeListProps) {
-  const [isAdding, setIsAdding] = useState(false)
+  const [isAddingLocal, setIsAddingLocal] = useState(false)
+  const isAdding = isAddingProp ?? isAddingLocal
+  const setIsAdding = onAddingChange ?? setIsAddingLocal
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState<TagColorVariant>('info')
@@ -84,7 +90,7 @@ export function ProductScopeList({
         <p className="py-8 text-center text-sm text-[color:var(--text-tertiary)]">
           {searchQuery.trim()
             ? 'No product scopes match your search.'
-            : 'No product scopes defined yet. Add your first one below.'}
+            : 'No product scopes defined yet. Click "Add Scope" above to get started.'}
         </p>
       )}
 
@@ -181,17 +187,9 @@ export function ProductScopeList({
         </div>
       )}
 
-      {/* Add button */}
+      {/* Scope count */}
       {!isAdding && (
-        <div className="flex items-center justify-between pt-1">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => setIsAdding(true)}
-            disabled={scopes.length >= MAX_SCOPES}
-          >
-            + Add Product Area or Initiative
-          </Button>
+        <div className="flex items-center justify-end pt-1">
           <span className="text-xs text-[color:var(--text-tertiary)]">
             {scopes.length} / {MAX_SCOPES}
           </span>

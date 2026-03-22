@@ -8,7 +8,8 @@
 import { createStep } from '@mastra/core/workflows'
 import { db } from '@/lib/db'
 import { eq, and, isNotNull } from 'drizzle-orm'
-import { sessions, projectSettings, productScopes, entityRelationships } from '@/lib/db/schema/app'
+import { sessions, productScopes, entityRelationships } from '@/lib/db/schema/app'
+import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings'
 import { summarizeOutputSchema, preparedPMContextSchema } from '../schemas'
 
 export const preparePMContext = createStep({
@@ -27,8 +28,8 @@ export const preparePMContext = createStep({
     logger?.info('[prepare-pm-context] Starting', { sessionId, projectId })
     await writer?.write({ type: 'progress', message: 'Fetching session context...' })
 
-    // Fetch session data and project settings in parallel
-    const [sessionRows, settingsRows] = await Promise.all([
+    // Fetch session data and workflow settings in parallel
+    const [sessionRows, workflowSettings] = await Promise.all([
       db
         .select({
           id: sessions.id,
@@ -40,21 +41,13 @@ export const preparePMContext = createStep({
         })
         .from(sessions)
         .where(eq(sessions.id, sessionId)),
-      db
-        .select({
-          issue_tracking_enabled: projectSettings.issue_tracking_enabled,
-          pm_dedup_include_closed: projectSettings.pm_dedup_include_closed,
-        })
-        .from(projectSettings)
-        .where(eq(projectSettings.project_id, projectId)),
+      getPmAgentSettingsAdmin(projectId),
     ])
 
     const session = sessionRows[0]
     if (!session) {
       throw new Error(`Failed to fetch session: Not found`)
     }
-
-    const settings = settingsRows[0]
 
     // Fetch product scope context if available
     let productScopeContext: {
@@ -108,7 +101,6 @@ export const preparePMContext = createStep({
 
     logger?.info('[prepare-pm-context] Completed', {
       messageCount: pipelineMessages.length,
-      hasSettings: !!settings,
     })
 
     return {
@@ -130,8 +122,8 @@ export const preparePMContext = createStep({
       },
       messages: pipelineMessages,
       settings: {
-        issueTrackingEnabled: settings?.issue_tracking_enabled ?? true,
-        pmDedupIncludeClosed: settings?.pm_dedup_include_closed ?? false,
+        issueTrackingEnabled: workflowSettings.issue_tracking_enabled,
+        pmDedupIncludeClosed: workflowSettings.pm_dedup_include_closed,
       },
     }
   },

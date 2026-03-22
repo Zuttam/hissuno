@@ -232,7 +232,7 @@ export function testIntercomConnection(accessToken: string): Promise<Response> {
 export function connectIntercom(body: {
   projectId: string
   accessToken: string
-  syncFrequency: string
+  syncFrequency?: string
   filterConfig?: unknown
 }): Promise<Response> {
   return fetchApiRaw(paths.intercomConnect, { method: 'POST', body })
@@ -278,7 +278,7 @@ export function connectGong(body: {
   baseUrl: string
   accessKey: string
   accessKeySecret: string
-  syncFrequency: string
+  syncFrequency?: string
   filterConfig?: unknown
 }): Promise<Response> {
   return fetchApiRaw(paths.gongConnect, { method: 'POST', body })
@@ -359,7 +359,7 @@ export function connectZendesk(body: {
   subdomain: string
   email: string
   apiToken: string
-  syncFrequency: string
+  syncFrequency?: string
   filterConfig?: unknown
 }): Promise<Response> {
   return fetchApiRaw(paths.zendeskConnect, { method: 'POST', body })
@@ -436,7 +436,7 @@ export function connectPosthog(body: {
   apiKey: string
   host?: string
   posthogProjectId: string
-  syncFrequency: string
+  syncFrequency?: string
   filterConfig?: unknown
 }): Promise<Response> {
   return fetchApiRaw(paths.posthogConnect, { method: 'POST', body })
@@ -507,7 +507,7 @@ export function testHubSpotConnection(accessToken: string): Promise<Response> {
 export function connectHubSpot(body: {
   projectId: string
   accessToken: string
-  syncFrequency: string
+  syncFrequency?: string
   filterConfig?: unknown
 }): Promise<Response> {
   return fetchApiRaw(paths.hubspotConnect, { method: 'POST', body })
@@ -550,7 +550,7 @@ export function testFathomConnection(apiKey: string): Promise<Response> {
 export function connectFathom(body: {
   projectId: string
   apiKey: string
-  syncFrequency: string
+  syncFrequency?: string
   filterConfig?: unknown
 }): Promise<Response> {
   return fetchApiRaw(paths.fathomConnect, { method: 'POST', body })

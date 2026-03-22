@@ -11,6 +11,7 @@ import { contacts, companies, sessions, issues, entityRelationships } from '@/li
 import { resolveRequestContext, getUserProjectIds, sanitizeSearchInput } from '@/lib/db/server'
 import { hasProjectAccess } from '@/lib/auth/project-members'
 import { ForbiddenError } from '@/lib/auth/authorization'
+import { fireGraphEval } from '@/lib/graph-eval'
 import type {
   ContactRecord,
   ContactWithCompany,
@@ -67,6 +68,8 @@ export async function insertContact(
   if (!contact) {
     throw new Error('Failed to insert contact: Unknown error')
   }
+
+  fireGraphEval(data.projectId, 'contact', contact.id)
 
   return contact as unknown as ContactRecord
 }
@@ -138,6 +141,8 @@ export async function updateContactById(
         console.warn('[db.contacts] Embedding failed', contactId, err)
       }
     })()
+
+    fireGraphEval(updated.project_id, 'contact', updated.id)
   }
 
   return updated

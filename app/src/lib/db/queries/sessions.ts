@@ -41,6 +41,7 @@ import type {
   UpdateSessionInput,
 } from '@/types/session'
 import { getDefaultSessionType } from '@/types/session'
+import { fireGraphEval } from '@/lib/graph-eval'
 
 // ---------------------------------------------------------------------------
 // Serialization helpers
@@ -694,6 +695,8 @@ export async function createManualSession(input: CreateSessionInput): Promise<Se
     } catch (linkError) {
       console.error('[db.sessions] Failed to link entities:', linkError)
     }
+
+    fireGraphEval(input.project_id, 'session', sessionId)
 
     // Fetch the session with relations
     const result = await db.query.sessions.findFirst({

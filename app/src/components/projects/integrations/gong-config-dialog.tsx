@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import { Check, Unplug, Plug, Zap } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
 import {
   fetchGongStatus,
   testGongConnection,
@@ -78,16 +79,13 @@ export function GongConfigDialog({
   const [baseUrl, setBaseUrl] = useState('')
   const [accessKey, setAccessKey] = useState('')
   const [accessKeySecret, setAccessKeySecret] = useState('')
+  const [isConnecting, setIsConnecting] = useState(false)
+
   const [syncFrequency, setSyncFrequency] = useState<SyncFrequency>('manual')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [isConnecting, setIsConnecting] = useState(false)
-
-  // Test connection state
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
-
-  // Connected state
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -175,17 +173,11 @@ export function GongConfigDialog({
     setError(null)
 
     try {
-      const filterConfig: FilterConfig = {}
-      if (fromDate) filterConfig.fromDate = fromDate
-      if (toDate) filterConfig.toDate = toDate
-
       const response = await connectGong({
         projectId,
         baseUrl: baseUrl.trim(),
         accessKey: accessKey.trim(),
         accessKeySecret: accessKeySecret.trim(),
-        syncFrequency,
-        filterConfig: Object.keys(filterConfig).length > 0 ? filterConfig : undefined,
       })
 
       const data = await response.json()
@@ -340,12 +332,12 @@ export function GongConfigDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Gong Integration" size="xxl">
+    <Dialog open={open} onClose={onClose} title="Gong Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
         {successMessage && (
-          <Alert variant="success">
+          <InlineAlert variant="success">
             {successMessage}
             {showSessionsLink && (
               <>
@@ -359,7 +351,7 @@ export function GongConfigDialog({
                 </Link>
               </>
             )}
-          </Alert>
+          </InlineAlert>
         )}
 
         {isLoading ? (
@@ -369,9 +361,7 @@ export function GongConfigDialog({
         ) : status.connected ? (
           // Connected state
           <div className="space-y-6">
-            <Alert variant="success">
-              &#10003; Connected to Gong
-            </Alert>
+            <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to Gong</p>
 
             {/* Sync Stats */}
             <div className="space-y-2">
@@ -551,20 +541,28 @@ export function GongConfigDialog({
             </div>
 
             {/* Danger Zone */}
-            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">Danger Zone</h4>
-              <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
-                Disconnect
-              </Button>
-              <p className="text-xs text-[color:var(--text-tertiary)]">
+            <div className="border-t border-[color:var(--accent-danger)] pt-4">
+              <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
+              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                 This will remove the Gong connection. Previously synced sessions will remain.
               </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="mt-3"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                loading={isDisconnecting}
+              >
+                <Unplug size={14} />
+                Disconnect
+              </Button>
             </div>
           </div>
         ) : (
           // Not connected state
           <div className="space-y-6">
-            <Alert variant="info">
+            <InlineAlert variant="info">
               Connect your Gong account to sync call transcripts into Hissuno.
               You&apos;ll need a{' '}
               <a
@@ -576,7 +574,7 @@ export function GongConfigDialog({
                 Gong API key
               </a>{' '}
               (access key + secret).
-            </Alert>
+            </InlineAlert>
 
             {/* Connect Form */}
             <div className="space-y-4">
@@ -622,26 +620,16 @@ export function GongConfigDialog({
                 <label className="text-sm font-medium text-[color:var(--foreground)]">
                   Access Key Secret
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={accessKeySecret}
-                    onChange={(e) => {
-                      setAccessKeySecret(e.target.value)
-                      setTestResult(null)
-                    }}
-                    placeholder="Enter your Gong access key secret"
-                    className="flex-1 rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                  />
-                  <Button
-                    variant="secondary"
-                    onClick={handleTestConnection}
-                    loading={isTesting}
-                    disabled={isTesting}
-                  >
-                    Test
-                  </Button>
-                </div>
+                <input
+                  type="password"
+                  value={accessKeySecret}
+                  onChange={(e) => {
+                    setAccessKeySecret(e.target.value)
+                    setTestResult(null)
+                  }}
+                  placeholder="Enter your Gong access key secret"
+                  className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                />
                 {testResult && (
                   <p
                     className={`text-xs ${
@@ -658,67 +646,26 @@ export function GongConfigDialog({
                 </p>
               </div>
 
-              {/* Sync Frequency */}
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-[color:var(--foreground)]">
-                  Sync Frequency
-                </label>
-                <select
-                  value={syncFrequency}
-                  onChange={(e) => setSyncFrequency(e.target.value as SyncFrequency)}
-                  className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTestConnection}
+                  loading={isTesting}
+                  disabled={isTesting}
                 >
-                  {FREQUENCY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  <Zap size={14} />
+                  Test
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleConnect} loading={isConnecting}>
+                  <Plug size={14} />
+                  Connect Gong
+                </Button>
               </div>
-
-              {/* Date Range (optional) */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-[color:var(--foreground)]">
-                  Date Range (optional)
-                </label>
-                <p className="text-xs text-[color:var(--text-tertiary)]">
-                  Only sync calls within this date range. Leave empty to sync all.
-                </p>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs text-[color:var(--text-secondary)]">From</label>
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs text-[color:var(--text-secondary)]">To</label>
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Button variant="primary" onClick={handleConnect} loading={isConnecting}>
-                Connect Gong
-              </Button>
             </div>
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
       </div>
     </Dialog>
   )

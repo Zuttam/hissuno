@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
       settings: {
         classification_guidelines: all.classification_guidelines,
         analysis_guidelines: all.analysis_guidelines,
+        issue_tracking_enabled: all.issue_tracking_enabled,
       },
     })
   } catch (error) {
@@ -63,20 +64,23 @@ export async function PATCH(request: NextRequest) {
     await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
-    const { classification_guidelines, analysis_guidelines } = body as {
+    const { classification_guidelines, analysis_guidelines, issue_tracking_enabled } = body as {
       classification_guidelines?: string | null
       analysis_guidelines?: string | null
+      issue_tracking_enabled?: boolean
     }
 
     const all = await updatePmAgentSettings(projectId, {
       classification_guidelines,
       analysis_guidelines,
+      issue_tracking_enabled,
     })
 
     return NextResponse.json({
       settings: {
         classification_guidelines: all.classification_guidelines,
         analysis_guidelines: all.analysis_guidelines,
+        issue_tracking_enabled: all.issue_tracking_enabled,
       },
     })
   } catch (error) {

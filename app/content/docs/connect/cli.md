@@ -61,7 +61,7 @@ hissuno setup oauth slack --client-id YOUR_ID --client-secret YOUR_SECRET
 hissuno setup oauth github --app-slug your-app --app-id 12345 --private-key BASE64_KEY
 ```
 
-After adding credentials, restart the server (`npm run dev`) for the integration to become available. Then connect it with `hissuno integrate <platform> connect`.
+After adding credentials, restart the server (`npm run dev`) for the integration to become available. Then connect it with `hissuno integrations add <platform>`.
 
 ## Config
 
@@ -162,45 +162,54 @@ hissuno add feedback   # Prompts for messages, name, tags
 
 Knowledge sources cannot be added via CLI — use the dashboard.
 
-### `hissuno integrate`
+### `hissuno integrations`
 
-Manage integrations from the CLI. Supports: `intercom`, `gong`, `zendesk`, `slack`, `github`, `jira`, `linear`.
+Manage integrations from the CLI. Supports: `intercom`, `gong`, `zendesk`, `slack`, `github`, `jira`, `linear`, `fathom`, `hubspot`, `notion`.
 
 ```bash
 # List all integrations with connection status
-hissuno integrate
+hissuno integrations list
 
 # Interactive wizard for a specific integration
-hissuno integrate gong
+hissuno integrations gong
 
 # Check detailed status
-hissuno integrate gong status
+hissuno integrations status gong
 
 # Connect a token-based integration
-hissuno integrate gong connect
+hissuno integrations add gong
 
 # Connect with arguments (non-interactive)
-hissuno integrate gong connect --access-key=KEY --access-key-secret=SECRET --base-url=https://api.gong.io --sync-frequency=24h
+hissuno integrations add gong --access-key=KEY --access-key-secret=SECRET --base-url=https://api.gong.io --sync-frequency=24h
 
 # Connect an OAuth integration (opens browser)
-hissuno integrate slack connect
+hissuno integrations add slack
+
+# Connect Fathom with an API key
+hissuno integrations add fathom --api-key=KEY --sync-frequency=24h
+
+# Connect HubSpot with a private app token
+hissuno integrations add hubspot --access-token=TOKEN --overwrite-policy=fill_nulls
+
+# Connect Notion with an internal integration token
+hissuno integrations add notion --access-token=TOKEN
 
 # Update sync settings
-hissuno integrate intercom configure
+hissuno integrations configure intercom
 
 # Trigger a manual sync
-hissuno integrate gong sync
-hissuno integrate intercom sync --mode full
+hissuno integrations sync gong
+hissuno integrations sync intercom --mode full
 
 # Disconnect an integration
-hissuno integrate zendesk disconnect
+hissuno integrations disconnect zendesk
 ```
 
-**Token-based integrations** (Gong, Zendesk, Intercom) can be connected directly from the CLI by providing API credentials. The CLI validates credentials against the platform API before saving.
+**Token-based integrations** (Gong, Zendesk, Fathom) can be connected directly from the CLI by providing API credentials. The CLI validates credentials against the platform API before saving.
 
 **OAuth integrations** (Slack, GitHub, Jira, Linear) open your browser to complete the authorization flow. You must be logged into the Hissuno dashboard in your browser.
 
-**Intercom** supports both token and OAuth — choose interactively or pass `--access-token` for the token flow.
+**Hybrid integrations** (Intercom, HubSpot, Notion) support both token and OAuth - choose interactively or pass `--access-token` for the token flow.
 
 **Connect flags by platform:**
 
@@ -209,7 +218,10 @@ hissuno integrate zendesk disconnect
 | Gong | `--access-key`, `--access-key-secret`, `--base-url`, `--sync-frequency` |
 | Zendesk | `--subdomain`, `--email`, `--api-token`, `--sync-frequency` |
 | Intercom | `--access-token`, `--sync-frequency` |
-| Slack, GitHub, Jira, Linear | (OAuth — no flags needed) |
+| Fathom | `--api-key`, `--sync-frequency` |
+| HubSpot | `--access-token`, `--sync-frequency`, `--overwrite-policy` |
+| Notion | `--access-token` |
+| Slack, GitHub, Jira, Linear | (OAuth - no flags needed) |
 
 **Sync flags:**
 
@@ -217,7 +229,7 @@ hissuno integrate zendesk disconnect
 |------|--------|
 | `--mode` | `incremental` (default), `full` |
 
-Sync is available for Intercom, Gong, and Zendesk. The CLI streams sync progress in real-time.
+Sync is available for Intercom, Gong, Zendesk, Fathom, and HubSpot. The CLI streams sync progress in real-time.
 
 ## JSON Output
 

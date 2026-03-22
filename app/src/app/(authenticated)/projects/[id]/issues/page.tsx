@@ -12,7 +12,8 @@ import { IssuesFilters } from '@/components/issues/issues-filters'
 import { IssuesTable } from '@/components/issues/issues-table'
 import { IssueSidebar } from '@/components/issues/issue-sidebar'
 import { CreateIssueDialog } from '@/components/issues/create-issue-dialog'
-import { Button, PageHeader, Pagination, Spinner } from '@/components/ui'
+import { Plus } from 'lucide-react'
+import { PageHeader, Pagination, Spinner } from '@/components/ui'
 import { Card } from '@/components/ui/card'
 import { BatchActionBar } from '@/components/ui/batch-action-bar'
 import { BatchProgressBar } from '@/components/ui/batch-progress-bar'
@@ -272,13 +273,14 @@ export default function ProjectIssuesPage() {
         title="Issues"
         onRefresh={() => void refresh()}
         actions={
-          <Button
-            variant="primary"
-            size="md"
+          <button
+            type="button"
             onClick={handleOpenCreateDialog}
+            className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
           >
-            Create
-          </Button>
+            <Plus size={14} />
+            Create Issue
+          </button>
         }
       />
 

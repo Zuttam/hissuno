@@ -4,7 +4,6 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { listProjectCustomTags, syncCustomTags, type SyncTagInput } from '@/lib/db/queries/custom-tags'
-import { getIssueSettings, updateIssueSettings } from '@/lib/db/queries/project-settings'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 
 export const runtime = 'nodejs'
@@ -25,12 +24,9 @@ export async function GET(request: NextRequest) {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
 
-    const [customTags, issueSettings] = await Promise.all([
-      listProjectCustomTags(projectId),
-      getIssueSettings(projectId),
-    ])
+    const customTags = await listProjectCustomTags(projectId)
 
-    return NextResponse.json({ customTags, issueSettings })
+    return NextResponse.json({ customTags })
   } catch (error) {
     if (error instanceof MissingProjectIdError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
@@ -69,33 +65,19 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload.' }, { status: 400 })
     }
 
-    let tagsSyncResult = null
-    let issueSettingsResult = null
-
     // Handle custom tags sync
-    if (Array.isArray(payload.custom_tags)) {
-      const validationError = validateCustomTags(payload.custom_tags)
-      if (validationError) {
-        return NextResponse.json({ error: validationError }, { status: 400 })
-      }
-      tagsSyncResult = await syncCustomTags(projectId, payload.custom_tags as SyncTagInput[])
-    }
-
-    // Handle issue tracking toggle
-    if (typeof payload.issue_tracking_enabled === 'boolean') {
-      issueSettingsResult = await updateIssueSettings(projectId, {
-        issue_tracking_enabled: payload.issue_tracking_enabled,
-      })
-    }
-
-    if (!tagsSyncResult && !issueSettingsResult) {
+    if (!Array.isArray(payload.custom_tags)) {
       return NextResponse.json({ error: 'No valid fields provided.' }, { status: 400 })
     }
 
-    return NextResponse.json({
-      customTags: tagsSyncResult,
-      issueSettings: issueSettingsResult,
-    })
+    const validationError = validateCustomTags(payload.custom_tags)
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 })
+    }
+
+    const customTags = await syncCustomTags(projectId, payload.custom_tags as SyncTagInput[])
+
+    return NextResponse.json({ customTags })
   } catch (error) {
     if (error instanceof MissingProjectIdError) {
       return NextResponse.json({ error: error.message }, { status: 400 })

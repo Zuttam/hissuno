@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import { Check, Unplug, Shield, KeyRound, Plug } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { fetchGithubStatus, disconnectGithub, githubConnectUrl, connectGithubPat } from '@/lib/api/integrations'
 
@@ -162,10 +163,10 @@ export function GitHubConfigDialog({
   const authMethodLabel = status.authMethod === 'pat' ? 'Access Token' : 'GitHub App'
 
   return (
-    <Dialog open={open} onClose={onClose} title="GitHub Integration" size="md">
+    <Dialog open={open} onClose={onClose} title="GitHub Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
-        {successMessage && <Alert variant="success">{successMessage}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        {successMessage && <InlineAlert variant="success">{successMessage}</InlineAlert>}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
@@ -173,56 +174,60 @@ export function GitHubConfigDialog({
           </div>
         ) : status.connected ? (
           <div className="space-y-4">
-            <Alert variant="success">
-              &#10003; Connected to GitHub: <strong>{status.accountLogin || 'Unknown'}</strong>
-              <span className="text-xs ml-2 opacity-75">via {authMethodLabel}</span>
-            </Alert>
+            <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to GitHub: {status.accountLogin || 'Unknown'} <span className="text-xs opacity-75">via {authMethodLabel}</span></p>
             <Button variant="secondary" onClick={handleRefresh}>
               Refresh Status
             </Button>
 
             {/* Danger Zone */}
-            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">Danger Zone</h4>
-              <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
+            <div className="border-t border-[color:var(--accent-danger)] pt-4">
+              <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
+              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
+                This will remove the GitHub connection.
+              </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="mt-3"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                loading={isDisconnecting}
+              >
+                <Unplug size={14} />
                 Disconnect
               </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
-            <Alert variant="info">
+            <InlineAlert variant="info">
               Connect your GitHub repository to analyze your codebase and generate product knowledge.
-            </Alert>
+            </InlineAlert>
 
             {/* Connection Method Toggle */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[color:var(--foreground)]">
-                Connection Method
-              </label>
-              <ToggleGroup
-                value={connectionMethod}
-                onChange={setConnectionMethod}
-                options={[
-                  { value: 'app' as const, label: 'GitHub App' },
-                  { value: 'pat' as const, label: 'Access Token' },
-                ]}
-              />
-            </div>
+            <ToggleGroup
+              value={connectionMethod}
+              onChange={setConnectionMethod}
+              options={[
+                { value: 'app' as const, label: 'GitHub App', icon: <Shield size={14} /> },
+                { value: 'pat' as const, label: 'Access Token', icon: <KeyRound size={14} /> },
+              ]}
+            />
 
             {connectionMethod === 'app' ? (
               <div className="space-y-4">
                 {oauthAvailable === false ? (
-                  <Alert variant="warning">
+                  <InlineAlert variant="attention">
                     OAuth is not configured on this instance. {oauthUnavailableReason} Use the Access Token method instead.
-                  </Alert>
+                  </InlineAlert>
                 ) : (
                   <>
                     <p className="text-sm text-[color:var(--text-secondary)]">
                       Connect via a GitHub App with OAuth. You&apos;ll be redirected to GitHub to authorize access.
                     </p>
                     <div className="flex items-center gap-3">
-                      <Button variant="primary" onClick={handleConnect}>
+                      <Button variant="primary" size="sm" onClick={handleConnect}>
+                        <Plug size={14} />
                         Connect GitHub
                       </Button>
                       {connectClicked && (
@@ -274,7 +279,8 @@ export function GitHubConfigDialog({
                   </p>
                 </div>
 
-                <Button variant="primary" onClick={handleConnectPat} loading={isConnecting}>
+                <Button variant="primary" size="sm" onClick={handleConnectPat} loading={isConnecting}>
+                  <Plug size={14} />
                   Connect
                 </Button>
               </div>
@@ -282,12 +288,6 @@ export function GitHubConfigDialog({
           </div>
         )}
 
-        {/* Footer with Close */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
       </div>
     </Dialog>
   )

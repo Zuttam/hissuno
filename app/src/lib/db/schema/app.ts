@@ -34,13 +34,12 @@ export const projectSettings = pgTable('project_settings', {
   session_idle_timeout_minutes: integer('session_idle_timeout_minutes'),
   session_goodbye_delay_seconds: integer('session_goodbye_delay_seconds'),
   session_idle_response_timeout_seconds: integer('session_idle_response_timeout_seconds'),
-  // Issue settings
-  issue_tracking_enabled: boolean('issue_tracking_enabled'),
-  pm_dedup_include_closed: boolean('pm_dedup_include_closed'),
-  // PM agent guidelines
+  // Feedback review workflow settings
   classification_guidelines: text('classification_guidelines'),
   brief_guidelines: text('brief_guidelines'),
   analysis_guidelines: text('analysis_guidelines'),
+  issue_tracking_enabled: boolean('issue_tracking_enabled'),
+  pm_dedup_include_closed: boolean('pm_dedup_include_closed'),
   // Support agent
   support_agent_package_id: uuid('support_agent_package_id'),
   support_agent_tone: text('support_agent_tone'),

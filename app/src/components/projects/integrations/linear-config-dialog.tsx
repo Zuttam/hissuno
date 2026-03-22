@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import { Check, Unplug, Shield, KeyRound, Plug, Zap } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import type { LinearIntegrationStatus, LinearTeam } from '@/types/linear'
 import {
@@ -246,12 +247,12 @@ export function LinearConfigDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Linear Integration" size="xxl">
+    <Dialog open={open} onClose={onClose} title="Linear Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
         {successMessage && (
-          <Alert variant="success">{successMessage}</Alert>
+          <InlineAlert variant="success">{successMessage}</InlineAlert>
         )}
 
         {isLoading ? (
@@ -260,9 +261,7 @@ export function LinearConfigDialog({
           </div>
         ) : status?.connected ? (
           <div className="space-y-6">
-            <Alert variant="success">
-              &#10003; Connected to: <strong>{status.organizationName}</strong>
-            </Alert>
+            <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to {status.organizationName}</p>
 
             {status.isConfigured ? (
               // Fully configured state
@@ -326,9 +325,9 @@ export function LinearConfigDialog({
             ) : (
               // Connected but not configured
               <div className="space-y-4">
-                <Alert variant="info">
+                <InlineAlert variant="info">
                   Select a Linear team to complete the setup.
-                </Alert>
+                </InlineAlert>
 
                 {isLoadingTeams ? (
                   <div className="flex items-center justify-center py-4">
@@ -352,63 +351,54 @@ export function LinearConfigDialog({
             )}
 
             {/* Danger Zone */}
-            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">
-                Danger Zone
-              </h4>
-              <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
-                Disconnect
-              </Button>
-              <p className="text-xs text-[color:var(--text-tertiary)]">
+            <div className="border-t border-[color:var(--accent-danger)] pt-4">
+              <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
+              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
                 This will remove the Linear connection. Previously synced issues will remain in Linear.
               </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="mt-3"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                loading={isDisconnecting}
+              >
+                <Unplug size={14} />
+                Disconnect
+              </Button>
             </div>
           </div>
         ) : (
           // Not connected state
           <div className="space-y-6">
-            <Alert variant="info">
+            <InlineAlert variant="info">
               Connect your Linear workspace to sync issues between Hissuno and Linear.
-            </Alert>
-
-            <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-4">
-              <h4 className="mb-2 text-sm font-medium text-[color:var(--foreground)]">
-                What happens when you connect:
-              </h4>
-              <ul className="space-y-1 text-sm text-[color:var(--text-secondary)]">
-                <li>1. New issues in Hissuno create Linear issues automatically</li>
-                <li>2. Product specs are linked as comments on Linear issues</li>
-                <li>3. Linear status changes sync back to Hissuno</li>
-              </ul>
-            </div>
+            </InlineAlert>
 
             {/* Connection Method Toggle */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-[color:var(--foreground)]">
-                Connection Method
-              </label>
-              <ToggleGroup
-                value={connectionMethod}
-                onChange={setConnectionMethod}
-                options={[
-                  { value: 'oauth' as const, label: 'OAuth' },
-                  { value: 'token' as const, label: 'API Key' },
-                ]}
-              />
-            </div>
+            <ToggleGroup
+              value={connectionMethod}
+              onChange={setConnectionMethod}
+              options={[
+                { value: 'oauth' as const, label: 'OAuth', icon: <Shield size={14} /> },
+                { value: 'token' as const, label: 'API Key', icon: <KeyRound size={14} /> },
+              ]}
+            />
 
             {connectionMethod === 'oauth' ? (
               <div className="space-y-4">
                 {oauthAvailable === false ? (
-                  <Alert variant="warning">
+                  <InlineAlert variant="attention">
                     OAuth is not configured on this instance. {oauthUnavailableReason} Use the API Key method instead.
-                  </Alert>
+                  </InlineAlert>
                 ) : (
                   <>
                     <p className="text-sm text-[color:var(--text-secondary)]">
                       Connect with one click using your Linear account. You&apos;ll be redirected to Linear to authorize access.
                     </p>
-                    <Button variant="primary" onClick={handleConnect}>
+                    <Button variant="primary" size="sm" onClick={handleConnect}>
+                      <Plug size={14} />
                       Connect with Linear
                     </Button>
                   </>
@@ -424,26 +414,16 @@ export function LinearConfigDialog({
                   <label className="text-sm font-medium text-[color:var(--foreground)]">
                     API Key
                   </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => {
-                        setApiKey(e.target.value)
-                        setTestResult(null)
-                      }}
-                      placeholder="lin_api_xxxxx"
-                      className="flex-1 rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                    />
-                    <Button
-                      variant="secondary"
-                      onClick={() => void handleTestApiKey()}
-                      loading={isTesting}
-                      disabled={isTesting || !apiKey.trim()}
-                    >
-                      Test
-                    </Button>
-                  </div>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => {
+                      setApiKey(e.target.value)
+                      setTestResult(null)
+                    }}
+                    placeholder="lin_api_xxxxx"
+                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
+                  />
                   {testResult && (
                     <p
                       className={`text-xs ${
@@ -457,25 +437,33 @@ export function LinearConfigDialog({
                   )}
                 </div>
 
-                <Button
-                  variant="primary"
-                  onClick={() => void handleConnectWithApiKey()}
-                  loading={isConnecting}
-                  disabled={!apiKey.trim()}
-                >
-                  Connect Linear
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => void handleTestApiKey()}
+                    loading={isTesting}
+                    disabled={isTesting || !apiKey.trim()}
+                  >
+                    <Zap size={14} />
+                    Test
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => void handleConnectWithApiKey()}
+                    loading={isConnecting}
+                    disabled={!apiKey.trim()}
+                  >
+                    <Plug size={14} />
+                    Connect Linear
+                  </Button>
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
       </div>
     </Dialog>
   )

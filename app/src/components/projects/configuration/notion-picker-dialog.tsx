@@ -19,6 +19,9 @@ interface NotionPickerDialogProps {
   onClose: () => void
   projectId: string
   onImported?: () => void
+  /** When 'single', only one page can be selected and onPageSelected is called */
+  mode?: 'bulk' | 'single'
+  onPageSelected?: (page: { pageId: string; title: string; url: string }) => void
 }
 
 export function NotionPickerDialog({
@@ -26,6 +29,8 @@ export function NotionPickerDialog({
   onClose,
   projectId,
   onImported,
+  mode = 'bulk',
+  onPageSelected,
 }: NotionPickerDialogProps) {
   const [pages, setPages] = useState<NotionPageItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -91,6 +96,9 @@ export function NotionPickerDialog({
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => {
+      if (mode === 'single') {
+        return prev.has(id) ? new Set() : new Set([id])
+      }
       const next = new Set(prev)
       if (next.has(id)) {
         next.delete(id)
@@ -171,7 +179,7 @@ export function NotionPickerDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Import from Notion" size="xxl">
+    <Dialog open={open} onClose={onClose} title={mode === 'single' ? 'Select Notion Page' : 'Import from Notion'} size="xxl">
       <div className="flex flex-col gap-4">
         {error && <Alert variant="danger">{error}</Alert>}
         {success && <Alert variant="success">{success}</Alert>}
@@ -291,20 +299,42 @@ export function NotionPickerDialog({
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-[color:var(--border-subtle)] pt-4">
           <span className="text-sm text-[color:var(--text-secondary)]">
-            {selectedIds.size > 0 ? `${selectedIds.size} page${selectedIds.size === 1 ? '' : 's'} selected` : 'Select pages to import'}
+            {selectedIds.size > 0
+              ? `${selectedIds.size} page${selectedIds.size === 1 ? '' : 's'} selected`
+              : mode === 'single' ? 'Select a page' : 'Select pages to import'}
           </span>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              onClick={handleImport}
-              disabled={selectedIds.size === 0 || isImporting}
-              loading={isImporting}
-            >
-              Import
-            </Button>
+            {mode === 'single' ? (
+              <Button
+                variant="primary"
+                disabled={selectedIds.size === 0}
+                onClick={() => {
+                  const selectedId = [...selectedIds][0]
+                  const allPages = [...pages]
+                  for (const children of Object.values(expandedDatabases)) {
+                    allPages.push(...children)
+                  }
+                  const page = allPages.find(p => p.id === selectedId)
+                  if (page && onPageSelected) {
+                    onPageSelected({ pageId: page.id, title: page.title, url: page.url })
+                  }
+                }}
+              >
+                Select
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                onClick={handleImport}
+                disabled={selectedIds.size === 0 || isImporting}
+                loading={isImporting}
+              >
+                Import
+              </Button>
+            )}
           </div>
         </div>
       </div>

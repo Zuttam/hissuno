@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Dialog, Button, Alert, Spinner } from '@/components/ui'
+import { Check, Unplug, Plug } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
 import {
   fetchSlackStatus,
   disconnectSlack,
@@ -289,10 +290,10 @@ export function SlackConfigDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="Slack Integration" size="xxl">
+    <Dialog open={open} onClose={onClose} title="Slack Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
-        {successMessage && <Alert variant="success">{successMessage}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        {successMessage && <InlineAlert variant="success">{successMessage}</InlineAlert>}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
@@ -300,9 +301,7 @@ export function SlackConfigDialog({
           </div>
         ) : status.connected ? (
           <div className="space-y-4">
-            <Alert variant="success">
-              &#10003; Connected to workspace: <strong>{status.workspaceName || 'Unknown'}</strong>
-            </Alert>
+            <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to {status.workspaceName || 'Unknown'}</p>
 
             {/* Channel List */}
             <div className="space-y-3">
@@ -493,36 +492,42 @@ export function SlackConfigDialog({
 
 
             {/* Danger Zone */}
-            <div className="space-y-2 pt-2 border-t border-[color:var(--border-subtle)]">
-              <h4 className="text-xs font-medium text-[color:var(--accent-danger)]">Danger Zone</h4>
-              <Button variant="danger" onClick={handleDisconnect} loading={isDisconnecting}>
+            <div className="border-t border-[color:var(--accent-danger)] pt-4">
+              <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
+              <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
+                This will remove the Slack connection and leave all configured channels.
+              </p>
+              <Button
+                variant="danger"
+                size="sm"
+                className="mt-3"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                loading={isDisconnecting}
+              >
+                <Unplug size={14} />
                 Disconnect
               </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-4">
-            <Alert variant="info">
+            <InlineAlert variant="info">
               Connect your Slack workspace to capture customer conversations from specific channels.
-            </Alert>
+            </InlineAlert>
             {oauthAvailable === false ? (
-              <Alert variant="warning">
+              <InlineAlert variant="attention">
                 OAuth is not configured on this instance. {oauthUnavailableReason}
-              </Alert>
+              </InlineAlert>
             ) : (
-              <Button variant="primary" onClick={handleConnect}>
+              <Button variant="primary" size="sm" onClick={handleConnect}>
+                <Plug size={14} />
                 Connect Slack
               </Button>
             )}
           </div>
         )}
 
-        {/* Footer with Close */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
-          </Button>
-        </div>
       </div>
     </Dialog>
   )

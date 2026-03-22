@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, type ChangeEvent } from 'react'
 import {
   Dialog,
   Button,
-  Alert,
+  InlineAlert,
   FormField,
   Input,
   Textarea,
@@ -186,10 +186,10 @@ import '@hissuno/widget/styles.css';
   const showDrawerLabel = settings.trigger_type === 'drawer-badge'
 
   return (
-    <Dialog open={open} onClose={onClose} title="Widget Configuration" size="xxl">
+    <Dialog open={open} onClose={onClose} title="Widget Configuration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <Alert variant="danger">{error}</Alert>}
-        {successMessage && <Alert variant="success">{successMessage}</Alert>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        {successMessage && <InlineAlert variant="success">{successMessage}</InlineAlert>}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-8">

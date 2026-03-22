@@ -23,6 +23,7 @@ const STEPS: WorkflowStepConfig[] = [
     description: 'Decides whether to create a new issue, upvote an existing one, or skip',
     guidelineKey: 'analysis_guidelines',
     placeholder: 'Guide what factors to consider when creating issues...',
+    toggleKey: 'issue_tracking_enabled',
   },
 ]
 
@@ -32,6 +33,7 @@ interface FeedbackReviewDialogProps {
   projectId: string
   classificationGuidelines: string
   analysisGuidelines: string
+  issueTrackingEnabled: boolean
   onSaved: () => void
 }
 
@@ -41,14 +43,16 @@ export function FeedbackReviewDialog({
   projectId,
   classificationGuidelines,
   analysisGuidelines,
+  issueTrackingEnabled,
   onSaved,
 }: FeedbackReviewDialogProps) {
   const initialValues = useMemo(
     () => ({
       classification_guidelines: classificationGuidelines,
       analysis_guidelines: analysisGuidelines,
+      issue_tracking_enabled: issueTrackingEnabled,
     }),
-    [classificationGuidelines, analysisGuidelines]
+    [classificationGuidelines, analysisGuidelines, issueTrackingEnabled]
   )
 
   return (

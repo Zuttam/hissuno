@@ -31,6 +31,7 @@ import {
   type InsertIssueData,
 } from '@/lib/db/queries/issues'
 import { upsertIssueEmbedding } from './embedding-service'
+import { fireGraphEval } from '@/lib/graph-eval'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -150,6 +151,8 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
     'issues-service.createIssue'
   )
 
+  fireGraphEval(input.project_id, 'issue', issue.id)
+
   return {
     ...issue,
     project,
@@ -194,6 +197,8 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
       'issues-service.updateIssue'
     )
   }
+
+  fireGraphEval(projectId, 'issue', issueId)
 
   return issue
 }

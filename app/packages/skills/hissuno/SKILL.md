@@ -71,7 +71,7 @@ hissuno skills uninstall            # Remove installed skills
 | Find items by meaning | `hissuno search <query>` | "Find feedback about checkout flow" |
 | Create new data | `hissuno add <type>` | "Log a bug about login failures" |
 | Traverse relationships | `hissuno get <type> <id> --json` | "What companies are affected by this issue?" |
-| Connect a data source | `hissuno integrate` | "Connect Intercom" |
+| Connect a data source | `hissuno integrations add <platform>` | "Connect Intercom" |
 | View current connection | `hissuno config show` | "Which instance am I connected to?" |
 | Switch environment | `hissuno profile use <name>` | "Switch to staging" |
 
@@ -111,9 +111,9 @@ Use `search` for semantic (meaning-based) matching. Use `list` when you want to 
 3. `hissuno config show` to verify the active connection
 
 ### Connect a Data Source
-1. `hissuno integrate` to see all integration statuses
-2. `hissuno integrate <platform>` to start the interactive setup wizard
-3. For syncable platforms: `hissuno integrate <platform> sync` to trigger initial data pull
+1. `hissuno integrations list` to see all integration statuses
+2. `hissuno integrations <platform>` to start the interactive setup wizard
+3. For syncable platforms: `hissuno integrations sync <platform>` to trigger initial data pull
 
 ## CLI Reference
 
@@ -132,8 +132,8 @@ hissuno get customers <id>                       # Contact details + company rel
 hissuno add issues                               # Interactive issue creation
 hissuno add scopes                               # Create a product scope with goals
 hissuno update scopes <id>                       # Modify scope name, type, or goals
-hissuno integrate                                # List all integration statuses
-hissuno integrate intercom sync                  # Sync Intercom conversations
+hissuno integrations list                         # List all integration statuses
+hissuno integrations sync intercom               # Sync Intercom conversations
 hissuno config show                              # View active connection
 hissuno profile list                             # List profiles
 hissuno profile use staging                      # Switch to staging profile

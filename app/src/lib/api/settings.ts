@@ -1,7 +1,6 @@
 import { fetchApi, buildUrl } from './fetch'
 import type { CustomTagRecord } from '@/types/session'
 import type { ProductScopeRecord } from '@/types/product-scope'
-import type { IssueSettings } from '@/lib/db/queries/project-settings/types'
 
 const paths = {
   customTags: '/api/settings/custom-tags',
@@ -27,7 +26,6 @@ export async function listCustomTags(projectId: string): Promise<CustomTagRecord
 
 export interface FeedbackIssuesSettings {
   customTags: CustomTagRecord[]
-  issueSettings: IssueSettings
 }
 
 export async function getFeedbackIssuesSettings(projectId: string): Promise<FeedbackIssuesSettings> {
@@ -177,7 +175,7 @@ export const updateKnowledgeAnalysisSettings = knowledgeAnalysis.update
 
 export async function updateFeedbackIssuesSettings(
   projectId: string,
-  body: { custom_tags?: unknown[]; issue_tracking_enabled?: boolean },
+  body: { custom_tags?: unknown[] },
 ) {
   const url = buildUrl(paths.feedbackIssues, { projectId })
   return fetchApi<Record<string, unknown>>(url, {

@@ -17,6 +17,7 @@ import type {
   CSVImportResult,
 } from '@/types/customer'
 import { isValidEmail } from '@/lib/customers/contact-resolution'
+import { fireGraphEval } from '@/lib/graph-eval'
 
 // Characters that spreadsheet apps interpret as formula/command prefixes (OWASP)
 const FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r']
@@ -334,11 +335,16 @@ async function importCompanyRow(
       .set(companyData)
       .where(eq(companies.id, existingId))
     result.updated++
+    fireGraphEval(projectId, 'company', existingId)
   } else {
-    await db
+    const [inserted] = await db
       .insert(companies)
       .values(companyData as typeof companies.$inferInsert)
+      .returning({ id: companies.id })
     result.created++
+    if (inserted) {
+      fireGraphEval(projectId, 'company', inserted.id)
+    }
   }
 }
 
@@ -407,6 +413,7 @@ async function importContactRow(
         if (newCompany) {
           companyMap.set(companyDomain, newCompany.id)
           contactData.company_id = newCompany.id
+          fireGraphEval(projectId, 'company', newCompany.id)
         }
       } catch {
         // Ignore company creation errors -- contact will just not be linked
@@ -436,10 +443,15 @@ async function importContactRow(
       .set(contactData)
       .where(eq(contacts.id, existingId))
     result.updated++
+    fireGraphEval(projectId, 'contact', existingId)
   } else {
-    await db
+    const [inserted] = await db
       .insert(contacts)
       .values(contactData as typeof contacts.$inferInsert)
+      .returning({ id: contacts.id })
     result.created++
+    if (inserted) {
+      fireGraphEval(projectId, 'contact', inserted.id)
+    }
   }
 }

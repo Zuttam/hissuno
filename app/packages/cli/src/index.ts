@@ -8,7 +8,7 @@ import { listCommand } from './commands/list.js'
 import { getCommand } from './commands/get.js'
 import { searchCommand } from './commands/search.js'
 import { addCommand } from './commands/add.js'
-import { integrateCommand } from './commands/integrate.js'
+import { integrationsCommand } from './commands/integrations.js'
 import { updateCommand } from './commands/update.js'
 import { setupCommand } from './commands/setup.js'
 import { configCommand } from './commands/config.js'
@@ -34,7 +34,7 @@ program.addCommand(getCommand)
 program.addCommand(searchCommand)
 program.addCommand(addCommand)
 program.addCommand(updateCommand)
-program.addCommand(integrateCommand)
+program.addCommand(integrationsCommand)
 program.addCommand(membersCommand)
 
 program.parseAsync(process.argv)
