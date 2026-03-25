@@ -1,6 +1,6 @@
 {
   "name": "hissuno",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Hissuno CLI — set up, connect, and query your product intelligence platform",
   "type": "module",
   "bin": {
