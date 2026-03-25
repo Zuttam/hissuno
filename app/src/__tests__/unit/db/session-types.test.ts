@@ -175,6 +175,7 @@ describe('getSessionUserDisplay', () => {
       message_count: 0,
       status: 'active',
       tags: [],
+      custom_fields: {},
       tags_auto_applied_at: null,
       first_message_at: null,
       last_activity_at: '2025-01-01T00:00:00Z',

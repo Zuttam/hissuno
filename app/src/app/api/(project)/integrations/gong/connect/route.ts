@@ -11,7 +11,7 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { GongClient, GongApiError } from '@/lib/integrations/gong/client'
 import {
   storeGongCredentials,
-  type GongSyncFrequency,
+  type SyncFrequency,
   type GongFilterConfig,
 } from '@/lib/integrations/gong'
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       accessKey: string
       accessKeySecret: string
       baseUrl: string
-      syncFrequency: GongSyncFrequency
+      syncFrequency: SyncFrequency
       filterConfig?: GongFilterConfig
     }
 
@@ -51,13 +51,9 @@ export async function POST(request: NextRequest) {
     if (!baseUrl) {
       return NextResponse.json({ error: 'baseUrl is required.' }, { status: 400 })
     }
-    if (!syncFrequency) {
-      return NextResponse.json({ error: 'syncFrequency is required.' }, { status: 400 })
-    }
-
-    // Validate sync frequency
-    const validFrequencies: GongSyncFrequency[] = ['manual', '1h', '6h', '24h']
-    if (!validFrequencies.includes(syncFrequency)) {
+    // Validate sync frequency (defaults to manual)
+    const validFrequencies: SyncFrequency[] = ['manual', '1h', '6h', '24h']
+    if (syncFrequency && !validFrequencies.includes(syncFrequency)) {
       return NextResponse.json({ error: 'Invalid syncFrequency.' }, { status: 400 })
     }
 
@@ -102,7 +98,7 @@ export async function POST(request: NextRequest) {
       accessKey,
       accessKeySecret,
       baseUrl,
-      syncFrequency,
+      syncFrequency: syncFrequency || 'manual',
       filterConfig,
     })
 

@@ -78,6 +78,10 @@ const paths = {
   notion: '/api/integrations/notion',
   notionConnect: '/api/integrations/notion/connect',
   notionPages: '/api/integrations/notion/pages',
+  notionDatabases: '/api/integrations/notion/databases',
+  notionSyncConfig: '/api/integrations/notion/sync-config',
+  notionSyncIssues: '/api/integrations/notion/sync/issues',
+  notionSyncKnowledge: '/api/integrations/notion/sync/knowledge',
 
   // HubSpot
   hubspot: '/api/integrations/hubspot',
@@ -476,6 +480,44 @@ export function fetchNotionPages(projectId: string, params?: { query?: string; s
 
 export function fetchNotionChildPages(projectId: string, pageId: string): Promise<Response> {
   return fetchApiRaw(buildUrl(`/api/integrations/notion/pages/${pageId}/children`, { projectId }))
+}
+
+export function fetchNotionDatabases(projectId: string, params?: { query?: string; startCursor?: string }): Promise<Response> {
+  return fetchApiRaw(buildUrl(paths.notionDatabases, { projectId, ...params }))
+}
+
+export function fetchNotionDatabaseSchema(projectId: string, databaseId: string): Promise<Response> {
+  return fetchApiRaw(buildUrl(`/api/integrations/notion/databases/${databaseId}`, { projectId }))
+}
+
+export function fetchNotionSyncConfig(projectId: string, syncType: string): Promise<Response> {
+  return fetchApiRaw(buildUrl(paths.notionSyncConfig, { projectId, syncType }))
+}
+
+export function saveNotionSyncConfig(body: {
+  projectId: string
+  syncType: string
+  notionDatabaseId?: string
+  notionDatabaseName?: string
+  fieldMapping?: unknown
+  notionRootPageIds?: string[]
+  includeChildren?: boolean
+  syncEnabled?: boolean
+  syncFrequency?: string
+}): Promise<Response> {
+  return fetchApiRaw(paths.notionSyncConfig, { method: 'PUT', body })
+}
+
+export function deleteNotionSyncConfig(projectId: string, syncType: string): Promise<Response> {
+  return fetchApiRaw(buildUrl(paths.notionSyncConfig, { projectId, syncType }), { method: 'DELETE' })
+}
+
+export function notionSyncIssuesUrl(projectId: string): string {
+  return buildUrl(paths.notionSyncIssues, { projectId })
+}
+
+export function notionSyncKnowledgeUrl(projectId: string): string {
+  return buildUrl(paths.notionSyncKnowledge, { projectId })
 }
 
 // ---------------------------------------------------------------------------

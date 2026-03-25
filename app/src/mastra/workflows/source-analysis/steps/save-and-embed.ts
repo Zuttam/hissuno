@@ -13,6 +13,7 @@ import { db } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { knowledgeSources } from '@/lib/db/schema/app'
 import { cleanupCodebaseForWorkflow } from '../../common/cleanup-codebase'
+import { generateSourceDescription } from '../../common/generate-description'
 
 export const saveAndEmbed = createStep({
   id: 'save-and-embed',
@@ -24,7 +25,7 @@ export const saveAndEmbed = createStep({
       throw new Error('Input data not found')
     }
 
-    const { projectId, sourceId, sanitizedContent, hasContent, codebaseLeaseId } = inputData
+    const { projectId, sourceId, sanitizedContent, hasContent, codebaseLeaseId, sourceName } = inputData
     const logger = mastra?.getLogger()
     const errors: string[] = []
     let chunksEmbedded = 0
@@ -53,18 +54,43 @@ export const saveAndEmbed = createStep({
         }
       }
 
-      // 1. Save analyzed content directly to DB column
+      // 1. Generate description if the source doesn't already have one
+      let generatedDescription: string | null = null
+      try {
+        const [existingSource] = await db
+          .select({ description: knowledgeSources.description })
+          .from(knowledgeSources)
+          .where(eq(knowledgeSources.id, sourceId))
+          .limit(1)
+
+        if (!existingSource?.description) {
+          await writer?.write({ type: 'progress', message: 'Generating description...' })
+          generatedDescription = await generateSourceDescription(sanitizedContent, sourceName)
+        }
+      } catch (descErr) {
+        // Non-critical - continue without description
+        logger?.warn('[save-and-embed] Description generation failed:', {
+          error: descErr instanceof Error ? descErr.message : 'Unknown error',
+        })
+      }
+
+      // 2. Save analyzed content directly to DB column
       await writer?.write({ type: 'progress', message: 'Saving analyzed content...' })
 
       try {
+        const updateFields: Record<string, unknown> = {
+          status: 'done',
+          analyzed_content: sanitizedContent,
+          analyzed_at: new Date(),
+          error_message: null,
+        }
+        if (generatedDescription) {
+          updateFields.description = generatedDescription
+        }
+
         await db
           .update(knowledgeSources)
-          .set({
-            status: 'done',
-            analyzed_content: sanitizedContent,
-            analyzed_at: new Date(),
-            error_message: null,
-          })
+          .set(updateFields)
           .where(eq(knowledgeSources.id, sourceId))
       } catch (updateErr) {
         const msg = updateErr instanceof Error ? updateErr.message : 'Unknown error'
@@ -72,7 +98,7 @@ export const saveAndEmbed = createStep({
         logger?.error('[save-and-embed] DB update failed:', { error: msg })
       }
 
-      // 2. Generate embeddings
+      // 3. Generate embeddings
       if (errors.length === 0) {
         await writer?.write({ type: 'progress', message: 'Generating embeddings...' })
 
@@ -113,7 +139,7 @@ export const saveAndEmbed = createStep({
       }
     }
 
-    // 3. Cleanup codebase lease if applicable
+    // 4. Cleanup codebase lease if applicable
     let codebaseCleanedUp = false
     if (codebaseLeaseId) {
       codebaseCleanedUp = await cleanupCodebaseForWorkflow({

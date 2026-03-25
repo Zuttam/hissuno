@@ -6,12 +6,12 @@
  */
 
 import { createStep } from '@mastra/core/workflows'
-import { triggerGraphEvaluation } from '../../graph-evaluation'
+import { evaluateEntityRelationships } from '../../graph-evaluation'
 import { sourceAnalysisOutputSchema, findRelationshipsOutputSchema } from '../schemas'
 
 export const triggerGraphEval = createStep({
   id: 'trigger-graph-eval',
-  description: 'Trigger async graph evaluation for entity relationship discovery',
+  description: 'Run graph evaluation for entity relationship discovery',
   inputSchema: sourceAnalysisOutputSchema,
   outputSchema: findRelationshipsOutputSchema,
   execute: async ({ inputData, mastra, writer }) => {
@@ -20,17 +20,20 @@ export const triggerGraphEval = createStep({
     const { projectId, sourceId } = inputData
     const logger = mastra?.getLogger()
 
-    logger?.info('[trigger-graph-eval] Triggering async graph evaluation', { sourceId })
-    await writer?.write({ type: 'progress', message: 'Triggering relationship discovery...' })
+    logger?.info('[trigger-graph-eval] Starting graph evaluation', { sourceId })
+    await writer?.write({ type: 'progress', message: 'Discovering relationships...' })
 
-    void triggerGraphEvaluation(mastra, {
-      projectId,
-      entityType: 'knowledge_source',
-      entityId: sourceId,
+    const result = await evaluateEntityRelationships(projectId, 'knowledge_source', sourceId)
+
+    if (result.errors.length > 0) {
+      logger?.warn('[trigger-graph-eval] Errors during evaluation', { errors: result.errors })
+    }
+
+    await writer?.write({
+      type: 'progress',
+      message: `Found ${result.relationshipsCreated} relationships${result.productScopeId ? ' + product scope' : ''}`,
     })
 
-    await writer?.write({ type: 'progress', message: 'Relationship discovery triggered (async)' })
-
-    return { ...inputData, relationshipsCreated: 0 }
+    return { ...inputData, relationshipsCreated: result.relationshipsCreated }
   },
 })

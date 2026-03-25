@@ -1,17 +1,17 @@
 /**
- * Backfill script for session and contact embeddings
+ * Backfill script for session, contact, and company embeddings
  *
- * Generates and stores embeddings for all existing sessions/contacts
+ * Generates and stores embeddings for all existing resources
  * that don't have embeddings yet.
  *
- * Run: npx tsx app/src/scripts/backfill-embeddings.ts [sessions|contacts|all]
+ * Run: npx tsx app/src/scripts/backfill-embeddings.ts [sessions|contacts|companies|all]
  */
 
 import { db } from '@/lib/db'
-import { sessions, sessionEmbeddings, contacts, contactEmbeddings, companies } from '@/lib/db/schema/app'
+import { sessions, embeddings, contacts, companies } from '@/lib/db/schema/app'
 import { and, desc, eq, isNotNull } from 'drizzle-orm'
 import { batchEmbedSessions } from '@/lib/sessions/embedding-service'
-import { batchEmbedContacts } from '@/lib/customers/contact-embedding-service'
+import { batchEmbedContacts, batchEmbedCompanies } from '@/lib/customers/customer-embedding-service'
 
 async function backfillSessionEmbeddings() {
   console.log('\n[backfill] Starting session embedding backfill...')
@@ -37,10 +37,11 @@ async function backfillSessionEmbeddings() {
 
   // Check which sessions already have embeddings
   const existingEmbeddingRows = await db
-    .select({ session_id: sessionEmbeddings.session_id })
-    .from(sessionEmbeddings)
+    .select({ entity_id: embeddings.entity_id })
+    .from(embeddings)
+    .where(eq(embeddings.entity_type, 'session'))
 
-  const existingIds = new Set(existingEmbeddingRows.map((e) => e.session_id))
+  const existingIds = new Set(existingEmbeddingRows.map((e) => e.entity_id))
   const sessionsToEmbed = allSessions.filter((s) => !existingIds.has(s.id))
 
   console.log(`[backfill] ${existingIds.size} sessions already have embeddings`)
@@ -111,10 +112,11 @@ async function backfillContactEmbeddings() {
 
   // Check which contacts already have embeddings
   const existingEmbeddingRows = await db
-    .select({ contact_id: contactEmbeddings.contact_id })
-    .from(contactEmbeddings)
+    .select({ entity_id: embeddings.entity_id })
+    .from(embeddings)
+    .where(eq(embeddings.entity_type, 'contact'))
 
-  const existingIds = new Set(existingEmbeddingRows.map((e) => e.contact_id))
+  const existingIds = new Set(existingEmbeddingRows.map((e) => e.entity_id))
   const contactsToEmbed = allContacts.filter((c) => !existingIds.has(c.id))
 
   console.log(`[backfill] ${existingIds.size} contacts already have embeddings`)
@@ -160,11 +162,77 @@ async function backfillContactEmbeddings() {
   return { embedded: totalEmbedded, errors: allErrors }
 }
 
+async function backfillCompanyEmbeddings() {
+  console.log('\n[backfill] Starting company embedding backfill...')
+
+  const allCompanies = await db
+    .select({
+      id: companies.id,
+      project_id: companies.project_id,
+      name: companies.name,
+      domain: companies.domain,
+      industry: companies.industry,
+      country: companies.country,
+      stage: companies.stage,
+      plan_tier: companies.plan_tier,
+      product_used: companies.product_used,
+      notes: companies.notes,
+    })
+    .from(companies)
+    .where(eq(companies.is_archived, false))
+    .orderBy(desc(companies.created_at))
+
+  if (allCompanies.length === 0) {
+    console.log('[backfill] No companies found to embed.')
+    return { embedded: 0, errors: [] as string[] }
+  }
+
+  console.log(`[backfill] Found ${allCompanies.length} companies`)
+
+  const existingEmbeddingRows = await db
+    .select({ entity_id: embeddings.entity_id })
+    .from(embeddings)
+    .where(eq(embeddings.entity_type, 'company'))
+
+  const existingIds = new Set(existingEmbeddingRows.map((e) => e.entity_id))
+  const companiesToEmbed = allCompanies.filter((c) => !existingIds.has(c.id))
+
+  console.log(`[backfill] ${existingIds.size} companies already have embeddings`)
+  console.log(`[backfill] ${companiesToEmbed.length} companies need embeddings`)
+
+  if (companiesToEmbed.length === 0) {
+    console.log('[backfill] All companies already have embeddings. Done!')
+    return { embedded: 0, errors: [] as string[] }
+  }
+
+  const batchSize = 10
+  let totalEmbedded = 0
+  const allErrors: string[] = []
+
+  for (let i = 0; i < companiesToEmbed.length; i += batchSize) {
+    const batch = companiesToEmbed.slice(i, i + batchSize)
+    const batchNum = Math.floor(i / batchSize) + 1
+    const totalBatches = Math.ceil(companiesToEmbed.length / batchSize)
+
+    console.log(`[backfill] Processing company batch ${batchNum}/${totalBatches}...`)
+
+    const { embedded, errors } = await batchEmbedCompanies(batch)
+    totalEmbedded += embedded
+    allErrors.push(...errors)
+
+    if (i + batchSize < companiesToEmbed.length) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
+  }
+
+  return { embedded: totalEmbedded, errors: allErrors }
+}
+
 async function main() {
   const target = process.argv[2] ?? 'all'
 
-  if (!['sessions', 'contacts', 'all'].includes(target)) {
-    console.error('Usage: npx tsx app/src/scripts/backfill-embeddings.ts [sessions|contacts|all]')
+  if (!['sessions', 'contacts', 'companies', 'all'].includes(target)) {
+    console.error('Usage: npx tsx app/src/scripts/backfill-embeddings.ts [sessions|contacts|companies|all]')
     process.exit(1)
   }
 
@@ -184,6 +252,15 @@ async function main() {
     console.log(`[backfill] Contacts embedded: ${embedded}`)
     if (errors.length > 0) {
       console.log(`[backfill] Contact errors (${errors.length}):`)
+      errors.forEach((e) => console.log(`  - ${e}`))
+    }
+  }
+
+  if (target === 'companies' || target === 'all') {
+    const { embedded, errors } = await backfillCompanyEmbeddings()
+    console.log(`[backfill] Companies embedded: ${embedded}`)
+    if (errors.length > 0) {
+      console.log(`[backfill] Company errors (${errors.length}):`)
       errors.forEach((e) => console.log(`  - ${e}`))
     }
   }

@@ -4,7 +4,7 @@ import { Agent } from '@mastra/core/agent'
  * Response Classifier Agent
  *
  * Lightweight agent for classifying whether the bot should respond to a message.
- * Uses a faster/cheaper model (gpt-4o-mini) for quick classification.
+ * Uses a faster/cheaper model (gpt-5.4-mini) for quick classification.
  *
  * This agent is called as a fallback when heuristics can't determine if the bot
  * should respond to a message in a subscribed thread.
@@ -61,6 +61,6 @@ Message: "I'll take it from here, thanks Hissuno"
 Response: SKIP
 Human is taking over the conversation.
 `,
-  model: 'openai/gpt-4o-mini',
+  model: 'openai/gpt-5.4-mini',
   tools: {},
 })

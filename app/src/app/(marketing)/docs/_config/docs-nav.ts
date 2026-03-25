@@ -24,6 +24,7 @@ export const DOCS_NAV: DocNavCategory[] = [
     slug: 'getting-started',
     description: 'Set up your account, create your first project, and start collecting feedback.',
     items: [
+      { title: 'Quickstart', slug: 'quickstart', href: '/docs/getting-started/quickstart' },
       { title: 'Account Setup', slug: 'account-setup', href: '/docs/getting-started/account-setup' },
       { title: 'First Project', slug: 'first-project', href: '/docs/getting-started/first-project' },
       { title: 'Add Your Data', slug: 'add-your-data', href: '/docs/getting-started/add-your-data' },
@@ -40,8 +41,23 @@ export const DOCS_NAV: DocNavCategory[] = [
           { title: 'Skills', slug: 'skills', href: '/docs/connect/skills' },
           { title: 'API', slug: 'api-overview', href: '/docs/api/overview' },
           { title: 'Authentication', slug: 'api-authentication', href: '/docs/api/authentication' },
+          { title: 'Sessions API', slug: 'api-sessions', href: '/docs/api/sessions' },
+          { title: 'Issues API', slug: 'api-issues', href: '/docs/api/issues' },
+          { title: 'Search API', slug: 'api-search', href: '/docs/api/search' },
         ],
       },
+    ],
+  },
+  {
+    title: 'Concepts',
+    slug: 'concepts',
+    description: 'Core concepts: knowledge graph, product ontology, embeddings, and graph evaluation.',
+    items: [
+      { title: 'Overview', slug: 'overview', href: '/docs/concepts/overview' },
+      { title: 'Knowledge Graph', slug: 'knowledge-graph', href: '/docs/concepts/knowledge-graph' },
+      { title: 'Scopes', slug: 'scopes', href: '/docs/concepts/scopes' },
+      { title: 'Embeddings', slug: 'embeddings', href: '/docs/concepts/embeddings' },
+      { title: 'Graph Evaluation', slug: 'graph-evaluation', href: '/docs/concepts/graph-evaluation' },
     ],
   },
   {
@@ -51,16 +67,16 @@ export const DOCS_NAV: DocNavCategory[] = [
     items: [
       { title: 'Overview', slug: 'overview', href: '/docs/agents/overview' },
       { title: 'Support Agent', slug: 'support-agent', href: '/docs/agents/support-agent' },
+      { title: 'Knowledge Packages', slug: 'knowledge-packages', href: '/docs/agents/knowledge-packages' },
       { title: 'PM Copilot', slug: 'pm-copilot', href: '/docs/agents/pm-copilot' },
     ],
   },
   {
     title: 'Knowledge',
     slug: 'knowledge',
-    description: 'Teach your AI agent about your product using knowledge sources and packages.',
+    description: 'Teach your AI agent about your product using knowledge sources.',
     items: [
       { title: 'Sources', slug: 'sources', href: '/docs/knowledge/sources' },
-      { title: 'Packages', slug: 'packages', href: '/docs/knowledge/packages' },
       { title: 'Analysis', slug: 'analysis', href: '/docs/knowledge/analysis' },
     ],
   },
@@ -108,6 +124,7 @@ export const DOCS_NAV: DocNavCategory[] = [
       { title: 'Jira', slug: 'jira', href: '/docs/integrations/jira' },
       { title: 'Linear', slug: 'linear', href: '/docs/integrations/linear' },
       { title: 'Zendesk', slug: 'zendesk', href: '/docs/integrations/zendesk' },
+      { title: 'Troubleshooting', slug: 'troubleshooting', href: '/docs/integrations/troubleshooting' },
     ],
     subsections: [
       {

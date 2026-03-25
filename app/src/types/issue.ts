@@ -56,6 +56,7 @@ export interface IssueRecord {
   brief: string | null
   brief_generated_at: string | null
   is_archived: boolean
+  custom_fields: Record<string, unknown>
   // Impact analysis
   impact_score: number | null
   impact_analysis: IssueImpactAnalysis | null
@@ -177,6 +178,7 @@ export interface CreateIssueInput {
   description: string
   priority?: IssuePriority
   product_scope_id?: string | null
+  custom_fields?: Record<string, unknown>
 }
 
 /**
@@ -194,6 +196,7 @@ export interface UpdateIssueInput {
   confidence_score?: number
   effort_score?: number
   product_scope_id?: string | null
+  custom_fields?: Record<string, unknown>
 }
 
 /**

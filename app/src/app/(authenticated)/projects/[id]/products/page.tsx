@@ -66,7 +66,7 @@ export default function ProductsPage() {
   if (isLoadingProject || !projectId) {
     return (
       <>
-        <PageHeader title="Product Areas & Initiatives" />
+        <PageHeader title="Product Scopes (product areas and initiatives)" />
         <div className="flex-1 flex items-center justify-center">
           <Spinner size="lg" />
         </div>
@@ -77,7 +77,7 @@ export default function ProductsPage() {
   return (
     <>
       <PageHeader
-        title="Product Areas & Initiatives"
+        title="Product Scopes (product areas and initiatives)"
         actions={
           <button
             type="button"

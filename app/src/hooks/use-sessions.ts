@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { SessionWithProject, SessionWithMessages, SessionFilters, ChatMessage, CreateSessionInput, UpdateSessionInput } from '@/types/session'
 import {
   listSessions,
@@ -11,6 +11,7 @@ import {
   batchArchiveSessions,
   batchSetCustomer as apiBatchSetCustomer,
 } from '@/lib/api/sessions'
+import { useDebounce } from './use-debounce'
 
 interface UseSessionsState {
   sessions: SessionWithProject[]
@@ -38,18 +39,7 @@ export function useSessions({
   const [isLoading, setIsLoading] = useState<boolean>(initialSessions.length === 0)
   const [error, setError] = useState<string | null>(null)
 
-  // Debounce search filter to avoid firing on every keystroke
-  const [debouncedSearch, setDebouncedSearch] = useState(filters.search)
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  useEffect(() => {
-    if (filters.search === debouncedSearch) return
-    clearTimeout(debounceTimerRef.current)
-    debounceTimerRef.current = setTimeout(() => {
-      setDebouncedSearch(filters.search)
-    }, 300)
-    return () => clearTimeout(debounceTimerRef.current)
-  }, [filters.search, debouncedSearch])
+  const debouncedSearch = useDebounce(filters.search, 300)
 
   const fetchSessions = useCallback(async () => {
     if (!filters.projectId) {

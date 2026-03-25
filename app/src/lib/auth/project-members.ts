@@ -257,7 +257,7 @@ export async function listProjectMembers(projectId: string): Promise<ProjectMemb
 /**
  * Check if a user has access to a project.
  */
-export async function hasProjectAccess(projectId: string, userId: string): Promise<boolean> {
+export async function isProjectMember(projectId: string, userId: string): Promise<boolean> {
   const [data] = await db
     .select({ id: projectMembers.id })
     .from(projectMembers)

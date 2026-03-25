@@ -8,7 +8,7 @@ import { isDatabaseConfigured } from '@/lib/db/config'
 import { CUSTOM_FIELD_TYPES } from '@/types/customer'
 import type { CustomerEntityType } from '@/types/customer'
 
-const VALID_ENTITY_TYPES = ['company', 'contact'] as const
+const VALID_ENTITY_TYPES = ['company', 'contact', 'issue', 'session'] as const
 
 export const runtime = 'nodejs'
 

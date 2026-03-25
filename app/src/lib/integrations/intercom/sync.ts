@@ -3,9 +3,7 @@
  * Handles fetching conversations from Intercom and creating Hissuno sessions.
  */
 
-import { db } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import { sessions, sessionMessages } from '@/lib/db/schema/app'
+import { createSessionWithMessagesAdmin } from '@/lib/sessions/sessions-service'
 import {
   IntercomClient,
   type IntercomContact,
@@ -16,13 +14,14 @@ import {
 } from './client'
 import {
   getIntercomCredentials,
-  isConversationSynced,
+  getSyncedConversationIds,
   recordSyncedConversation,
   updateSyncState,
   createSyncRun,
   completeSyncRun,
   type IntercomFilterConfig,
 } from './index'
+import { stripHtml } from '@/lib/integrations/shared/sync-utils'
 
 /**
  * Progress event during sync
@@ -153,7 +152,7 @@ function generateSessionName(conversation: IntercomConversation): string {
   // Use first message content (truncated)
   const firstMessage = conversation.source?.body
   if (firstMessage) {
-    const cleaned = firstMessage.replace(/<[^>]*>/g, '').trim()
+    const cleaned = stripHtml(firstMessage)
     if (cleaned.length > 50) {
       return cleaned.substring(0, 47) + '...'
     }
@@ -189,38 +188,12 @@ async function createSessionFromConversation(
   const userId = fullContact?.external_id || fullContact?.id || null
   const userMetadata = buildUserMetadata(conversation.id, fullContact)
 
-  // Create session
-  try {
-    await db.insert(sessions).values({
-      id: sessionId,
-      project_id: projectId,
-      source: 'intercom',
-      status: 'closed', // Historical data is always closed
-      name: generateSessionName(conversation),
-      user_metadata: { ...userMetadata, ...(userId ? { userId } : {}) },
-      first_message_at: new Date(conversation.created_at * 1000),
-      last_activity_at: new Date(conversation.updated_at * 1000),
-      created_at: new Date(conversation.created_at * 1000),
-    })
-  } catch (sessionError) {
-    console.error('[intercom.sync] Failed to create session:', sessionError)
-    return null
-  }
-
   // Collect all messages (source + parts)
-  const messageValues: Array<{
-    session_id: string
-    project_id: string
-    sender_type: string
-    content: string
-    created_at: Date
-  }> = []
+  const messages: Array<{ sender_type: string; content: string; created_at?: Date }> = []
 
   // Add source message (first message in conversation)
   if (conversation.source?.body) {
-    messageValues.push({
-      session_id: sessionId,
-      project_id: projectId,
+    messages.push({
       sender_type: mapAuthorTypeToSenderType(conversation.source.author.type),
       content: conversation.source.body,
       created_at: new Date(conversation.created_at * 1000),
@@ -235,42 +208,40 @@ async function createSessionFromConversation(
       continue
     }
 
-    messageValues.push({
-      session_id: sessionId,
-      project_id: projectId,
+    messages.push({
       sender_type: mapAuthorTypeToSenderType(part.author.type),
       content: part.body,
       created_at: new Date(part.created_at * 1000),
     })
   }
 
-  // Insert messages
-  if (messageValues.length > 0) {
-    try {
-      await db.insert(sessionMessages).values(messageValues)
-    } catch (messagesError) {
-      console.error('[intercom.sync] Failed to insert messages:', messagesError)
-      // Continue anyway - session was created
-    }
-  }
+  // Create session with messages via service
+  const result = await createSessionWithMessagesAdmin({
+    id: sessionId,
+    projectId,
+    source: 'intercom',
+    status: 'closed',
+    name: generateSessionName(conversation),
+    userMetadata: { ...userMetadata, ...(userId ? { userId } : {}) },
+    firstMessageAt: new Date(conversation.created_at * 1000),
+    lastActivityAt: new Date(conversation.updated_at * 1000),
+    createdAt: new Date(conversation.created_at * 1000),
+    messages,
+  })
 
-  // Update session message count
-  await db
-    .update(sessions)
-    .set({ message_count: messageValues.length })
-    .where(eq(sessions.id, sessionId))
+  if (!result) return null
 
   // Record the sync
   await recordSyncedConversation({
     connectionId,
     intercomConversationId: conversation.id,
-    sessionId,
+    sessionId: result.sessionId,
     conversationCreatedAt: new Date(conversation.created_at * 1000).toISOString(),
     conversationUpdatedAt: new Date(conversation.updated_at * 1000).toISOString(),
-    partsCount: messageValues.length,
+    partsCount: result.messageCount,
   })
 
-  return { sessionId, messageCount: messageValues.length }
+  return { sessionId: result.sessionId, messageCount: result.messageCount }
 }
 
 /**
@@ -335,13 +306,13 @@ export async function syncIntercomConversations(
   let conversationsSkipped = 0
 
   try {
+    // Pre-fetch all synced conversation IDs to avoid N+1 queries
+    const syncedConversationIds = await getSyncedConversationIds(credentials.connectionId)
+
     // Process a single conversation: check dedup, fetch full details, create session
     const processConversation = async (conversation: IntercomConversationListItem) => {
       // Check if already synced
-      const alreadySynced = await isConversationSynced(
-        credentials.connectionId,
-        conversation.id
-      )
+      const alreadySynced = syncedConversationIds.has(conversation.id)
 
       if (alreadySynced) {
         conversationsSkipped++

@@ -66,6 +66,40 @@ export interface NotionSearchResult {
   title?: NotionRichText[]
 }
 
+export interface NotionDatabaseProperty {
+  id: string
+  name: string
+  type: string
+  title?: Record<string, never>
+  rich_text?: Record<string, never>
+  number?: { format: string }
+  select?: { options: Array<{ id: string; name: string; color: string }> }
+  multi_select?: { options: Array<{ id: string; name: string; color: string }> }
+  status?: {
+    options: Array<{ id: string; name: string; color: string }>
+    groups: Array<{ id: string; name: string; option_ids: string[] }>
+  }
+  date?: Record<string, never>
+  people?: Record<string, never>
+  checkbox?: Record<string, never>
+  url?: Record<string, never>
+  email?: Record<string, never>
+  phone_number?: Record<string, never>
+  formula?: { expression: string }
+  relation?: { database_id: string }
+  rollup?: { function: string }
+}
+
+export interface NotionDatabase {
+  id: string
+  object: 'database'
+  title: NotionRichText[]
+  properties: Record<string, NotionDatabaseProperty>
+  url: string
+  created_time: string
+  last_edited_time: string
+}
+
 export class NotionClient {
   private accessToken: string
 
@@ -223,5 +257,34 @@ export class NotionClient {
     if (startCursor) body.start_cursor = startCursor
 
     return this.request('POST', `/databases/${databaseId}/query`, { body })
+  }
+
+  /**
+   * Get a database schema (properties/columns).
+   */
+  async getDatabase(databaseId: string): Promise<NotionDatabase> {
+    return this.request('GET', `/databases/${databaseId}`)
+  }
+
+  /**
+   * Get all pages from a database (handles pagination).
+   */
+  async getAllDatabasePages(databaseId: string, maxPages = 20): Promise<NotionPage[]> {
+    const allPages: NotionPage[] = []
+    let cursor: string | undefined
+    let page = 0
+
+    do {
+      const response = await this.getDatabasePages(databaseId, cursor)
+      allPages.push(...response.results)
+      cursor = response.has_more ? (response.next_cursor ?? undefined) : undefined
+      page++
+      if (page >= maxPages) {
+        console.warn(`[notion.client] getAllDatabasePages: hit pagination limit (${maxPages} pages) for database ${databaseId}`)
+        break
+      }
+    } while (cursor)
+
+    return allPages
   }
 }

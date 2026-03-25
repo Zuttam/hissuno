@@ -8,7 +8,7 @@ import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
 import { issueAnalysisRuns } from '@/lib/db/schema/app'
 import { eq, and } from 'drizzle-orm'
-import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
+import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/utils/sse'
 import { mastra } from '@/mastra'
 import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings/workflow-guidelines'
 

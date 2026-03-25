@@ -132,14 +132,14 @@ describe('formatResourceList', () => {
     expect(result).toContain('3 contacts')
   })
 
-  it('formats knowledge items with source count', () => {
+  it('formats knowledge items with type and status', () => {
     const items = [
-      { id: 'k-1', name: 'Docs', description: 'API documentation', sourceCount: 3 },
+      { id: 'k-1', name: 'API Docs', type: 'website', status: 'done', url: 'https://docs.example.com' },
     ]
     const result = formatResourceList('knowledge', items, 1)
     expect(result).toContain('Knowledge (1 total)')
-    expect(result).toContain('Docs')
-    expect(result).toContain('3 sources')
+    expect(result).toContain('API Docs')
+    expect(result).toContain('website')
   })
 })
 
@@ -219,7 +219,6 @@ describe('formatResourceTypes', () => {
   it('includes all resource types', () => {
     const result = formatResourceTypes()
     expect(result).toContain('knowledge')
-    expect(result).toContain('sources')
     expect(result).toContain('feedback')
     expect(result).toContain('issues')
     expect(result).toContain('customers')

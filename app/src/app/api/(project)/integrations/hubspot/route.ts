@@ -15,7 +15,7 @@ import {
   updateHubSpotSettings,
   disconnectHubSpot,
   getSyncStats,
-  type HubSpotSyncFrequency,
+  type SyncFrequency,
   type HubSpotFilterConfig,
 } from '@/lib/integrations/hubspot'
 
@@ -76,7 +76,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { projectId, syncFrequency, syncEnabled, filterConfig } = body as {
       projectId: string
-      syncFrequency?: HubSpotSyncFrequency
+      syncFrequency?: SyncFrequency
       syncEnabled?: boolean
       filterConfig?: HubSpotFilterConfig
     }

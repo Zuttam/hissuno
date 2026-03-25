@@ -6,7 +6,7 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
 import { knowledgeSources, entityRelationships } from '@/lib/db/schema/app'
-import { deleteCodebase, updateGitHubCodebase } from '@/lib/codebase'
+import { deleteCodebase, updateGitHubCodebase } from '@/lib/knowledge/codebase'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { setEntityProductScope } from '@/lib/db/queries/entity-relationships'
 

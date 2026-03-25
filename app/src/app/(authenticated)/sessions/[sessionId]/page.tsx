@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { getIssueById } from '@/lib/db/queries/issues'
 import { listProjects } from '@/lib/db/queries/projects'
 import { getSessionById } from '@/lib/db/queries/sessions'
+import { getSessionUser } from '@/lib/auth/server'
 
 interface SessionDetailPageParams {
   params: Promise<{ sessionId: string }>
@@ -18,7 +19,8 @@ export default async function SessionDetailPage({ params }: SessionDetailPagePar
   }
 
   // If session not found or no project, redirect to projects list
-  const projects = await listProjects()
+  const user = await getSessionUser()
+  const projects = await listProjects(user!.id)
 
   if (projects.length > 0) {
     redirect(`/projects/${projects[0].id}/sessions`)

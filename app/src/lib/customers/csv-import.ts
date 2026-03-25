@@ -17,7 +17,7 @@ import type {
   CSVImportResult,
 } from '@/types/customer'
 import { isValidEmail } from '@/lib/customers/contact-resolution'
-import { fireGraphEval } from '@/lib/graph-eval'
+import { fireGraphEval } from '@/lib/utils/graph-eval'
 
 // Characters that spreadsheet apps interpret as formula/command prefixes (OWASP)
 const FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r']

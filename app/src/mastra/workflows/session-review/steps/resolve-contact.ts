@@ -8,7 +8,7 @@
 
 import { createStep } from '@mastra/core/workflows'
 import { resolveContactForSession } from '@/lib/customers/contact-resolution'
-import { triggerGraphEvaluation } from '../../graph-evaluation'
+import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { preparedPMContextSchema } from '../schemas'
 
 export const resolveContact = createStep({
@@ -46,11 +46,7 @@ export const resolveContact = createStep({
 
       // Trigger async graph-eval for newly created contacts
       if (result.created) {
-        void triggerGraphEvaluation(mastra, {
-          projectId,
-          entityType: 'contact',
-          entityId: result.contactId,
-        })
+        fireGraphEval(projectId, 'contact', result.contactId)
       }
     } else {
       logger?.info('[resolve-contact] No email found, skipping')

@@ -15,7 +15,7 @@ import {
   updateFathomSettings,
   disconnectFathom,
   getSyncStats,
-  type FathomSyncFrequency,
+  type SyncFrequency,
   type FathomFilterConfig,
 } from '@/lib/integrations/fathom'
 
@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { projectId, syncFrequency, syncEnabled, filterConfig } = body as {
       projectId: string
-      syncFrequency?: FathomSyncFrequency
+      syncFrequency?: SyncFrequency
       syncEnabled?: boolean
       filterConfig?: FathomFilterConfig
     }

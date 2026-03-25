@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Check, Unplug, Plug } from 'lucide-react'
-import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
+import { Check, Unplug, Plug, Save } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner, FormField, Select } from '@/components/ui'
 import type { JiraIntegrationStatus, JiraProject, JiraIssueType } from '@/types/jira'
 import {
   fetchJiraStatus as apiFetchJiraStatus,
@@ -287,7 +287,7 @@ export function JiraConfigDialog({
 
                 {/* Reconfigure */}
                 <div className="space-y-2 border-t border-[color:var(--border-subtle)] pt-4">
-                  <Button variant="secondary" onClick={fetchJiraProjects} loading={isLoadingProjects}>
+                  <Button variant="secondary" size="sm" onClick={fetchJiraProjects} loading={isLoadingProjects}>
                     Change Configuration
                   </Button>
                 </div>
@@ -420,14 +420,10 @@ function ConfigurationForm({
   return (
     <div className="space-y-4">
       {/* Jira Project Selector */}
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-[color:var(--foreground)]">
-          Jira Project
-        </label>
-        <select
+      <FormField label="Jira Project">
+        <Select
           value={selectedProjectKey}
           onChange={onProjectChange}
-          className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
         >
           <option value="">Select a project...</option>
           {jiraProjects.map((p) => (
@@ -435,14 +431,11 @@ function ConfigurationForm({
               {p.key} - {p.name}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
+      </FormField>
 
       {/* Issue Type Selector */}
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-[color:var(--foreground)]">
-          Default Issue Type
-        </label>
+      <FormField label="Default Issue Type">
         {isLoadingIssueTypes ? (
           <div className="flex items-center gap-2 py-2">
             <Spinner size="sm" />
@@ -451,11 +444,10 @@ function ConfigurationForm({
             </span>
           </div>
         ) : (
-          <select
+          <Select
             value={selectedIssueTypeId}
             onChange={onIssueTypeChange}
             disabled={!selectedProjectKey || issueTypes.length === 0}
-            className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)] disabled:opacity-50"
           >
             <option value="">Select an issue type...</option>
             {issueTypes
@@ -465,17 +457,19 @@ function ConfigurationForm({
                   {t.name}
                 </option>
               ))}
-          </select>
+          </Select>
         )}
-      </div>
+      </FormField>
 
       <Button
         variant="primary"
+        size="sm"
         onClick={onSave}
         loading={isSaving}
         disabled={!selectedProjectKey || !selectedIssueTypeId}
       >
-        Save Configuration
+        <Save size={14} />
+        Save
       </Button>
     </div>
   )

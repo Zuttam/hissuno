@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getProjectById } from '@/lib/projects/keys'
 import { cancelChatRun } from '@/lib/agent/chat-run-service'
 import { isOriginAllowed } from '@/lib/utils/widget-auth'
+import { getWidgetRequestOrigin, addWidgetCorsHeaders, createWidgetOptionsResponse } from '@/lib/utils/widget-cors'
 
 export const runtime = 'nodejs'
+
+const CORS_METHODS = 'POST, OPTIONS'
 
 interface CancelRequestBody {
   projectId: string
@@ -11,106 +14,78 @@ interface CancelRequestBody {
 }
 
 /**
- * Get the request origin from headers
- * Uses Origin header if present, otherwise falls back to request URL origin
- */
-function getRequestOrigin(request: NextRequest): string {
-  return request.headers.get('Origin') || request.nextUrl.origin
-}
-
-/**
- * Add CORS headers to response
- */
-function addCorsHeaders(response: NextResponse, origin: string): NextResponse {
-  response.headers.set('Access-Control-Allow-Origin', origin)
-  response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type')
-  return response
-}
-
-/**
  * POST /api/integrations/widget/chat/stream/cancel
  * Cancel a running chat
  */
 export async function POST(request: NextRequest) {
-  const origin = getRequestOrigin(request)
+  const origin = getWidgetRequestOrigin(request)
 
   try {
     const body = (await request.json()) as CancelRequestBody
     const { projectId, sessionId } = body
 
     if (!projectId) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'projectId is required' }, { status: 400 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     if (!sessionId) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'sessionId is required' }, { status: 400 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // Validate project
     const project = await getProjectById(projectId)
     if (!project) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Invalid project ID' }, { status: 401 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // Check origin
     if (!isOriginAllowed(origin, project.allowed_origins)) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     const result = await cancelChatRun({ sessionId })
 
     if (!result.success) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({
           message: result.error,
           cancelled: false,
         }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     console.log('[widget/chat/stream/cancel] Cancelled chat for session:', sessionId)
 
-    return addCorsHeaders(
+    return addWidgetCorsHeaders(
       NextResponse.json({
         message: 'Chat cancelled successfully.',
         cancelled: true,
       }),
-      origin
+      origin, CORS_METHODS
     )
   } catch (error) {
     console.error('[widget/chat/stream/cancel] unexpected error', error)
-    return addCorsHeaders(
+    return addWidgetCorsHeaders(
       NextResponse.json({ error: 'Failed to cancel chat.' }, { status: 500 }),
-      origin
+      origin, CORS_METHODS
     )
   }
 }
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  const origin = getRequestOrigin(request)
-
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-    },
-  })
+  return createWidgetOptionsResponse(request, CORS_METHODS)
 }

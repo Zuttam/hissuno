@@ -99,6 +99,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (body.user_metadata !== undefined) input.user_metadata = body.user_metadata
     if (body.contact_id !== undefined) input.contact_id = body.contact_id
     if (body.is_human_takeover !== undefined) input.is_human_takeover = body.is_human_takeover
+    if (body.custom_fields !== undefined) input.custom_fields = body.custom_fields
 
     // Check if there's anything to update
     if (Object.keys(input).length === 0) {

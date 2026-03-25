@@ -27,9 +27,7 @@ import type {
   knowledgePackageSources,
   entityRelationships,
   sourceCodes,
-  sessionEmbeddings,
-  issueEmbeddings,
-  contactEmbeddings,
+  embeddings,
   slackWorkspaceTokens,
   slackChannels,
   slackThreadSessions,
@@ -141,14 +139,8 @@ export type EntityType = 'company' | 'contact' | 'issue' | 'session' | 'knowledg
 // ---------------------------------------------------------------------------
 // Embeddings
 // ---------------------------------------------------------------------------
-export type SessionEmbeddingRow = typeof sessionEmbeddings.$inferSelect
-export type SessionEmbeddingInsert = typeof sessionEmbeddings.$inferInsert
-
-export type IssueEmbeddingRow = typeof issueEmbeddings.$inferSelect
-export type IssueEmbeddingInsert = typeof issueEmbeddings.$inferInsert
-
-export type ContactEmbeddingRow = typeof contactEmbeddings.$inferSelect
-export type ContactEmbeddingInsert = typeof contactEmbeddings.$inferInsert
+export type EmbeddingRow = typeof embeddings.$inferSelect
+export type EmbeddingInsert = typeof embeddings.$inferInsert
 
 // ---------------------------------------------------------------------------
 // Integrations

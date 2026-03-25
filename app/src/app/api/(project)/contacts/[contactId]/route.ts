@@ -4,6 +4,7 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { getContactById, updateContactById, deleteContactById } from '@/lib/db/queries/contacts'
+import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import type { UpdateContactInput } from '@/types/customer'
 
@@ -76,6 +77,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const contact = await updateContactById(contactId, body)
+    fireGraphEval(projectId, 'contact', contact.id)
 
     return NextResponse.json({ contact })
   } catch (error) {

@@ -13,9 +13,7 @@
  * - Workflows → issues-service.ts → db/queries/issues.ts + embedding-service.ts
  */
 
-import { UnauthorizedError } from '@/lib/auth/server'
 import { isDatabaseConfigured } from '@/lib/db/config'
-import { resolveRequestContext } from '@/lib/db/server'
 import {
   insertIssue,
   updateIssueById,
@@ -26,12 +24,17 @@ import {
   getIssueForUpvote,
   getIssueForEmbedding,
   updateIssueArchiveStatusById,
-  verifyProjectAccess,
   getIssueProjectId,
   type InsertIssueData,
 } from '@/lib/db/queries/issues'
-import { upsertIssueEmbedding } from './embedding-service'
-import { fireGraphEval } from '@/lib/graph-eval'
+import { getProjectById } from '@/lib/db/queries/projects'
+import { searchSimilarIssues, buildIssueEmbeddingText } from './embedding-service'
+import { fireEmbedding } from '@/lib/utils/embeddings'
+import { searchWithFallback } from '@/lib/search/search-with-fallback'
+import { db } from '@/lib/db'
+import { eq, and, desc, ilike, or } from 'drizzle-orm'
+import { issues } from '@/lib/db/schema/app'
+import { fireGraphEval } from '@/lib/utils/graph-eval'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -58,48 +61,25 @@ export function calculatePriority(upvoteCount: number): IssuePriority {
 }
 
 /**
- * Create embedding for an issue (non-blocking, logs on failure)
+ * Fire embedding update for an issue if title or description changed.
+ * Uses the shared fireEmbedding() for consistent fire-and-forget pattern.
  */
-async function createIssueEmbedding(
-  issueId: string,
-  projectId: string,
-  title: string,
-  description: string,
-  logPrefix: string
-): Promise<boolean> {
-  try {
-    const result = await upsertIssueEmbedding(issueId, projectId, title, description)
-    return result.updated
-  } catch (error) {
-    console.warn(`[${logPrefix}] Failed to create embedding for issue ${issueId}:`, error)
-    return false
-  }
-}
-
-/**
- * Update embedding for an issue if title or description changed
- */
-async function maybeUpdateIssueEmbedding(
+function maybeFireIssueEmbedding(
   issueId: string,
   projectId: string,
   currentTitle: string,
   currentDescription: string,
   newTitle: string | undefined,
-  newDescription: string | undefined,
-  logPrefix: string
-): Promise<boolean> {
-  // Check if title or description changed
+  newDescription: string | undefined
+): void {
   const titleChanged = newTitle !== undefined && newTitle !== currentTitle
   const descriptionChanged = newDescription !== undefined && newDescription !== currentDescription
 
-  if (!titleChanged && !descriptionChanged) {
-    return false
-  }
+  if (!titleChanged && !descriptionChanged) return
 
   const finalTitle = newTitle ?? currentTitle
   const finalDescription = newDescription ?? currentDescription
-
-  return createIssueEmbedding(issueId, projectId, finalTitle, finalDescription, logPrefix)
+  fireEmbedding(issueId, 'issue', projectId, buildIssueEmbeddingText(finalTitle, finalDescription))
 }
 
 // ============================================================================
@@ -114,13 +94,12 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
     throw new Error('Database must be configured.')
   }
 
-  await resolveRequestContext()
-
-  // Verify user owns the project
-  const project = await verifyProjectAccess(input.project_id)
-  if (!project) {
-    throw new UnauthorizedError('You do not have permission to create issues for this project.')
+  // Look up project for return value
+  const projectRow = await getProjectById(input.project_id)
+  if (!projectRow) {
+    throw new Error('Project not found.')
   }
+  const project = { id: projectRow.id, name: projectRow.name }
 
   // Insert the issue
   const issue = await insertIssue({
@@ -133,6 +112,7 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
     upvoteCount: 1,
     status: 'open',
     productScopeId: input.product_scope_id ?? null,
+    customFields: input.custom_fields ?? undefined,
   })
 
   // Link to sessions if provided
@@ -142,15 +122,7 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
     }
   }
 
-  // Create embedding (non-blocking)
-  await createIssueEmbedding(
-    issue.id,
-    input.project_id,
-    input.title,
-    input.description,
-    'issues-service.createIssue'
-  )
-
+  fireEmbedding(issue.id, 'issue', input.project_id, buildIssueEmbeddingText(input.title, input.description))
   fireGraphEval(input.project_id, 'issue', issue.id)
 
   return {
@@ -167,17 +139,10 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
     throw new Error('Database must be configured.')
   }
 
-  await resolveRequestContext()
-
   // Get project_id + current title/description in a single query
   const current = await getIssueForEmbedding(issueId)
   if (!current) {
     throw new Error('Issue not found.')
-  }
-
-  const project = await verifyProjectAccess(current.projectId)
-  if (!project) {
-    throw new UnauthorizedError('You do not have permission to update this issue.')
   }
 
   const projectId = current.projectId
@@ -185,17 +150,9 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
   // Update the issue
   const issue = await updateIssueById(issueId, input)
 
-  // Update embedding if text changed (non-blocking)
+  // Update embedding if text changed
   if (current) {
-    await maybeUpdateIssueEmbedding(
-      issueId,
-      projectId,
-      current.title,
-      current.description,
-      input.title,
-      input.description,
-      'issues-service.updateIssue'
-    )
+    maybeFireIssueEmbedding(issueId, projectId, current.title, current.description, input.title, input.description)
   }
 
   fireGraphEval(projectId, 'issue', issueId)
@@ -212,17 +169,10 @@ export async function deleteIssue(issueId: string): Promise<boolean> {
     throw new Error('Database must be configured.')
   }
 
-  await resolveRequestContext()
-
-  // Verify user owns the project this issue belongs to
+  // Verify issue exists
   const projectId = await getIssueProjectId(issueId)
   if (!projectId) {
     return false // Issue not found
-  }
-
-  const project = await verifyProjectAccess(projectId)
-  if (!project) {
-    throw new UnauthorizedError('You do not have permission to delete this issue.')
   }
 
   // Delete the issue (embedding cascade delete handled by DB)
@@ -240,17 +190,10 @@ export async function updateIssueArchiveStatus(
     throw new Error('Database must be configured.')
   }
 
-  await resolveRequestContext()
-
-  // Verify user owns the project this issue belongs to
+  // Verify issue exists
   const projectId = await getIssueProjectId(issueId)
   if (!projectId) {
     throw new Error('Issue not found.')
-  }
-
-  const project = await verifyProjectAccess(projectId)
-  if (!project) {
-    throw new UnauthorizedError('You do not have permission to update this issue.')
   }
 
   return updateIssueArchiveStatusById(issueId, isArchived)
@@ -270,7 +213,9 @@ export interface CreateIssueAdminInput {
   title: string
   description: string
   priority?: IssuePriority
+  status?: 'open' | 'ready' | 'in_progress' | 'resolved' | 'closed'
   productScopeId?: string | null
+  customFields?: Record<string, unknown>
 }
 
 /**
@@ -278,7 +223,6 @@ export interface CreateIssueAdminInput {
  */
 export interface CreateIssueAdminResult {
   issue: IssueRecord
-  embeddingCreated: boolean
 }
 
 /**
@@ -297,8 +241,9 @@ export async function createIssueAdmin(
     priority: input.priority ?? 'low',
     priorityManualOverride: false, // Agent-created issues use automatic priority
     upvoteCount: 1,
-    status: 'open',
+    status: input.status ?? 'open',
     productScopeId: input.productScopeId ?? null,
+    customFields: input.customFields,
   }
 
   const issue = await insertIssue(insertData)
@@ -311,16 +256,32 @@ export async function createIssueAdmin(
     ])
   }
 
-  // Create embedding (non-blocking)
-  const embeddingCreated = await createIssueEmbedding(
-    issue.id,
-    input.projectId,
-    input.title,
-    input.description,
-    'issues-service.createIssueAdmin'
-  )
+  fireEmbedding(issue.id, 'issue', input.projectId, buildIssueEmbeddingText(input.title, input.description))
+  fireGraphEval(input.projectId, 'issue', issue.id)
 
-  return { issue, embeddingCreated }
+  return { issue }
+}
+
+/**
+ * Updates an issue with embedding + graph eval. No user auth required.
+ * Use this for integrations, sync jobs, and workflows.
+ */
+export async function updateIssueAdmin(
+  issueId: string,
+  projectId: string,
+  input: UpdateIssueInput
+): Promise<IssueRecord> {
+  const issue = await updateIssueById(issueId, input)
+
+  // Update embedding if text changed
+  const current = await getIssueForEmbedding(issueId)
+  if (current) {
+    maybeFireIssueEmbedding(issueId, projectId, current.title, current.description, input.title, input.description)
+  }
+
+  fireGraphEval(projectId, 'issue', issueId)
+
+  return issue
 }
 
 /**
@@ -362,4 +323,71 @@ export async function upvoteIssueAdmin(
  */
 export async function markSessionReviewedAdmin(sessionId: string): Promise<void> {
   await markSessionPMReviewed(sessionId)
+}
+
+// ============================================================================
+// Search Operations
+// ============================================================================
+
+export interface SearchIssueResult {
+  id: string
+  name: string
+  snippet: string
+  score?: number
+}
+
+/**
+ * Searches issues using semantic search with ILIKE fallback.
+ */
+export async function searchIssues(
+  projectId: string,
+  query: string,
+  limit: number = 10
+): Promise<SearchIssueResult[]> {
+  return searchWithFallback<SearchIssueResult>({
+    logPrefix: '[issues-service]',
+    semanticSearch: async () => {
+      const results = await searchSimilarIssues(projectId, query, query, {
+        limit,
+        threshold: 0.4,
+        includeClosed: true,
+      })
+      return results.map((r) => ({
+        id: r.issueId,
+        name: r.title,
+        snippet: r.description.slice(0, 200),
+        score: r.similarity,
+      }))
+    },
+    textFallback: async () => {
+      const s = `%${query}%`
+      const data = await db
+        .select({
+          id: issues.id,
+          title: issues.title,
+          description: issues.description,
+          updated_at: issues.updated_at,
+        })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.project_id, projectId),
+            eq(issues.is_archived, false),
+            or(
+              ilike(issues.title, s),
+              ilike(issues.description, s)
+            )
+          )
+        )
+        .orderBy(desc(issues.updated_at))
+        .limit(limit)
+
+      return data.map((r) => ({
+        id: r.id,
+        name: r.title,
+        snippet: (r.description ?? '').slice(0, 200),
+        score: 0,
+      }))
+    },
+  })
 }

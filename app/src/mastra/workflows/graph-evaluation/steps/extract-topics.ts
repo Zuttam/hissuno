@@ -5,17 +5,15 @@
  * For contacts, skips LLM and uses the embedding text directly.
  */
 
-import { createStep } from '@mastra/core/workflows'
 import { generateObject } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { z } from 'zod'
-import { entityContentSchema, topicsExtractedSchema } from '../schemas'
 import type { GraphEntityType } from '../schemas'
 
 /**
  * Core logic for topic extraction. Exported for inline use.
  */
-export async function extractTopicsFn(
+export async function extractTopics(
   contentForSearch: string,
   entityName: string,
   entityType: GraphEntityType,
@@ -39,7 +37,7 @@ export async function extractTopicsFn(
     const entityLabel = entityType === 'knowledge_source' ? 'knowledge source' : entityType
 
     const { object } = await generateObject({
-      model: openai('gpt-4o-mini'),
+      model: openai('gpt-5.4-mini'),
       schema: z.object({
         topics: z.array(z.string()).describe('3-5 key topics/keywords for finding related entities'),
       }),
@@ -62,17 +60,3 @@ export async function extractTopicsFn(
   }
 }
 
-export const extractTopics = createStep({
-  id: 'extract-topics',
-  description: 'Extract key topics from entity content using LLM',
-  inputSchema: entityContentSchema,
-  outputSchema: topicsExtractedSchema,
-  execute: async ({ inputData }) => {
-    if (!inputData) throw new Error('Input data not found')
-
-    const { contentForSearch, entityName, entityType, guidelines } = inputData
-    const result = await extractTopicsFn(contentForSearch, entityName, entityType, guidelines)
-
-    return { ...inputData, ...result }
-  },
-})

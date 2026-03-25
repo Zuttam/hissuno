@@ -15,7 +15,7 @@ import {
   updatePosthogSettings,
   disconnectPosthog,
   getSyncStats,
-  type PosthogSyncFrequency,
+  type SyncFrequency,
   type PosthogEventConfig,
 } from '@/lib/integrations/posthog'
 
@@ -73,7 +73,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { projectId, syncFrequency, syncEnabled, eventConfig, filterConfig } = body as {
       projectId: string
-      syncFrequency?: PosthogSyncFrequency
+      syncFrequency?: SyncFrequency
       syncEnabled?: boolean
       eventConfig?: PosthogEventConfig
       filterConfig?: Record<string, unknown>

@@ -28,7 +28,7 @@ export function FormField({
   children,
   ...props
 }: FormFieldProps) {
-  const containerClasses = 'flex flex-col gap-2'
+  const containerClasses = 'flex flex-col gap-1'
   const mergedClasses = className
     ? `${containerClasses} ${className}`
     : containerClasses
@@ -39,7 +39,7 @@ export function FormField({
         <span
           className={
             labelClassName ??
-            'block text-sm font-mono font-semibold uppercase tracking-wide text-(--foreground)'
+            'block text-xs font-mono font-medium text-(--text-secondary)'
           }
         >
           {label}{required && <span className="text-(--accent-danger) ml-0.5">*</span>}
@@ -74,7 +74,7 @@ export function FormField({
       <span
         className={
           labelClassName ??
-          'block text-sm font-mono font-semibold uppercase tracking-wide text-[--foreground]'
+          'block text-xs font-mono font-medium text-[--text-secondary]'
         }
       >
         {label}{required && <span className="text-(--accent-danger) ml-0.5">*</span>}

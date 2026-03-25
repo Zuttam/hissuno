@@ -14,7 +14,8 @@ import { contacts, companies, entityRelationships } from '@/lib/db/schema/app'
 import { isUniqueViolation } from '@/lib/db/errors'
 import { eq, and, isNotNull } from 'drizzle-orm'
 import type { ContactRecord } from '@/types/customer'
-import { buildContactEmbeddingText, upsertContactEmbedding } from '@/lib/customers/contact-embedding-service'
+import { buildContactEmbeddingText } from '@/lib/customers/customer-embedding-service'
+import { fireEmbedding } from '@/lib/utils/embeddings'
 import { setSessionContact } from '@/lib/db/queries/entity-relationships'
 
 // ============================================================================
@@ -260,8 +261,7 @@ export async function resolveContactForSession(
             .then((rows) => rows[0]?.name ?? null)
         : null
       const embeddingText = buildContactEmbeddingText({ name, email, role, title, companyName })
-      void upsertContactEmbedding(newContact.id, projectId, embeddingText)
-        .catch((err) => console.warn('[contact-resolution] Embedding failed', newContact.id, err))
+      fireEmbedding(newContact.id, 'contact', projectId, embeddingText)
 
       return {
         contactId: newContact.id,

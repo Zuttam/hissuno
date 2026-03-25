@@ -9,7 +9,7 @@
 import { db } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { projects } from '@/lib/db/schema/app'
-import { acquireCodebase, type AcquireResult } from '@/lib/codebase/manager'
+import { acquireCodebase, type AcquireResult } from '@/lib/knowledge/codebase/manager'
 
 export interface PrepareCodebaseParams {
   projectId: string

@@ -10,7 +10,7 @@ export type CompanyStage = (typeof COMPANY_STAGES)[number]
 export const CUSTOM_FIELD_TYPES = ['text', 'number', 'date', 'boolean', 'select'] as const
 export type CustomFieldType = (typeof CUSTOM_FIELD_TYPES)[number]
 
-export type CustomerEntityType = 'company' | 'contact'
+export type CustomerEntityType = 'company' | 'contact' | 'issue' | 'session'
 
 // ============================================================================
 // Base Row Types (from Drizzle schema)

@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils/class'
 import { Collapsible } from '@/components/ui/collapsible'
 import { DOCS_NAV } from '@/app/(marketing)/docs/_config/docs-nav'
 import type { DocNavItem, DocNavSubsection } from '@/app/(marketing)/docs/_config/docs-nav'
+import { DocsSearchTrigger } from './docs-search-dialog'
 
 interface DocsSidebarProps {
   className?: string
@@ -85,6 +86,7 @@ export function DocsSidebar({ className }: DocsSidebarProps) {
   return (
     <aside className={cn('w-64 shrink-0', className)}>
       <div className="sticky top-24 max-h-[calc(100vh-6rem)] overflow-y-auto pb-8">
+        <DocsSearchTrigger className="mb-4" />
         <nav className="space-y-4" aria-label="Documentation navigation">
           {DOCS_NAV.map((category) => {
             const isCategoryActive =

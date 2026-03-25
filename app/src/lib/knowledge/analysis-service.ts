@@ -105,6 +105,97 @@ export async function triggerSourceAnalysis(
   }
 }
 
+/**
+ * Triggers analysis for multiple sources in the background (fire-and-forget).
+ * Used by Notion sync to process sources through the analysis workflow.
+ * No user context required.
+ */
+export async function triggerSourceAnalysisBatch(
+  projectId: string,
+  sourceIds: string[]
+): Promise<void> {
+  if (sourceIds.length === 0) return
+
+  const workflow = mastra.getWorkflow('sourceAnalysisWorkflow')
+  if (!workflow) {
+    console.error('[analysis-service] sourceAnalysisWorkflow not found for batch trigger')
+    return
+  }
+
+  // Fetch only the columns needed for workflow input
+  const sources = await db
+    .select({
+      id: knowledgeSources.id,
+      type: knowledgeSources.type,
+      url: knowledgeSources.url,
+      storage_path: knowledgeSources.storage_path,
+      content: knowledgeSources.content,
+      analysis_scope: knowledgeSources.analysis_scope,
+      notion_page_id: knowledgeSources.notion_page_id,
+      origin: knowledgeSources.origin,
+      name: knowledgeSources.name,
+    })
+    .from(knowledgeSources)
+    .where(
+      and(
+        eq(knowledgeSources.project_id, projectId),
+        inArray(knowledgeSources.id, sourceIds)
+      )
+    )
+
+  console.log(`[analysis-service] Triggering batch analysis for ${sources.length} sources`)
+
+  // Process each source sequentially (to avoid overwhelming the LLM)
+  for (const source of sources) {
+    try {
+      // Set status to analyzing
+      await db
+        .update(knowledgeSources)
+        .set({ status: 'analyzing', error_message: null })
+        .where(eq(knowledgeSources.id, source.id))
+
+      const runId = `batch-${source.id}-${Date.now()}`
+      const run = await workflow.createRunAsync({ runId })
+
+      const input = {
+        projectId,
+        sourceId: source.id,
+        sourceType: source.type as 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'codebase' | 'notion',
+        url: source.url,
+        storagePath: source.storage_path,
+        content: source.content,
+        analysisScope: source.analysis_scope ?? null,
+        notionPageId: source.notion_page_id ?? null,
+        origin: source.origin ?? null,
+        sourceName: source.name ?? null,
+      }
+
+      // Run the workflow and consume the stream to completion
+      const stream = run.stream({ inputData: input })
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _event of stream.fullStream) {
+        // Consume events to drive workflow to completion
+      }
+
+      console.log(`[analysis-service] Completed analysis for source ${source.id}`)
+    } catch (error) {
+      console.error(`[analysis-service] Failed analysis for source ${source.id}:`, error)
+      // Mark as failed and continue with next source
+      try {
+        await db
+          .update(knowledgeSources)
+          .set({
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Batch analysis failed',
+          })
+          .where(eq(knowledgeSources.id, source.id))
+      } catch {
+        // Best effort
+      }
+    }
+  }
+}
+
 export type TriggerAnalysisParams = {
   projectId: string
   userId: string

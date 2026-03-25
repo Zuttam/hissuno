@@ -13,7 +13,7 @@ import { join } from 'path'
 import { db } from '@/lib/db'
 import { eq, inArray, and, or, ilike, isNotNull, sql, desc, asc, count } from 'drizzle-orm'
 import { projects, knowledgeSources, knowledgeEmbeddings, sourceCodes, compilationRuns } from '@/lib/db/schema/app'
-import { getLocalPath } from '@/lib/codebase/git-operations'
+import { getLocalPath } from '@/lib/knowledge/codebase/git-operations'
 import type { KnowledgeSourceType } from '@/lib/knowledge/types'
 
 // ============================================================================

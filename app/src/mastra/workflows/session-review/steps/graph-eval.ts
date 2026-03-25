@@ -8,7 +8,7 @@
 
 import { createStep } from '@mastra/core/workflows'
 import { summarizeOutputSchema } from '../schemas'
-import { runGraphEvalInline } from '../../graph-evaluation'
+import { evaluateEntityRelationships } from '../../graph-evaluation'
 
 export const graphEvalSession = createStep({
   id: 'graph-eval-session',
@@ -24,7 +24,7 @@ export const graphEvalSession = createStep({
     logger?.info('[graph-eval-session] Starting', { sessionId, projectId })
     await writer?.write({ type: 'progress', message: 'Discovering relationships...' })
 
-    const result = await runGraphEvalInline(projectId, 'session', sessionId)
+    const result = await evaluateEntityRelationships(projectId, 'session', sessionId)
 
     if (result.errors.length > 0) {
       logger?.warn('[graph-eval-session] Errors during evaluation', { errors: result.errors })

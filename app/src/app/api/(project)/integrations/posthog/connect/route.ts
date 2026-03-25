@@ -11,7 +11,7 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { PosthogClient, PosthogApiError } from '@/lib/integrations/posthog/client'
 import {
   storePosthogCredentials,
-  type PosthogSyncFrequency,
+  type SyncFrequency,
 } from '@/lib/integrations/posthog'
 import { autoDetectEventConfig } from '@/lib/integrations/posthog/sync'
 
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       apiKey: string
       host?: string
       posthogProjectId: string
-      syncFrequency: PosthogSyncFrequency
+      syncFrequency: SyncFrequency
       filterConfig?: { fromDate?: string; toDate?: string; sync_new_contacts?: boolean }
     }
 
@@ -47,12 +47,9 @@ export async function POST(request: NextRequest) {
     if (!posthogProjectId) {
       return NextResponse.json({ error: 'posthogProjectId is required.' }, { status: 400 })
     }
-    if (!syncFrequency) {
-      return NextResponse.json({ error: 'syncFrequency is required.' }, { status: 400 })
-    }
-
-    const validFrequencies: PosthogSyncFrequency[] = ['manual', '1h', '6h', '24h']
-    if (!validFrequencies.includes(syncFrequency)) {
+    // Validate sync frequency (defaults to manual)
+    const validFrequencies: SyncFrequency[] = ['manual', '1h', '6h', '24h']
+    if (syncFrequency && !validFrequencies.includes(syncFrequency)) {
       return NextResponse.json({ error: 'Invalid syncFrequency.' }, { status: 400 })
     }
 
@@ -116,7 +113,7 @@ export async function POST(request: NextRequest) {
       posthogProjectId,
       eventConfig,
       filterConfig,
-      syncFrequency,
+      syncFrequency: syncFrequency || 'manual',
     })
 
     if (!result.success) {

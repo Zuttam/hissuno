@@ -90,7 +90,7 @@ export const INTEGRATION_TYPES: IntegrationType[] = [
   {
     id: 'notion',
     name: 'Notion',
-    description: 'Import Notion pages as knowledge sources',
+    description: 'Sync Notion databases as issues and pages as knowledge sources',
     category: 'knowledge',
     iconSrc: '/logos/notion.svg',
     invertInDark: true,

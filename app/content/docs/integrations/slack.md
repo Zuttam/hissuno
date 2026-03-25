@@ -20,13 +20,26 @@ If you are self-hosting Hissuno, you need to create your own Slack app before us
 
 ### Installation Steps
 
+From the dashboard:
+
 1. Navigate to **Integrations** in the sidebar and click **Configure** on the Slack card
 2. Click **Add to Slack**
 3. Review the requested permissions and authorize the Hissuno bot
 4. Select which Slack channels the bot should join
 5. Click **Allow** to complete the installation
 
-After installation, the Hissuno bot will appear in your Slack workspace and join the selected channels.
+Or from the CLI:
+
+```bash
+hissuno integrations add slack
+# Opens browser for OAuth authorization
+```
+
+After installation, the Hissuno bot will appear in your Slack workspace and join the selected channels. Verify the connection:
+
+```bash
+hissuno integrations status slack
+```
 
 ### Bot Permissions
 

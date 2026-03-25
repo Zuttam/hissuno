@@ -8,7 +8,7 @@ import { isDatabaseConfigured } from '@/lib/db/config'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
-import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
+import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/utils/sse'
 import { hasPosthogConnection } from '@/lib/integrations/posthog'
 import { syncPosthogProfiles, type SyncProgressEvent } from '@/lib/integrations/posthog/sync'
 

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Check, Unplug, Shield, KeyRound, Plug, Zap } from 'lucide-react'
-import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
+import { Check, Unplug, Shield, KeyRound, Plug, Zap, Save } from 'lucide-react'
+import { Dialog, Button, InlineAlert, Spinner, FormField, Input, Select } from '@/components/ui'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import type { LinearIntegrationStatus, LinearTeam } from '@/types/linear'
 import {
@@ -305,7 +305,7 @@ export function LinearConfigDialog({
 
                 {/* Reconfigure */}
                 <div className="space-y-2 border-t border-[color:var(--border-subtle)] pt-4">
-                  <Button variant="secondary" onClick={fetchTeams} loading={isLoadingTeams}>
+                  <Button variant="secondary" size="sm" onClick={fetchTeams} loading={isLoadingTeams}>
                     Change Team
                   </Button>
                 </div>
@@ -410,11 +410,8 @@ export function LinearConfigDialog({
                   Use a personal API key from Linear. Go to Settings &gt; Account &gt; Security &gt; Personal API keys to create one.
                 </p>
 
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    API Key
-                  </label>
-                  <input
+                <FormField label="API Key">
+                  <Input
                     type="password"
                     value={apiKey}
                     onChange={(e) => {
@@ -422,7 +419,6 @@ export function LinearConfigDialog({
                       setTestResult(null)
                     }}
                     placeholder="lin_api_xxxxx"
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
                   />
                   {testResult && (
                     <p
@@ -435,7 +431,7 @@ export function LinearConfigDialog({
                       {testResult.message}
                     </p>
                   )}
-                </div>
+                </FormField>
 
                 <div className="flex gap-2">
                   <Button
@@ -495,14 +491,10 @@ function TeamConfigurationForm({
   return (
     <div className="space-y-4">
       {/* Team Selector */}
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-[color:var(--foreground)]">
-          Linear Team
-        </label>
-        <select
+      <FormField label="Linear Team">
+        <Select
           value={selectedTeamId}
           onChange={onTeamChange}
-          className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
         >
           <option value="">Select a team...</option>
           {teams.map((t) => (
@@ -510,8 +502,8 @@ function TeamConfigurationForm({
               {t.key} - {t.name}
             </option>
           ))}
-        </select>
-      </div>
+        </Select>
+      </FormField>
 
       {/* Auto-sync toggle */}
       <div className="space-y-1">
@@ -531,11 +523,13 @@ function TeamConfigurationForm({
 
       <Button
         variant="primary"
+        size="sm"
         onClick={onSave}
         loading={isSaving}
         disabled={!selectedTeamId}
       >
-        Save Configuration
+        <Save size={14} />
+        Save
       </Button>
     </div>
   )

@@ -8,8 +8,7 @@
 
 import { db } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
-import { contacts, companies, sessions, sessionMessages } from '@/lib/db/schema/app'
-import { isUniqueViolation } from '@/lib/db/errors'
+import { contacts, companies } from '@/lib/db/schema/app'
 import { PosthogClient, type PosthogPerson, type PosthogEvent, PosthogApiError, PosthogRateLimitError } from './client'
 import {
   getPosthogCredentials,
@@ -18,10 +17,9 @@ import {
   type PosthogFilterConfig,
 } from './index'
 import { insertSyncRun, updateSyncRun } from '@/lib/db/queries/posthog'
-import { insertContact } from '@/lib/db/queries/contacts'
 import { isValidEmail, extractEmailDomain, isGenericEmailDomain } from '@/lib/customers/contact-resolution'
-import { buildContactEmbeddingText, upsertContactEmbedding } from '@/lib/customers/contact-embedding-service'
-import { setSessionContact } from '@/lib/db/queries/entity-relationships'
+import { createSessionWithMessagesAdmin } from '@/lib/sessions/sessions-service'
+import { upsertContactAdmin } from '@/lib/customers/customers-service'
 
 const LOG_PREFIX = '[posthog.sync]'
 
@@ -159,54 +157,19 @@ async function createContactFromPosthog(params: {
   }
 
   try {
-    const contact = await insertContact({
+    // Upsert contact - handles duplicate emails gracefully
+    const { record } = await upsertContactAdmin({
       projectId,
-      name,
       email,
+      name,
+      title: (personProps.title as string) ?? null,
       companyId,
-      role: (personProps.role as string) ?? null,
-      title: (personProps.title as string) ?? null,
-      customFields: {},
+      mergeStrategy: 'fill_nulls',
     })
 
-    // Fire-and-forget: generate embedding
-    const companyName = companyId
-      ? await db
-          .select({ name: companies.name })
-          .from(companies)
-          .where(eq(companies.id, companyId))
-          .limit(1)
-          .then((rows) => rows[0]?.name ?? null)
-      : null
-    const embeddingText = buildContactEmbeddingText({
-      name,
-      email,
-      role: (personProps.role as string) ?? null,
-      title: (personProps.title as string) ?? null,
-      companyName,
-    })
-    void upsertContactEmbedding(contact.id, projectId, embeddingText)
-      .catch((err) => console.warn(`${LOG_PREFIX} Embedding failed for new contact`, contact.id, err))
-
-    return contact.id
-  } catch (insertError: unknown) {
-    // Handle unique constraint violation (email already exists)
-    if (isUniqueViolation(insertError)) {
-      // Contact was created concurrently - look it up
-      const existing = await db
-        .select({ id: contacts.id })
-        .from(contacts)
-        .where(
-          and(
-            eq(contacts.project_id, projectId),
-            eq(contacts.email, email)
-          )
-        )
-        .limit(1)
-      return existing[0]?.id ?? null
-    }
-
-    console.error(`${LOG_PREFIX} Failed to create contact for ${email}:`, insertError)
+    return record.id
+  } catch (err) {
+    console.error(`${LOG_PREFIX} Failed to create contact for ${email}:`, err)
     return null
   }
 }
@@ -253,50 +216,22 @@ async function createBehavioralSession(params: {
     }
   }
 
-  // Wrap session insert + message save + message_count update in a transaction
-  await db.transaction(async (tx) => {
-    // Insert session directly (no auth context needed - same pattern as Zendesk/Intercom sync)
-    await tx
-      .insert(sessions)
-      .values({
-        id: sessionId,
-        project_id: projectId,
-        name: `PostHog Activity - ${contactName}`,
-        description: `Behavioral data imported from PostHog for ${contactEmail}`,
-        status: 'closed',
-        source: 'posthog',
-        session_type: 'behavioral',
-        tags: [],
-        message_count: 0,
-        user_metadata: { email: contactEmail, name: contactName },
-        analysis_status: 'pending',
-        first_message_at: events.length > 0 ? new Date(events[events.length - 1].timestamp) : now,
-        last_activity_at: events.length > 0 ? new Date(events[0].timestamp) : now,
-        is_human_takeover: false,
-        is_archived: false,
-        created_at: now,
-        updated_at: now,
-      })
-
-    // Save summary message inline (within the transaction)
-    await tx
-      .insert(sessionMessages)
-      .values({
-        session_id: sessionId,
-        project_id: projectId,
-        sender_type: 'system',
-        content: summaryContent,
-      })
-
-    // Update message count
-    await tx
-      .update(sessions)
-      .set({ message_count: 1 })
-      .where(eq(sessions.id, sessionId))
+  // Create session with summary message via service
+  await createSessionWithMessagesAdmin({
+    id: sessionId,
+    projectId,
+    source: 'posthog',
+    sessionType: 'behavioral',
+    status: 'closed',
+    name: `PostHog Activity - ${contactName}`,
+    description: `Behavioral data imported from PostHog for ${contactEmail}`,
+    userMetadata: { email: contactEmail, name: contactName },
+    firstMessageAt: events.length > 0 ? new Date(events[events.length - 1].timestamp) : now,
+    lastActivityAt: events.length > 0 ? new Date(events[0].timestamp) : now,
+    createdAt: now,
+    messages: [{ sender_type: 'system', content: summaryContent }],
+    contactId,
   })
-
-  // Link session to contact (uses its own transaction)
-  await setSessionContact(projectId, sessionId, contactId)
 }
 
 // ============================================================================
@@ -370,16 +305,6 @@ export async function syncPosthogProfiles(
   let contactsCreated = 0
 
   try {
-    // Fetch cohorts once upfront (unused now but kept for filterConfig compatibility)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let cohortMap: Map<number, string> = new Map()
-    try {
-      const cohorts = await client.getCohorts()
-      cohortMap = new Map(cohorts.map((c) => [c.id, c.name]))
-    } catch (err) {
-      console.warn(`${LOG_PREFIX} Failed to fetch cohorts:`, err)
-    }
-
     // ========================================================================
     // Phase 1: Enrich existing contacts and create behavioral sessions
     // ========================================================================

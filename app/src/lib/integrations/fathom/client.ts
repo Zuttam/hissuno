@@ -42,13 +42,20 @@ export interface FathomInvitee {
 }
 
 /**
- * Fathom transcript entry
+ * Fathom transcript entry.
+ * The Fathom API may use either snake_case or camelCase field names,
+ * and speaker info may be nested in a `speaker` object.
  */
 export interface FathomTranscriptEntry {
   speaker_name?: string
   speaker_email?: string
+  speakerName?: string
+  speakerEmail?: string
+  speaker?: { name?: string; email?: string }
   start_time?: number
   end_time?: number
+  startTime?: number
+  endTime?: number
   text: string
 }
 
@@ -78,7 +85,7 @@ export interface FathomMeeting {
   calendar_invitees?: FathomInvitee[]
   recorded_by?: string
   transcript?: FathomTranscriptEntry[]
-  default_summary?: string
+  default_summary?: string | Record<string, unknown>
   action_items?: Array<{ text: string; assignee?: string }>
   crm_matches?: unknown[]
 }
@@ -104,7 +111,8 @@ export class FathomClient {
     options: {
       params?: Record<string, string | number | boolean | undefined>
       body?: Record<string, unknown>
-    } = {}
+    } = {},
+    retryCount = 0
   ): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`)
 
@@ -134,9 +142,15 @@ export class FathomClient {
 
     const response = await fetch(url.toString(), fetchOptions)
 
-    // Handle rate limiting
+    // Handle rate limiting with automatic retry
     if (response.status === 429) {
       const retryAfter = parseInt(response.headers.get('RateLimit-Reset') || response.headers.get('Retry-After') || '60', 10)
+      if (retryCount < 3) {
+        const waitSeconds = Math.min(retryAfter, 120)
+        console.log(`[FathomClient] Rate limited, waiting ${waitSeconds}s before retry ${retryCount + 1}/3`)
+        await new Promise((resolve) => setTimeout(resolve, waitSeconds * 1000))
+        return this.request<T>(method, path, options, retryCount + 1)
+      }
       throw new FathomRateLimitError(retryAfter)
     }
 
@@ -168,6 +182,20 @@ export class FathomClient {
       params: { limit: 1 },
     })
     return { success: true }
+  }
+
+  /**
+   * Get the account name by fetching the first team member's name
+   */
+  async getAccountName(): Promise<string | null> {
+    try {
+      const response = await this.request<{
+        items: Array<{ name: string; email: string }>
+      }>('GET', '/team_members', { params: { limit: 1 } })
+      return response.items[0]?.name || null
+    } catch {
+      return null
+    }
   }
 
   /**

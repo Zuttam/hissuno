@@ -9,24 +9,29 @@
 import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { getContext } from './context'
-import { RESOURCE_TYPES, type ResourceType, type ResourceAdapter } from './resources/types'
-import { knowledgeAdapter } from './resources/knowledge'
-import { feedbackAdapter } from './resources/feedback'
-import { issuesAdapter } from './resources/issues'
-import { customersAdapter } from './resources/customers'
+import { db } from '@/lib/db'
+import { eq, and, asc, desc, inArray, isNotNull } from 'drizzle-orm'
+import { sessions, sessionMessages, issues, contacts, companies, knowledgeSources, entityRelationships } from '@/lib/db/schema/app'
+import { listSessions } from '@/lib/db/queries/sessions'
+import { listIssues } from '@/lib/db/queries/issues'
+import { listContacts } from '@/lib/db/queries/contacts'
+import { listCompanies } from '@/lib/db/queries/companies'
+import { getSessionContactInfo, batchGetSessionContacts } from '@/lib/db/queries/entity-relationships'
+import { searchSessions } from '@/lib/sessions/sessions-service'
+import { searchIssues } from '@/lib/issues/issues-service'
+import { searchCustomers } from '@/lib/customers/customers-service'
+import { searchKnowledge } from '@/lib/knowledge/knowledge-service'
+import { createSessionAdmin } from '@/lib/sessions/sessions-service'
+import { createIssueAdmin } from '@/lib/issues/issues-service'
+import { createContactAdmin, createCompanyAdmin } from '@/lib/customers/customers-service'
+import type { SessionTag, SessionSource } from '@/types/session'
+import type { IssueType, IssuePriority, IssueStatus } from '@/types/issue'
+import type { CompanyStage } from '@/types/customer'
 
 const LOG_PREFIX = '[mcp.resource-tools]'
 
-const adapters: Record<ResourceType, ResourceAdapter> = {
-  knowledge: knowledgeAdapter,
-  feedback: feedbackAdapter,
-  issues: issuesAdapter,
-  customers: customersAdapter,
-}
-
-function getAdapter(type: ResourceType): ResourceAdapter {
-  return adapters[type]
-}
+const RESOURCE_TYPES = ['knowledge', 'feedback', 'issues', 'customers'] as const
+type ResourceType = (typeof RESOURCE_TYPES)[number]
 
 /**
  * Register all resource tools on the MCP server.
@@ -106,9 +111,149 @@ export function registerResourceTools(server: McpServer) {
       const ctx = getContext()
 
       try {
-        const adapter = getAdapter(params.type)
-        const filters = { ...(params.filters ?? {}), limit: params.limit ?? 20 }
-        const { items, total } = await adapter.list(ctx.projectId, filters)
+        const filters = { ...(params.filters ?? {}) }
+        const limit = params.limit ?? 20
+        let items: Array<{ id: string; name: string; description: string; metadata: Record<string, string> }> = []
+        let total = 0
+
+        switch (params.type) {
+          case 'feedback': {
+            const { sessions: data, total: t } = await listSessions(ctx.projectId, {
+              source: typeof filters.source === 'string' ? (filters.source as SessionSource) : undefined,
+              status: typeof filters.status === 'string' ? (filters.status as 'active' | 'closed') : undefined,
+              contactId: typeof filters.contact_id === 'string' ? filters.contact_id : undefined,
+              search: typeof filters.search === 'string' ? filters.search : undefined,
+              tags: Array.isArray(filters.tags) ? filters.tags as SessionTag[] : undefined,
+              limit,
+            })
+            total = t
+            items = data.map((s) => {
+              const contactName = s.contact?.name ?? null
+              const companyName = s.contact?.company?.name ?? null
+              return {
+                id: s.id,
+                name: s.name ?? 'Unnamed feedback',
+                description: [contactName, companyName].filter(Boolean).join(' @ ') || (s.source ?? 'unknown'),
+                metadata: {
+                  source: s.source ?? 'unknown',
+                  status: s.status ?? 'active',
+                  messageCount: String(s.message_count ?? 0),
+                  ...(Array.isArray(s.tags) && s.tags.length > 0 ? { tags: (s.tags as string[]).join(', ') } : {}),
+                  lastActivityAt: s.last_activity_at ?? '',
+                },
+              }
+            })
+            break
+          }
+
+          case 'issues': {
+            const { issues: data, total: t } = await listIssues(ctx.projectId, {
+              type: typeof filters.type === 'string' ? (filters.type as IssueType) : undefined,
+              priority: typeof filters.priority === 'string' ? (filters.priority as IssuePriority) : undefined,
+              status: typeof filters.status === 'string' ? (filters.status as IssueStatus) : undefined,
+              search: typeof filters.search === 'string' ? filters.search : undefined,
+              limit,
+            })
+            total = t
+            items = data.map((i) => ({
+              id: i.id,
+              name: i.title,
+              description: `${i.type} | ${i.priority} priority | ${i.status}`,
+              metadata: {
+                type: i.type,
+                priority: i.priority,
+                status: i.status ?? 'open',
+                upvoteCount: String(i.upvote_count ?? 0),
+                updatedAt: i.updated_at ?? '',
+              },
+            }))
+            break
+          }
+
+          case 'customers': {
+            const customerType = typeof filters.customer_type === 'string' ? filters.customer_type : 'contacts'
+
+            if (customerType === 'companies') {
+              const { companies: data, total: t } = await listCompanies(ctx.projectId, {
+                search: typeof filters.search === 'string' ? filters.search : undefined,
+                stage: typeof filters.stage === 'string' ? (filters.stage as CompanyStage) : undefined,
+                industry: typeof filters.industry === 'string' ? filters.industry : undefined,
+                limit,
+              })
+              total = t
+              items = data.map((c) => ({
+                id: c.id,
+                name: c.name,
+                description: [c.domain, c.stage, c.industry].filter(Boolean).join(' | '),
+                metadata: {
+                  domain: c.domain ?? '',
+                  stage: c.stage ?? 'prospect',
+                  ...(c.industry ? { industry: c.industry } : {}),
+                  ...(c.arr != null ? { arr: String(c.arr) } : {}),
+                  ...(c.health_score != null ? { healthScore: String(c.health_score) } : {}),
+                  contactCount: String(c.contact_count ?? 0),
+                },
+              }))
+            } else {
+              const { contacts: data, total: t } = await listContacts(ctx.projectId, {
+                companyId: typeof filters.company_id === 'string' ? filters.company_id : undefined,
+                search: typeof filters.search === 'string' ? filters.search : undefined,
+                role: typeof filters.role === 'string' ? filters.role : undefined,
+                limit,
+              })
+              total = t
+              items = data.map((c) => {
+                const companyName = c.company?.name ?? null
+                return {
+                  id: c.id,
+                  name: c.name,
+                  description: [c.email, c.role, companyName].filter(Boolean).join(' | '),
+                  metadata: {
+                    email: c.email,
+                    ...(c.role ? { role: c.role } : {}),
+                    ...(c.title ? { title: c.title } : {}),
+                    ...(companyName ? { company: companyName } : {}),
+                    isChampion: String(c.is_champion ?? false),
+                    ...(c.last_contacted_at ? { lastContactedAt: typeof c.last_contacted_at === 'string' ? c.last_contacted_at : c.last_contacted_at.toISOString() } : {}),
+                  },
+                }
+              })
+            }
+            break
+          }
+
+          case 'knowledge': {
+            const data = await db
+              .select({
+                id: knowledgeSources.id,
+                type: knowledgeSources.type,
+                name: knowledgeSources.name,
+                description: knowledgeSources.description,
+                analyzed_at: knowledgeSources.analyzed_at,
+              })
+              .from(knowledgeSources)
+              .where(
+                and(
+                  eq(knowledgeSources.project_id, ctx.projectId),
+                  eq(knowledgeSources.status, 'done')
+                )
+              )
+              .orderBy(desc(knowledgeSources.created_at))
+              .limit(limit)
+
+            items = data.map((s) => ({
+              id: s.id,
+              name: s.name ?? 'Untitled',
+              description: s.description ?? '',
+              metadata: {
+                type: s.type,
+                ...(s.analyzed_at ? { analyzedAt: s.analyzed_at.toISOString() } : {}),
+              },
+            }))
+            total = items.length
+            break
+          }
+        }
 
         console.log(`${LOG_PREFIX} list_resources type=${params.type} total=${total}`)
 
@@ -160,19 +305,382 @@ export function registerResourceTools(server: McpServer) {
       const ctx = getContext()
 
       try {
-        const adapter = getAdapter(params.type)
-        const detail = await adapter.get(ctx.projectId, params.id)
+        let markdown: string | null = null
 
-        console.log(`${LOG_PREFIX} get_resource type=${params.type} id=${params.id} found=${!!detail}`)
+        switch (params.type) {
+          case 'feedback': {
+            const [session] = await db
+              .select({
+                id: sessions.id,
+                name: sessions.name,
+                source: sessions.source,
+                status: sessions.status,
+                message_count: sessions.message_count,
+                tags: sessions.tags,
+                created_at: sessions.created_at,
+              })
+              .from(sessions)
+              .where(
+                and(
+                  eq(sessions.id, params.id),
+                  eq(sessions.project_id, ctx.projectId)
+                )
+              )
 
-        if (!detail) {
+            if (!session) break
+
+            const messages = await db
+              .select({
+                sender_type: sessionMessages.sender_type,
+                content: sessionMessages.content,
+                created_at: sessionMessages.created_at,
+              })
+              .from(sessionMessages)
+              .where(eq(sessionMessages.session_id, params.id))
+              .orderBy(asc(sessionMessages.created_at))
+
+            const contactInfo = await getSessionContactInfo(params.id)
+            const contactName = contactInfo?.contactName ?? null
+            const contactEmail = contactInfo?.contactEmail ?? null
+
+            const lines: string[] = [
+              `# ${session.name ?? 'Feedback Session'}`,
+              '',
+              `- **Source:** ${session.source}`,
+              `- **Status:** ${session.status}`,
+              `- **Messages:** ${session.message_count ?? 0}`,
+              contactName ? `- **Contact:** ${contactName} (${contactEmail ?? 'no email'})` : null,
+              Array.isArray(session.tags) && session.tags.length > 0 ? `- **Tags:** ${(session.tags as string[]).join(', ')}` : null,
+              `- **Created:** ${session.created_at?.toISOString() ?? ''}`,
+              '',
+              '## Conversation',
+              '',
+            ].filter((line): line is string => line !== null)
+
+            for (const msg of messages) {
+              const role = msg.sender_type === 'user' ? 'Customer' : 'Agent'
+              lines.push(`**${role}:** ${msg.content}`, '')
+            }
+
+            markdown = lines.join('\n')
+            break
+          }
+
+          case 'issues': {
+            const [issue] = await db
+              .select({
+                id: issues.id,
+                title: issues.title,
+                description: issues.description,
+                type: issues.type,
+                priority: issues.priority,
+                status: issues.status,
+                upvote_count: issues.upvote_count,
+                created_at: issues.created_at,
+                updated_at: issues.updated_at,
+              })
+              .from(issues)
+              .where(
+                and(
+                  eq(issues.id, params.id),
+                  eq(issues.project_id, ctx.projectId)
+                )
+              )
+
+            if (!issue) break
+
+            const lines: string[] = [
+              `# ${issue.title}`,
+              '',
+              `- **Type:** ${issue.type}`,
+              `- **Priority:** ${issue.priority}`,
+              `- **Status:** ${issue.status}`,
+              `- **Upvotes:** ${issue.upvote_count ?? 0}`,
+              `- **Created:** ${issue.created_at?.toISOString() ?? ''}`,
+              `- **Updated:** ${issue.updated_at?.toISOString() ?? ''}`,
+              '',
+              '## Description',
+              '',
+              issue.description ?? '_No description_',
+              '',
+            ]
+
+            const sessionLinks = await db
+              .select({ session_id: entityRelationships.session_id })
+              .from(entityRelationships)
+              .where(
+                and(
+                  eq(entityRelationships.issue_id, params.id),
+                  isNotNull(entityRelationships.session_id),
+                ),
+              )
+
+            const sessionIds = sessionLinks
+              .map((r) => r.session_id)
+              .filter((sid): sid is string => sid !== null)
+
+            // Batch-fetch sessions and contacts (3 queries instead of 4N)
+            const [sessionRows, contactInfoMap] = await Promise.all([
+              sessionIds.length > 0
+                ? db.select({ id: sessions.id, name: sessions.name, created_at: sessions.created_at })
+                    .from(sessions).where(inArray(sessions.id, sessionIds))
+                : Promise.resolve([]),
+              batchGetSessionContacts(sessionIds),
+            ])
+
+            const linkedSessions = sessionRows.map((s) => {
+              const info = contactInfoMap.get(s.id)
+              const contactInfoStr = [info?.contactName, info?.companyName].filter(Boolean).join(' @ ')
+              return {
+                id: s.id,
+                name: s.name,
+                contactInfo: contactInfoStr,
+                created_at: s.created_at?.toISOString() ?? '',
+              }
+            })
+
+            if (linkedSessions.length > 0) {
+              lines.push('## Linked Feedback', '')
+              for (const s of linkedSessions) {
+                lines.push(`- **${s.name ?? s.id}** ${s.contactInfo ? `(${s.contactInfo})` : ''} — ${s.created_at}`)
+              }
+              lines.push('')
+            }
+
+            markdown = lines.join('\n')
+            break
+          }
+
+          case 'customers': {
+            // Try contacts first, then companies
+            const [contact] = await db
+              .select({
+                id: contacts.id,
+                name: contacts.name,
+                email: contacts.email,
+                role: contacts.role,
+                title: contacts.title,
+                phone: contacts.phone,
+                is_champion: contacts.is_champion,
+                notes: contacts.notes,
+                last_contacted_at: contacts.last_contacted_at,
+                company_id: contacts.company_id,
+              })
+              .from(contacts)
+              .where(
+                and(
+                  eq(contacts.id, params.id),
+                  eq(contacts.project_id, ctx.projectId)
+                )
+              )
+
+            if (contact) {
+              // Fetch company name and linked sessions in parallel
+              const [companyResult, contactSessions] = await Promise.all([
+                contact.company_id
+                  ? db.select({ name: companies.name }).from(companies).where(eq(companies.id, contact.company_id))
+                  : Promise.resolve([]),
+                db
+                  .select({
+                    id: sessions.id,
+                    name: sessions.name,
+                    source: sessions.source,
+                    message_count: sessions.message_count,
+                    created_at: sessions.created_at,
+                  })
+                  .from(sessions)
+                  .where(
+                    inArray(
+                      sessions.id,
+                      db
+                        .select({ id: entityRelationships.session_id })
+                        .from(entityRelationships)
+                        .where(
+                          and(
+                            eq(entityRelationships.contact_id, params.id),
+                            isNotNull(entityRelationships.session_id),
+                          ),
+                        ),
+                    ),
+                  )
+                  .orderBy(desc(sessions.created_at))
+                  .limit(20),
+              ])
+              const companyName = companyResult[0]?.name ?? null
+
+              const sessionIds = contactSessions.map((s) => s.id)
+              const issueMap = new Map<string, { id: string; title: string; type: string; status: string }>()
+
+              if (sessionIds.length > 0) {
+                const issueLinks = await db
+                  .select({ issue_id: entityRelationships.issue_id })
+                  .from(entityRelationships)
+                  .where(
+                    and(
+                      inArray(entityRelationships.session_id, sessionIds),
+                      isNotNull(entityRelationships.issue_id),
+                    ),
+                  )
+
+                const issueIds = [...new Set(
+                  issueLinks
+                    .map((r) => r.issue_id)
+                    .filter((id): id is string => id !== null),
+                )]
+
+                if (issueIds.length > 0) {
+                  const issueRows = await db
+                    .select({
+                      id: issues.id,
+                      title: issues.title,
+                      type: issues.type,
+                      status: issues.status,
+                    })
+                    .from(issues)
+                    .where(inArray(issues.id, issueIds))
+
+                  for (const issue of issueRows) {
+                    issueMap.set(issue.id, {
+                      id: issue.id,
+                      title: issue.title,
+                      type: issue.type,
+                      status: issue.status ?? 'open',
+                    })
+                  }
+                }
+              }
+
+              const lines: string[] = [
+                `# ${contact.name}`,
+                '',
+                `- **Email:** ${contact.email}`,
+                contact.role ? `- **Role:** ${contact.role}` : null,
+                contact.title ? `- **Title:** ${contact.title}` : null,
+                contact.phone ? `- **Phone:** ${contact.phone}` : null,
+                companyName ? `- **Company:** ${companyName}` : null,
+                `- **Champion:** ${contact.is_champion ? 'Yes' : 'No'}`,
+                contact.last_contacted_at ? `- **Last Contacted:** ${contact.last_contacted_at.toISOString()}` : null,
+                contact.notes ? `\n## Notes\n\n${contact.notes}` : null,
+              ].filter((line): line is string => line !== null)
+
+              if (contactSessions.length > 0) {
+                lines.push('', '## Feedback Sessions', '')
+                for (const s of contactSessions) {
+                  lines.push(`- **${s.name ?? s.id}** (${s.source}, ${s.message_count ?? 0} messages) — ${s.created_at?.toISOString() ?? ''}`)
+                }
+              }
+
+              const issueList = Array.from(issueMap.values())
+              if (issueList.length > 0) {
+                lines.push('', '## Linked Issues', '')
+                for (const i of issueList) {
+                  lines.push(`- **${i.title}** (${i.type}, ${i.status})`)
+                }
+              }
+
+              markdown = lines.join('\n')
+            } else {
+              // Try companies
+              const company = await db.query.companies.findFirst({
+                where: and(
+                  eq(companies.id, params.id),
+                  eq(companies.project_id, ctx.projectId)
+                ),
+                with: {
+                  contacts: {
+                    columns: { id: true, name: true, email: true },
+                  },
+                },
+              })
+
+              if (company) {
+                const lines: string[] = [
+                  `# ${company.name}`,
+                  '',
+                  `- **Domain:** ${company.domain}`,
+                  company.industry ? `- **Industry:** ${company.industry}` : null,
+                  company.country ? `- **Country:** ${company.country}` : null,
+                  company.arr != null ? `- **ARR:** $${Number(company.arr).toLocaleString()}` : null,
+                  `- **Stage:** ${company.stage ?? 'prospect'}`,
+                  company.plan_tier ? `- **Plan Tier:** ${company.plan_tier}` : null,
+                  company.employee_count != null ? `- **Employees:** ${company.employee_count}` : null,
+                  company.health_score != null ? `- **Health Score:** ${company.health_score}/100` : null,
+                  company.renewal_date ? `- **Renewal Date:** ${company.renewal_date.toISOString()}` : null,
+                  company.notes ? `\n## Notes\n\n${company.notes}` : null,
+                ].filter((line): line is string => line !== null)
+
+                const companyContacts = company.contacts as Array<{ id: string; name: string; email: string }> | undefined
+                if (companyContacts && companyContacts.length > 0) {
+                  lines.push('', '## Contacts', '')
+                  for (const c of companyContacts) {
+                    lines.push(`- **${c.name}** (${c.email})`)
+                  }
+                }
+
+                markdown = lines.join('\n')
+              }
+            }
+            break
+          }
+
+          case 'knowledge': {
+            const [source] = await db
+              .select({
+                id: knowledgeSources.id,
+                name: knowledgeSources.name,
+                type: knowledgeSources.type,
+                description: knowledgeSources.description,
+                analyzed_content: knowledgeSources.analyzed_content,
+                analyzed_at: knowledgeSources.analyzed_at,
+                status: knowledgeSources.status,
+              })
+              .from(knowledgeSources)
+              .where(
+                and(
+                  eq(knowledgeSources.id, params.id),
+                  eq(knowledgeSources.project_id, ctx.projectId)
+                )
+              )
+
+            if (!source) break
+
+            if (source.status !== 'done' || !source.analyzed_content) {
+              break
+            }
+
+            const content = source.analyzed_content
+            if (!content) {
+              throw new Error('Analyzed content is empty')
+            }
+
+            const header = [
+              `# ${source.name ?? 'Knowledge Source'}`,
+              '',
+              `- **Type:** ${source.type}`,
+              source.description ? `- **Description:** ${source.description}` : null,
+              source.analyzed_at ? `- **Analyzed:** ${source.analyzed_at.toISOString()}` : null,
+              '',
+              '---',
+              '',
+            ]
+              .filter((line) => line !== null)
+              .join('\n')
+
+            markdown = header + content
+            break
+          }
+        }
+
+        console.log(`${LOG_PREFIX} get_resource type=${params.type} id=${params.id} found=${!!markdown}`)
+
+        if (!markdown) {
           return {
             content: [{ type: 'text' as const, text: `Not found: ${params.type} with ID \`${params.id}\`` }],
             isError: true,
           }
         }
 
-        return { content: [{ type: 'text' as const, text: detail.markdown }] }
+        return { content: [{ type: 'text' as const, text: markdown }] }
       } catch (error) {
         console.error(`${LOG_PREFIX} get_resource error`, error)
         return {
@@ -208,16 +716,25 @@ export function registerResourceTools(server: McpServer) {
       try {
         let allResults: Array<{ id: string; type: ResourceType; name: string; snippet: string; score?: number }>
 
+        const searchByType = async (type: ResourceType) => {
+          switch (type) {
+            case 'feedback':
+              return (await searchSessions(ctx.projectId, params.query, limit)).map((r) => ({ ...r, type: 'feedback' as const }))
+            case 'issues':
+              return (await searchIssues(ctx.projectId, params.query, limit)).map((r) => ({ ...r, type: 'issues' as const }))
+            case 'customers':
+              return (await searchCustomers(ctx.projectId, params.query, limit)).map((r) => ({ ...r, type: 'customers' as const }))
+            case 'knowledge':
+              return (await searchKnowledge(ctx.projectId, params.query, limit)).map((r) => ({ ...r, type: 'knowledge' as const }))
+          }
+        }
+
         if (params.type) {
-          const adapter = getAdapter(params.type)
-          allResults = await adapter.search(ctx.projectId, params.query, limit)
+          allResults = await searchByType(params.type)
         } else {
           // Search all types in parallel
           const results = await Promise.allSettled(
-            RESOURCE_TYPES.map(async (type) => {
-              const adapter = getAdapter(type)
-              return adapter.search(ctx.projectId, params.query, limit)
-            })
+            RESOURCE_TYPES.map((type) => searchByType(type))
           )
 
           allResults = []
@@ -293,16 +810,139 @@ export function registerResourceTools(server: McpServer) {
       }
 
       try {
-        const adapter = getAdapter(params.type)
-        const result = await adapter.add(ctx.projectId, params.data)
+        let resultId: string
+        let resultName: string
+        let resultType: string = params.type
 
-        console.log(`${LOG_PREFIX} add_resource type=${params.type} id=${result.id}`)
+        switch (params.type) {
+          case 'feedback': {
+            const messages = params.data.messages
+            if (!Array.isArray(messages) || messages.length === 0) {
+              throw new Error('Validation error: "messages" array is required and must not be empty.')
+            }
+
+            const name = typeof params.data.name === 'string' ? params.data.name : undefined
+            const tags = Array.isArray(params.data.tags) ? params.data.tags as SessionTag[] : []
+
+            const result = await createSessionAdmin({
+              project_id: ctx.projectId,
+              name,
+              tags,
+              source: 'api',
+              messages: messages
+                .filter((msg): msg is { role: string; content: string } =>
+                  typeof msg === 'object' && msg !== null &&
+                  typeof (msg as Record<string, unknown>).content === 'string'
+                )
+                .map((msg) => ({
+                  role: msg.role === 'user' ? 'user' as const : 'assistant' as const,
+                  content: msg.content,
+                })),
+            })
+
+            if (!result) {
+              throw new Error('Failed to create feedback session')
+            }
+
+            resultId = result.id
+            resultName = result.name ?? 'New feedback'
+            break
+          }
+
+          case 'issues': {
+            const VALID_TYPES = ['bug', 'feature_request', 'change_request'] as const
+            const type = params.data.type
+            if (typeof type !== 'string' || !VALID_TYPES.includes(type as IssueType)) {
+              throw new Error(`Validation error: "type" must be one of: ${VALID_TYPES.join(', ')}`)
+            }
+
+            if (typeof params.data.title !== 'string' || (params.data.title as string).trim().length === 0) {
+              throw new Error('Validation error: "title" is required.')
+            }
+
+            if (typeof params.data.description !== 'string' || (params.data.description as string).trim().length === 0) {
+              throw new Error('Validation error: "description" is required.')
+            }
+
+            const result = await createIssueAdmin({
+              projectId: ctx.projectId,
+              type: type as IssueType,
+              title: params.data.title as string,
+              description: params.data.description as string,
+              priority: typeof params.data.priority === 'string' ? (params.data.priority as 'low' | 'medium' | 'high') : undefined,
+            })
+
+            resultId = result.issue.id
+            resultName = result.issue.title
+            break
+          }
+
+          case 'customers': {
+            const customerType = typeof params.data.customer_type === 'string' ? params.data.customer_type : 'contacts'
+
+            if (customerType === 'companies') {
+              if (typeof params.data.name !== 'string' || (params.data.name as string).trim().length === 0) {
+                throw new Error('Validation error: "name" is required.')
+              }
+              if (typeof params.data.domain !== 'string' || (params.data.domain as string).trim().length === 0) {
+                throw new Error('Validation error: "domain" is required.')
+              }
+
+              const company = await createCompanyAdmin({
+                projectId: ctx.projectId,
+                name: params.data.name as string,
+                domain: params.data.domain as string,
+                industry: typeof params.data.industry === 'string' ? params.data.industry : undefined,
+                arr: typeof params.data.arr === 'number' ? params.data.arr : undefined,
+                stage: typeof params.data.stage === 'string' ? params.data.stage : undefined,
+                employeeCount: typeof params.data.employee_count === 'number' ? params.data.employee_count : undefined,
+                planTier: typeof params.data.plan_tier === 'string' ? params.data.plan_tier : undefined,
+                country: typeof params.data.country === 'string' ? params.data.country : undefined,
+                notes: typeof params.data.notes === 'string' ? params.data.notes : undefined,
+              })
+
+              resultId = company.id
+              resultName = company.name
+            } else {
+              if (typeof params.data.name !== 'string' || (params.data.name as string).trim().length === 0) {
+                throw new Error('Validation error: "name" is required.')
+              }
+
+              if (typeof params.data.email !== 'string' || (params.data.email as string).trim().length === 0) {
+                throw new Error('Validation error: "email" is required.')
+              }
+
+              const contact = await createContactAdmin({
+                projectId: ctx.projectId,
+                name: params.data.name as string,
+                email: params.data.email as string,
+                role: typeof params.data.role === 'string' ? params.data.role : undefined,
+                title: typeof params.data.title === 'string' ? params.data.title : undefined,
+                phone: typeof params.data.phone === 'string' ? params.data.phone : undefined,
+                companyId: typeof params.data.company_id === 'string' ? params.data.company_id : undefined,
+                isChampion: typeof params.data.is_champion === 'boolean' ? params.data.is_champion : undefined,
+              })
+
+              resultId = contact.id
+              resultName = contact.name
+            }
+
+            resultType = 'customers'
+            break
+          }
+
+          case 'knowledge': {
+            throw new Error('Knowledge sources cannot be created via MCP. Use the dashboard to add and analyze knowledge sources.')
+          }
+        }
+
+        console.log(`${LOG_PREFIX} add_resource type=${params.type} id=${resultId!}`)
 
         return {
           content: [
             {
               type: 'text' as const,
-              text: `Created ${result.type}: **${result.name}** (ID: \`${result.id}\`)`,
+              text: `Created ${resultType}: **${resultName!}** (ID: \`${resultId!}\`)`,
             },
           ],
         }

@@ -8,9 +8,6 @@
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { projectSettings } from '@/lib/db/schema/app'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { resolveRequestContext } from '@/lib/db/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
 import type { PmAgentSettings, PmAgentSettingsInput } from './types'
 import { DEFAULT_PM_AGENT_SETTINGS } from './types'
 
@@ -39,18 +36,11 @@ function rowToSettings(row: {
 }
 
 /**
- * Gets workflow settings for a project. Requires authenticated user context.
+ * Gets workflow settings for a project.
  * Returns default values if no settings exist.
  */
 export async function getPmAgentSettings(projectId: string): Promise<PmAgentSettings> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have access to this project.')
-    }
-
     const row = await db.query.projectSettings.findFirst({
       where: eq(projectSettings.project_id, projectId),
       columns: WORKFLOW_COLUMNS,
@@ -62,30 +52,18 @@ export async function getPmAgentSettings(projectId: string): Promise<PmAgentSett
 
     return rowToSettings(row)
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      throw error
-    }
     console.error('[project-settings.workflow-guidelines] unexpected error', projectId, error)
     throw error
   }
 }
 
 /**
- * Gets workflow settings for a project using admin context.
- * Used in workflow execution where there's no user auth.
+ * Gets workflow settings with graceful fallback to defaults on error.
+ * Used in workflow execution and contexts without user auth.
  */
 export async function getPmAgentSettingsAdmin(projectId: string): Promise<PmAgentSettings> {
   try {
-    const row = await db.query.projectSettings.findFirst({
-      where: eq(projectSettings.project_id, projectId),
-      columns: WORKFLOW_COLUMNS,
-    })
-
-    if (!row) {
-      return DEFAULT_PM_AGENT_SETTINGS
-    }
-
-    return rowToSettings(row)
+    return await getPmAgentSettings(projectId)
   } catch (error) {
     console.error('[project-settings.workflow-guidelines] unexpected error (admin)', projectId, error)
     return DEFAULT_PM_AGENT_SETTINGS
@@ -93,20 +71,13 @@ export async function getPmAgentSettingsAdmin(projectId: string): Promise<PmAgen
 }
 
 /**
- * Updates workflow settings for a project. Requires authenticated user context.
+ * Updates workflow settings for a project.
  */
 export async function updatePmAgentSettings(
   projectId: string,
   settings: PmAgentSettingsInput
 ): Promise<PmAgentSettings> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have access to this project.')
-    }
-
     // Build update payload with only provided fields
     const updatePayload: Record<string, unknown> = {
       updated_at: new Date(),
@@ -152,9 +123,6 @@ export async function updatePmAgentSettings(
 
     return rowToSettings(row)
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      throw error
-    }
     console.error('[project-settings.workflow-guidelines] unexpected error updating', projectId, error)
     throw error
   }

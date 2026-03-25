@@ -4,14 +4,10 @@
  * Pure database operations for companies.
  */
 
-import { cache } from 'react'
-import { eq, and, desc, ilike, or, count as drizzleCount, inArray } from 'drizzle-orm'
+import { eq, and, desc, ilike, or, count as drizzleCount } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { companies } from '@/lib/db/schema/app'
-import { resolveRequestContext, getUserProjectIds, sanitizeSearchInput } from '@/lib/db/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
-import { fireGraphEval } from '@/lib/graph-eval'
-import { ForbiddenError } from '@/lib/auth/authorization'
+import { sanitizeSearchInput } from '@/lib/db/server'
 import type {
   CompanyRecord,
   CompanyWithContacts,
@@ -71,8 +67,6 @@ export async function insertCompany(
     throw new Error('Failed to insert company: Unknown error')
   }
 
-  fireGraphEval(data.projectId, 'company', company.id)
-
   return company as unknown as CompanyRecord
 }
 
@@ -105,8 +99,6 @@ export async function updateCompanyById(
   if (!company) {
     throw new Error(`Failed to update company: Not found`)
   }
-
-  fireGraphEval(company.project_id, 'company', company.id)
 
   return company as unknown as CompanyRecord
 }
@@ -142,10 +134,11 @@ export async function updateCompanyArchiveStatus(
 // Query Functions (use user-authenticated client, with caching)
 // ============================================================================
 
-export const listCompanies = cache(async (filters: CompanyFilters = {}): Promise<{ companies: CompanyWithContacts[], total: number }> => {
+export async function listCompanies(
+  projectId: string,
+  filters: CompanyFilters
+): Promise<{ companies: CompanyWithContacts[]; total: number }> {
   try {
-    const { userId } = await resolveRequestContext()
-
     // Build conditions
     const conditions = []
 
@@ -154,20 +147,8 @@ export const listCompanies = cache(async (filters: CompanyFilters = {}): Promise
       conditions.push(eq(companies.is_archived, false))
     }
 
-    if (filters.projectId) {
-      const hasAccess = await hasProjectAccess(filters.projectId, userId)
-      if (!hasAccess) {
-        throw new ForbiddenError('You do not have access to this project.')
-      }
-      conditions.push(eq(companies.project_id, filters.projectId))
-    } else {
-      // No projectId specified — scope to only projects the user can access
-      const projectIds = await getUserProjectIds(userId)
-      if (projectIds.length === 0) {
-        return { companies: [], total: 0 }
-      }
-      conditions.push(inArray(companies.project_id, projectIds))
-    }
+    conditions.push(eq(companies.project_id, projectId))
+
     if (filters.stage) {
       conditions.push(eq(companies.stage, filters.stage))
     }
@@ -226,12 +207,10 @@ export const listCompanies = cache(async (filters: CompanyFilters = {}): Promise
     console.error('[db.companies] unexpected error listing companies', error)
     throw error
   }
-})
+}
 
-export const getCompanyById = cache(async (companyId: string): Promise<CompanyWithContacts | null> => {
+export async function getCompanyById(companyId: string): Promise<CompanyWithContacts | null> {
   try {
-    const { userId } = await resolveRequestContext()
-
     const company = await db.query.companies.findFirst({
       where: eq(companies.id, companyId),
       with: {
@@ -245,11 +224,6 @@ export const getCompanyById = cache(async (companyId: string): Promise<CompanyWi
       return null
     }
 
-    const hasAccess = await hasProjectAccess(company.project_id, userId)
-    if (!hasAccess) {
-      return null
-    }
-
     return {
       ...company,
       contact_count: Array.isArray(company.contacts) ? company.contacts.length : 0,
@@ -258,4 +232,4 @@ export const getCompanyById = cache(async (companyId: string): Promise<CompanyWi
     console.error('[db.companies] unexpected error getting company', companyId, error)
     throw error
   }
-})
+}

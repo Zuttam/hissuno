@@ -88,7 +88,7 @@ Return a JSON object:
 }
 \`\`\`
 `,
-  model: 'openai/gpt-4o-mini',
+  model: 'openai/gpt-5.4-mini',
   tools: {
     'get-session-context': getSessionContextTool,
   },

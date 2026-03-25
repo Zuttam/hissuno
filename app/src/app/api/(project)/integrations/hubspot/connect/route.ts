@@ -14,7 +14,7 @@ import { HubSpotClient, HubSpotApiError, exchangePersonalAccessKey } from '@/lib
 import { getHubSpotOAuthUrl } from '@/lib/integrations/hubspot/oauth'
 import {
   storeHubSpotCredentials,
-  type HubSpotSyncFrequency,
+  type SyncFrequency,
   type HubSpotFilterConfig,
 } from '@/lib/integrations/hubspot'
 
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     const { projectId, accessToken, syncFrequency, filterConfig } = body as {
       projectId: string
       accessToken: string
-      syncFrequency: HubSpotSyncFrequency
+      syncFrequency: SyncFrequency
       filterConfig?: HubSpotFilterConfig
     }
 
@@ -105,12 +105,9 @@ export async function POST(request: NextRequest) {
     if (!accessToken) {
       return NextResponse.json({ error: 'accessToken is required.' }, { status: 400 })
     }
-    if (!syncFrequency) {
-      return NextResponse.json({ error: 'syncFrequency is required.' }, { status: 400 })
-    }
-
-    const validFrequencies: HubSpotSyncFrequency[] = ['manual', '1h', '6h', '24h']
-    if (!validFrequencies.includes(syncFrequency)) {
+    // Validate sync frequency (defaults to manual)
+    const validFrequencies: SyncFrequency[] = ['manual', '1h', '6h', '24h']
+    if (syncFrequency && !validFrequencies.includes(syncFrequency)) {
       return NextResponse.json({ error: 'Invalid syncFrequency.' }, { status: 400 })
     }
 
@@ -150,7 +147,7 @@ export async function POST(request: NextRequest) {
       hubId,
       hubName,
       authMethod: 'token',
-      syncFrequency,
+      syncFrequency: syncFrequency || 'manual',
       filterConfig,
     })
 

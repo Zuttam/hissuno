@@ -151,7 +151,7 @@ describe('GET /api/issues', () => {
     expect(body.issues).toEqual(issues)
     expect(body.total).toBe(1)
 
-    const filters = mockListIssues.mock.calls[0][0]
+    const filters = mockListIssues.mock.calls[0][1]
     expect(filters.projectId).toBe(PROJECT_ID)
   })
 
@@ -163,7 +163,7 @@ describe('GET /api/issues', () => {
     )
     await GET(req)
 
-    const filters = mockListIssues.mock.calls[0][0]
+    const filters = mockListIssues.mock.calls[0][1]
     expect(filters.type).toBe('bug')
     expect(filters.priority).toBe('high')
     expect(filters.status).toBe('open')
@@ -178,7 +178,7 @@ describe('GET /api/issues', () => {
     )
     await GET(req)
 
-    const filters = mockListIssues.mock.calls[0][0]
+    const filters = mockListIssues.mock.calls[0][1]
     expect(filters.reachLevel).toBe('high')
     expect(filters.impactLevel).toBe('medium')
     expect(filters.confidenceLevel).toBe('low')
@@ -193,7 +193,7 @@ describe('GET /api/issues', () => {
     )
     await GET(req)
 
-    const filters = mockListIssues.mock.calls[0][0]
+    const filters = mockListIssues.mock.calls[0][1]
     expect(filters.productScopeIds).toEqual(['pa-1', 'pa-2', 'pa-3'])
   })
 
@@ -205,7 +205,7 @@ describe('GET /api/issues', () => {
     )
     await GET(req)
 
-    const filters = mockListIssues.mock.calls[0][0]
+    const filters = mockListIssues.mock.calls[0][1]
     expect(filters.limit).toBe(25)
     expect(filters.offset).toBe(50)
   })
@@ -218,7 +218,7 @@ describe('GET /api/issues', () => {
     )
     await GET(req)
 
-    const filters = mockListIssues.mock.calls[0][0]
+    const filters = mockListIssues.mock.calls[0][1]
     expect(filters.showArchived).toBe(true)
   })
 

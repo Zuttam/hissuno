@@ -4,6 +4,7 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { getCompanyById, updateCompanyById, deleteCompanyById } from '@/lib/db/queries/companies'
+import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { COMPANY_STAGES } from '@/types/customer'
 import type { UpdateCompanyInput } from '@/types/customer'
@@ -82,6 +83,16 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const company = await updateCompanyById(companyId, body)
+    fireGraphEval(projectId, 'company', company.id)
+
+    // Fire-and-forget embedding update
+    void (async () => {
+      try {
+        const { fireEmbedding } = await import('@/lib/utils/embeddings')
+        const { buildCompanyEmbeddingText } = await import('@/lib/customers/customer-embedding-service')
+        fireEmbedding(companyId, 'company', projectId, buildCompanyEmbeddingText(company))
+      } catch {}
+    })()
 
     return NextResponse.json({ company })
   } catch (error) {

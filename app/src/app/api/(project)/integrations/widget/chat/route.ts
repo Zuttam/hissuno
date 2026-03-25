@@ -4,9 +4,10 @@ import { upsertSession, isSessionInHumanTakeover } from '@/lib/db/queries/sessio
 import { triggerChatRun, getChatRunStatus } from '@/lib/agent/chat-run-service'
 import { saveSessionMessage } from '@/lib/db/queries/session-messages'
 import { resolveContactForSession } from '@/lib/customers/contact-resolution'
-import { hasProjectAccess } from '@/lib/auth/project-members'
+import { isProjectMember } from '@/lib/auth/project-members'
 import { isOriginAllowed, verifyWidgetJWT } from '@/lib/utils/widget-auth'
 import { UUID_REGEX } from '@/lib/db/server'
+import { getWidgetRequestOrigin, addWidgetCorsHeaders, createWidgetOptionsResponse } from '@/lib/utils/widget-cors'
 
 export const runtime = 'nodejs'
 
@@ -36,72 +37,56 @@ function generateUniqueSessionId(): string {
   return crypto.randomUUID()
 }
 
-/**
- * Add CORS headers to response
- */
-function addCorsHeaders(response: NextResponse, origin: string): NextResponse {
-  response.headers.set('Access-Control-Allow-Origin', origin)
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type')
-  return response
-}
-
-/**
- * Get the request origin from headers
- * Uses Origin header if present, otherwise falls back to request URL origin
- */
-function getRequestOrigin(request: NextRequest): string {
-  return request.headers.get('Origin') || request.nextUrl.origin
-}
+const CORS_METHODS = 'GET, POST, OPTIONS'
 
 /**
  * GET /api/integrations/widget/chat?projectId=xxx&sessionId=xxx
  * Get the current status of a chat run
  */
 export async function GET(request: NextRequest) {
-  const origin = getRequestOrigin(request)
+  const origin = getWidgetRequestOrigin(request)
 
   try {
     const projectId = request.nextUrl.searchParams.get('projectId')
     const sessionId = request.nextUrl.searchParams.get('sessionId')
 
     if (!projectId) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'projectId is required' }, { status: 400 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     if (!sessionId) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'sessionId is required' }, { status: 400 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // Validate project
     const project = await getProjectById(projectId)
     if (!project) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Invalid project ID' }, { status: 401 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // Check origin for widget requests
     if (!isOriginAllowed(origin, project.allowed_origins)) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     const status = await getChatRunStatus({ sessionId })
 
-    return addCorsHeaders(NextResponse.json(status), origin)
+    return addWidgetCorsHeaders(NextResponse.json(status), origin, CORS_METHODS)
   } catch (error) {
     console.error('[widget/chat.get] unexpected error', error)
-    return addCorsHeaders(
+    return addWidgetCorsHeaders(
       NextResponse.json({ error: 'Failed to get status' }, { status: 500 }),
       origin
     )
@@ -113,7 +98,7 @@ export async function GET(request: NextRequest) {
  * Trigger a new chat run (creates chat_run record, returns runId for SSE streaming)
  */
 export async function POST(request: NextRequest) {
-  const origin = getRequestOrigin(request)
+  const origin = getWidgetRequestOrigin(request)
 
   try {
     const body = (await request.json()) as AgentRequestBody
@@ -131,33 +116,33 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Messages array is required' }, { status: 400 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     if (!projectId) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'projectId is required' }, { status: 400 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // Look up project by ID
     const project = await getProjectById(projectId)
     if (!project) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Invalid project ID' }, { status: 401 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // Always check origin
     if (!isOriginAllowed(origin, project.allowed_origins)) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
@@ -169,7 +154,7 @@ export async function POST(request: NextRequest) {
     // If widget token is required
     if (project.widget_token_required) {
       if (!project.secret_key) {
-        return addCorsHeaders(
+        return addWidgetCorsHeaders(
           NextResponse.json({ error: 'Project secret key is required' }, { status: 401 }),
           origin
         )
@@ -177,7 +162,7 @@ export async function POST(request: NextRequest) {
 
       // If token is required, reject if not provided
       if (!widgetToken) {
-        return addCorsHeaders(
+        return addWidgetCorsHeaders(
           NextResponse.json({ error: 'Widget token is required' }, { status: 401 }),
           origin
         )
@@ -186,7 +171,7 @@ export async function POST(request: NextRequest) {
 
         const verifyResult = verifyWidgetJWT(widgetToken, project.secret_key)
         if (!verifyResult.valid) {
-          return addCorsHeaders(
+          return addWidgetCorsHeaders(
             NextResponse.json({ error: verifyResult.error }, { status: 401 }),
             origin
           )
@@ -235,7 +220,7 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        return addCorsHeaders(
+        return addWidgetCorsHeaders(
           NextResponse.json({
             message: 'Human takeover active.',
             status: 'human_takeover',
@@ -258,7 +243,7 @@ export async function POST(request: NextRequest) {
     // Body-supplied userId is untrusted and must never be used for authorization.
     let toolScopingContactId = contactResult.contactId
     if (isVerifiedIdentity && userId) {
-      const isTeamMember = await hasProjectAccess(projectId, userId)
+      const isTeamMember = await isProjectMember(projectId, userId)
       if (isTeamMember) {
         toolScopingContactId = null
       }
@@ -270,7 +255,7 @@ export async function POST(request: NextRequest) {
     if (toolScopingContactId !== null && !widgetToken) {
       const dashboardUserId = request.headers.get('x-user-id')
       if (dashboardUserId) {
-        const isDashboardTeamMember = await hasProjectAccess(projectId, dashboardUserId)
+        const isDashboardTeamMember = await isProjectMember(projectId, dashboardUserId)
         if (isDashboardTeamMember) {
           toolScopingContactId = null
         }
@@ -289,12 +274,12 @@ export async function POST(request: NextRequest) {
     })
 
     if (!result.success) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json(
           { error: result.error, runId: result.runId, chatRunId: result.chatRunId },
           { status: result.statusCode }
         ),
-        origin
+        origin, CORS_METHODS
       )
     }
 
@@ -311,7 +296,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    return addCorsHeaders(
+    return addWidgetCorsHeaders(
       NextResponse.json({
         message: 'Chat started.',
         status: 'processing',
@@ -323,7 +308,7 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('[widget/chat.post] unexpected error', error)
-    return addCorsHeaders(
+    return addWidgetCorsHeaders(
       NextResponse.json({ error: 'Failed to process request' }, { status: 500 }),
       origin
     )
@@ -332,15 +317,5 @@ export async function POST(request: NextRequest) {
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  const origin = getRequestOrigin(request)
-
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-    },
-  })
+  return createWidgetOptionsResponse(request, CORS_METHODS)
 }

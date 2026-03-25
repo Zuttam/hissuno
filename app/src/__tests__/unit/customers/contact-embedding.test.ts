@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { buildContactEmbeddingText } from '@/lib/customers/contact-embedding-service'
+import { buildContactEmbeddingText } from '@/lib/customers/customer-embedding-service'
 
 describe('buildContactEmbeddingText', () => {
   it('includes name and email as required fields', () => {

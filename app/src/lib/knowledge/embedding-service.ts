@@ -12,7 +12,7 @@ import {
   generateEmbedding,
   generateEmbeddings,
   formatEmbeddingForPgVector,
-} from '@/lib/embeddings/shared'
+} from '@/lib/utils/embeddings'
 import { chunkKnowledgeContent } from './chunking'
 
 export interface EmbeddingResult {
@@ -107,8 +107,8 @@ export async function embedKnowledgeSource(source: {
 }
 
 /**
- * Search knowledge embeddings by source IDs (or all project sources)
- * Uses the search_knowledge_embeddings_v2 RPC function
+ * Search knowledge embeddings by source IDs (or all project sources).
+ * Uses direct vector similarity on the knowledge_embeddings table.
  */
 export async function searchKnowledgeBySourceIds(
   projectId: string,
@@ -131,8 +131,7 @@ export async function searchKnowledgeBySourceIds(
   const { sourceIds, limit = 5, similarityThreshold = 0.5 } = options
 
   const queryEmbedding = await embedQuery(query)
-
-  console.log(`[embedding-service] Searching v2 for "${query}" in project ${projectId}`)
+  const embeddingStr = formatEmbeddingForPgVector(queryEmbedding)
 
   const results = await db.execute<{
     id: string
@@ -142,16 +141,20 @@ export async function searchKnowledgeBySourceIds(
     parent_headings: string[]
     similarity: number
   }>(sql`
-    SELECT * FROM search_knowledge_embeddings_v2(
-      ${projectId},
-      ${formatEmbeddingForPgVector(queryEmbedding)}::vector,
-      ${sourceIds ?? null},
-      ${limit},
-      ${similarityThreshold}
-    )
+    SELECT
+      ke.id,
+      ke.source_id,
+      ke.chunk_text,
+      ke.section_heading,
+      ke.parent_headings,
+      1 - (ke.embedding <=> ${embeddingStr}::vector) AS similarity
+    FROM knowledge_embeddings ke
+    WHERE ke.project_id = ${projectId}
+      AND 1 - (ke.embedding <=> ${embeddingStr}::vector) >= ${similarityThreshold}
+      ${sourceIds && sourceIds.length > 0 ? sql`AND ke.source_id = ANY(${sourceIds})` : sql``}
+    ORDER BY ke.embedding <=> ${embeddingStr}::vector
+    LIMIT ${limit}
   `)
-
-  console.log(`[embedding-service] Search v2 returned ${results.rows.length} results`)
 
   return results.rows.map((row) => ({
     id: row.id,

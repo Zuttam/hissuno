@@ -6,11 +6,9 @@
 import { db } from '@/lib/db'
 import { eq, and, or, ne, lte, isNull, sql, count as drizzleCount } from 'drizzle-orm'
 import { fathomConnections, fathomSyncRuns, fathomSyncedMeetings } from '@/lib/db/schema/app'
-
-/**
- * Sync frequency options
- */
-export type FathomSyncFrequency = 'manual' | '1h' | '6h' | '24h'
+import { type SyncFrequency } from '@/lib/integrations/shared/sync-constants'
+export type { SyncFrequency }
+import { calculateNextSyncTime } from '@/lib/integrations/shared/sync-utils'
 
 /**
  * Filter configuration for sync
@@ -25,7 +23,8 @@ export interface FathomFilterConfig {
  */
 export interface FathomIntegrationStatus {
   connected: boolean
-  syncFrequency: FathomSyncFrequency | null
+  accountName: string | null
+  syncFrequency: SyncFrequency | null
   syncEnabled: boolean
   lastSyncAt: string | null
   lastSyncStatus: 'success' | 'error' | 'in_progress' | null
@@ -43,6 +42,7 @@ export async function hasFathomConnection(
 ): Promise<FathomIntegrationStatus> {
   const rows = await db
     .select({
+      account_name: fathomConnections.account_name,
       sync_frequency: fathomConnections.sync_frequency,
       sync_enabled: fathomConnections.sync_enabled,
       filter_config: fathomConnections.filter_config,
@@ -60,6 +60,7 @@ export async function hasFathomConnection(
   if (!data) {
     return {
       connected: false,
+      accountName: null,
       syncFrequency: null,
       syncEnabled: false,
       lastSyncAt: null,
@@ -73,7 +74,8 @@ export async function hasFathomConnection(
 
   return {
     connected: true,
-    syncFrequency: data.sync_frequency as FathomSyncFrequency,
+    accountName: data.account_name,
+    syncFrequency: data.sync_frequency as SyncFrequency,
     syncEnabled: data.sync_enabled,
     lastSyncAt: data.last_sync_at?.toISOString() ?? null,
     lastSyncStatus: data.last_sync_status as 'success' | 'error' | 'in_progress' | null,
@@ -121,8 +123,9 @@ export async function storeFathomCredentials(
   params: {
     projectId: string
     apiKey: string
-    syncFrequency: FathomSyncFrequency
+    syncFrequency: SyncFrequency
     filterConfig?: FathomFilterConfig
+    accountName?: string | null
   }
 ): Promise<{ success: boolean; connectionId?: string; error?: string }> {
   const nextSyncAt = calculateNextSyncTime(params.syncFrequency)
@@ -133,6 +136,7 @@ export async function storeFathomCredentials(
       .values({
         project_id: params.projectId,
         api_key: params.apiKey,
+        account_name: params.accountName ?? null,
         sync_frequency: params.syncFrequency,
         sync_enabled: params.syncFrequency !== 'manual',
         filter_config: params.filterConfig || {},
@@ -143,6 +147,7 @@ export async function storeFathomCredentials(
         target: fathomConnections.project_id,
         set: {
           api_key: params.apiKey,
+          account_name: params.accountName ?? null,
           sync_frequency: params.syncFrequency,
           sync_enabled: params.syncFrequency !== 'manual',
           filter_config: params.filterConfig || {},
@@ -170,7 +175,7 @@ export async function storeFathomCredentials(
 export async function updateFathomSettings(
   projectId: string,
   settings: {
-    syncFrequency?: FathomSyncFrequency
+    syncFrequency?: SyncFrequency
     syncEnabled?: boolean
     filterConfig?: FathomFilterConfig
   }
@@ -336,7 +341,7 @@ export async function updateSyncState(
 
     const conn = connRows[0]
     if (conn) {
-      const nextSync = calculateNextSyncTime(conn.sync_frequency as FathomSyncFrequency)
+      const nextSync = calculateNextSyncTime(conn.sync_frequency as SyncFrequency)
       updateData.next_sync_at = nextSync ? new Date(nextSync) : null
     }
   }
@@ -482,26 +487,3 @@ export async function getSyncStats(
   }
 }
 
-/**
- * Calculate next sync time based on frequency
- */
-export function calculateNextSyncTime(frequency: FathomSyncFrequency): string | null {
-  if (frequency === 'manual') {
-    return null
-  }
-
-  const now = new Date()
-  switch (frequency) {
-    case '1h':
-      now.setHours(now.getHours() + 1)
-      break
-    case '6h':
-      now.setHours(now.getHours() + 6)
-      break
-    case '24h':
-      now.setDate(now.getDate() + 1)
-      break
-  }
-
-  return now.toISOString()
-}

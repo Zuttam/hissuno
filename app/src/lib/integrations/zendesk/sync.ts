@@ -3,10 +3,8 @@
  * Handles fetching tickets from Zendesk and creating Hissuno sessions.
  */
 
-import { db } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { sessions, sessionMessages, contacts, companies } from '@/lib/db/schema/app'
-import { setSessionContact } from '@/lib/db/queries/entity-relationships'
+import { createSessionWithMessagesAdmin } from '@/lib/sessions/sessions-service'
+import { upsertCompanyAdmin, upsertContactAdmin } from '@/lib/customers/customers-service'
 import {
   ZendeskClient,
   type ZendeskTicket,
@@ -18,13 +16,14 @@ import {
 } from './client'
 import {
   getZendeskCredentials,
-  isTicketSynced,
+  getSyncedTicketIds,
   recordSyncedTicket,
   updateSyncState,
   createSyncRun,
   completeSyncRun,
   type ZendeskFilterConfig,
 } from './index'
+import { stripHtml } from '@/lib/integrations/shared/sync-utils'
 
 /**
  * Progress event during sync
@@ -80,13 +79,6 @@ function generateSessionId(ticketId: number, projectId: string): string {
 }
 
 /**
- * Strip HTML tags from content
- */
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, '').trim()
-}
-
-/**
  * Build enriched user metadata from Zendesk ticket/user/org
  */
 function buildUserMetadata(
@@ -139,51 +131,23 @@ async function enrichContact(
   if (!user.email) return null
 
   try {
-    // Try to find existing contact by email
-    const existingRows = await db
-      .select({ id: contacts.id, company_id: contacts.company_id })
-      .from(contacts)
-      .where(
-        and(
-          eq(contacts.project_id, projectId),
-          eq(contacts.email, user.email)
-        )
-      )
-
-    const existingContact = existingRows[0]
-
-    if (existingContact) {
-      // If contact exists but has no company, and we have org data, link them
-      if (!existingContact.company_id && organization) {
-        const companyId = await findOrCreateCompany(projectId, organization)
-        if (companyId) {
-          await db
-            .update(contacts)
-            .set({ company_id: companyId })
-            .where(eq(contacts.id, existingContact.id))
-        }
-      }
-      return existingContact.id
-    }
-
-    // Create new contact
+    // Resolve company first if we have org data
     let companyId: string | null = null
     if (organization) {
       companyId = await findOrCreateCompany(projectId, organization)
     }
 
-    const inserted = await db
-      .insert(contacts)
-      .values({
-        project_id: projectId,
-        name: user.name || user.email,
-        email: user.email,
-        company_id: companyId,
-        phone: user.phone ?? null,
-      })
-      .returning({ id: contacts.id })
+    // Upsert contact - fill_nulls will link company if contact has no company_id
+    const { record } = await upsertContactAdmin({
+      projectId,
+      email: user.email,
+      name: user.name || user.email,
+      phone: user.phone ?? null,
+      companyId,
+      mergeStrategy: 'fill_nulls',
+    })
 
-    return inserted[0]?.id ?? null
+    return record.id
   } catch (err) {
     console.warn('[zendesk.sync] Failed to enrich contact:', err)
     return null
@@ -198,35 +162,17 @@ async function findOrCreateCompany(
   organization: ZendeskOrganization
 ): Promise<string | null> {
   try {
-    const domain = organization.domain_names?.[0] || ''
+    // Use the first domain_name, or fall back to org name as domain
+    const domain = organization.domain_names?.[0] || organization.name
 
-    // Try to find by name first
-    const existingRows = await db
-      .select({ id: companies.id })
-      .from(companies)
-      .where(
-        and(
-          eq(companies.project_id, projectId),
-          eq(companies.name, organization.name)
-        )
-      )
+    const { record } = await upsertCompanyAdmin({
+      projectId,
+      domain,
+      name: organization.name,
+      mergeStrategy: 'fill_nulls',
+    })
 
-    const existingCompany = existingRows[0]
-
-    if (existingCompany) {
-      return existingCompany.id
-    }
-
-    const inserted = await db
-      .insert(companies)
-      .values({
-        project_id: projectId,
-        name: organization.name,
-        domain,
-      })
-      .returning({ id: companies.id })
-
-    return inserted[0]?.id ?? null
+    return record.id
   } catch (err) {
     console.warn('[zendesk.sync] Failed to find/create company:', err)
     return null
@@ -282,66 +228,40 @@ async function createSessionFromTicket(
   const userMetadata = buildUserMetadata(ticket, requester, organization)
   const sessionName = ticket.subject || 'Zendesk Ticket'
 
-  // Create session
-  try {
-    await db.insert(sessions).values({
-      id: sessionId,
-      project_id: projectId,
-      source: 'zendesk',
-      session_type: 'chat',
-      status: 'closed',
-      name: sessionName,
-      user_metadata: { ...userMetadata, userId: requester?.email || String(ticket.requester_id) },
-      first_message_at: new Date(ticket.created_at),
-      last_activity_at: new Date(ticket.updated_at),
-      created_at: new Date(ticket.created_at),
-    })
-  } catch (sessionError) {
-    console.error(`[zendesk.sync] Failed to create session for ticket ${ticket.id}:`, sessionError)
-    return null
-  }
-
-  // Link contact via entity_relationships
-  if (contactId) {
-    await setSessionContact(projectId, sessionId, contactId)
-  }
-
   // Build messages from comments
-  const messageValues: Array<{
-    session_id: string
-    project_id: string
-    sender_type: string
-    content: string
-    created_at: Date
-  }> = []
+  const messages: Array<{ sender_type: string; content: string; created_at: Date }> = []
 
   for (const comment of ticketComments) {
     const content = comment.plain_body || stripHtml(comment.html_body || comment.body || '')
     if (!content.trim()) continue
 
-    messageValues.push({
-      session_id: sessionId,
-      project_id: projectId,
+    messages.push({
       sender_type: mapAuthorToSenderType(comment.author_id, ticket.requester_id),
       content,
       created_at: new Date(comment.created_at),
     })
   }
 
-  // Insert messages
-  if (messageValues.length > 0) {
-    try {
-      await db.insert(sessionMessages).values(messageValues)
-    } catch (messagesError) {
-      console.error(`[zendesk.sync] Failed to insert messages for ticket ${ticket.id}:`, messagesError)
-    }
-  }
+  // Create session with messages via service
+  const result = await createSessionWithMessagesAdmin({
+    id: sessionId,
+    projectId,
+    source: 'zendesk',
+    sessionType: 'chat',
+    status: 'closed',
+    name: sessionName,
+    userMetadata: { ...userMetadata, userId: requester?.email || String(ticket.requester_id) },
+    firstMessageAt: new Date(ticket.created_at),
+    lastActivityAt: new Date(ticket.updated_at),
+    createdAt: new Date(ticket.created_at),
+    messages,
+    contactId: contactId ?? undefined,
+  })
 
-  // Update session message count
-  await db
-    .update(sessions)
-    .set({ message_count: messageValues.length })
-    .where(eq(sessions.id, sessionId))
+  if (!result) {
+    console.error(`[zendesk.sync] Failed to create session for ticket ${ticket.id}`)
+    return null
+  }
 
   // Record the sync
   await recordSyncedTicket({
@@ -350,10 +270,10 @@ async function createSessionFromTicket(
     sessionId,
     ticketCreatedAt: ticket.created_at,
     ticketUpdatedAt: ticket.updated_at,
-    commentsCount: messageValues.length,
+    commentsCount: result.messageCount,
   })
 
-  return { sessionId, messageCount: messageValues.length }
+  return { sessionId, messageCount: result.messageCount }
 }
 
 /**
@@ -418,9 +338,12 @@ export async function syncZendeskTickets(
   let ticketsSkipped = 0
 
   try {
+    // Pre-fetch all synced ticket IDs to avoid N+1 queries
+    const syncedTicketIds = await getSyncedTicketIds(credentials.connectionId)
+
     const processTicket = async (ticket: ZendeskTicket) => {
       // Check if already synced
-      const alreadySynced = await isTicketSynced(credentials.connectionId, ticket.id)
+      const alreadySynced = syncedTicketIds.has(ticket.id)
 
       if (alreadySynced) {
         ticketsSkipped++

@@ -10,7 +10,7 @@ import { db } from '@/lib/db'
 import { projects } from '@/lib/db/schema/app'
 import { eq } from 'drizzle-orm'
 import { getSafeRedirectPath } from '@/lib/auth/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
+import { assertProjectAccess } from '@/lib/auth/authorization'
 import { storeNotionCredentials } from '@/lib/integrations/notion'
 import { exchangeNotionOAuthCode } from '@/lib/integrations/notion/oauth'
 
@@ -89,8 +89,9 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Project not found.')
     }
 
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
+    try {
+      await assertProjectAccess({ type: 'user' as const, userId, email: null, name: null }, projectId)
+    } catch {
       return redirectWithError('Project access denied.')
     }
 

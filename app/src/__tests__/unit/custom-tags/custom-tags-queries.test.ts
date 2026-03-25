@@ -8,21 +8,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { UnauthorizedError } from '@/lib/auth/server'
 
-// Mock auth modules
-const mockResolveRequestContext = vi.fn()
-const mockHasProjectAccess = vi.fn()
+// Mock dependencies
 const mockIsDatabaseConfigured = vi.fn()
 
 vi.mock('@/lib/db/config', () => ({
   isDatabaseConfigured: () => mockIsDatabaseConfigured(),
-}))
-
-vi.mock('@/lib/db/server', () => ({
-  resolveRequestContext: () => mockResolveRequestContext(),
-}))
-
-vi.mock('@/lib/auth/project-members', () => ({
-  hasProjectAccess: (...args: unknown[]) => mockHasProjectAccess(...args),
 }))
 
 // Mock Drizzle db with chainable query builder
@@ -134,8 +124,7 @@ afterEach(() => {
 
 // Setup helper for auth context
 function setupAuthContext() {
-  mockResolveRequestContext.mockResolvedValue({ userId: 'user-123', db: {}, apiKeyProjectId: null })
-  mockHasProjectAccess.mockResolvedValue(true)
+  // Auth is now handled at the route level, not in query functions
 }
 
 // getProjectCustomTags (admin — no auth required)
@@ -172,21 +161,6 @@ describe('getProjectCustomTags', () => {
 // syncCustomTags
 
 describe('syncCustomTags', () => {
-  describe('authorization', () => {
-    it('throws UnauthorizedError when user cannot be resolved', async () => {
-      mockResolveRequestContext.mockRejectedValue(new UnauthorizedError())
-
-      await expect(syncCustomTags('project-123', [])).rejects.toThrow(UnauthorizedError)
-    })
-
-    it('throws UnauthorizedError when project access denied', async () => {
-      mockResolveRequestContext.mockResolvedValue({ userId: 'user-123', db: {}, apiKeyProjectId: null })
-      mockHasProjectAccess.mockResolvedValue(false)
-
-      await expect(syncCustomTags('project-123', [])).rejects.toThrow(UnauthorizedError)
-    })
-  })
-
   describe('creating new tags', () => {
     it('creates tags with temp_ prefix IDs', async () => {
       setupAuthContext()

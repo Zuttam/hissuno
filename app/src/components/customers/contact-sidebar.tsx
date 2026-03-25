@@ -8,6 +8,7 @@ import type { UpdateContactInput } from '@/types/customer'
 import type { ContactLinkedSession, ContactLinkedIssue } from '@/lib/db/queries/contacts'
 import { listCompanies } from '@/lib/api/companies'
 import { RelatedEntitiesSection } from '@/components/shared/related-entities-section'
+import { formatRelativeTime } from '@/lib/utils/format-time'
 import { listContactSessions, listContactIssues } from '@/lib/api/contacts'
 
 interface ContactSidebarProps {
@@ -474,22 +475,6 @@ function formatDateTime(dateString: string | Date | null | undefined): string {
   return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function formatRelativeDate(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '-'
-  const date = dateString instanceof Date ? dateString : new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) {
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-    if (diffHours === 0) return 'just now'
-    return `${diffHours}h ago`
-  }
-  if (diffDays === 1) return 'yesterday'
-  if (diffDays < 7) return `${diffDays}d ago`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
-  return `${Math.floor(diffDays / 30)}mo ago`
-}
 
 const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
   widget: 'info',
@@ -572,7 +557,7 @@ function ContactActivitySections({ contactId, projectId }: { contactId: string; 
                       {session.name || 'Unnamed'}
                     </span>
                     <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
-                      {formatRelativeDate(session.created_at)}
+                      {formatRelativeTime(session.created_at)}
                     </span>
                   </Link>
                 ))}

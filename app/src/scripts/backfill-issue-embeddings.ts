@@ -8,8 +8,8 @@
  */
 
 import { db } from '@/lib/db'
-import { issues, issueEmbeddings } from '@/lib/db/schema/app'
-import { desc } from 'drizzle-orm'
+import { issues, embeddings } from '@/lib/db/schema/app'
+import { desc, eq } from 'drizzle-orm'
 import { batchEmbedIssues } from '@/lib/issues/embedding-service'
 
 async function backfillIssueEmbeddings() {
@@ -35,10 +35,11 @@ async function backfillIssueEmbeddings() {
 
   // Check which issues already have embeddings
   const existingEmbeddingRows = await db
-    .select({ issue_id: issueEmbeddings.issue_id })
-    .from(issueEmbeddings)
+    .select({ entity_id: embeddings.entity_id })
+    .from(embeddings)
+    .where(eq(embeddings.entity_type, 'issue'))
 
-  const existingIds = new Set(existingEmbeddingRows.map((e) => e.issue_id))
+  const existingIds = new Set(existingEmbeddingRows.map((e) => e.entity_id))
   const issuesToEmbed = allIssues.filter((i) => !existingIds.has(i.id))
 
   console.log(`[backfill] ${existingIds.size} issues already have embeddings`)

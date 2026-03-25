@@ -236,7 +236,7 @@ export default function IntegrationsPage() {
             id: 'fathom',
             type: 'fathom',
             name: 'Fathom',
-            detail: '',
+            detail: data.accountName || '',
             status: 'active',
             lastSyncAt: data.lastSyncAt || null,
           })

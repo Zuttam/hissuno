@@ -3,7 +3,13 @@ import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { isDatabaseConfigured } from '@/lib/db/config'
-import { listProjectProductScopes, syncProductScopes, createProductScope, type SyncScopeInput, type CreateProductScopeInput } from '@/lib/db/queries/product-scopes'
+import { getProjectProductScopes } from '@/lib/db/queries/product-scopes'
+import {
+  createProductScope,
+  syncProductScopes,
+  type CreateProductScopeAdminInput,
+  type SyncScopeInput,
+} from '@/lib/product-scopes/product-scopes-service'
 import { generateSlugFromName } from '@/lib/security/sanitize'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import type { ProductScopeGoal } from '@/types/product-scope'
@@ -27,7 +33,7 @@ export async function GET(request: NextRequest) {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
 
-    const scopes = await listProjectProductScopes(projectId)
+    const scopes = await getProjectProductScopes(projectId)
     return NextResponse.json({ scopes })
   } catch (error) {
     if (error instanceof MissingProjectIdError) {
@@ -110,12 +116,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Invalid slug. Must start with a letter and contain only lowercase alphanumeric and underscores.` }, { status: 400 })
     }
 
-    const input: CreateProductScopeInput = {
+    const input: CreateProductScopeAdminInput = {
       name: trimmedName,
       slug: resolvedSlug,
       description,
       color,
-      type: type as CreateProductScopeInput['type'],
+      type: type as CreateProductScopeAdminInput['type'],
       goals: goals ?? null,
     }
 

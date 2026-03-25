@@ -7,44 +7,62 @@ describe('formatRelativeTime', () => {
   })
 
   describe('null/undefined/empty handling', () => {
-    it('returns "Never" for null', () => {
-      expect(formatRelativeTime(null)).toBe('Never')
+    it('returns "-" for null', () => {
+      expect(formatRelativeTime(null)).toBe('-')
     })
 
-    it('returns "Never" for undefined', () => {
-      expect(formatRelativeTime(undefined)).toBe('Never')
+    it('returns "-" for undefined', () => {
+      expect(formatRelativeTime(undefined)).toBe('-')
     })
 
-    it('returns "Never" for empty string', () => {
-      expect(formatRelativeTime('')).toBe('Never')
+    it('returns "-" for empty string', () => {
+      expect(formatRelativeTime('')).toBe('-')
     })
   })
 
-  describe('"Just now" threshold (< 1 hour)', () => {
-    it('returns "Just now" for date 30 minutes ago', () => {
+  describe('"just now" threshold (<= 1 minute)', () => {
+    it('returns "just now" for current time', () => {
       vi.useFakeTimers()
-      const now = new Date('2025-06-15T12:00:00Z')
-      vi.setSystemTime(now)
+      vi.setSystemTime(new Date('2025-06-15T12:00:00Z'))
 
-      const thirtyMinAgo = '2025-06-15T11:30:00Z'
-      expect(formatRelativeTime(thirtyMinAgo)).toBe('Just now')
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('just now')
     })
 
-    it('returns "Just now" for date 1 second ago', () => {
+    it('returns "just now" for date 1 minute ago', () => {
       vi.useFakeTimers()
-      const now = new Date('2025-06-15T12:00:00Z')
-      vi.setSystemTime(now)
+      vi.setSystemTime(new Date('2025-06-15T12:01:00Z'))
 
-      const justNow = '2025-06-15T11:59:59Z'
-      expect(formatRelativeTime(justNow)).toBe('Just now')
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('just now')
     })
 
-    it('returns "Just now" for current time', () => {
+    it('returns "just now" for date 30 seconds ago', () => {
       vi.useFakeTimers()
-      const now = new Date('2025-06-15T12:00:00Z')
-      vi.setSystemTime(now)
+      vi.setSystemTime(new Date('2025-06-15T12:00:30Z'))
 
-      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('Just now')
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('just now')
+    })
+  })
+
+  describe('minutes threshold (2-59 minutes)', () => {
+    it('returns "2m ago" for date 2 minutes ago', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2025-06-15T12:02:00Z'))
+
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('2m ago')
+    })
+
+    it('returns "30m ago" for date 30 minutes ago', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2025-06-15T12:30:00Z'))
+
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('30m ago')
+    })
+
+    it('returns "59m ago" for date 59 minutes ago', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2025-06-15T12:59:00Z'))
+
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('59m ago')
     })
   })
 
@@ -71,14 +89,16 @@ describe('formatRelativeTime', () => {
     })
   })
 
-  describe('days threshold (1-6 days)', () => {
-    it('returns "1d ago" for date exactly 24 hours ago', () => {
+  describe('yesterday threshold (1 day)', () => {
+    it('returns "yesterday" for date exactly 24 hours ago', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2025-06-16T12:00:00Z'))
 
-      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('1d ago')
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('yesterday')
     })
+  })
 
+  describe('days threshold (2-6 days)', () => {
     it('returns "3d ago" for date 3 days ago', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2025-06-18T12:00:00Z'))
@@ -94,25 +114,35 @@ describe('formatRelativeTime', () => {
     })
   })
 
-  describe('date display threshold (>= 7 days)', () => {
-    it('returns locale date string for date 7 days ago', () => {
+  describe('weeks threshold (7-29 days)', () => {
+    it('returns "1w ago" for date 7 days ago', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2025-06-22T12:00:00Z'))
 
-      const result = formatRelativeTime('2025-06-15T12:00:00Z')
-      // Should be a locale date string, not "Xd ago"
-      expect(result).not.toContain('d ago')
-      expect(result).not.toContain('h ago')
-      expect(result).not.toBe('Just now')
-      expect(result).not.toBe('Never')
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('1w ago')
     })
 
-    it('returns locale date string for date 30 days ago', () => {
+    it('returns "3w ago" for date 21 days ago', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2025-07-06T12:00:00Z'))
+
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('3w ago')
+    })
+  })
+
+  describe('months threshold (>= 30 days)', () => {
+    it('returns "1mo ago" for date 30 days ago', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2025-07-15T12:00:00Z'))
 
-      const result = formatRelativeTime('2025-06-15T12:00:00Z')
-      expect(result).not.toContain('d ago')
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('1mo ago')
+    })
+
+    it('returns "6mo ago" for date ~180 days ago', () => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2025-12-15T12:00:00Z'))
+
+      expect(formatRelativeTime('2025-06-15T12:00:00Z')).toBe('6mo ago')
     })
   })
 
@@ -128,29 +158,23 @@ describe('formatRelativeTime', () => {
 
   describe('edge cases', () => {
     it('handles invalid date string gracefully', () => {
-      // new Date('not-a-date') produces NaN time, so diff will be NaN
-      // Math.floor(NaN) = NaN, NaN < 1 is false, NaN < 24 is false,
-      // NaN < 7 is false, so it falls through to toLocaleDateString()
-      // which returns "Invalid Date"
       const result = formatRelativeTime('not-a-date')
       expect(typeof result).toBe('string')
-      // It should not crash
     })
 
     it('handles future dates', () => {
       vi.useFakeTimers()
       vi.setSystemTime(new Date('2025-06-15T12:00:00Z'))
 
-      // Future date: diff is negative, hours is negative
-      // negative < 1 is true, so returns "Just now"
+      // Future date: diffMs is negative, diffDays is negative (< 0)
+      // diffDays === 0 is false for large future diffs, falls through
       const result = formatRelativeTime('2025-06-20T12:00:00Z')
-      expect(result).toBe('Just now')
+      expect(typeof result).toBe('string')
     })
 
     it('handles epoch zero date', () => {
       const result = formatRelativeTime('1970-01-01T00:00:00Z')
-      // Very old date - should return locale date string
-      expect(result).not.toBe('Never')
+      expect(result).not.toBe('-')
       expect(typeof result).toBe('string')
     })
   })

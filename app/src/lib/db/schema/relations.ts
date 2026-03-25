@@ -25,9 +25,7 @@ import {
   knowledgePackages,
   knowledgePackageSources,
   entityRelationships,
-  sessionEmbeddings,
-  issueEmbeddings,
-  contactEmbeddings,
+  embeddings,
   slackWorkspaceTokens,
   slackChannels,
   slackThreadSessions,
@@ -51,6 +49,8 @@ import {
   posthogConnections,
   posthogSyncRuns,
   notionConnections,
+  notionSyncConfigs,
+  notionIssueSyncs,
   hubspotConnections,
   hubspotSyncRuns,
   hubspotSyncedCompanies,
@@ -96,6 +96,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   gongConnection: one(gongConnections, { fields: [projects.id], references: [gongConnections.project_id] }),
   posthogConnection: one(posthogConnections, { fields: [projects.id], references: [posthogConnections.project_id] }),
   notionConnection: one(notionConnections, { fields: [projects.id], references: [notionConnections.project_id] }),
+  notionSyncConfigs: many(notionSyncConfigs),
   hubspotConnection: one(hubspotConnections, { fields: [projects.id], references: [hubspotConnections.project_id] }),
   fathomConnection: one(fathomConnections, { fields: [projects.id], references: [fathomConnections.project_id] }),
 }))
@@ -157,7 +158,7 @@ export const companiesRelations = relations(companies, ({ one, many }) => ({
 export const contactsRelations = relations(contacts, ({ one, many }) => ({
   project: one(projects, { fields: [contacts.project_id], references: [projects.id] }),
   company: one(companies, { fields: [contacts.company_id], references: [companies.id] }),
-  embedding: one(contactEmbeddings, { fields: [contacts.id], references: [contactEmbeddings.contact_id] }),
+  embedding: one(embeddings, { fields: [contacts.id], references: [embeddings.entity_id] }),
   entityRelationships: many(entityRelationships),
 }))
 
@@ -174,7 +175,7 @@ export const sessionsRelations = relations(sessions, ({ one, many }) => ({
   messages: many(sessionMessages),
   reviews: many(sessionReviews),
   chatRuns: many(chatRuns),
-  embedding: one(sessionEmbeddings, { fields: [sessions.id], references: [sessionEmbeddings.session_id] }),
+  embedding: one(embeddings, { fields: [sessions.id], references: [embeddings.entity_id] }),
   entityRelationships: many(entityRelationships),
 }))
 
@@ -200,9 +201,10 @@ export const chatRunsRelations = relations(chatRuns, ({ one }) => ({
 export const issuesRelations = relations(issues, ({ one, many }) => ({
   project: one(projects, { fields: [issues.project_id], references: [projects.id] }),
   analysisRuns: many(issueAnalysisRuns),
-  embedding: one(issueEmbeddings, { fields: [issues.id], references: [issueEmbeddings.issue_id] }),
+  embedding: one(embeddings, { fields: [issues.id], references: [embeddings.entity_id] }),
   jiraSync: one(jiraIssueSyncs, { fields: [issues.id], references: [jiraIssueSyncs.issue_id] }),
   linearSync: one(linearIssueSyncs, { fields: [issues.id], references: [linearIssueSyncs.issue_id] }),
+  notionSync: one(notionIssueSyncs, { fields: [issues.id], references: [notionIssueSyncs.issue_id] }),
   entityRelationships: many(entityRelationships),
 }))
 
@@ -260,19 +262,8 @@ export const entityRelationshipsRelations = relations(entityRelationships, ({ on
 // Embeddings
 // ---------------------------------------------------------------------------
 
-export const sessionEmbeddingsRelations = relations(sessionEmbeddings, ({ one }) => ({
-  session: one(sessions, { fields: [sessionEmbeddings.session_id], references: [sessions.id] }),
-  project: one(projects, { fields: [sessionEmbeddings.project_id], references: [projects.id] }),
-}))
-
-export const issueEmbeddingsRelations = relations(issueEmbeddings, ({ one }) => ({
-  issue: one(issues, { fields: [issueEmbeddings.issue_id], references: [issues.id] }),
-  project: one(projects, { fields: [issueEmbeddings.project_id], references: [projects.id] }),
-}))
-
-export const contactEmbeddingsRelations = relations(contactEmbeddings, ({ one }) => ({
-  contact: one(contacts, { fields: [contactEmbeddings.contact_id], references: [contacts.id] }),
-  project: one(projects, { fields: [contactEmbeddings.project_id], references: [projects.id] }),
+export const embeddingsRelations = relations(embeddings, ({ one }) => ({
+  project: one(projects, { fields: [embeddings.project_id], references: [projects.id] }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -405,8 +396,20 @@ export const posthogSyncRunsRelations = relations(posthogSyncRuns, ({ one }) => 
 // Integrations: Notion
 // ---------------------------------------------------------------------------
 
-export const notionConnectionsRelations = relations(notionConnections, ({ one }) => ({
+export const notionConnectionsRelations = relations(notionConnections, ({ one, many }) => ({
   project: one(projects, { fields: [notionConnections.project_id], references: [projects.id] }),
+  syncConfigs: many(notionSyncConfigs),
+  issueSyncs: many(notionIssueSyncs),
+}))
+
+export const notionSyncConfigsRelations = relations(notionSyncConfigs, ({ one }) => ({
+  connection: one(notionConnections, { fields: [notionSyncConfigs.connection_id], references: [notionConnections.id] }),
+  project: one(projects, { fields: [notionSyncConfigs.project_id], references: [projects.id] }),
+}))
+
+export const notionIssueSyncsRelations = relations(notionIssueSyncs, ({ one }) => ({
+  connection: one(notionConnections, { fields: [notionIssueSyncs.connection_id], references: [notionConnections.id] }),
+  issue: one(issues, { fields: [notionIssueSyncs.issue_id], references: [issues.id] }),
 }))
 
 // ---------------------------------------------------------------------------

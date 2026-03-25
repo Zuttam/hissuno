@@ -207,12 +207,6 @@ export function CustomTagsSection({
 
   return (
     <div className="space-y-4">
-      {/* Description */}
-      <p className="text-sm text-[color:var(--text-secondary)]">
-        Define custom tags for feedback classification. These tags will be used alongside the
-        built-in tags (bug, feature request, etc.) when the AI classifies your sessions.
-      </p>
-
       {/* Error display */}
       {error && (
         <div className="p-3 rounded-md bg-[color:var(--background-danger)] text-[color:var(--text-danger)] text-sm">
@@ -300,12 +294,6 @@ export function CustomTagsSection({
           </div>
         ))}
       </div>
-
-      {tags.length === 0 && !isAdding && (
-        <p className="py-4 text-center text-sm text-[color:var(--text-secondary)]">
-          No custom tags defined yet.
-        </p>
-      )}
 
       {/* Add new tag form */}
       {isAdding && (

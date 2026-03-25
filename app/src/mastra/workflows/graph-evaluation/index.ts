@@ -1,46 +1,31 @@
 /**
- * Graph Evaluation Workflow
+ * Graph Evaluation - Entity Relationship Discovery
  *
- * Unified entity relationship discovery workflow.
- * Can be triggered:
- * - Inline: within session-review and issue-analysis workflows (synchronous)
- * - Async: for knowledge sources, contacts, and companies (fire-and-forget)
+ * Discovers relationships between entities (sessions, issues, knowledge sources,
+ * contacts, companies) by extracting topics and running semantic + text matching.
+ *
+ * Usage:
+ * - Inline: `await evaluateEntityRelationships(projectId, entityType, entityId)`
+ * - Fire-and-forget: `fireGraphEval(projectId, entityType, entityId)` from `@/lib/utils/graph-eval`
  */
 
-import { createWorkflow } from '@mastra/core/workflows'
-import type { Mastra } from '@mastra/core/mastra'
-import { graphEvaluationInputSchema, graphEvaluationOutputSchema } from './schemas'
 import type { GraphEvaluationOutput, GraphEntityType } from './schemas'
 import { loadEntityContent } from './steps/load-entity-content'
 import { extractTopics } from './steps/extract-topics'
 import { discoverRelationships } from './steps/discover-relationships'
-import { loadEntityContentFn } from './steps/load-entity-content'
-import { extractTopicsFn } from './steps/extract-topics'
-import { discoverRelationshipsFn } from './steps/discover-relationships'
-
-export const graphEvaluationWorkflow = createWorkflow({
-  id: 'graph-evaluation-workflow',
-  inputSchema: graphEvaluationInputSchema,
-  outputSchema: graphEvaluationOutputSchema,
-})
-  .then(loadEntityContent)
-  .then(extractTopics)
-  .then(discoverRelationships)
-
-graphEvaluationWorkflow.commit()
 
 /**
- * Run graph evaluation inline (synchronous). Used within session-review
- * and issue-analysis workflows where downstream steps need the results.
+ * Evaluate entity relationships synchronously. Returns discovered relationships
+ * and product scope assignment.
  */
-export async function runGraphEvalInline(
+export async function evaluateEntityRelationships(
   projectId: string,
   entityType: GraphEntityType,
   entityId: string,
 ): Promise<GraphEvaluationOutput> {
   try {
     // Step 1: Load entity content
-    const content = await loadEntityContentFn(projectId, entityType, entityId)
+    const content = await loadEntityContent(projectId, entityType, entityId)
 
     if (!content.contentForSearch && !content.contentForTextMatch) {
       return {
@@ -54,7 +39,7 @@ export async function runGraphEvalInline(
     }
 
     // Step 2: Extract topics
-    const topicsResult = await extractTopicsFn(
+    const topicsResult = await extractTopics(
       content.contentForSearch,
       content.entityName,
       entityType,
@@ -62,7 +47,7 @@ export async function runGraphEvalInline(
     )
 
     // Step 3: Discover relationships
-    const discoveryResult = await discoverRelationshipsFn({
+    const discoveryResult = await discoverRelationships({
       projectId,
       entityType,
       entityId,
@@ -86,26 +71,6 @@ export async function runGraphEvalInline(
       productScopeId: null,
       errors: [err instanceof Error ? err.message : 'Unknown error'],
     }
-  }
-}
-
-/**
- * Trigger graph evaluation asynchronously (fire-and-forget).
- * Used after knowledge source analysis, contact creation, and company creation.
- */
-export async function triggerGraphEvaluation(
-  mastra: Mastra | undefined,
-  input: { projectId: string; entityType: GraphEntityType; entityId: string }
-) {
-  try {
-    const workflow = mastra?.getWorkflow('graphEvaluationWorkflow')
-    if (!workflow) return
-    const run = await workflow.createRunAsync({
-      runId: `graph-eval-${input.entityType}-${input.entityId}-${Date.now()}`,
-    })
-    void run.start({ inputData: input })
-  } catch (err) {
-    console.warn('[graph-evaluation] Failed to trigger', err)
   }
 }
 

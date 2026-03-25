@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { projects } from '@/lib/db/schema/app'
 import { eq } from 'drizzle-orm'
 import { getSafeRedirectPath } from '@/lib/auth/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
+import { assertProjectAccess } from '@/lib/auth/authorization'
 import { storeGitHubInstallation } from '@/lib/integrations/github'
 import { getInstallationInfo } from '@/lib/integrations/github/jwt'
 
@@ -87,8 +87,9 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Project not found.', origin)
     }
 
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
+    try {
+      await assertProjectAccess({ type: 'user' as const, userId, email: null, name: null }, projectId)
+    } catch {
       return redirectWithError('Project access denied.', origin)
     }
 

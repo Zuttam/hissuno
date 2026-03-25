@@ -3,9 +3,7 @@
  * Handles fetching calls from Gong and creating Hissuno sessions.
  */
 
-import { db } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import { sessions, sessionMessages } from '@/lib/db/schema/app'
+import { createSessionWithMessagesAdmin } from '@/lib/sessions/sessions-service'
 import {
   GongClient,
   type GongCallListItem,
@@ -16,7 +14,7 @@ import {
 } from './client'
 import {
   getGongCredentials,
-  isCallAlreadySynced,
+  getSyncedCallIds,
   recordSyncedCall,
   updateSyncState,
   createSyncRun,
@@ -168,33 +166,8 @@ async function createSessionFromGongCall(
   const userId = externalParticipant?.emailAddress || externalParticipant?.name || null
   const userMetadata = buildUserMetadata(call, externalParticipant)
 
-  // Create session
-  try {
-    await db.insert(sessions).values({
-      id: sessionId,
-      project_id: projectId,
-      source: 'gong',
-      session_type: 'meeting',
-      status: 'closed', // Historical data is always closed
-      name: generateSessionName(call),
-      user_metadata: { ...userMetadata, ...(userId ? { userId } : {}) },
-      first_message_at: new Date(call.started),
-      last_activity_at: new Date(new Date(call.started).getTime() + call.duration * 1000),
-      created_at: new Date(call.started),
-    })
-  } catch (sessionError) {
-    console.error('[gong.sync] Failed to create session:', sessionError)
-    return null
-  }
-
   // Build messages from transcript
-  const messageValues: Array<{
-    session_id: string
-    project_id: string
-    sender_type: string
-    content: string
-    created_at: Date
-  }> = []
+  const messages: Array<{ sender_type: string; content: string; created_at?: Date }> = []
 
   if (transcript?.transcript) {
     for (const entry of transcript.transcript) {
@@ -210,9 +183,7 @@ async function createSessionFromGongCall(
       const startMs = entry.sentences[0]?.start || 0
       const messageTime = new Date(new Date(call.started).getTime() + startMs)
 
-      messageValues.push({
-        session_id: sessionId,
-        project_id: projectId,
+      messages.push({
         sender_type: senderType,
         content: `[${speakerName}]: ${text}`,
         created_at: messageTime,
@@ -220,33 +191,34 @@ async function createSessionFromGongCall(
     }
   }
 
-  // Insert messages
-  if (messageValues.length > 0) {
-    try {
-      await db.insert(sessionMessages).values(messageValues)
-    } catch (messagesError) {
-      console.error('[gong.sync] Failed to insert messages:', messagesError)
-      // Continue anyway - session was created
-    }
-  }
+  // Create session with messages via service
+  const result = await createSessionWithMessagesAdmin({
+    id: sessionId,
+    projectId,
+    source: 'gong',
+    sessionType: 'meeting',
+    status: 'closed',
+    name: generateSessionName(call),
+    userMetadata: { ...userMetadata, ...(userId ? { userId } : {}) },
+    firstMessageAt: new Date(call.started),
+    lastActivityAt: new Date(new Date(call.started).getTime() + call.duration * 1000),
+    createdAt: new Date(call.started),
+    messages,
+  })
 
-  // Update session message count
-  await db
-    .update(sessions)
-    .set({ message_count: messageValues.length })
-    .where(eq(sessions.id, sessionId))
+  if (!result) return null
 
   // Record the sync
   await recordSyncedCall({
     connectionId,
     gongCallId: call.id,
-    sessionId,
+    sessionId: result.sessionId,
     callCreatedAt: new Date(call.started).toISOString(),
     callDurationSeconds: call.duration,
-    messagesCount: messageValues.length,
+    messagesCount: result.messageCount,
   })
 
-  return { sessionId, messageCount: messageValues.length }
+  return { sessionId: result.sessionId, messageCount: result.messageCount }
 }
 
 /**
@@ -310,6 +282,9 @@ export async function syncGongCalls(
   let callsSkipped = 0
 
   try {
+    // Pre-fetch all synced call IDs to avoid N+1 queries
+    const syncedCallIds = await getSyncedCallIds(credentials.connectionId)
+
     // First pass: collect all call IDs and check which are already synced
     const callsToSync: GongCallListItem[] = []
 
@@ -329,10 +304,7 @@ export async function syncGongCalls(
       if (options.signal?.aborted) break
 
       // Check if already synced
-      const alreadySynced = await isCallAlreadySynced(
-        credentials.connectionId,
-        call.id
-      )
+      const alreadySynced = syncedCallIds.has(call.id)
 
       if (alreadySynced) {
         callsSkipped++

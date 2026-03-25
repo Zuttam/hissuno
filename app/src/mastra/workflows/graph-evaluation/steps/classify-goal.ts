@@ -2,7 +2,7 @@
  * Goal Classification
  *
  * Lightweight LLM call to classify which specific product scope goal
- * an entity best contributes to. Uses gpt-4o-mini for consistency
+ * an entity best contributes to. Uses gpt-5.4-mini for consistency
  * with the extract-topics pattern.
  */
 
@@ -51,7 +51,7 @@ export async function classifyGoal(input: ClassifyGoalInput): Promise<ClassifyGo
     const goalsText = goals.map((g, i) => `${i + 1}. [${g.id}] ${g.text}`).join('\n')
 
     const { object } = await generateObject({
-      model: openai('gpt-4o-mini'),
+      model: openai('gpt-5.4-mini'),
       schema: z.object({
         goalId: z.string().nullable().describe('The ID of the best matching goal, or null if none fit'),
         reasoning: z.string().describe('Brief explanation of why this goal was chosen (or why none matched)'),

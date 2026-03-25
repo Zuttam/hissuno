@@ -57,10 +57,13 @@ vi.mock('@/lib/auth/project-context', () => ({
 }))
 
 const mockListContacts = vi.fn()
-const mockInsertContact = vi.fn()
 vi.mock('@/lib/db/queries/contacts', () => ({
   listContacts: (...args: unknown[]) => mockListContacts(...args),
-  insertContact: (...args: unknown[]) => mockInsertContact(...args),
+}))
+
+const mockCreateContact = vi.fn()
+vi.mock('@/lib/customers/customers-service', () => ({
+  createContact: (...args: unknown[]) => mockCreateContact(...args),
 }))
 
 // ---------------------------------------------------------------------------
@@ -149,7 +152,7 @@ describe('GET /api/contacts', () => {
     expect(body.total).toBe(2)
     expect(mockListContacts).toHaveBeenCalled()
 
-    const filters = mockListContacts.mock.calls[0][0]
+    const filters = mockListContacts.mock.calls[0][1]
     expect(filters.projectId).toBe(PROJECT_ID)
   })
 
@@ -162,7 +165,7 @@ describe('GET /api/contacts', () => {
     const res = await GET(req)
 
     expect(res.status).toBe(200)
-    const filters = mockListContacts.mock.calls[0][0]
+    const filters = mockListContacts.mock.calls[0][1]
     expect(filters.companyId).toBe('comp-1')
     expect(filters.search).toBe('alice')
     expect(filters.isChampion).toBe(true)
@@ -177,7 +180,7 @@ describe('GET /api/contacts', () => {
     const res = await GET(req)
 
     expect(res.status).toBe(200)
-    const filters = mockListContacts.mock.calls[0][0]
+    const filters = mockListContacts.mock.calls[0][1]
     expect(filters.limit).toBe(10)
     expect(filters.offset).toBe(20)
   })
@@ -190,7 +193,7 @@ describe('GET /api/contacts', () => {
     )
     await GET(req)
 
-    const filters = mockListContacts.mock.calls[0][0]
+    const filters = mockListContacts.mock.calls[0][1]
     expect(filters.showArchived).toBe(true)
   })
 
@@ -283,7 +286,7 @@ describe('POST /api/contacts', () => {
 
   it('creates contact with valid input and returns 201', async () => {
     const createdContact = { id: 'c-new', ...validBody }
-    mockInsertContact.mockResolvedValue(createdContact)
+    mockCreateContact.mockResolvedValue(createdContact)
 
     const req = createPostRequest(validBody)
     const res = await POST(req)
@@ -291,10 +294,10 @@ describe('POST /api/contacts', () => {
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.contact.id).toBe('c-new')
-    expect(mockInsertContact).toHaveBeenCalled()
+    expect(mockCreateContact).toHaveBeenCalled()
   })
 
-  it('passes optional fields through to insertContact', async () => {
+  it('passes optional fields through to createContact', async () => {
     const fullBody = {
       ...validBody,
       company_id: 'comp-1',
@@ -307,12 +310,12 @@ describe('POST /api/contacts', () => {
       notes: 'Key decision maker',
       custom_fields: { segment: 'enterprise' },
     }
-    mockInsertContact.mockResolvedValue({ id: 'c-new' })
+    mockCreateContact.mockResolvedValue({ id: 'c-new' })
 
     const req = createPostRequest(fullBody)
     await POST(req)
 
-    const input = mockInsertContact.mock.calls[0][0]
+    const input = mockCreateContact.mock.calls[0][0]
     expect(input.projectId).toBe(PROJECT_ID)
     expect(input.companyId).toBe('comp-1')
     expect(input.role).toBe('Engineering')
@@ -325,12 +328,12 @@ describe('POST /api/contacts', () => {
   })
 
   it('defaults optional fields to null or empty', async () => {
-    mockInsertContact.mockResolvedValue({ id: 'c-new' })
+    mockCreateContact.mockResolvedValue({ id: 'c-new' })
 
     const req = createPostRequest(validBody)
     await POST(req)
 
-    const input = mockInsertContact.mock.calls[0][0]
+    const input = mockCreateContact.mock.calls[0][0]
     expect(input.companyId).toBeNull()
     expect(input.role).toBeNull()
     expect(input.title).toBeNull()
@@ -343,7 +346,7 @@ describe('POST /api/contacts', () => {
   })
 
   it('returns 500 on unexpected error', async () => {
-    mockInsertContact.mockRejectedValue(new Error('DB write failed'))
+    mockCreateContact.mockRejectedValue(new Error('DB write failed'))
 
     const req = createPostRequest(validBody)
     const res = await POST(req)

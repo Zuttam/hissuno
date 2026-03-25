@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { CustomTagRecord } from '@/types/session'
 import { listCustomTags } from '@/lib/api/settings'
+import { useFetchData } from './use-fetch-data'
 
 interface UseCustomTagsOptions {
   projectId?: string
@@ -20,43 +21,17 @@ export function useCustomTags({
   projectId,
   initialTags = [],
 }: UseCustomTagsOptions): UseCustomTagsState {
-  const [tags, setTags] = useState<CustomTagRecord[]>(initialTags)
-  const [isLoading, setIsLoading] = useState<boolean>(initialTags.length === 0 && Boolean(projectId))
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchTags = useCallback(async () => {
-    if (!projectId) {
-      setTags([])
-      setIsLoading(false)
-      setError(null)
-      return
-    }
-
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const result = await listCustomTags(projectId)
-      setTags(result)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unexpected error loading custom tags.'
-      setError(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [projectId])
-
-  useEffect(() => {
-    void fetchTags()
-  }, [fetchTags])
+  const { data, isLoading, error, refresh } = useFetchData<CustomTagRecord[]>({
+    fetchFn: () => listCustomTags(projectId!),
+    deps: [projectId],
+    initialData: initialTags,
+    initialLoading: initialTags.length === 0 && Boolean(projectId),
+    skip: !projectId,
+    errorPrefix: 'Unexpected error loading custom tags',
+  })
 
   return useMemo(
-    () => ({
-      tags,
-      isLoading,
-      error,
-      refresh: fetchTags,
-    }),
-    [tags, isLoading, error, fetchTags]
+    () => ({ tags: data ?? [], isLoading, error, refresh }),
+    [data, isLoading, error, refresh]
   )
 }

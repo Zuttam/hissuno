@@ -3,7 +3,8 @@ import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
-import { listSessions, getProjectIntegrationStats, createManualSession } from '@/lib/db/queries/sessions'
+import { listSessions, getProjectIntegrationStats } from '@/lib/db/queries/sessions'
+import { createSession } from '@/lib/sessions/sessions-service'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import type { SessionFilters, CreateSessionInput, CreateMessageInput, SessionTag, SessionType } from '@/types/session'
 import { SESSION_TAGS } from '@/types/session'
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined,
     }
 
-    const { sessions, total } = await listSessions(filters)
+    const { sessions, total } = await listSessions(projectId, filters)
 
     return NextResponse.json({ sessions, total })
   } catch (error) {
@@ -147,11 +148,12 @@ export async function POST(request: NextRequest) {
       page_url: body.page_url || undefined,
       page_title: body.page_title || undefined,
       tags,
+      custom_fields: body.custom_fields || undefined,
       messages,
     }
 
     // Note: Limits are enforced at analysis time (PM review), not at session creation
-    const session = await createManualSession(input)
+    const session = await createSession(input)
 
     return NextResponse.json({ session }, { status: 201 })
   } catch (error) {

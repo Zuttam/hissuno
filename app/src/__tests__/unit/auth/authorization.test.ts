@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockHasProjectAccess = vi.fn()
 const mockHasProjectRole = vi.fn()
 vi.mock('@/lib/auth/project-members', () => ({
-  hasProjectAccess: (...args: unknown[]) => mockHasProjectAccess(...args),
+  isProjectMember: (...args: unknown[]) => mockHasProjectAccess(...args),
   hasProjectRole: (...args: unknown[]) => mockHasProjectRole(...args),
 }))
 

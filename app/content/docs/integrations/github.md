@@ -97,7 +97,13 @@ Only one branch can be synced at a time per project.
 
 ### Manual Re-sync
 
-You can trigger a full re-analysis at any time from the integration settings page. This is useful after major refactors or when you first set up the integration and want to ensure all knowledge is captured.
+You can trigger a full re-analysis at any time from the integration settings page or from the CLI:
+
+```bash
+hissuno integrations sync github
+```
+
+This is useful after major refactors or when you first set up the integration and want to ensure all knowledge is captured.
 
 ## Troubleshooting
 

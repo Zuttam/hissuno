@@ -2,7 +2,6 @@
  * Sessions Database Layer (Drizzle ORM)
  */
 
-import { cache } from 'react'
 import {
   eq,
   and,
@@ -15,6 +14,7 @@ import {
   lte,
   isNotNull,
 } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import {
   sessions,
@@ -22,12 +22,9 @@ import {
   entityRelationships,
   issues,
 } from '@/lib/db/schema/app'
-import { resolveRequestContext, getUserProjectIds, sanitizeSearchInput, dateToIso } from '@/lib/db/server'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
-import { saveSessionMessage } from '@/lib/db/queries/session-messages'
-import { setSessionContact, setEntityProductScope, getSessionLinkedIssueIds, getRelatedIds, linkEntities } from '@/lib/db/queries/entity-relationships'
-import { ensureSessionName, generateDefaultName } from '@/lib/sessions/name-generator'
+import { sanitizeSearchInput, dateToIso } from '@/lib/db/server'
+import { setSessionContact, setEntityProductScope, getSessionLinkedIssueIds, getRelatedIds } from '@/lib/db/queries/entity-relationships'
+import { ensureSessionName } from '@/lib/sessions/name-generator'
 import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-notifications'
 import type {
   SessionRecord,
@@ -37,18 +34,16 @@ import type {
   SessionTag,
   SessionSource,
   SessionType,
-  CreateSessionInput,
   UpdateSessionInput,
 } from '@/types/session'
 import { getDefaultSessionType } from '@/types/session'
-import { fireGraphEval } from '@/lib/graph-eval'
 
 // ---------------------------------------------------------------------------
 // Serialization helpers
 // ---------------------------------------------------------------------------
 
 /** Convert a Drizzle session row to the SessionRecord-compatible shape */
-function rowToSessionRecord(row: typeof sessions.$inferSelect): SessionRecord {
+export function rowToSessionRecord(row: typeof sessions.$inferSelect): SessionRecord {
   return {
     ...row,
     user_metadata: row.user_metadata as Record<string, string> | null,
@@ -58,6 +53,7 @@ function rowToSessionRecord(row: typeof sessions.$inferSelect): SessionRecord {
     message_count: row.message_count ?? 0,
     status: (row.status ?? 'active') as SessionRecord['status'],
     tags: (row.tags ?? []) as SessionTag[],
+    custom_fields: (row.custom_fields as Record<string, unknown>) ?? {},
     tags_auto_applied_at: dateToIso(row.tags_auto_applied_at),
     first_message_at: dateToIso(row.first_message_at),
     last_activity_at: row.last_activity_at?.toISOString() ?? new Date().toISOString(),
@@ -168,192 +164,175 @@ export async function updateSessionActivity(sessionId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Shared filter builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds filter conditions for listSessions.
+ * Handles every filter EXCEPT companyId (which needs project-scoped contact lookup).
+ */
+function buildSessionFilterConditions(filters: SessionFilters): SQL[] {
+  const conditions: SQL[] = []
+  if (!filters.showArchived) {
+    conditions.push(eq(sessions.is_archived, false))
+  }
+  if (filters.sessionId) {
+    conditions.push(ilike(sessions.id, `%${sanitizeSearchInput(filters.sessionId)}%`))
+  }
+  if (filters.name) {
+    conditions.push(ilike(sessions.name, `%${sanitizeSearchInput(filters.name)}%`))
+  }
+  if (filters.status) {
+    conditions.push(eq(sessions.status, filters.status))
+  }
+  if (filters.source) {
+    conditions.push(eq(sessions.source, filters.source))
+  }
+  if (filters.sessionType) {
+    conditions.push(eq(sessions.session_type, filters.sessionType))
+  }
+  if (filters.isHumanTakeover) {
+    conditions.push(eq(sessions.is_human_takeover, true))
+  }
+  if (filters.tags && filters.tags.length > 0) {
+    conditions.push(sql`${sessions.tags} && ${sql.param(filters.tags)}::text[]`)
+  }
+  if (filters.dateFrom) {
+    conditions.push(gte(sessions.created_at, new Date(filters.dateFrom)))
+  }
+  if (filters.dateTo) {
+    conditions.push(lte(sessions.created_at, new Date(filters.dateTo)))
+  }
+  if (filters.contactId) {
+    conditions.push(
+      inArray(
+        sessions.id,
+        db.select({ id: entityRelationships.session_id })
+          .from(entityRelationships)
+          .where(
+            and(
+              eq(entityRelationships.contact_id, filters.contactId),
+              isNotNull(entityRelationships.session_id),
+            )
+          ),
+      )
+    )
+  }
+  if (filters.isAnalyzed) {
+    conditions.push(eq(sessions.analysis_status, 'analyzed'))
+  }
+  if (filters.productScopeIds && filters.productScopeIds.length > 0) {
+    conditions.push(
+      inArray(
+        sessions.id,
+        db.select({ id: entityRelationships.session_id })
+          .from(entityRelationships)
+          .where(
+            and(
+              inArray(entityRelationships.product_scope_id, filters.productScopeIds),
+              isNotNull(entityRelationships.session_id),
+            )
+          ),
+      )
+    )
+  }
+  return conditions
+}
+
+// ---------------------------------------------------------------------------
 // Queries
 // ---------------------------------------------------------------------------
 
 /**
- * Lists sessions with optional filters. Requires authenticated user context.
- * Only returns sessions for projects owned by the current user.
+ * Lists sessions for a single project. Callers are responsible for
+ * verifying that the caller has access to `projectId`.
  */
-export const listSessions = cache(
-  async (filters: SessionFilters = {}): Promise<{ sessions: SessionWithProject[]; total: number }> => {
-    try {
-      const { userId, apiKeyProjectId } = await resolveRequestContext()
-
-      if (apiKeyProjectId && !filters.projectId) {
-        throw new Error('API key requests must include a projectId filter.')
-      }
-
-      // Get projects accessible by this user
-      const projectIds = apiKeyProjectId ? [apiKeyProjectId] : await getUserProjectIds(userId)
-
-      if (projectIds.length === 0) {
-        return { sessions: [], total: 0 }
-      }
-
-      // Search across message content, session name, and contact name via database RPC
-      if (filters.search && filters.search.trim().length >= 2 && filters.projectId) {
-        const searchTerm = filters.search.trim()
-        const sanitized = sanitizeSearchInput(searchTerm)
-        const limit = filters.limit ?? 50
-        const offset = filters.offset ?? 0
-
-        // Phase 1: RPC handles search + filters + pagination
-        const searchResults = await db.execute<{ session_id: string; total_count: number }>(sql`
-          SELECT * FROM search_sessions_multi(
-            p_project_id := ${filters.projectId}::uuid,
-            p_query := ${searchTerm},
-            p_query_like := ${sanitized},
-            p_status := ${filters.status || null},
-            p_source := ${filters.source || null},
-            p_session_type := ${filters.sessionType || null},
-            p_is_human_takeover := ${filters.isHumanTakeover || null}::boolean,
-            p_is_archived := ${filters.showArchived ?? false},
-            p_is_analyzed := ${filters.isAnalyzed || null}::boolean,
-            p_tags := ${filters.tags && filters.tags.length > 0 ? filters.tags : null}::text[],
-            p_date_from := ${filters.dateFrom || null}::timestamptz,
-            p_date_to := ${filters.dateTo || null}::timestamptz,
-            p_contact_id := ${filters.contactId || null}::uuid,
-            p_company_id := ${filters.companyId || null}::uuid,
-            p_product_area_ids := ${filters.productScopeIds && filters.productScopeIds.length > 0 ? filters.productScopeIds : null}::uuid[],
-            p_limit := ${limit},
-            p_offset := ${offset}
-          )
-        `)
-
-        if (!searchResults.rows || searchResults.rows.length === 0) {
-          return { sessions: [], total: 0 }
-        }
-
-        const matchedIds = searchResults.rows.map((r) => r.session_id)
-        const totalCount = searchResults.rows[0].total_count
-
-        // Phase 2: Fetch full session data for this page of IDs
-        const results = await db.query.sessions.findMany({
-          where: inArray(sessions.id, matchedIds),
-          with: {
-            project: { columns: { id: true, name: true } },
-          },
-          orderBy: [desc(sessions.last_activity_at)],
-        })
-
-        // Batch-fetch contacts and issue counts from entity_relationships
-        const enrichedResults = await enrichSessionsWithEntityRelationships(results)
-        const mapped = enrichedResults.map((r) => toSessionWithProject(r))
-        return { sessions: mapped, total: Number(totalCount) }
-      }
-
-      // Build conditions array for non-search queries
-      const conditions = [inArray(sessions.project_id, projectIds)]
-
-      if (!filters.showArchived) {
-        conditions.push(eq(sessions.is_archived, false))
-      }
-      if (filters.projectId) {
-        conditions.push(eq(sessions.project_id, filters.projectId))
-      }
-      if (filters.sessionId) {
-        conditions.push(ilike(sessions.id, `%${sanitizeSearchInput(filters.sessionId)}%`))
-      }
-      if (filters.name) {
-        conditions.push(ilike(sessions.name, `%${sanitizeSearchInput(filters.name)}%`))
-      }
-      if (filters.status) {
-        conditions.push(eq(sessions.status, filters.status))
-      }
-      if (filters.source) {
-        conditions.push(eq(sessions.source, filters.source))
-      }
-      if (filters.sessionType) {
-        conditions.push(eq(sessions.session_type, filters.sessionType))
-      }
-      if (filters.isHumanTakeover) {
-        conditions.push(eq(sessions.is_human_takeover, true))
-      }
-      if (filters.tags && filters.tags.length > 0) {
-        conditions.push(sql`${sessions.tags} && ${sql.param(filters.tags)}::text[]`)
-      }
-      if (filters.dateFrom) {
-        conditions.push(gte(sessions.created_at, new Date(filters.dateFrom)))
-      }
-      if (filters.dateTo) {
-        conditions.push(lte(sessions.created_at, new Date(filters.dateTo)))
-      }
-      if (filters.contactId) {
-        conditions.push(
-          inArray(
-            sessions.id,
-            db.select({ id: entityRelationships.session_id })
-              .from(entityRelationships)
-              .where(
-                and(
-                  eq(entityRelationships.contact_id, filters.contactId),
-                  isNotNull(entityRelationships.session_id),
-                )
-              ),
-          )
-        )
-      }
-      if (filters.isAnalyzed) {
-        conditions.push(eq(sessions.analysis_status, 'analyzed'))
-      }
-      if (filters.productScopeIds && filters.productScopeIds.length > 0) {
-        conditions.push(
-          inArray(
-            sessions.id,
-            db.select({ id: entityRelationships.session_id })
-              .from(entityRelationships)
-              .where(
-                and(
-                  inArray(entityRelationships.product_scope_id, filters.productScopeIds),
-                  isNotNull(entityRelationships.session_id),
-                )
-              ),
-          )
-        )
-      }
-      if (filters.companyId) {
-        const companyContacts = await db
-          .select({ id: contacts.id })
-          .from(contacts)
-          .where(
-            and(
-              eq(contacts.company_id, filters.companyId),
-              eq(contacts.project_id, filters.projectId ?? ''),
-            )
-          )
-        const contactIds = companyContacts.map((c) => c.id)
-        if (contactIds.length === 0) {
-          return { sessions: [], total: 0 }
-        }
-        conditions.push(
-          inArray(
-            sessions.id,
-            db.select({ id: entityRelationships.session_id })
-              .from(entityRelationships)
-              .where(
-                and(
-                  inArray(entityRelationships.contact_id, contactIds),
-                  isNotNull(entityRelationships.session_id),
-                )
-              ),
-          )
-        )
-      }
-
-      const whereClause = and(...conditions)
-
-      // Count query
-      const [{ total }] = await db
-        .select({ total: countFn() })
-        .from(sessions)
-        .where(whereClause)
-
-      // Data query with relations
+export async function listSessions(
+  projectId: string,
+  filters: SessionFilters
+): Promise<{ sessions: SessionWithProject[]; total: number }> {
+  try {
+    // Search across message content, session name, and contact name via database RPC
+    if (filters.search && filters.search.trim().length >= 2) {
+      const searchTerm = filters.search.trim()
+      const sanitized = sanitizeSearchInput(searchTerm)
       const limit = filters.limit ?? 50
       const offset = filters.offset ?? 0
 
+      // Phase 1: RPC handles search + filters + pagination
+      const searchResults = await db.execute<{ session_id: string; total_count: number }>(sql`
+        SELECT * FROM search_sessions_multi(
+          p_project_id := ${projectId}::uuid,
+          p_query := ${searchTerm},
+          p_query_like := ${sanitized},
+          p_status := ${filters.status || null},
+          p_source := ${filters.source || null},
+          p_session_type := ${filters.sessionType || null},
+          p_is_human_takeover := ${filters.isHumanTakeover || null}::boolean,
+          p_is_archived := ${filters.showArchived ?? false},
+          p_is_analyzed := ${filters.isAnalyzed || null}::boolean,
+          p_tags := ${filters.tags && filters.tags.length > 0 ? filters.tags : null}::text[],
+          p_date_from := ${filters.dateFrom || null}::timestamptz,
+          p_date_to := ${filters.dateTo || null}::timestamptz,
+          p_contact_id := ${filters.contactId || null}::uuid,
+          p_company_id := ${filters.companyId || null}::uuid,
+          p_product_area_ids := ${filters.productScopeIds && filters.productScopeIds.length > 0 ? filters.productScopeIds : null}::uuid[],
+          p_limit := ${limit},
+          p_offset := ${offset}
+        )
+      `)
+
+      if (!searchResults.rows || searchResults.rows.length === 0) {
+        return { sessions: [], total: 0 }
+      }
+
+      const matchedIds = searchResults.rows.map((r) => r.session_id)
+      const totalCount = searchResults.rows[0].total_count
+
+      // Phase 2: Fetch full session data for this page of IDs
       const results = await db.query.sessions.findMany({
+        where: inArray(sessions.id, matchedIds),
+        with: {
+          project: { columns: { id: true, name: true } },
+        },
+        orderBy: [desc(sessions.last_activity_at)],
+      })
+
+      // Batch-fetch contacts and issue counts from entity_relationships
+      const enrichedResults = await enrichSessionsWithEntityRelationships(results)
+      const mapped = enrichedResults.map((r) => toSessionWithProject(r))
+      return { sessions: mapped, total: Number(totalCount) }
+    }
+
+    // Build conditions array for non-search queries
+    const conditions = [eq(sessions.project_id, projectId), ...buildSessionFilterConditions(filters)]
+
+    if (filters.companyId) {
+      conditions.push(
+        inArray(
+          sessions.id,
+          db.select({ id: entityRelationships.session_id })
+            .from(entityRelationships)
+            .innerJoin(contacts, eq(entityRelationships.contact_id, contacts.id))
+            .where(
+              and(
+                eq(contacts.company_id, filters.companyId),
+                eq(contacts.project_id, projectId),
+                isNotNull(entityRelationships.session_id),
+              )
+            ),
+        )
+      )
+    }
+
+    const whereClause = and(...conditions)
+    const limit = filters.limit ?? 50
+    const offset = filters.offset ?? 0
+
+    // Run count + data queries in parallel
+    const [countResult, results] = await Promise.all([
+      db.select({ total: countFn() }).from(sessions).where(whereClause),
+      db.query.sessions.findMany({
         where: whereClause,
         with: {
           project: { columns: { id: true, name: true } },
@@ -361,28 +340,27 @@ export const listSessions = cache(
         orderBy: [desc(sessions.last_activity_at)],
         limit,
         offset,
-      })
+      }),
+    ])
+    const total = countResult[0].total
 
-      // Batch-fetch contacts and issue counts from entity_relationships
-      const enrichedResults = await enrichSessionsWithEntityRelationships(results)
-      const mapped = enrichedResults.map((r) => toSessionWithProject(r))
-      return { sessions: mapped, total: Number(total) }
-    } catch (error) {
-      console.error('[db.sessions] unexpected error listing sessions', error)
-      throw error
-    }
+    // Batch-fetch contacts and issue counts from entity_relationships
+    const enrichedResults = await enrichSessionsWithEntityRelationships(results)
+    const mapped = enrichedResults.map((r) => toSessionWithProject(r))
+    return { sessions: mapped, total: Number(total) }
+  } catch (error) {
+    console.error('[db.sessions] unexpected error listing sessions', error)
+    throw error
   }
-)
+}
 
 /**
  * Gets a session by ID. Requires authenticated user context.
  * Only returns the session if it belongs to a project owned by the current user.
  * Includes linked issues from PM review.
  */
-export const getSessionById = cache(async (sessionId: string): Promise<SessionWithProject | null> => {
+export async function getSessionById(sessionId: string): Promise<SessionWithProject | null> {
   try {
-    const { userId } = await resolveRequestContext()
-
     const result = await db.query.sessions.findFirst({
       where: eq(sessions.id, sessionId),
       with: {
@@ -391,9 +369,6 @@ export const getSessionById = cache(async (sessionId: string): Promise<SessionWi
     })
 
     if (!result) return null
-
-    const hasAccess = await hasProjectAccess(result.project_id, userId)
-    if (!hasAccess) return null
 
     // Fetch linked entities from entity_relationships (in parallel - independent queries)
     const [linkedIssueIds, contactIds, productScopeIds] = await Promise.all([
@@ -461,38 +436,31 @@ export const getSessionById = cache(async (sessionId: string): Promise<SessionWi
     console.error('[db.sessions] unexpected error getting session', sessionId, error)
     throw error
   }
-})
+}
 
 /**
  * Gets recent sessions for a specific project.
  */
-export const getProjectSessions = cache(
-  async (projectId: string, limit = 5): Promise<SessionWithProject[]> => {
-    try {
-      const { userId } = await resolveRequestContext()
+export async function getProjectSessions(projectId: string, limit = 5): Promise<SessionWithProject[]> {
+  try {
+    const results = await db.query.sessions.findMany({
+      where: eq(sessions.project_id, projectId),
+      with: {
+        project: { columns: { id: true, name: true } },
+      },
+      orderBy: [desc(sessions.last_activity_at)],
+      limit,
+    })
 
-      const hasAccess = await hasProjectAccess(projectId, userId)
-      if (!hasAccess) return []
-
-      const results = await db.query.sessions.findMany({
-        where: eq(sessions.project_id, projectId),
-        with: {
-          project: { columns: { id: true, name: true } },
-        },
-        orderBy: [desc(sessions.last_activity_at)],
-        limit,
-      })
-
-      // Batch-fetch contacts and issue counts from entity_relationships
-      const enrichedResults = await enrichSessionsWithEntityRelationships(results)
-      const mapped = enrichedResults.map((r) => toSessionWithProject(r))
-      return mapped
-    } catch (error) {
-      console.error('[db.sessions] unexpected error getting project sessions', projectId, error)
-      throw error
-    }
+    // Batch-fetch contacts and issue counts from entity_relationships
+    const enrichedResults = await enrichSessionsWithEntityRelationships(results)
+    const mapped = enrichedResults.map((r) => toSessionWithProject(r))
+    return mapped
+  } catch (error) {
+    console.error('[db.sessions] unexpected error getting project sessions', projectId, error)
+    throw error
   }
-)
+}
 
 /**
  * Updates tags for a session. Uses admin client for workflow/API use.
@@ -560,187 +528,49 @@ export interface IntegrationStats {
   hasAnySessions: boolean // Has ever received any sessions
 }
 
-export const getProjectIntegrationStats = cache(
-  async (projectId: string): Promise<IntegrationStats> => {
-    let userId: string
-    try {
-      ({ userId } = await resolveRequestContext())
-    } catch {
-      return { lastActivityAt: null, isActive: false, hasAnySessions: false }
-    }
-
-    try {
-      const hasAccess = await hasProjectAccess(projectId, userId)
-      if (!hasAccess) {
-        return { lastActivityAt: null, isActive: false, hasAnySessions: false }
-      }
-
-      // Get most recent widget session
-      const [latest] = await db
-        .select({ last_activity_at: sessions.last_activity_at })
-        .from(sessions)
-        .where(and(eq(sessions.project_id, projectId), eq(sessions.source, 'widget')))
-        .orderBy(desc(sessions.last_activity_at))
-        .limit(1)
-
-      // Check for widget activity in last 7 days
-      const sevenDaysAgo = new Date()
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-      const [{ recentCount }] = await db
-        .select({ recentCount: countFn() })
-        .from(sessions)
-        .where(
-          and(
-            eq(sessions.project_id, projectId),
-            eq(sessions.source, 'widget'),
-            gte(sessions.last_activity_at, sevenDaysAgo),
-          )
-        )
-
-      return {
-        lastActivityAt: latest?.last_activity_at?.toISOString() ?? null,
-        isActive: Number(recentCount) > 0,
-        hasAnySessions: !!latest,
-      }
-    } catch {
-      return { lastActivityAt: null, isActive: false, hasAnySessions: false }
-    }
-  }
-)
-
-/**
- * Creates a manual session. Requires authenticated user context.
- */
-export async function createManualSession(input: CreateSessionInput): Promise<SessionWithProject | null> {
+export async function getProjectIntegrationStats(projectId: string): Promise<IntegrationStats> {
   try {
-    const { userId } = await resolveRequestContext()
+    // Get most recent widget session
+    const [latest] = await db
+      .select({ last_activity_at: sessions.last_activity_at })
+      .from(sessions)
+      .where(and(eq(sessions.project_id, projectId), eq(sessions.source, 'widget')))
+      .orderBy(desc(sessions.last_activity_at))
+      .limit(1)
 
-    const hasAccess = await hasProjectAccess(input.project_id, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have permission to create sessions for this project.')
+    // Check for widget activity in last 7 days
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const [{ recentCount }] = await db
+      .select({ recentCount: countFn() })
+      .from(sessions)
+      .where(
+        and(
+          eq(sessions.project_id, projectId),
+          eq(sessions.source, 'widget'),
+          gte(sessions.last_activity_at, sevenDaysAgo),
+        )
+      )
+
+    return {
+      lastActivityAt: latest?.last_activity_at?.toISOString() ?? null,
+      isActive: Number(recentCount) > 0,
+      hasAnySessions: !!latest,
     }
-
-    const sessionId = crypto.randomUUID()
-    const messageCount = input.messages?.length ?? 0
-    const now = new Date()
-
-    const sessionName =
-      input.name ||
-      generateDefaultName({
-        userId: input.user_metadata?.userId || null,
-        source: 'manual',
-        createdAt: now.toISOString(),
-      })
-
-    const [inserted] = await db
-      .insert(sessions)
-      .values({
-        id: sessionId,
-        project_id: input.project_id,
-        user_metadata: input.user_metadata || {},
-        page_url: input.page_url || null,
-        page_title: input.page_title || null,
-        name: sessionName,
-        description: input.description || null,
-        source: 'manual',
-        session_type: input.session_type || 'chat',
-        status: 'active',
-        message_count: messageCount,
-        tags: input.tags ?? [],
-        is_archived: false,
-        first_message_at: messageCount > 0 ? now : null,
-        last_activity_at: now,
-      })
-      .returning()
-
-    // Store messages in session_messages table if provided
-    if (input.messages && input.messages.length > 0) {
-      try {
-        for (const msg of input.messages) {
-          await saveSessionMessage({
-            sessionId,
-            projectId: input.project_id,
-            senderType: msg.role === 'user' ? 'user' : 'ai',
-            content: msg.content,
-          })
-        }
-      } catch (msgError) {
-        console.error('[db.sessions] Failed to store messages:', msgError)
-      }
-    }
-
-    // Link entities (contact, companies, issues, etc.) - non-blocking
-    try {
-      const linkPromises: Promise<void>[] = []
-      if (input.contact_id) {
-        linkPromises.push(setSessionContact(input.project_id, sessionId, input.contact_id))
-      }
-      if (input.linked_entities) {
-        const { companies: companyIds, issues: issueIds, knowledge_sources: ksIds, product_scopes: scopeIds } = input.linked_entities
-        for (const id of companyIds ?? []) {
-          linkPromises.push(linkEntities(input.project_id, 'session', sessionId, 'company', id))
-        }
-        for (const id of issueIds ?? []) {
-          linkPromises.push(linkEntities(input.project_id, 'session', sessionId, 'issue', id))
-        }
-        for (const id of ksIds ?? []) {
-          linkPromises.push(linkEntities(input.project_id, 'session', sessionId, 'knowledge_source', id))
-        }
-        for (const id of scopeIds ?? []) {
-          linkPromises.push(linkEntities(input.project_id, 'session', sessionId, 'product_scope', id))
-        }
-      }
-      await Promise.allSettled(linkPromises)
-    } catch (linkError) {
-      console.error('[db.sessions] Failed to link entities:', linkError)
-    }
-
-    fireGraphEval(input.project_id, 'session', sessionId)
-
-    // Fetch the session with relations
-    const result = await db.query.sessions.findFirst({
-      where: eq(sessions.id, sessionId),
-      with: {
-        project: { columns: { id: true, name: true } },
-      },
-    })
-
-    if (result) {
-      const enrichedResults = await enrichSessionsWithEntityRelationships([result])
-      return toSessionWithProject(enrichedResults[0])
-    }
-    return rowToSessionRecord(inserted) as unknown as SessionWithProject
-  } catch (error) {
-    console.error('[db.sessions] unexpected error creating manual session', error)
-    throw error
+  } catch {
+    return { lastActivityAt: null, isActive: false, hasAnySessions: false }
   }
 }
 
 /**
- * Updates the archive status of a session. Requires authenticated user context.
+ * Updates the archive status of a session.
  */
 export async function updateSessionArchiveStatus(
   sessionId: string,
   isArchived: boolean
 ): Promise<SessionRecord | null> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    // Get session and verify ownership
-    const [session] = await db
-      .select({ project_id: sessions.project_id })
-      .from(sessions)
-      .where(eq(sessions.id, sessionId))
-      .limit(1)
-
-    if (!session) return null
-
-    const hasAccess = await hasProjectAccess(session.project_id, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have permission to update this session.')
-    }
-
     const [updated] = await db
       .update(sessions)
       .set({
@@ -758,16 +588,14 @@ export async function updateSessionArchiveStatus(
 }
 
 /**
- * Updates a session. Requires authenticated user context.
+ * Updates a session.
  */
 export async function updateSession(
   sessionId: string,
   input: UpdateSessionInput
 ): Promise<SessionRecord | null> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    // Get session and verify ownership
+    // Get session to find project_id for contact linking
     const [session] = await db
       .select({ project_id: sessions.project_id })
       .from(sessions)
@@ -775,11 +603,6 @@ export async function updateSession(
       .limit(1)
 
     if (!session) return null
-
-    const hasAccess = await hasProjectAccess(session.project_id, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have permission to update this session.')
-    }
 
     // Build update object
     const updates: Record<string, unknown> = {
@@ -793,6 +616,7 @@ export async function updateSession(
       updates.is_human_takeover = input.is_human_takeover
       updates.human_takeover_at = input.is_human_takeover ? new Date() : null
     }
+    if (input.custom_fields !== undefined) updates.custom_fields = input.custom_fields
 
     const [updated] = await db
       .update(sessions)
@@ -811,10 +635,9 @@ export async function updateSession(
 
     // Re-embed if name changed (fire-and-forget)
     if (input.name !== undefined && result.name && result.description) {
-      const { upsertSessionEmbedding } = await import('@/lib/sessions/embedding-service')
-      void upsertSessionEmbedding(sessionId, result.project_id, result.name, result.description).catch(
-        (err) => console.warn('[db.sessions] Embedding failed', sessionId, err)
-      )
+      const { fireEmbedding } = await import('@/lib/utils/embeddings')
+      const { buildSessionEmbeddingText } = await import('@/lib/sessions/embedding-service')
+      fireEmbedding(sessionId, 'session', result.project_id, buildSessionEmbeddingText(result.name, result.description))
     }
 
     return result
@@ -875,12 +698,6 @@ export async function getPendingPMReviews(
   }[]
   count: number
 }> {
-  try {
-    await resolveRequestContext()
-  } catch {
-    return { sessions: [], count: 0 }
-  }
-
   try {
     const whereClause = and(
       eq(sessions.project_id, projectId),
@@ -949,7 +766,7 @@ type SessionQueryResult = Awaited<ReturnType<typeof db.query.sessions.findMany>>
  * Batch-fetch contacts (with companies) and issue counts from entity_relationships
  * for a list of sessions.
  */
-async function enrichSessionsWithEntityRelationships(
+export async function enrichSessionsWithEntityRelationships(
   sessionList: SessionQueryResult[]
 ): Promise<(SessionQueryResult & {
   contact?: { id: string; name: string; email: string; company: { id: string; name: string; domain: string; arr: number | null; stage: string | null } | null } | null
@@ -1032,9 +849,9 @@ async function enrichSessionsWithEntityRelationships(
 // Internal: transform relational query result to SessionWithProject
 // ---------------------------------------------------------------------------
 
-type SessionRelationalResult = Awaited<ReturnType<typeof enrichSessionsWithEntityRelationships>>[number]
+export type SessionRelationalResult = Awaited<ReturnType<typeof enrichSessionsWithEntityRelationships>>[number]
 
-function toSessionWithProject(r: SessionRelationalResult): SessionWithProject {
+export function toSessionWithProject(r: SessionRelationalResult): SessionWithProject {
   const record = rowToSessionRecord(r)
 
   const projectData = ('project' in r && r.project)

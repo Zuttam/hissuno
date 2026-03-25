@@ -71,7 +71,7 @@ When the PM Agent identifies a concern that does not match any existing issue, i
 When extracted feedback matches an existing issue, the PM Agent upvotes it instead of creating a duplicate. The matching process considers:
 
 1. **Semantic similarity** -- Is the customer describing the same problem, even in different words?
-2. **Product area** -- Does the feedback relate to the same feature or component?
+2. **Scope** -- Does the feedback relate to the same product area or initiative?
 3. **Category alignment** -- Is this the same type of concern (bug vs. feature request)?
 
 When an issue is upvoted:

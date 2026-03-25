@@ -19,7 +19,7 @@ import { IssueAnalysisDialog } from '@/components/projects/workflows/issue-analy
 import { ProjectInfoSection } from '@/components/projects/configuration/project-info-section'
 import { DangerZoneSection } from '@/components/projects/configuration/danger-zone-section'
 import { CustomTagsSection, type LocalCustomTag } from '@/components/projects/configuration/custom-tags-section'
-import { FieldsEditor } from '@/components/customers/custom-fields-settings-dialog'
+import { FieldsEditor, type BuiltInField } from '@/components/customers/custom-fields-settings-dialog'
 import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
 import { Button, Heading, Spinner, PageHeader } from '@/components/ui'
 import { formatRelativeTime } from '@/lib/utils/format-time'
@@ -34,10 +34,50 @@ import {
 } from '@/lib/api/settings'
 import type { KnowledgePackageWithSources } from '@/lib/knowledge/types'
 
-const VALID_TABS = ['general', 'access', 'customers', 'agents-workflows', 'feedback'] as const
+const VALID_TABS = ['general', 'access', 'ontology', 'agents-workflows'] as const
+const LEGACY_TAB_REDIRECTS: Record<string, string> = { customers: 'ontology', feedback: 'ontology' }
 type SettingsTab = (typeof VALID_TABS)[number]
 
 const MAX_TAGS = 10
+
+const COMPANY_BUILT_IN_FIELDS: BuiltInField[] = [
+  { label: 'Name', type: 'Text' },
+  { label: 'Domain', type: 'Text' },
+  { label: 'ARR', type: 'Number' },
+  { label: 'Stage', type: 'Select' },
+  { label: 'Industry', type: 'Text' },
+  { label: 'Country', type: 'Text' },
+  { label: 'Employee Count', type: 'Number' },
+  { label: 'Plan Tier', type: 'Text' },
+  { label: 'Health Score', type: 'Number' },
+  { label: 'Renewal Date', type: 'Date' },
+]
+
+const CONTACT_BUILT_IN_FIELDS: BuiltInField[] = [
+  { label: 'Name', type: 'Text' },
+  { label: 'Email', type: 'Text' },
+  { label: 'Company', type: 'Relation' },
+  { label: 'Role', type: 'Text' },
+  { label: 'Title', type: 'Text' },
+  { label: 'Phone', type: 'Text' },
+  { label: 'Champion', type: 'Yes/No' },
+]
+
+const ISSUE_BUILT_IN_FIELDS: BuiltInField[] = [
+  { label: 'Title', type: 'Text' },
+  { label: 'Description', type: 'Text' },
+  { label: 'Type', type: 'Select' },
+  { label: 'Priority', type: 'Select' },
+  { label: 'Status', type: 'Select' },
+]
+
+const FEEDBACK_BUILT_IN_FIELDS: BuiltInField[] = [
+  { label: 'Name', type: 'Text' },
+  { label: 'Source', type: 'Select' },
+  { label: 'Type', type: 'Select' },
+  { label: 'Tags', type: 'Multi-select' },
+  { label: 'Status', type: 'Select' },
+]
 
 interface AgentSettings {
   supportAgent: {
@@ -94,9 +134,9 @@ export default function AgentsSettingsPage() {
     return members.some((m) => m.user_id === user.id && m.role === 'owner' && m.status === 'active')
   }, [members, user])
 
-  // Active tab from URL
+  // Active tab from URL (with legacy redirect support)
   const tabParam = searchParams.get('tab')
-  const resolvedTab = tabParam
+  const resolvedTab = tabParam ? (LEGACY_TAB_REDIRECTS[tabParam] ?? tabParam) : null
   const activeTab: SettingsTab = resolvedTab && VALID_TABS.includes(resolvedTab as SettingsTab) ? (resolvedTab as SettingsTab) : 'general'
 
   const handleTabChange = useCallback((value: string) => {
@@ -122,6 +162,9 @@ export default function AgentsSettingsPage() {
   const [isSavingGeneral, setIsSavingGeneral] = useState(false)
   const [generalError, setGeneralError] = useState<string | null>(null)
   const [generalSaved, setGeneralSaved] = useState(false)
+
+  // --- Ontology sub-navigation ---
+  const [ontologySection, setOntologySection] = useState<'customers' | 'issues' | 'feedback'>('customers')
 
   // --- Feedback tab state ---
   const [customTags, setCustomTags] = useState<LocalCustomTag[]>([])
@@ -311,9 +354,8 @@ export default function AgentsSettingsPage() {
         <TabsList>
           <Tab value="general">General</Tab>
           <Tab value="access">Access</Tab>
-          <Tab value="customers">Customers</Tab>
+          <Tab value="ontology">Ontology</Tab>
           <Tab value="agents-workflows">Agents & Workflows</Tab>
-          <Tab value="feedback">Feedback & Issues</Tab>
         </TabsList>
 
         {/* General Tab */}
@@ -368,33 +410,105 @@ export default function AgentsSettingsPage() {
           </div>
         </TabsPanel>
 
-        {/* Customers Tab */}
-        <TabsPanel value="customers">
+        {/* Ontology Tab */}
+        <TabsPanel value="ontology">
+          {/* Sub-navigation pills */}
+          <div className="mb-6 flex gap-1">
+            {(['customers', 'issues', 'feedback'] as const).map((section) => (
+              <button
+                key={section}
+                type="button"
+                onClick={() => setOntologySection(section)}
+                className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                  ontologySection === section
+                    ? 'bg-[color:var(--background-secondary)] font-medium text-[color:var(--foreground)]'
+                    : 'text-[color:var(--text-secondary)] hover:text-[color:var(--foreground)]'
+                }`}
+              >
+                {section === 'customers' ? 'Customers' : section === 'issues' ? 'Issues' : 'Feedback'}
+              </button>
+            ))}
+          </div>
+
           <div className="max-w-2xl flex flex-col gap-6">
-            {/* Company Fields */}
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1">
-                <Heading as="h3" size="subsection">Company Fields</Heading>
-                <p className="text-sm text-[color:var(--text-secondary)]">
-                  Define custom fields to capture additional information about your companies.
-                </p>
-              </div>
-              <FieldsEditor projectId={projectId} entityType="company" />
-            </div>
+            {/* Customers section */}
+            {ontologySection === 'customers' && (
+              <>
+                <FieldsEditor projectId={projectId} entityType="company" builtInFields={COMPANY_BUILT_IN_FIELDS} title="Company Fields" />
 
-            {/* Divider */}
-            <div className="border-t border-[color:var(--border-subtle)]" />
+                <div className="border-t border-[color:var(--border-subtle)]" />
 
-            {/* Contact Fields */}
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1">
-                <Heading as="h3" size="subsection">Contact Fields</Heading>
-                <p className="text-sm text-[color:var(--text-secondary)]">
-                  Define custom fields to capture additional information about your contacts.
-                </p>
-              </div>
-              <FieldsEditor projectId={projectId} entityType="contact" />
-            </div>
+                <FieldsEditor projectId={projectId} entityType="contact" builtInFields={CONTACT_BUILT_IN_FIELDS} title="Contact Fields" />
+              </>
+            )}
+
+            {/* Issues section */}
+            {ontologySection === 'issues' && (
+              <FieldsEditor projectId={projectId} entityType="issue" builtInFields={ISSUE_BUILT_IN_FIELDS} title="Issue Fields" />
+            )}
+
+            {/* Feedback section */}
+            {ontologySection === 'feedback' && (
+              <>
+                <FieldsEditor projectId={projectId} entityType="session" builtInFields={FEEDBACK_BUILT_IN_FIELDS} title="Feedback Fields" />
+
+                <div className="border-t border-[color:var(--border-subtle)]" />
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    <Heading as="h3" size="subsection">Tags</Heading>
+                    {tagsSaved && (
+                      <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
+                    )}
+                  </div>
+
+                  <p className="text-sm text-[color:var(--text-secondary)]">
+                    Tags are used by the AI to classify feedback sessions.
+                  </p>
+
+                  {/* Built-in tags (readonly) */}
+                  <div className="space-y-0.5">
+                    {[
+                      { label: 'General Feedback', color: 'bg-blue-500', description: 'General product feedback and opinions' },
+                      { label: 'Win', color: 'bg-green-500', description: 'Positive outcomes and customer successes' },
+                      { label: 'Loss', color: 'bg-red-500', description: 'Customer churn, lost deals, or negative outcomes' },
+                      { label: 'Bug', color: 'bg-red-500', description: 'Software defects and broken functionality' },
+                      { label: 'Feature Request', color: 'bg-yellow-500', description: 'Requests for new features or capabilities' },
+                      { label: 'Change Request', color: 'bg-yellow-500', description: 'Requests to modify existing functionality' },
+                    ].map((tag) => (
+                      <div key={tag.label} className="flex items-start gap-2.5 px-2 py-1.5">
+                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tag.color}`} />
+                        <div className="min-w-0">
+                          <span className="text-sm text-[color:var(--text-secondary)]">{tag.label}</span>
+                          <p className="text-xs text-[color:var(--text-tertiary)]">{tag.description}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Custom tags */}
+                  {isLoadingFeedback ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Spinner size="md" />
+                    </div>
+                  ) : (
+                    <CustomTagsSection
+                      tags={customTags}
+                      onTagsChange={setCustomTags}
+                      onCommit={handleSaveTags}
+                      canAddMore={customTags.length < MAX_TAGS}
+                      error={null}
+                    />
+                  )}
+                </div>
+
+                {feedbackError && (
+                  <div className="rounded-[4px] border border-[color:var(--accent-danger)] p-3 text-sm text-[color:var(--accent-danger)]">
+                    {feedbackError}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </TabsPanel>
 
@@ -451,43 +565,6 @@ export default function AgentsSettingsPage() {
           </div>
         </TabsPanel>
 
-        {/* Feedback & Issues Tab */}
-        <TabsPanel value="feedback">
-          <div className="max-w-2xl flex flex-col gap-6">
-            {isLoadingFeedback ? (
-              <div className="flex items-center justify-center py-8">
-                <Spinner size="md" />
-              </div>
-            ) : (
-              <>
-                {/* Custom Tags Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Heading as="h3" size="subsection">Custom Tags</Heading>
-                    {tagsSaved && (
-                      <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
-                    )}
-                  </div>
-                  <CustomTagsSection
-                    tags={customTags}
-                    onTagsChange={setCustomTags}
-                    onCommit={handleSaveTags}
-                    canAddMore={customTags.length < MAX_TAGS}
-                    error={null}
-                  />
-                </div>
-
-              </>
-            )}
-
-            {/* Inline error */}
-            {feedbackError && (
-              <div className="rounded-[4px] border border-[color:var(--accent-danger)] p-3 text-sm text-[color:var(--accent-danger)]">
-                {feedbackError}
-              </div>
-            )}
-          </div>
-        </TabsPanel>
       </Tabs>
 
       {/* Dialogs */}

@@ -102,6 +102,27 @@ Sources can be grouped into named packages. A named package is a labeled collect
 - Each named package has a name, optional description, and optional guidelines that influence how the AI compiles knowledge
 - When analysis runs, packages are generated per named package, and the Hissuno Agent can reference the appropriate package based on context
 
+## CLI Reference
+
+You can manage and query knowledge from the CLI:
+
+```bash
+# List all knowledge sources and their status
+hissuno list sources
+
+# List compiled knowledge packages
+hissuno list knowledge
+
+# Search knowledge semantically
+hissuno search "how to reset password" --type knowledge
+
+# View a specific knowledge entry
+hissuno get knowledge kb_abc123
+
+# Check integration status for connected sources
+hissuno integrations status github
+```
+
 ## Best Practices
 
 - **Start with your codebase and docs site** for the most comprehensive coverage

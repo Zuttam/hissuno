@@ -95,6 +95,7 @@ export function createMockSession(
     last_activity_at: new Date().toISOString(),
     pm_reviewed_at: null,
     tags: [],
+    custom_fields: {},
     tags_auto_applied_at: null,
     goodbye_detected_at: null,
     idle_prompt_sent_at: null,
@@ -142,6 +143,7 @@ export function createMockIssue(
     brief: null,
     brief_generated_at: null,
     is_archived: false,
+    custom_fields: {},
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     // Impact/effort fields

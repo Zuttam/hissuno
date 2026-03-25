@@ -1,32 +1,14 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import Image from 'next/image'
-import { MessageSquare, Code2, PenLine, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { Input, Select, CollapsibleSection, Button, Combobox, FilterChip, FilterLabel } from '@/components/ui'
 import type { SessionFilters, SessionSource } from '@/types/session'
 import { SESSION_SOURCE_INFO, SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
 import type { ProjectRow } from '@/lib/db/queries/projects'
 import { useCustomTags } from '@/hooks/use-custom-tags'
 import { useProductScopes } from '@/hooks/use-product-scopes'
-
-const ICON_SIZE = 8
-
-const SOURCE_ICONS: Record<SessionSource, React.ReactNode> = {
-  widget: <MessageSquare size={ICON_SIZE} />,
-  slack: <Image src="/logos/slack.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
-  intercom: <Image src="/logos/intercom.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
-  zendesk: (
-    <>
-      <Image src="/logos/zendesk.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} className="dark:hidden" />
-      <Image src="/logos/zendesk-dark.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} className="hidden dark:block" />
-    </>
-  ),
-  gong: <Image src="/logos/gong.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
-  posthog: <Image src="/logos/posthog.svg" alt="" width={ICON_SIZE} height={ICON_SIZE} />,
-  api: <Code2 size={ICON_SIZE} />,
-  manual: <PenLine size={ICON_SIZE} />,
-}
+import { getSourceIcon } from '@/lib/constants/source-icons'
 
 interface SessionsFiltersProps {
   projects: ProjectRow[]
@@ -298,7 +280,7 @@ export function SessionsFilters({
           <FilterChip
             key={source}
             label={SESSION_SOURCE_INFO[source].label}
-            icon={SOURCE_ICONS[source]}
+            icon={getSourceIcon(source, 8)}
             active={filters.source === source}
             onClick={() => handleSourceToggle(source)}
           />

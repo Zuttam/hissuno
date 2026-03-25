@@ -7,7 +7,7 @@ import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
 import { issues } from '@/lib/db/schema/app'
 import { and, eq, inArray } from 'drizzle-orm'
-import { validateBatchIds, BatchValidationError } from '@/lib/batch/validation'
+import { validateBatchIds, BatchValidationError } from '@/lib/utils/batch/validation'
 
 export const runtime = 'nodejs'
 

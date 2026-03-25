@@ -10,7 +10,7 @@ import { db } from '@/lib/db'
 import { projects } from '@/lib/db/schema/app'
 import { eq } from 'drizzle-orm'
 import { getSafeRedirectPath } from '@/lib/auth/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
+import { assertProjectAccess } from '@/lib/auth/authorization'
 import { storeHubSpotCredentials } from '@/lib/integrations/hubspot'
 import { exchangeHubSpotOAuthCode } from '@/lib/integrations/hubspot/oauth'
 import { HubSpotClient } from '@/lib/integrations/hubspot/client'
@@ -87,8 +87,9 @@ export async function GET(request: NextRequest) {
       return redirectWithError('Project not found.')
     }
 
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
+    try {
+      await assertProjectAccess({ type: 'user' as const, userId, email: null, name: null }, projectId)
+    } catch {
       return redirectWithError('Project access denied.')
     }
 

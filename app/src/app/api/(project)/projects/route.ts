@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
-import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/codebase'
+import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/knowledge/codebase'
 import { triggerPackageCompilation } from '@/lib/knowledge/analysis-service'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { ForbiddenError } from '@/lib/auth/authorization'

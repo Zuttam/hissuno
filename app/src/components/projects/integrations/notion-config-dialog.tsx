@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import { Check, Unplug, Shield, KeyRound, Plug } from 'lucide-react'
-import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
+import { Dialog, Button, InlineAlert, Spinner, FormField, Input } from '@/components/ui'
+import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import {
   fetchNotionStatus,
@@ -11,6 +11,8 @@ import {
   notionConnectUrl,
   connectNotionToken,
 } from '@/lib/api/integrations'
+import { NotionIssueSyncTab } from './notion-issue-sync-tab'
+import { NotionKnowledgeSyncTab } from './notion-knowledge-sync-tab'
 
 interface NotionConfigDialogProps {
   open: boolean
@@ -49,6 +51,9 @@ export function NotionConfigDialog({
   // Token form state
   const [accessToken, setAccessToken] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
+
+  // Tabs state
+  const [activeTab, setActiveTab] = useState('issues')
 
   const fetchStatus = useCallback(async () => {
     setIsLoading(true)
@@ -136,7 +141,8 @@ export function NotionConfigDialog({
             <Spinner size="md" />
           </div>
         ) : status.connected ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
+            {/* Connection status header */}
             <div className="space-y-1">
               <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to {status.workspaceName || 'Unknown'} <span className="text-xs opacity-75">via {authMethodLabel}</span></p>
               {status.authMethod === 'token' && (
@@ -154,22 +160,25 @@ export function NotionConfigDialog({
               )}
             </div>
 
-            <p className="text-sm text-[color:var(--text-secondary)]">
-              You can now import Notion pages as knowledge sources from the{' '}
-              <Link
-                href={`/projects/${projectId}/knowledge#sources`}
-                className="underline hover:text-[color:var(--foreground)]"
-                onClick={onClose}
-              >
-                Knowledge page
-              </Link>.
-            </p>
+            {/* Tabs for Issue Sync and Knowledge Sync */}
+            <Tabs value={activeTab} onChange={setActiveTab}>
+              <TabsList className="-mx-4 px-4">
+                <Tab value="issues">Issue Sync</Tab>
+                <Tab value="knowledge">Knowledge Sync</Tab>
+              </TabsList>
+              <TabsPanel value="issues" className="px-0 py-4" forceMount>
+                <NotionIssueSyncTab projectId={projectId} />
+              </TabsPanel>
+              <TabsPanel value="knowledge" className="px-0 py-4" forceMount>
+                <NotionKnowledgeSyncTab projectId={projectId} />
+              </TabsPanel>
+            </Tabs>
 
             {/* Danger Zone */}
             <div className="border-t border-[color:var(--accent-danger)] pt-4">
               <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
               <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                This will remove the Notion connection. Previously imported pages will remain as knowledge sources.
+                This will remove the Notion connection and all sync configurations.
               </p>
               <Button
                 variant="danger"
@@ -231,22 +240,9 @@ export function NotionConfigDialog({
                 </p>
 
                 {/* Integration Token */}
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    Internal Integration Token
-                  </label>
-                  <input
-                    type="password"
-                    value={accessToken}
-                    onChange={(e) => {
-                      setAccessToken(e.target.value)
-                      setError(null)
-                    }}
-                    placeholder="ntn_... or secret_..."
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                  />
-                  <p className="text-xs text-[color:var(--text-tertiary)]">
-                    Create an internal integration at{' '}
+                <FormField
+                  label="Internal Integration Token"
+                  supportingText={<>Create an internal integration at{' '}
                     <a
                       href="https://www.notion.so/profile/integrations"
                       target="_blank"
@@ -255,9 +251,18 @@ export function NotionConfigDialog({
                     >
                       notion.so/profile/integrations
                     </a>{' '}
-                    and share your pages with it.
-                  </p>
-                </div>
+                    and share your pages with it.</>}
+                >
+                  <Input
+                    type="password"
+                    value={accessToken}
+                    onChange={(e) => {
+                      setAccessToken(e.target.value)
+                      setError(null)
+                    }}
+                    placeholder="ntn_... or secret_..."
+                  />
+                </FormField>
 
                 <Button variant="primary" size="sm" onClick={handleConnectToken} loading={isConnecting}>
                   <Plug size={14} />

@@ -3,7 +3,7 @@
  *
  * Tests the 5 resource tools:
  * - list_resource_types: returns all types with schemas
- * - list_resources: routes to correct adapter with filters
+ * - list_resources: calls correct query function with filters
  * - get_resource: returns markdown or error when not found
  * - search_resources: single-type and cross-type search
  * - add_resource: creates resource or rejects in contact mode
@@ -19,16 +19,50 @@ import type { McpContext } from '@/mcp/context'
 
 const {
   mockGetContext,
-  mockKnowledgeAdapter,
-  mockFeedbackAdapter,
-  mockIssuesAdapter,
-  mockCustomersAdapter,
+  mockListSessionsInternal,
+  mockListIssuesInternal,
+  mockListContactsInternal,
+  mockListCompaniesInternal,
+  mockGetSessionContactInfo,
+  mockBatchGetSessionContacts,
+  mockSearchSessions,
+  mockSearchIssues,
+  mockSearchCustomers,
+  mockSearchKnowledge,
+  mockCreateSessionAdmin,
+  mockCreateIssueAdmin,
+  mockCreateContactAdmin,
+  mockCreateCompanyAdmin,
+  mockDb,
 } = vi.hoisted(() => ({
   mockGetContext: vi.fn<() => McpContext>(),
-  mockKnowledgeAdapter: { list: vi.fn(), get: vi.fn(), search: vi.fn(), add: vi.fn() },
-  mockFeedbackAdapter: { list: vi.fn(), get: vi.fn(), search: vi.fn(), add: vi.fn() },
-  mockIssuesAdapter: { list: vi.fn(), get: vi.fn(), search: vi.fn(), add: vi.fn() },
-  mockCustomersAdapter: { list: vi.fn(), get: vi.fn(), search: vi.fn(), add: vi.fn() },
+  mockListSessionsInternal: vi.fn(),
+  mockListIssuesInternal: vi.fn(),
+  mockListContactsInternal: vi.fn(),
+  mockListCompaniesInternal: vi.fn(),
+  mockGetSessionContactInfo: vi.fn(),
+  mockBatchGetSessionContacts: vi.fn(),
+  mockSearchSessions: vi.fn(),
+  mockSearchIssues: vi.fn(),
+  mockSearchCustomers: vi.fn(),
+  mockSearchKnowledge: vi.fn(),
+  mockCreateSessionAdmin: vi.fn(),
+  mockCreateIssueAdmin: vi.fn(),
+  mockCreateContactAdmin: vi.fn(),
+  mockCreateCompanyAdmin: vi.fn(),
+  mockDb: {
+    select: vi.fn().mockReturnThis(),
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue([]),
+    execute: vi.fn().mockResolvedValue({ rows: [] }),
+    query: {
+      companies: {
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+    },
+  },
 }))
 
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => ({
@@ -39,20 +73,71 @@ vi.mock('@/mcp/context', () => ({
   getContext: () => mockGetContext(),
 }))
 
-vi.mock('@/mcp/resources/knowledge', () => ({
-  knowledgeAdapter: mockKnowledgeAdapter,
+vi.mock('@/lib/db', () => ({
+  db: mockDb,
 }))
 
-vi.mock('@/mcp/resources/feedback', () => ({
-  feedbackAdapter: mockFeedbackAdapter,
+vi.mock('@/lib/db/schema/app', () => ({
+  sessions: { id: 'sessions.id', name: 'sessions.name', project_id: 'sessions.project_id', source: 'sessions.source', status: 'sessions.status', message_count: 'sessions.message_count', tags: 'sessions.tags', created_at: 'sessions.created_at', last_activity_at: 'sessions.last_activity_at' },
+  sessionMessages: { session_id: 'sessionMessages.session_id', sender_type: 'sessionMessages.sender_type', content: 'sessionMessages.content', created_at: 'sessionMessages.created_at' },
+  issues: { id: 'issues.id', title: 'issues.title', description: 'issues.description', type: 'issues.type', priority: 'issues.priority', status: 'issues.status', upvote_count: 'issues.upvote_count', created_at: 'issues.created_at', updated_at: 'issues.updated_at', project_id: 'issues.project_id', is_archived: 'issues.is_archived' },
+  contacts: { id: 'contacts.id', name: 'contacts.name', email: 'contacts.email', role: 'contacts.role', title: 'contacts.title', phone: 'contacts.phone', is_champion: 'contacts.is_champion', notes: 'contacts.notes', last_contacted_at: 'contacts.last_contacted_at', company_id: 'contacts.company_id', project_id: 'contacts.project_id', is_archived: 'contacts.is_archived' },
+  companies: { id: 'companies.id', name: 'companies.name', domain: 'companies.domain', project_id: 'companies.project_id' },
+  knowledgeSources: { id: 'knowledgeSources.id', name: 'knowledgeSources.name', type: 'knowledgeSources.type', description: 'knowledgeSources.description', analyzed_content: 'knowledgeSources.analyzed_content', analyzed_at: 'knowledgeSources.analyzed_at', status: 'knowledgeSources.status', project_id: 'knowledgeSources.project_id', created_at: 'knowledgeSources.created_at', enabled: 'knowledgeSources.enabled' },
+  entityRelationships: { session_id: 'entityRelationships.session_id', contact_id: 'entityRelationships.contact_id', issue_id: 'entityRelationships.issue_id' },
 }))
 
-vi.mock('@/mcp/resources/issues', () => ({
-  issuesAdapter: mockIssuesAdapter,
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn(),
+  and: vi.fn(),
+  asc: vi.fn(),
+  desc: vi.fn(),
+  ilike: vi.fn(),
+  or: vi.fn(),
+  inArray: vi.fn(),
+  isNotNull: vi.fn(),
+  sql: vi.fn(),
 }))
 
-vi.mock('@/mcp/resources/customers', () => ({
-  customersAdapter: mockCustomersAdapter,
+vi.mock('@/lib/db/queries/sessions', () => ({
+  listSessions: (...args: unknown[]) => mockListSessionsInternal(...args),
+}))
+
+vi.mock('@/lib/db/queries/issues', () => ({
+  listIssues: (...args: unknown[]) => mockListIssuesInternal(...args),
+}))
+
+vi.mock('@/lib/db/queries/contacts', () => ({
+  listContacts: (...args: unknown[]) => mockListContactsInternal(...args),
+}))
+
+vi.mock('@/lib/db/queries/companies', () => ({
+  listCompanies: (...args: unknown[]) => mockListCompaniesInternal(...args),
+}))
+
+vi.mock('@/lib/db/queries/entity-relationships', () => ({
+  getSessionContactInfo: (...args: unknown[]) => mockGetSessionContactInfo(...args),
+  batchGetSessionContacts: (...args: unknown[]) => mockBatchGetSessionContacts(...args),
+}))
+
+vi.mock('@/lib/sessions/sessions-service', () => ({
+  searchSessions: (...args: unknown[]) => mockSearchSessions(...args),
+  createSessionAdmin: (...args: unknown[]) => mockCreateSessionAdmin(...args),
+}))
+
+vi.mock('@/lib/issues/issues-service', () => ({
+  searchIssues: (...args: unknown[]) => mockSearchIssues(...args),
+  createIssueAdmin: (...args: unknown[]) => mockCreateIssueAdmin(...args),
+}))
+
+vi.mock('@/lib/customers/customers-service', () => ({
+  searchCustomers: (...args: unknown[]) => mockSearchCustomers(...args),
+  createContactAdmin: (...args: unknown[]) => mockCreateContactAdmin(...args),
+  createCompanyAdmin: (...args: unknown[]) => mockCreateCompanyAdmin(...args),
+}))
+
+vi.mock('@/lib/knowledge/knowledge-service', () => ({
+  searchKnowledge: (...args: unknown[]) => mockSearchKnowledge(...args),
 }))
 
 // ============================================================================
@@ -112,6 +197,12 @@ function contactContext(): McpContext {
 describe('MCP Resource Tools', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset chainable db mock
+    mockDb.select.mockReturnThis()
+    mockDb.from.mockReturnThis()
+    mockDb.where.mockReturnThis()
+    mockDb.orderBy.mockReturnThis()
+    mockDb.limit.mockResolvedValue([])
     setupTools()
   })
 
@@ -137,10 +228,18 @@ describe('MCP Resource Tools', () => {
   // --------------------------------------------------------------------------
 
   describe('list_resources', () => {
-    it('calls correct adapter with projectId and filters', async () => {
+    it('calls correct query function with projectId and filters', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockIssuesAdapter.list.mockResolvedValue({
-        items: [{ id: 'i-1', name: 'Login bug', description: 'bug | high | open', metadata: { type: 'bug' } }],
+      mockListIssuesInternal.mockResolvedValue({
+        issues: [{
+          id: 'i-1',
+          title: 'Login bug',
+          type: 'bug',
+          priority: 'high',
+          status: 'open',
+          upvote_count: 0,
+          updated_at: '2024-01-01',
+        }],
         total: 1,
       })
 
@@ -150,15 +249,22 @@ describe('MCP Resource Tools', () => {
         limit: 10,
       })
 
-      expect(mockIssuesAdapter.list).toHaveBeenCalledWith('proj-1', { status: 'open', limit: 10 })
+      expect(mockListIssuesInternal).toHaveBeenCalledWith('proj-1', {
+        type: undefined,
+        priority: undefined,
+        status: 'open',
+        search: undefined,
+        limit: 10,
+      })
       expect(result.isError).toBeUndefined()
       expect(result.content[0].text).toContain('Login bug')
       expect(result.content[0].text).toContain('i-1')
     })
 
-    it('returns error when adapter throws', async () => {
+    it('returns error when query function throws', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockKnowledgeAdapter.list.mockRejectedValue(new Error('DB down'))
+      // For knowledge, the code calls db.select()...limit() directly
+      mockDb.limit.mockRejectedValue(new Error('DB down'))
 
       const result = await capturedHandlers.list_resources({ type: 'knowledge' })
 
@@ -174,22 +280,36 @@ describe('MCP Resource Tools', () => {
   describe('get_resource', () => {
     it('returns markdown when resource is found', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockIssuesAdapter.get.mockResolvedValue({
+      // For get_resource issues, the code calls db.select()...where() then
+      // db.select()...where() for session links, then batchGetSessionContacts
+      const mockIssue = {
         id: 'i-1',
-        type: 'issues',
-        markdown: '# Login Bug\n\nUsers cannot log in.',
-      })
+        title: 'Login Bug',
+        description: 'Users cannot log in.',
+        type: 'bug',
+        priority: 'high',
+        status: 'open',
+        upvote_count: 3,
+        created_at: new Date('2024-01-01'),
+        updated_at: new Date('2024-01-02'),
+      }
+      // First db call returns the issue, second returns session links (empty)
+      mockDb.where
+        .mockResolvedValueOnce([mockIssue])    // issue query
+        .mockResolvedValueOnce([])              // session links query
+      mockBatchGetSessionContacts.mockResolvedValue(new Map())
 
       const result = await capturedHandlers.get_resource({ type: 'issues', id: 'i-1' })
 
-      expect(mockIssuesAdapter.get).toHaveBeenCalledWith('proj-1', 'i-1')
       expect(result.isError).toBeUndefined()
       expect(result.content[0].text).toContain('# Login Bug')
     })
 
     it('returns error when resource is not found', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockCustomersAdapter.get.mockResolvedValue(null)
+      // For customers, first tries contacts (empty), then tries companies (null)
+      mockDb.where.mockResolvedValueOnce([]) // contact query returns empty
+      mockDb.query.companies.findFirst.mockResolvedValue(null) // company query returns null
 
       const result = await capturedHandlers.get_resource({ type: 'customers', id: 'nonexistent' })
 
@@ -203,10 +323,10 @@ describe('MCP Resource Tools', () => {
   // --------------------------------------------------------------------------
 
   describe('search_resources', () => {
-    it('searches one adapter when type is specified', async () => {
+    it('searches one type when type is specified', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockIssuesAdapter.search.mockResolvedValue([
-        { id: 'i-1', type: 'issues', name: 'Checkout bug', snippet: 'Error in checkout', score: 0.85 },
+      mockSearchIssues.mockResolvedValue([
+        { id: 'i-1', name: 'Checkout bug', snippet: 'Error in checkout', score: 0.85 },
       ])
 
       const result = await capturedHandlers.search_resources({
@@ -215,33 +335,33 @@ describe('MCP Resource Tools', () => {
         limit: 5,
       })
 
-      expect(mockIssuesAdapter.search).toHaveBeenCalledWith('proj-1', 'checkout flow', 5)
-      expect(mockKnowledgeAdapter.search).not.toHaveBeenCalled()
-      expect(mockFeedbackAdapter.search).not.toHaveBeenCalled()
-      expect(mockCustomersAdapter.search).not.toHaveBeenCalled()
+      expect(mockSearchIssues).toHaveBeenCalledWith('proj-1', 'checkout flow', 5)
+      expect(mockSearchKnowledge).not.toHaveBeenCalled()
+      expect(mockSearchSessions).not.toHaveBeenCalled()
+      expect(mockSearchCustomers).not.toHaveBeenCalled()
       expect(result.content[0].text).toContain('Checkout bug')
       expect(result.content[0].text).toContain('85%')
     })
 
-    it('searches all 4 adapters in parallel when no type specified', async () => {
+    it('searches all 4 types in parallel when no type specified', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockKnowledgeAdapter.search.mockResolvedValue([
-        { id: 'k-1', type: 'knowledge', name: 'Auth docs', snippet: 'Setup auth', score: 0.9 },
+      mockSearchKnowledge.mockResolvedValue([
+        { id: 'k-1', name: 'Auth docs', snippet: 'Setup auth', score: 0.9 },
       ])
-      mockFeedbackAdapter.search.mockResolvedValue([
-        { id: 'f-1', type: 'feedback', name: 'Auth complaint', snippet: 'Cannot login' },
+      mockSearchSessions.mockResolvedValue([
+        { id: 'f-1', name: 'Auth complaint', snippet: 'Cannot login' },
       ])
-      mockIssuesAdapter.search.mockResolvedValue([
-        { id: 'i-1', type: 'issues', name: 'Auth bug', snippet: 'Login fails', score: 0.7 },
+      mockSearchIssues.mockResolvedValue([
+        { id: 'i-1', name: 'Auth bug', snippet: 'Login fails', score: 0.7 },
       ])
-      mockCustomersAdapter.search.mockResolvedValue([])
+      mockSearchCustomers.mockResolvedValue([])
 
       const result = await capturedHandlers.search_resources({ query: 'auth' })
 
-      expect(mockKnowledgeAdapter.search).toHaveBeenCalled()
-      expect(mockFeedbackAdapter.search).toHaveBeenCalled()
-      expect(mockIssuesAdapter.search).toHaveBeenCalled()
-      expect(mockCustomersAdapter.search).toHaveBeenCalled()
+      expect(mockSearchKnowledge).toHaveBeenCalled()
+      expect(mockSearchSessions).toHaveBeenCalled()
+      expect(mockSearchIssues).toHaveBeenCalled()
+      expect(mockSearchCustomers).toHaveBeenCalled()
 
       const text = result.content[0].text
       expect(text).toContain('3 results')
@@ -255,16 +375,16 @@ describe('MCP Resource Tools', () => {
 
     it('handles partial failures gracefully', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockKnowledgeAdapter.search.mockRejectedValue(new Error('Embedding API down'))
-      mockFeedbackAdapter.search.mockResolvedValue([
-        { id: 'f-1', type: 'feedback', name: 'Some session', snippet: 'content' },
+      mockSearchKnowledge.mockRejectedValue(new Error('Embedding API down'))
+      mockSearchSessions.mockResolvedValue([
+        { id: 'f-1', name: 'Some session', snippet: 'content' },
       ])
-      mockIssuesAdapter.search.mockResolvedValue([])
-      mockCustomersAdapter.search.mockResolvedValue([])
+      mockSearchIssues.mockResolvedValue([])
+      mockSearchCustomers.mockResolvedValue([])
 
       const result = await capturedHandlers.search_resources({ query: 'test' })
 
-      // Should succeed with results from working adapters
+      // Should succeed with results from working services
       expect(result.isError).toBeUndefined()
       expect(result.content[0].text).toContain('1 results')
       expect(result.content[0].text).toContain('Some session')
@@ -278,10 +398,8 @@ describe('MCP Resource Tools', () => {
   describe('add_resource', () => {
     it('creates resource in user mode', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockIssuesAdapter.add.mockResolvedValue({
-        id: 'i-new',
-        type: 'issues',
-        name: 'New Bug',
+      mockCreateIssueAdmin.mockResolvedValue({
+        issue: { id: 'i-new', title: 'New Bug' },
       })
 
       const result = await capturedHandlers.add_resource({
@@ -289,17 +407,19 @@ describe('MCP Resource Tools', () => {
         data: { type: 'bug', title: 'New Bug', description: 'Something broke' },
       })
 
-      expect(mockIssuesAdapter.add).toHaveBeenCalledWith('proj-1', {
+      expect(mockCreateIssueAdmin).toHaveBeenCalledWith({
+        projectId: 'proj-1',
         type: 'bug',
         title: 'New Bug',
         description: 'Something broke',
+        priority: undefined,
       })
       expect(result.isError).toBeUndefined()
       expect(result.content[0].text).toContain('New Bug')
       expect(result.content[0].text).toContain('i-new')
     })
 
-    it('rejects in contact mode without calling adapter', async () => {
+    it('rejects in contact mode without calling service', async () => {
       mockGetContext.mockReturnValue(contactContext())
 
       const result = await capturedHandlers.add_resource({
@@ -309,12 +429,11 @@ describe('MCP Resource Tools', () => {
 
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('not available in contact mode')
-      expect(mockIssuesAdapter.add).not.toHaveBeenCalled()
+      expect(mockCreateIssueAdmin).not.toHaveBeenCalled()
     })
 
-    it('surfaces validation error from adapter', async () => {
+    it('surfaces validation error from inline validation', async () => {
       mockGetContext.mockReturnValue(userContext())
-      mockIssuesAdapter.add.mockRejectedValue(new Error('Validation error: "title" is required.'))
 
       const result = await capturedHandlers.add_resource({
         type: 'issues',

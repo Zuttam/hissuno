@@ -6,6 +6,7 @@ import { Spinner, CollapsibleSection, Badge } from '@/components/ui'
 import { archiveIssue } from '@/lib/api/issues'
 import { TrimmedText } from '@/components/ui/trimmed-text'
 import type { IssueStatus, IssuePriority, IssueType } from '@/types/issue'
+import { formatRelativeTime } from '@/lib/utils/format-time'
 import { useIssueDetail } from '@/hooks/use-issues'
 import { useProductScopes } from '@/hooks/use-product-scopes'
 import { useEntityRelationships } from '@/hooks/use-entity-relationships'
@@ -263,9 +264,9 @@ export function IssueSidebar({
               <span>&middot;</span>
               <span>{issue.sessions?.length || 0} session{(issue.sessions?.length || 0) !== 1 ? 's' : ''}</span>
               <span>&middot;</span>
-              <span>Created {formatRelativeDate(issue.created_at)}</span>
+              <span>Created {formatRelativeTime(issue.created_at)}</span>
               <span>&middot;</span>
-              <span>Updated {formatRelativeDate(issue.updated_at)}</span>
+              <span>Updated {formatRelativeTime(issue.updated_at)}</span>
               {(() => {
                 const scope = issue.product_scope_id
                   ? productScopes.find((a) => a.id === issue.product_scope_id)
@@ -495,7 +496,7 @@ export function IssueSidebar({
             {/* Scores (RICE) */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
               <CollapsibleSection
-                title={<>Scores (RICE){riceScore != null && <span className="ml-1.5 font-bold text-[color:var(--accent-primary)]">{riceScore.toFixed(1)}</span>}{issue.analysis_computed_at && <span className="ml-1 text-[10px] normal-case tracking-normal text-[color:var(--text-tertiary)]">{formatRelativeDate(issue.analysis_computed_at)}</span>}</>}
+                title={<>Scores (RICE){riceScore != null && <span className="ml-1.5 font-bold text-[color:var(--accent-primary)]">{riceScore.toFixed(1)}</span>}{issue.analysis_computed_at && <span className="ml-1 text-[10px] normal-case tracking-normal text-[color:var(--text-tertiary)]">{formatRelativeTime(issue.analysis_computed_at)}</span>}</>}
                 variant="flat"
                 defaultExpanded
               >
@@ -544,7 +545,7 @@ export function IssueSidebar({
             {/* Brief */}
             <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
               <CollapsibleSection
-                title={<>Brief{issue.brief_generated_at && <span className="ml-1.5 text-[10px] normal-case tracking-normal text-[color:var(--text-tertiary)]">{formatRelativeDate(issue.brief_generated_at)}</span>}</>}
+                title={<>Brief{issue.brief_generated_at && <span className="ml-1.5 text-[10px] normal-case tracking-normal text-[color:var(--text-tertiary)]">{formatRelativeTime(issue.brief_generated_at)}</span>}</>}
                 variant="flat"
                 defaultExpanded
               >
@@ -572,30 +573,6 @@ export function IssueSidebar({
   )
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function formatRelativeDate(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '-'
-  const date = dateString instanceof Date ? dateString : new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) {
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-    if (diffHours === 0) {
-      const diffMinutes = Math.floor(diffMs / (1000 * 60))
-      return diffMinutes <= 1 ? 'just now' : `${diffMinutes}m ago`
-    }
-    return `${diffHours}h ago`
-  }
-  if (diffDays === 1) return 'yesterday'
-  if (diffDays < 7) return `${diffDays}d ago`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
-  return `${Math.floor(diffDays / 30)}mo ago`
-}
 
 // ============================================================================
 // Score Row

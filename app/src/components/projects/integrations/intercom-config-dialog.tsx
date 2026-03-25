@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { Check, Unplug, Shield, KeyRound, Plug, Zap } from 'lucide-react'
-import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
+import { Dialog, Button, InlineAlert, Spinner, FormField, Input } from '@/components/ui'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import {
   fetchIntercomStatus,
@@ -14,6 +14,9 @@ import {
   intercomOAuthConnectUrl,
   intercomSyncUrl,
 } from '@/lib/api/integrations'
+import { useIntegrationSync } from '@/hooks/use-integration-sync'
+import { SyncSettingsSection } from './sync-settings-section'
+import { formatSyncDate } from '@/lib/integrations/shared/sync-constants'
 
 interface IntercomConfigDialogProps {
   open: boolean
@@ -26,51 +29,6 @@ interface IntercomConfigDialogProps {
   oauthUnavailableReason?: string
 }
 
-type SyncFrequency = 'manual' | '1h' | '6h' | '24h'
-type SyncMode = 'incremental' | 'full'
-
-interface FilterConfig {
-  fromDate?: string
-  toDate?: string
-}
-
-interface IntercomStatus {
-  connected: boolean
-  workspaceName?: string | null
-  workspaceId?: string | null
-  syncFrequency?: SyncFrequency | null
-  syncEnabled?: boolean
-  lastSyncAt?: string | null
-  lastSyncStatus?: 'success' | 'error' | 'in_progress' | null
-  lastSyncConversationsCount?: number
-  nextSyncAt?: string | null
-  filterConfig?: FilterConfig | null
-  stats?: {
-    totalSynced: number
-    lastSyncRuns: Array<{
-      status: string
-      startedAt: string
-      conversationsSynced: number
-    }>
-  }
-}
-
-interface SyncProgress {
-  type: string
-  message: string
-  current: number
-  total: number
-  conversationId?: string
-  sessionId?: string
-}
-
-const FREQUENCY_OPTIONS: Array<{ value: SyncFrequency; label: string }> = [
-  { value: 'manual', label: 'Manual only' },
-  { value: '1h', label: 'Every hour' },
-  { value: '6h', label: 'Every 6 hours' },
-  { value: '24h', label: 'Daily' },
-]
-
 export function IntercomConfigDialog({
   open,
   onClose,
@@ -79,71 +37,27 @@ export function IntercomConfigDialog({
   oauthAvailable,
   oauthUnavailableReason,
 }: IntercomConfigDialogProps) {
-  const [status, setStatus] = useState<IntercomStatus>({ connected: false })
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [showSessionsLink, setShowSessionsLink] = useState(false)
+  const sync = useIntegrationSync({
+    projectId,
+    open,
+    fetchStatus: fetchIntercomStatus,
+    updateSettings: updateIntercomSettings,
+    syncUrl: intercomSyncUrl,
+    itemNoun: 'conversation',
+    itemNounPlural: 'conversations',
+    onStatusChanged,
+  })
 
   // Connection method toggle
   const [connectionMethod, setConnectionMethod] = useState<'oauth' | 'token'>(oauthAvailable === false ? 'token' : 'oauth')
 
   // Connect form state
   const [accessToken, setAccessToken] = useState('')
-  const [syncFrequency, setSyncFrequency] = useState<SyncFrequency>('manual')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
 
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
-  const [isUpdatingSettings, setIsUpdatingSettings] = useState(false)
-  const [isSyncing, setIsSyncing] = useState(false)
-  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null)
-  const [syncMode, setSyncMode] = useState<SyncMode>('incremental')
-
-  const eventSourceRef = useRef<EventSource | null>(null)
-
-  // Fetch status
-  const fetchStatus = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await fetchIntercomStatus(projectId)
-      if (!response.ok) {
-        throw new Error('Failed to load Intercom status')
-      }
-      const data = await response.json()
-      setStatus(data)
-
-      // Initialize form state from existing config
-      if (data.filterConfig) {
-        setFromDate(data.filterConfig.fromDate || '')
-        setToDate(data.filterConfig.toDate || '')
-      }
-      if (data.syncFrequency) {
-        setSyncFrequency(data.syncFrequency)
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load Intercom status')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [projectId])
-
-  useEffect(() => {
-    if (open) {
-      void fetchStatus()
-    }
-    return () => {
-      // Cleanup event source on close
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close()
-        eventSourceRef.current = null
-      }
-    }
-  }, [open, fetchStatus])
 
   const handleTestConnection = async () => {
     if (!accessToken.trim()) {
@@ -172,23 +86,18 @@ export function IntercomConfigDialog({
 
   const handleConnect = async () => {
     if (!accessToken.trim()) {
-      setError('Access token is required.')
+      sync.setError('Access token is required.')
       return
     }
 
     setIsConnecting(true)
-    setError(null)
+    sync.setError(null)
 
     try {
-      const filterConfig: FilterConfig = {}
-      if (fromDate) filterConfig.fromDate = fromDate
-      if (toDate) filterConfig.toDate = toDate
-
       const response = await connectIntercom({
         projectId,
         accessToken: accessToken.trim(),
-        syncFrequency,
-        filterConfig: Object.keys(filterConfig).length > 0 ? filterConfig : undefined,
+        syncFrequency: sync.syncFrequency,
       })
 
       const data = await response.json()
@@ -198,11 +107,11 @@ export function IntercomConfigDialog({
       }
 
       setAccessToken('')
-      setSuccessMessage(null)
+      sync.setSuccessMessage(null)
       onStatusChanged?.()
-      await fetchStatus()
+      await sync.refreshStatus()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to connect Intercom')
+      sync.setError(err instanceof Error ? err.message : 'Failed to connect Intercom')
     } finally {
       setIsConnecting(false)
     }
@@ -210,7 +119,7 @@ export function IntercomConfigDialog({
 
   const handleDisconnect = async () => {
     setIsDisconnecting(true)
-    setError(null)
+    sync.setError(null)
 
     try {
       const response = await disconnectIntercom(projectId)
@@ -220,137 +129,26 @@ export function IntercomConfigDialog({
         throw new Error(data.error || 'Failed to disconnect Intercom')
       }
 
-      setStatus({ connected: false })
+      await sync.refreshStatus()
       onStatusChanged?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to disconnect Intercom')
+      sync.setError(err instanceof Error ? err.message : 'Failed to disconnect Intercom')
     } finally {
       setIsDisconnecting(false)
     }
   }
 
-  const saveSettings = async (): Promise<{ success: boolean }> => {
-    const filterConfig: FilterConfig = {}
-    if (fromDate) filterConfig.fromDate = fromDate
-    if (toDate) filterConfig.toDate = toDate
-
-    const response = await updateIntercomSettings(projectId, {
-      syncFrequency,
-      filterConfig: Object.keys(filterConfig).length > 0 ? filterConfig : {},
-    })
-
-    if (!response.ok) {
-      const data = await response.json()
-      throw new Error(data.error || 'Failed to update settings')
-    }
-
-    return { success: true }
-  }
-
-  const handleUpdateSettings = async () => {
-    setIsUpdatingSettings(true)
-    setError(null)
-
-    try {
-      await saveSettings()
-      setSuccessMessage('Settings updated successfully.')
-      await fetchStatus()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update settings')
-    } finally {
-      setIsUpdatingSettings(false)
-    }
-  }
-
-  const handleStopSync = () => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-      eventSourceRef.current = null
-    }
-    const synced = syncProgress?.current ?? 0
-    setIsSyncing(false)
-    setSuccessMessage(`Sync stopped. ${synced} conversation${synced === 1 ? '' : 's'} synced.`)
-    setShowSessionsLink(synced > 0)
-    void fetchStatus()
-    onStatusChanged?.()
-  }
-
-  const handleSync = async () => {
-    setIsSyncing(true)
-    setSyncProgress(null)
-    setError(null)
-    setShowSessionsLink(false)
-
-    // Auto-save settings so the sync uses the current UI state
-    try {
-      await saveSettings()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save settings before sync')
-      setIsSyncing(false)
-      return
-    }
-
-    // Close any existing event source
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close()
-    }
-
-    const mode = status.lastSyncAt ? syncMode : 'full'
-    const eventSource = new EventSource(
-      intercomSyncUrl(projectId, mode)
-    )
-    eventSourceRef.current = eventSource
-
-    eventSource.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        setSyncProgress(data)
-
-        if (data.type === 'complete') {
-          eventSource.close()
-          eventSourceRef.current = null
-          setIsSyncing(false)
-          setSuccessMessage(data.message)
-          setShowSessionsLink(true)
-          void fetchStatus()
-          onStatusChanged?.()
-        } else if (data.type === 'error') {
-          eventSource.close()
-          eventSourceRef.current = null
-          setIsSyncing(false)
-          setError(data.message)
-          void fetchStatus()
-          onStatusChanged?.()
-        }
-      } catch {
-        // Ignore parse errors
-      }
-    })
-
-    eventSource.onerror = () => {
-      eventSource.close()
-      eventSourceRef.current = null
-      setIsSyncing(false)
-      setError('Connection to sync stream lost.')
-      void fetchStatus()
-      onStatusChanged?.()
-    }
-  }
-
-  const formatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return 'Never'
-    return new Date(dateStr).toLocaleString()
-  }
+  const status = sync.status as { connected?: boolean; workspaceName?: string; lastSyncAt?: string; lastSyncStatus?: string; lastSyncConversationsCount?: number; nextSyncAt?: string; stats?: { totalSynced: number } }
 
   return (
     <Dialog open={open} onClose={onClose} title="Intercom Integration" size="lg">
       <div className="flex flex-col gap-6">
-        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        {sync.error && <InlineAlert variant="danger">{sync.error}</InlineAlert>}
 
-        {successMessage && (
+        {sync.successMessage && (
           <InlineAlert variant="success">
-            {successMessage}
-            {showSessionsLink && (
+            {sync.successMessage}
+            {sync.showResultLink && (
               <>
                 {' '}
                 <Link
@@ -365,17 +163,17 @@ export function IntercomConfigDialog({
           </InlineAlert>
         )}
 
-        {isLoading ? (
+        {sync.isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Spinner size="md" />
           </div>
         ) : status.connected ? (
           // Connected state
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to {status.workspaceName || 'Unknown'}</p>
 
             {/* Sync Stats */}
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <h4 className="text-sm font-medium text-[color:var(--foreground)]">Sync Status</h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -390,7 +188,7 @@ export function IntercomConfigDialog({
                 </div>
                 <div>
                   <span className="text-[color:var(--text-secondary)]">Last Sync:</span>{' '}
-                  <span className="font-medium">{formatDate(status.lastSyncAt)}</span>
+                  <span className="font-medium">{formatSyncDate(status.lastSyncAt)}</span>
                 </div>
                 <div>
                   <span className="text-[color:var(--text-secondary)]">Last Status:</span>{' '}
@@ -417,142 +215,26 @@ export function IntercomConfigDialog({
               </div>
             </div>
 
-            {/* Settings */}
-            <div className="space-y-4 border-t border-[color:var(--border-subtle)] pt-4">
-              <h4 className="text-sm font-medium text-[color:var(--foreground)]">Sync Settings</h4>
-
-              {/* Sync Frequency */}
-              <div className="space-y-1">
-                <label className="text-sm text-[color:var(--text-secondary)]">Sync Frequency</label>
-                <select
-                  value={syncFrequency}
-                  onChange={(e) => setSyncFrequency(e.target.value as SyncFrequency)}
-                  className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                >
-                  {FREQUENCY_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm text-[color:var(--text-secondary)]">From Date (optional)</label>
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-sm text-[color:var(--text-secondary)]">To Date (optional)</label>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                  />
-                </div>
-              </div>
-
-              <Button
-                variant="secondary"
-                onClick={handleUpdateSettings}
-                loading={isUpdatingSettings}
-              >
-                Save Settings
-              </Button>
-            </div>
-
-            {/* Manual Sync */}
-            <div className="flex flex-col gap-3 border-t border-[color:var(--border-subtle)] pt-4">
-              <div>
-                <h4 className="text-sm font-medium text-[color:var(--foreground)]">Manual Sync</h4>
-                <p className="text-xs text-[color:var(--text-tertiary)]">
-                  Manually trigger a sync to import conversations from Intercom.
-                  {status.nextSyncAt && (
-                    <>
-                      {' '}
-                      Next automatic sync: {formatDate(status.nextSyncAt)}
-                    </>
-                  )}
-                </p>
-              </div>
-
-              {status.lastSyncAt && !isSyncing && (
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="intercom-sync-mode"
-                      value="incremental"
-                      checked={syncMode === 'incremental'}
-                      onChange={() => setSyncMode('incremental')}
-                      className="mt-1"
-                    />
-                    <div>
-                      <span className="text-sm text-[color:var(--foreground)]">Sync new only</span>
-                      <p className="text-xs text-[color:var(--text-tertiary)]">
-                        Only import conversations since {formatDate(status.lastSyncAt)}
-                      </p>
-                    </div>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="intercom-sync-mode"
-                      value="full"
-                      checked={syncMode === 'full'}
-                      onChange={() => setSyncMode('full')}
-                      className="mt-1"
-                    />
-                    <div>
-                      <span className="text-sm text-[color:var(--foreground)]">Sync from start date</span>
-                      <p className="text-xs text-[color:var(--text-tertiary)]">
-                        Re-scan all conversations from your configured date range. Already imported sessions will be skipped.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              )}
-
-              {isSyncing && syncProgress && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Spinner size="sm" />
-                    <span className="text-sm text-[color:var(--text-secondary)]">
-                      {syncProgress.message}
-                    </span>
-                  </div>
-                  {syncProgress.total > 0 && (
-                    <div className="h-2 w-full rounded-full bg-[color:var(--border-subtle)] overflow-hidden">
-                      <div
-                        className="h-full bg-[color:var(--accent-selected)] transition-all duration-300"
-                        style={{
-                          width: `${Math.round((syncProgress.current / syncProgress.total) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div>
-                {isSyncing ? (
-                  <Button variant="danger" onClick={handleStopSync}>
-                    Stop Sync
-                  </Button>
-                ) : (
-                  <Button variant="secondary" onClick={handleSync}>
-                    Sync Now
-                  </Button>
-                )}
-              </div>
-            </div>
+            <SyncSettingsSection
+              syncFrequency={sync.syncFrequency}
+              onSyncFrequencyChange={sync.setSyncFrequency}
+              fromDate={sync.fromDate}
+              onFromDateChange={sync.setFromDate}
+              toDate={sync.toDate}
+              onToDateChange={sync.setToDate}
+              syncMode={sync.syncMode}
+              onSyncModeChange={sync.setSyncMode}
+              isSyncing={sync.isSyncing}
+              syncProgress={sync.syncProgress}
+              isUpdatingSettings={sync.isUpdatingSettings}
+              lastSyncAt={status.lastSyncAt}
+              nextSyncAt={status.nextSyncAt}
+              onSave={sync.handleUpdateSettings}
+              onSync={sync.handleSync}
+              onStopSync={sync.handleStopSync}
+              itemNounPlural="conversations"
+              integrationId="intercom"
+            />
 
             {/* Danger Zone */}
             <div className="border-t border-[color:var(--accent-danger)] pt-4">
@@ -575,7 +257,7 @@ export function IntercomConfigDialog({
           </div>
         ) : (
           // Not connected state
-          <div className="space-y-6">
+          <div className="flex flex-col gap-6">
             <InlineAlert variant="info">
               Connect your Intercom workspace to sync conversations into Hissuno.
             </InlineAlert>
@@ -591,7 +273,7 @@ export function IntercomConfigDialog({
             />
 
             {connectionMethod === 'oauth' ? (
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 {oauthAvailable === false ? (
                   <InlineAlert variant="attention">
                     OAuth is not configured on this instance. {oauthUnavailableReason} Use the Access Token method instead.
@@ -615,7 +297,7 @@ export function IntercomConfigDialog({
                 )}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="flex flex-col gap-4">
                 <p className="text-xs text-[color:var(--text-tertiary)]">
                   For developers with private Intercom apps. You&apos;ll need an{' '}
                   <a
@@ -630,11 +312,11 @@ export function IntercomConfigDialog({
                 </p>
 
                 {/* Access Token */}
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    Access Token
-                  </label>
-                  <input
+                <FormField
+                  label="Access Token"
+                  supportingText="Find this in your Intercom Developer Hub under your app's Authentication settings."
+                >
+                  <Input
                     type="password"
                     value={accessToken}
                     onChange={(e) => {
@@ -642,7 +324,6 @@ export function IntercomConfigDialog({
                       setTestResult(null)
                     }}
                     placeholder="Enter your Intercom access token"
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
                   />
                   {testResult && (
                     <p
@@ -655,10 +336,7 @@ export function IntercomConfigDialog({
                       {testResult.message}
                     </p>
                   )}
-                  <p className="text-xs text-[color:var(--text-tertiary)]">
-                    Find this in your Intercom Developer Hub under your app&apos;s Authentication settings.
-                  </p>
-                </div>
+                </FormField>
 
                 <div className="flex gap-2">
                   <Button

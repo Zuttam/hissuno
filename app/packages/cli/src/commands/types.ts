@@ -7,15 +7,9 @@ import { formatResourceTypes, renderJson } from '../lib/output.js'
 
 const RESOURCE_TYPE_DEFINITIONS = {
   knowledge: {
-    description: 'Knowledge packages (grouped, compiled knowledge bundles).',
+    description: 'Knowledge sources (codebases, documents, URLs, Notion pages).',
     filters: [],
     search: 'Semantic vector search across all knowledge chunks',
-    add: null,
-  },
-  sources: {
-    description: 'Individual knowledge sources (codebases, documents, URLs, Notion pages).',
-    filters: [],
-    search: null,
     add: null,
   },
   feedback: {

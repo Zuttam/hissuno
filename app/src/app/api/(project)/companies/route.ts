@@ -3,7 +3,8 @@ import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
-import { listCompanies, insertCompany } from '@/lib/db/queries/companies'
+import { listCompanies } from '@/lib/db/queries/companies'
+import { createCompany } from '@/lib/customers/customers-service'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { COMPANY_STAGES } from '@/types/customer'
 import type { CompanyStage } from '@/types/customer'
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined,
     }
 
-    const { companies, total } = await listCompanies(filters)
+    const { companies, total } = await listCompanies(projectId, filters)
     return NextResponse.json({ companies, total })
   } catch (error) {
     if (error instanceof MissingProjectIdError) {
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Invalid stage. Must be one of: ${COMPANY_STAGES.join(', ')}` }, { status: 400 })
     }
 
-    const company = await insertCompany({
+    const company = await createCompany({
       projectId,
       name: body.name,
       domain: body.domain,

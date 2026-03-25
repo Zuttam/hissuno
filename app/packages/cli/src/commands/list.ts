@@ -9,8 +9,7 @@ import { formatResourceList, renderJson, error } from '../lib/output.js'
 import { resolveCustomerType } from '../lib/customer-type.js'
 
 const TYPE_ENDPOINTS: Record<string, { path: string; key: string }> = {
-  knowledge: { path: '/api/knowledge/packages', key: 'packages' },
-  sources: { path: '/api/knowledge/sources', key: 'sources' },
+  knowledge: { path: '/api/knowledge/sources', key: 'sources' },
   feedback: { path: '/api/sessions', key: 'sessions' },
   issues: { path: '/api/issues', key: 'issues' },
   customers: { path: '/api/contacts', key: 'contacts' },
@@ -19,7 +18,7 @@ const TYPE_ENDPOINTS: Record<string, { path: string; key: string }> = {
 
 export const listCommand = new Command('list')
   .description('List resources of a given type')
-  .argument('<type>', 'Resource type: knowledge, sources, feedback, issues, customers, scopes')
+  .argument('<type>', 'Resource type: knowledge, feedback, issues, customers, scopes')
   .option('--source <source>', 'Filter feedback by source (widget|slack|intercom|gong|api|manual)')
   .option('--status <status>', 'Filter by status')
   .option('--tags <tags>', 'Filter feedback by tags (comma-separated)')

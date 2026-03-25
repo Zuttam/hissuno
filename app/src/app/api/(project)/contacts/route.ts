@@ -3,7 +3,8 @@ import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
-import { listContacts, insertContact } from '@/lib/db/queries/contacts'
+import { listContacts } from '@/lib/db/queries/contacts'
+import { createContact } from '@/lib/customers/customers-service'
 import { isDatabaseConfigured } from '@/lib/db/config'
 
 export const runtime = 'nodejs'
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined,
     }
 
-    const { contacts, total } = await listContacts(filters)
+    const { contacts, total } = await listContacts(projectId, filters)
     return NextResponse.json({ contacts, total })
   } catch (error) {
     if (error instanceof MissingProjectIdError) {
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'email is required.' }, { status: 400 })
     }
 
-    const contact = await insertContact({
+    const contact = await createContact({
       projectId,
       name: body.name,
       email: body.email,

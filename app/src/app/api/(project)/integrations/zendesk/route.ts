@@ -15,7 +15,7 @@ import {
   updateZendeskSettings,
   disconnectZendesk,
   getSyncStats,
-  type ZendeskSyncFrequency,
+  type SyncFrequency,
   type ZendeskFilterConfig,
 } from '@/lib/integrations/zendesk'
 
@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { projectId, syncFrequency, syncEnabled, filterConfig } = body as {
       projectId: string
-      syncFrequency?: ZendeskSyncFrequency
+      syncFrequency?: SyncFrequency
       syncEnabled?: boolean
       filterConfig?: ZendeskFilterConfig
     }

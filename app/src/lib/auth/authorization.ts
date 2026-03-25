@@ -1,6 +1,6 @@
 import type { RequestIdentity } from './identity'
 import type { ProjectRole } from '@/types/project-members'
-import { hasProjectAccess, hasProjectRole } from './project-members'
+import { isProjectMember, hasProjectRole } from './project-members'
 import { UnauthorizedError } from './server'
 
 export class ForbiddenError extends Error {
@@ -48,7 +48,7 @@ export async function assertProjectAccess(
       throw new ForbiddenError(`Requires '${options.requiredRole}' role.`)
     }
   } else {
-    const hasAccess = await hasProjectAccess(projectId, identity.userId)
+    const hasAccess = await isProjectMember(projectId, identity.userId)
     if (!hasAccess) {
       throw new UnauthorizedError()
     }

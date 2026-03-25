@@ -7,6 +7,7 @@ import {
   jsonb,
   integer,
   doublePrecision,
+  unique,
 } from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { vector } from './custom-types'
@@ -257,6 +258,7 @@ export const sessions = pgTable('sessions', {
   page_url: text('page_url'),
   page_title: text('page_title'),
   user_metadata: jsonb('user_metadata'),
+  custom_fields: jsonb('custom_fields'),
   // Lifecycle timestamps
   first_message_at: timestamp('first_message_at', { mode: 'date' }),
   last_activity_at: timestamp('last_activity_at', { mode: 'date' }),
@@ -340,6 +342,7 @@ export const issues = pgTable('issues', {
   priority: text('priority').notNull().default('medium'),
   status: text('status'),
   is_archived: boolean('is_archived').notNull().default(false),
+  custom_fields: jsonb('custom_fields'),
   upvote_count: integer('upvote_count').default(0),
   priority_manual_override: boolean('priority_manual_override').default(false),
   // RICE scores
@@ -483,45 +486,13 @@ export const entityRelationships = pgTable('entity_relationships', {
 })
 
 // ---------------------------------------------------------------------------
-// Embeddings (Session, Issue, Contact)
+// Embeddings (unified table for issues, sessions, contacts, companies, product scopes)
 // ---------------------------------------------------------------------------
 
-export const sessionEmbeddings = pgTable('session_embeddings', {
+export const embeddings = pgTable('embeddings', {
   id: uuid('id').primaryKey().defaultRandom(),
-  session_id: uuid('session_id')
-    .notNull()
-    .unique()
-    .references(() => sessions.id),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  embedding: vector('embedding', { dimensions: 1536 }).notNull(),
-  text_hash: text('text_hash').notNull(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const issueEmbeddings = pgTable('issue_embeddings', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  issue_id: uuid('issue_id')
-    .notNull()
-    .unique()
-    .references(() => issues.id),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  embedding: vector('embedding', { dimensions: 1536 }).notNull(),
-  text_hash: text('text_hash').notNull(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const contactEmbeddings = pgTable('contact_embeddings', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  contact_id: uuid('contact_id')
-    .notNull()
-    .unique()
-    .references(() => contacts.id),
+  entity_id: uuid('entity_id').notNull().unique(),
+  entity_type: text('entity_type').notNull(), // 'issue' | 'session' | 'contact' | 'company' | 'product_scope'
   project_id: uuid('project_id')
     .notNull()
     .references(() => projects.id),
@@ -940,6 +911,53 @@ export const notionConnections = pgTable('notion_connections', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
+export const notionSyncConfigs = pgTable('notion_sync_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  connection_id: uuid('connection_id')
+    .notNull()
+    .references(() => notionConnections.id, { onDelete: 'cascade' }),
+  project_id: uuid('project_id')
+    .notNull()
+    .references(() => projects.id),
+  sync_type: text('sync_type').notNull(), // 'issues' | 'knowledge'
+  // Issue sync specific
+  notion_database_id: text('notion_database_id'),
+  notion_database_name: text('notion_database_name'),
+  field_mapping: jsonb('field_mapping'),
+  // Knowledge sync specific
+  notion_root_page_ids: jsonb('notion_root_page_ids'),
+  include_children: boolean('include_children').default(true),
+  // Shared sync state
+  sync_enabled: boolean('sync_enabled').notNull().default(false),
+  sync_frequency: text('sync_frequency').notNull().default('manual'),
+  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
+  last_sync_status: text('last_sync_status'),
+  last_sync_error: text('last_sync_error'),
+  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
+  last_sync_count: integer('last_sync_count'),
+  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+}, (table) => [
+  unique().on(table.connection_id, table.sync_type),
+])
+
+export const notionIssueSyncs = pgTable('notion_issue_syncs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  connection_id: uuid('connection_id')
+    .notNull()
+    .references(() => notionConnections.id, { onDelete: 'cascade' }),
+  issue_id: uuid('issue_id')
+    .notNull()
+    .unique()
+    .references(() => issues.id, { onDelete: 'cascade' }),
+  notion_page_id: text('notion_page_id').notNull(),
+  notion_page_url: text('notion_page_url'),
+  last_notion_edited_time: timestamp('last_notion_edited_time', { mode: 'date' }),
+  last_sync_status: text('last_sync_status').notNull().default('synced'),
+  last_synced_at: timestamp('last_synced_at', { mode: 'date' }),
+  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
+})
+
 // ---------------------------------------------------------------------------
 // Integrations: HubSpot
 // ---------------------------------------------------------------------------
@@ -1024,6 +1042,7 @@ export const fathomConnections = pgTable('fathom_connections', {
     .unique()
     .references(() => projects.id, { onDelete: 'cascade' }),
   api_key: text('api_key').notNull(),
+  account_name: text('account_name'),
   sync_frequency: text('sync_frequency').notNull().default('manual'),
   sync_enabled: boolean('sync_enabled').notNull().default(false),
   filter_config: jsonb('filter_config'),

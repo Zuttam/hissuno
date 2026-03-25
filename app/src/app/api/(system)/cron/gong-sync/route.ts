@@ -15,7 +15,15 @@ export const maxDuration = 300 // 5 minutes
  * GET /api/cron/gong-sync
  * Process all Gong connections due for sync
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+  }
+
   if (!isDatabaseConfigured()) {
     return NextResponse.json({ error: 'Database must be configured.' }, { status: 500 })
   }

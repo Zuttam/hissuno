@@ -76,7 +76,7 @@ The `-->  statement-breakpoint` comments in migration files are harmless to psql
 - **Database**: PostgreSQL + Drizzle ORM (any provider: Supabase, Neon, Railway, local)
 - **Auth**: AuthJS v5 (next-auth) with Google OAuth + Credentials
 - **AI Framework**: Mastra (multi-agent orchestration)
-- **AI SDK**: Vercel AI SDK v5 with OpenAI (GPT-5, GPT-4o)
+- **AI SDK**: Vercel AI SDK v5 with OpenAI (GPT-5, gpt-5.4)
 - **Styling**: Tailwind CSS v4 + CSS variables, `motion` for animations
 - **Testing**: Vitest
 - **3D/WebGL**: React Three Fiber (drei, postprocessing)

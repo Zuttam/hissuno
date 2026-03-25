@@ -84,6 +84,28 @@ You can trigger the Session Review workflow for any closed session from the feed
 
 Issue tracking is controlled at the project level. Open the project edit dialog accessible from the **Dashboard** page and toggle **Issue Tracking**. When disabled, the Session Review workflow still classifies and tags sessions but skips the PM decision and execution steps. You can re-enable it at any time and manually review sessions that were closed while tracking was off.
 
+## Working with Issues from the CLI
+
+You can list, search, and create issues from the terminal:
+
+```bash
+# List open bugs sorted by priority
+hissuno list issues --issue-type bug --status open --priority high
+
+# Search for issues by topic
+hissuno search "csv export" --type issues
+
+# View full issue details with linked sessions
+hissuno get issues iss_abc123
+
+# Create an issue manually
+hissuno add issues
+# Prompts: type (bug/feature_request/change_request), title, description, priority
+
+# Export high-priority issues to JSON
+hissuno --json list issues --priority high > urgent-issues.json
+```
+
 ## What Happens After an Issue Is Created
 
 Immediately after creation, Hissuno kicks off the Issue Analysis workflow in the background. This workflow computes velocity, impact, and effort scores, then recalculates the issue's priority using a multi-factor algorithm. If your project has a Jira integration enabled, the new issue is also synced to Jira automatically.

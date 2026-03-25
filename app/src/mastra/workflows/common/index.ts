@@ -7,3 +7,4 @@
 
 export * from './prepare-codebase'
 export * from './cleanup-codebase'
+export * from './generate-description'

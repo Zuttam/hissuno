@@ -23,7 +23,6 @@ function cliTypeToEntityType(type: string, customerType?: string): string {
     contact: 'contact',
     contacts: 'contact',
     knowledge: 'knowledge_source',
-    sources: 'knowledge_source',
     scopes: 'product_scope',
     scope: 'product_scope',
   }
@@ -31,8 +30,7 @@ function cliTypeToEntityType(type: string, customerType?: string): string {
 }
 
 const TYPE_ENDPOINTS: Record<string, { path: (id: string) => string; key: string }> = {
-  knowledge: { path: (id) => `/api/knowledge/packages/${id}`, key: 'package' },
-  sources: { path: (id) => `/api/knowledge/sources/${id}`, key: 'source' },
+  knowledge: { path: (id) => `/api/knowledge/sources/${id}`, key: 'source' },
   feedback: { path: (id) => `/api/sessions/${id}`, key: 'session' },
   issues: { path: (id) => `/api/issues/${id}`, key: 'issue' },
   customers: { path: (id) => `/api/contacts/${id}`, key: 'contact' },
@@ -41,7 +39,7 @@ const TYPE_ENDPOINTS: Record<string, { path: (id: string) => string; key: string
 
 export const getCommand = new Command('get')
   .description('Get full details of a specific resource')
-  .argument('<type>', 'Resource type: knowledge, sources, feedback, issues, customers, scopes')
+  .argument('<type>', 'Resource type: knowledge, feedback, issues, customers, scopes')
   .argument('<id>', 'Resource ID')
   .option('--customer-type <type>', 'Customer sub-type: contacts (default) or companies')
   .action(async (type, id, opts, cmd) => {

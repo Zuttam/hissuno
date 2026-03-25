@@ -64,7 +64,7 @@ export async function generateSessionNameFromMessages(
 
   try {
     const { text } = await generateText({
-      model: openai('gpt-4o-mini'),
+      model: openai('gpt-5.4-mini'),
       maxOutputTokens: 50,
       temperature: 0.3,
       system: `You generate concise, descriptive titles for support conversations.

@@ -103,7 +103,7 @@ export async function compilePackageContent(
     : ''
 
   const { object: categorized } = await generateObject({
-    model: openai('gpt-4o'),
+    model: openai('gpt-5.4'),
     schema: compilationSchema,
     prompt: `You are a technical writer organizing product knowledge into a structured support package.
 

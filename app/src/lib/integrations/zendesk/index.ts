@@ -6,11 +6,9 @@
 import { db } from '@/lib/db'
 import { eq, and, or, ne, lte, isNull, sql, count as drizzleCount } from 'drizzle-orm'
 import { zendeskConnections, zendeskSyncRuns, zendeskSyncedTickets } from '@/lib/db/schema/app'
-
-/**
- * Sync frequency options
- */
-export type ZendeskSyncFrequency = 'manual' | '1h' | '6h' | '24h'
+import { type SyncFrequency } from '@/lib/integrations/shared/sync-constants'
+export type { SyncFrequency }
+import { calculateNextSyncTime } from '@/lib/integrations/shared/sync-utils'
 
 /**
  * Filter configuration for sync
@@ -28,7 +26,7 @@ export interface ZendeskConnection {
   projectId: string
   subdomain: string
   accountName: string | null
-  syncFrequency: ZendeskSyncFrequency
+  syncFrequency: SyncFrequency
   syncEnabled: boolean
   filterConfig: ZendeskFilterConfig
   lastSyncAt: string | null
@@ -47,7 +45,7 @@ export interface ZendeskIntegrationStatus {
   connected: boolean
   subdomain: string | null
   accountName: string | null
-  syncFrequency: ZendeskSyncFrequency | null
+  syncFrequency: SyncFrequency | null
   syncEnabled: boolean
   lastSyncAt: string | null
   lastSyncStatus: 'success' | 'error' | 'in_progress' | null
@@ -98,7 +96,7 @@ export async function hasZendeskConnection(
     connected: true,
     subdomain: data.subdomain,
     accountName: data.account_name,
-    syncFrequency: data.sync_frequency as ZendeskSyncFrequency,
+    syncFrequency: data.sync_frequency as SyncFrequency,
     syncEnabled: data.sync_enabled,
     lastSyncAt: data.last_sync_at?.toISOString() ?? null,
     lastSyncStatus: data.last_sync_status as 'success' | 'error' | 'in_progress' | null,
@@ -156,7 +154,7 @@ export async function storeZendeskCredentials(
     adminEmail: string
     apiToken: string
     accountName: string | null
-    syncFrequency: ZendeskSyncFrequency
+    syncFrequency: SyncFrequency
     filterConfig?: ZendeskFilterConfig
   }
 ): Promise<{ success: boolean; connectionId?: string; error?: string }> {
@@ -211,7 +209,7 @@ export async function storeZendeskCredentials(
 export async function updateZendeskSettings(
   projectId: string,
   settings: {
-    syncFrequency?: ZendeskSyncFrequency
+    syncFrequency?: SyncFrequency
     syncEnabled?: boolean
     filterConfig?: ZendeskFilterConfig
   }
@@ -307,6 +305,20 @@ export async function isTicketSynced(
 }
 
 /**
+ * Get all synced ticket IDs for a connection (batch pre-fetch to avoid N+1)
+ */
+export async function getSyncedTicketIds(
+  connectionId: string
+): Promise<Set<number>> {
+  const rows = await db
+    .select({ zendesk_ticket_id: zendeskSyncedTickets.zendesk_ticket_id })
+    .from(zendeskSyncedTickets)
+    .where(eq(zendeskSyncedTickets.connection_id, connectionId))
+
+  return new Set(rows.map((row) => row.zendesk_ticket_id))
+}
+
+/**
  * Record a synced ticket
  */
 export async function recordSyncedTicket(
@@ -363,7 +375,7 @@ export async function updateSyncState(
 
     const conn = connRows[0]
     if (conn) {
-      const nextSync = calculateNextSyncTime(conn.sync_frequency as ZendeskSyncFrequency)
+      const nextSync = calculateNextSyncTime(conn.sync_frequency as SyncFrequency)
       updateData.next_sync_at = nextSync ? new Date(nextSync) : null
     }
   }
@@ -508,26 +520,3 @@ export async function getSyncStats(
   }
 }
 
-/**
- * Calculate next sync time based on frequency
- */
-function calculateNextSyncTime(frequency: ZendeskSyncFrequency): string | null {
-  if (frequency === 'manual') {
-    return null
-  }
-
-  const now = new Date()
-  switch (frequency) {
-    case '1h':
-      now.setHours(now.getHours() + 1)
-      break
-    case '6h':
-      now.setHours(now.getHours() + 6)
-      break
-    case '24h':
-      now.setDate(now.getDate() + 1)
-      break
-  }
-
-  return now.toISOString()
-}

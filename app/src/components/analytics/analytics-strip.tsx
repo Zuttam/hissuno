@@ -8,6 +8,7 @@ import { MiniBar } from './charts/sparkline'
 import { LineChart } from './charts/line-chart'
 import { BarChart } from './charts/bar-chart'
 import { cn } from '@/lib/utils/class'
+import { formatARR } from '@/lib/utils/format-currency'
 
 const STATUS_LABEL_MAP: Record<string, string> = {
   open: 'Open',
@@ -408,12 +409,6 @@ function CustomersStrip({ projectId, isExpanded, onToggle, className }: StripCon
     totalARR: 0,
     avgARR: 0,
     byStage: [],
-  }
-
-  const formatARR = (num: number) => {
-    if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`
-    if (num >= 1_000) return `$${(num / 1_000).toFixed(0)}K`
-    return `$${num.toFixed(0)}`
   }
 
   return (

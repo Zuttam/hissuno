@@ -6,7 +6,8 @@ import { sessions, sessionMessages } from '@/lib/db/schema/app'
 import { eq, and, gt } from 'drizzle-orm'
 import { getProjectById } from '@/lib/projects/keys'
 import { isOriginAllowed } from '@/lib/utils/widget-auth'
-import { SSE_HEADERS } from '@/lib/sse'
+import { SSE_HEADERS } from '@/lib/utils/sse'
+import { getWidgetRequestOrigin, createWidgetCorsHeaders, createWidgetOptionsResponse } from '@/lib/utils/widget-cors'
 import type { ChatMessage } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -29,22 +30,12 @@ interface UpdateSSEEvent {
 }
 
 /**
- * Get the request origin from headers
- * Uses Origin header if present, otherwise falls back to request URL origin
+ * Merge SSE headers with widget CORS headers.
  */
-function getRequestOrigin(request: NextRequest): string {
-  return request.headers.get('Origin') || request.nextUrl.origin
-}
-
-/**
- * Add CORS headers to SSE response
- */
-function addCorsToSSEHeaders(origin: string): Record<string, string> {
+function getSSECorsHeaders(origin: string): Record<string, string> {
   return {
     ...SSE_HEADERS,
-    'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    ...createWidgetCorsHeaders(origin),
   }
 }
 
@@ -54,35 +45,35 @@ function addCorsToSSEHeaders(origin: string): Record<string, string> {
  * Widget connects to receive updates in real-time.
  */
 export async function GET(request: NextRequest) {
-  const origin = getRequestOrigin(request)
+  const origin = getWidgetRequestOrigin(request)
   const projectId = request.nextUrl.searchParams.get('projectId')
   const sessionId = request.nextUrl.searchParams.get('sessionId')
 
   if (!projectId) {
     return NextResponse.json(
       { error: 'projectId is required' },
-      { status: 400, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 400, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
   if (!sessionId) {
     return NextResponse.json(
       { error: 'sessionId is required' },
-      { status: 400, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 400, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
   if (!UUID_REGEX.test(sessionId)) {
     return NextResponse.json(
       { error: 'Invalid session ID format' },
-      { status: 400, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 400, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
   if (!isDatabaseConfigured()) {
     return NextResponse.json(
       { error: 'Server not configured' },
-      { status: 500, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 500, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
@@ -91,7 +82,7 @@ export async function GET(request: NextRequest) {
   if (!project) {
     return NextResponse.json(
       { error: 'Invalid project ID' },
-      { status: 401, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 401, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
@@ -99,11 +90,11 @@ export async function GET(request: NextRequest) {
   if (!isOriginAllowed(origin, project.allowed_origins)) {
     return NextResponse.json(
       { error: 'Origin not allowed' },
-      { status: 403, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 403, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
-  const corsHeaders = addCorsToSSEHeaders(origin)
+  const corsHeaders = getSSECorsHeaders(origin)
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -268,15 +259,5 @@ export async function GET(request: NextRequest) {
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  const origin = getRequestOrigin(request)
-
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-    },
-  })
+  return createWidgetOptionsResponse(request)
 }

@@ -6,11 +6,9 @@
 import { db } from '@/lib/db'
 import { eq, and, or, ne, lte, isNull, sql, count as drizzleCount } from 'drizzle-orm'
 import { gongConnections, gongSyncRuns, gongSyncedCalls } from '@/lib/db/schema/app'
-
-/**
- * Sync frequency options
- */
-export type GongSyncFrequency = 'manual' | '1h' | '6h' | '24h'
+import { type SyncFrequency } from '@/lib/integrations/shared/sync-constants'
+export type { SyncFrequency }
+import { calculateNextSyncTime } from '@/lib/integrations/shared/sync-utils'
 
 /**
  * Filter configuration for sync
@@ -25,7 +23,7 @@ export interface GongFilterConfig {
  */
 export interface GongIntegrationStatus {
   connected: boolean
-  syncFrequency: GongSyncFrequency | null
+  syncFrequency: SyncFrequency | null
   syncEnabled: boolean
   lastSyncAt: string | null
   lastSyncStatus: 'success' | 'error' | 'in_progress' | null
@@ -73,7 +71,7 @@ export async function hasGongConnection(
 
   return {
     connected: true,
-    syncFrequency: data.sync_frequency as GongSyncFrequency,
+    syncFrequency: data.sync_frequency as SyncFrequency,
     syncEnabled: data.sync_enabled,
     lastSyncAt: data.last_sync_at?.toISOString() ?? null,
     lastSyncStatus: data.last_sync_status as 'success' | 'error' | 'in_progress' | null,
@@ -125,7 +123,7 @@ export async function storeGongCredentials(
     accessKey: string
     accessKeySecret: string
     baseUrl: string
-    syncFrequency: GongSyncFrequency
+    syncFrequency: SyncFrequency
     filterConfig?: GongFilterConfig
   }
 ): Promise<{ success: boolean; connectionId?: string; error?: string }> {
@@ -178,7 +176,7 @@ export async function storeGongCredentials(
 export async function updateGongSettings(
   projectId: string,
   settings: {
-    syncFrequency?: GongSyncFrequency
+    syncFrequency?: SyncFrequency
     syncEnabled?: boolean
     filterConfig?: GongFilterConfig
   }
@@ -274,6 +272,20 @@ export async function isCallAlreadySynced(
 }
 
 /**
+ * Get all synced call IDs for a connection (batch pre-fetch to avoid N+1)
+ */
+export async function getSyncedCallIds(
+  connectionId: string
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ gong_call_id: gongSyncedCalls.gong_call_id })
+    .from(gongSyncedCalls)
+    .where(eq(gongSyncedCalls.connection_id, connectionId))
+
+  return new Set(rows.map((row) => row.gong_call_id))
+}
+
+/**
  * Record a synced call
  */
 export async function recordSyncedCall(
@@ -330,7 +342,7 @@ export async function updateSyncState(
 
     const conn = connRows[0]
     if (conn) {
-      const nextSync = calculateNextSyncTime(conn.sync_frequency as GongSyncFrequency)
+      const nextSync = calculateNextSyncTime(conn.sync_frequency as SyncFrequency)
       updateData.next_sync_at = nextSync ? new Date(nextSync) : null
     }
   }
@@ -475,26 +487,3 @@ export async function getSyncStats(
   }
 }
 
-/**
- * Calculate next sync time based on frequency
- */
-export function calculateNextSyncTime(frequency: GongSyncFrequency): string | null {
-  if (frequency === 'manual') {
-    return null
-  }
-
-  const now = new Date()
-  switch (frequency) {
-    case '1h':
-      now.setHours(now.getHours() + 1)
-      break
-    case '6h':
-      now.setHours(now.getHours() + 6)
-      break
-    case '24h':
-      now.setDate(now.getDate() + 1)
-      break
-  }
-
-  return now.toISOString()
-}

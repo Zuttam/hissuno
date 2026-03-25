@@ -58,10 +58,10 @@ export function useSessions(options: { initialSessions?: SessionWithProject[] } 
 
 ## SSE Streaming Routes
 
-Use shared utilities from `@/lib/sse`:
+Use shared utilities from `@/lib/utils/sse`:
 
 ```typescript
-import { createSSEStreamWithExecutor, createSSEEvent } from '@/lib/sse'
+import { createSSEStreamWithExecutor, createSSEEvent } from '@/lib/utils/sse'
 
 export async function GET(request: Request) {
   return createSSEStreamWithExecutor<MyEventType>({
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
 export const myAgent = new Agent({
   name: 'My Agent',
   instructions: `You are an agent that does X...`,
-  model: 'openai/gpt-4o',
+  model: 'openai/gpt-5.4',
   tools: Object.fromEntries(myTools.map((tool) => [tool.id, tool])),
 })
 ```

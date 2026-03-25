@@ -15,7 +15,7 @@ import {
   updateIntercomSettings,
   disconnectIntercom,
   getSyncStats,
-  type IntercomSyncFrequency,
+  type SyncFrequency,
   type IntercomFilterConfig,
 } from '@/lib/integrations/intercom'
 
@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { projectId, syncFrequency, syncEnabled, filterConfig } = body as {
       projectId: string
-      syncFrequency?: IntercomSyncFrequency
+      syncFrequency?: SyncFrequency
       syncEnabled?: boolean
       filterConfig?: IntercomFilterConfig
     }

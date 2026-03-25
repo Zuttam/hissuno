@@ -20,6 +20,7 @@ import { eq, and } from 'drizzle-orm'
 import { createIssueAdmin } from '@/lib/issues/issues-service'
 import { insertCompany } from '@/lib/db/queries/companies'
 import { insertContact } from '@/lib/db/queries/contacts'
+import { fireGraphEval } from '@/lib/utils/graph-eval'
 import {
   setSessionContact,
   setEntityProductScope,
@@ -27,7 +28,7 @@ import {
 } from '@/lib/db/queries/entity-relationships'
 import { batchEmbedIssues } from '@/lib/issues/embedding-service'
 import { batchEmbedSessions } from '@/lib/sessions/embedding-service'
-import { batchEmbedContacts } from '@/lib/customers/contact-embedding-service'
+import { batchEmbedContacts } from '@/lib/customers/customer-embedding-service'
 import { embedKnowledgeSource } from '@/lib/knowledge/embedding-service'
 
 import { DEMO_PRODUCT_SCOPES } from './demo-data/product-scopes'
@@ -103,6 +104,7 @@ export async function createDemoProjectData({
         healthScore: company.healthScore,
       })
       companyIds.push(created.id)
+      fireGraphEval(projectId, 'company', created.id)
       companiesCreated++
     } catch (err) {
       console.error('[demo-data-service] failed to create company:', company.name, err)
@@ -125,6 +127,7 @@ export async function createDemoProjectData({
         isChampion: contact.isChampion,
       })
       contactIds.push(created.id)
+      fireGraphEval(projectId, 'contact', created.id)
       contactsCreated++
     } catch (err) {
       console.error('[demo-data-service] failed to create contact:', contact.name, err)

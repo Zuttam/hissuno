@@ -11,7 +11,7 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { FathomClient, FathomApiError } from '@/lib/integrations/fathom/client'
 import {
   storeFathomCredentials,
-  type FathomSyncFrequency,
+  type SyncFrequency,
   type FathomFilterConfig,
 } from '@/lib/integrations/fathom'
 
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const { projectId, apiKey, syncFrequency, filterConfig } = body as {
       projectId: string
       apiKey: string
-      syncFrequency: FathomSyncFrequency
+      syncFrequency: SyncFrequency
       filterConfig?: FathomFilterConfig
     }
 
@@ -43,13 +43,9 @@ export async function POST(request: NextRequest) {
     if (!apiKey) {
       return NextResponse.json({ error: 'apiKey is required.' }, { status: 400 })
     }
-    if (!syncFrequency) {
-      return NextResponse.json({ error: 'syncFrequency is required.' }, { status: 400 })
-    }
-
-    // Validate sync frequency
-    const validFrequencies: FathomSyncFrequency[] = ['manual', '1h', '6h', '24h']
-    if (!validFrequencies.includes(syncFrequency)) {
+    // Validate sync frequency (defaults to manual)
+    const validFrequencies: SyncFrequency[] = ['manual', '1h', '6h', '24h']
+    if (syncFrequency && !validFrequencies.includes(syncFrequency)) {
       return NextResponse.json({ error: 'Invalid syncFrequency.' }, { status: 400 })
     }
 
@@ -74,12 +70,16 @@ export async function POST(request: NextRequest) {
       throw error
     }
 
+    // Fetch account name for display
+    const accountName = await client.getAccountName()
+
     // Store credentials
     const result = await storeFathomCredentials({
       projectId,
       apiKey,
-      syncFrequency,
+      syncFrequency: syncFrequency || 'manual',
       filterConfig,
+      accountName,
     })
 
     if (!result.success) {

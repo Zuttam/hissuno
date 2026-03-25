@@ -153,9 +153,6 @@ export function formatResourceList(type: string, items: ResourceItem[], total: n
       case 'knowledge':
         lines.push(formatKnowledgeRow(item, name))
         break
-      case 'sources':
-        lines.push(formatSourceRow(item, name))
-        break
       case 'scopes':
         lines.push(formatScopeRow(item, name))
         break
@@ -239,15 +236,6 @@ function formatScopeRow(item: ResourceItem, name: string): string {
 }
 
 function formatKnowledgeRow(item: ResourceItem, name: string): string {
-  const desc = item.description ? dimText(truncate(String(item.description), 60)) : ''
-  const sources = item.sourceCount != null ? `${item.sourceCount} sources` : ''
-  const lastAnalyzed = item.lastAnalyzedAt ? `analyzed ${formatDate(item.lastAnalyzedAt)}` : dimText('not analyzed')
-
-  const parts = [desc, sources, lastAnalyzed].filter(Boolean)
-  return `  ${itemName(name)}\n    ${parts.join('  ')}`
-}
-
-function formatSourceRow(item: ResourceItem, name: string): string {
   const id = dimText(truncate(String(item.id ?? ''), 12))
   const type = item.type ? badge(String(item.type), MAGENTA) : ''
   const status = item.status ? label(String(item.status)) : ''
@@ -285,9 +273,6 @@ export function formatResourceDetail(type: string, item: ResourceItem, extra?: R
       break
     case 'knowledge':
       formatKnowledgeDetail(lines, item)
-      break
-    case 'sources':
-      formatSourceDetail(lines, item)
       break
     case 'scopes':
       formatScopeDetail(lines, item)
@@ -380,22 +365,6 @@ function formatScopeDetail(lines: string[], item: ResourceItem): void {
 }
 
 function formatKnowledgeDetail(lines: string[], item: ResourceItem): void {
-  if (item.description) lines.push(`${label('Description:')} ${item.description}`)
-  if (item.sourceCount != null) lines.push(`${label('Sources:')} ${item.sourceCount}`)
-  if (item.lastAnalyzedAt) lines.push(`${label('Last analyzed:')} ${formatDate(item.lastAnalyzedAt)}`)
-  if (item.compiled_at) lines.push(`${label('Compiled:')} ${formatDate(item.compiled_at)}`)
-
-  const sources = item.sources as Array<{ name?: string; type?: string; status?: string }> | undefined
-  if (sources && sources.length > 0) {
-    lines.push('', `${BOLD}Sources:${RESET}`)
-    for (const src of sources) {
-      const parts = [src.type, src.status].filter(Boolean).join(' - ')
-      lines.push(`  - ${src.name ?? 'Unnamed'}${parts ? ` (${parts})` : ''}`)
-    }
-  }
-}
-
-function formatSourceDetail(lines: string[], item: ResourceItem): void {
   if (item.type) lines.push(`${label('Type:')} ${badge(String(item.type), MAGENTA)}`)
   if (item.status) lines.push(`${label('Status:')} ${item.status}`)
   if (item.enabled !== undefined) lines.push(`${label('Enabled:')} ${item.enabled ? badge('Yes', GREEN) : badge('No', RED)}`)
@@ -466,13 +435,9 @@ export function formatResourceTypes(): string {
     heading('Hissuno Resource Types'),
     '',
     `${BOLD}knowledge${RESET}`,
-    '  Knowledge packages (grouped, compiled knowledge bundles).',
+    '  Knowledge sources (codebases, documents, URLs, Notion pages).',
     `  ${label('Filters:')} (none)`,
     `  ${label('Search:')} Semantic vector search across all knowledge chunks`,
-    '',
-    `${BOLD}sources${RESET}`,
-    '  Individual knowledge sources (codebases, documents, URLs, Notion pages).',
-    `  ${label('Filters:')} (none)`,
     '',
     `${BOLD}feedback${RESET}`,
     '  Customer feedback sessions (conversations from widget, Slack, Intercom, etc.).',

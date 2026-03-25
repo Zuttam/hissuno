@@ -11,7 +11,7 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { ZendeskClient, ZendeskApiError } from '@/lib/integrations/zendesk/client'
 import {
   storeZendeskCredentials,
-  type ZendeskSyncFrequency,
+  type SyncFrequency,
   type ZendeskFilterConfig,
 } from '@/lib/integrations/zendesk'
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       subdomain: string
       email: string
       apiToken: string
-      syncFrequency: ZendeskSyncFrequency
+      syncFrequency: SyncFrequency
       filterConfig?: ZendeskFilterConfig
     }
 
@@ -51,13 +51,9 @@ export async function POST(request: NextRequest) {
     if (!apiToken) {
       return NextResponse.json({ error: 'apiToken is required.' }, { status: 400 })
     }
-    if (!syncFrequency) {
-      return NextResponse.json({ error: 'syncFrequency is required.' }, { status: 400 })
-    }
-
-    // Validate sync frequency
-    const validFrequencies: ZendeskSyncFrequency[] = ['manual', '1h', '6h', '24h']
-    if (!validFrequencies.includes(syncFrequency)) {
+    // Validate sync frequency (defaults to manual)
+    const validFrequencies: SyncFrequency[] = ['manual', '1h', '6h', '24h']
+    if (syncFrequency && !validFrequencies.includes(syncFrequency)) {
       return NextResponse.json({ error: 'Invalid syncFrequency.' }, { status: 400 })
     }
 
@@ -90,7 +86,7 @@ export async function POST(request: NextRequest) {
       adminEmail: email.trim(),
       apiToken: apiToken.trim(),
       accountName: accountInfo.name,
-      syncFrequency,
+      syncFrequency: syncFrequency || 'manual',
       filterConfig,
     })
 

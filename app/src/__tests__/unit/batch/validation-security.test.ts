@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { BatchValidationError } from '@/lib/batch/validation'
+import { BatchValidationError } from '@/lib/utils/batch/validation'
 
 // Mock the database module
 vi.mock('@/lib/db', () => ({
@@ -28,7 +28,7 @@ vi.mock('drizzle-orm', () => ({
 }))
 
 describe('validateBatchIds - security edge cases', () => {
-  let validateBatchIds: typeof import('@/lib/batch/validation').validateBatchIds
+  let validateBatchIds: typeof import('@/lib/utils/batch/validation').validateBatchIds
   let mockDb: { select: ReturnType<typeof vi.fn> }
 
   beforeEach(async () => {
@@ -37,7 +37,7 @@ describe('validateBatchIds - security edge cases', () => {
     const dbModule = await import('@/lib/db')
     mockDb = dbModule.db as unknown as { select: ReturnType<typeof vi.fn> }
 
-    const mod = await import('@/lib/batch/validation')
+    const mod = await import('@/lib/utils/batch/validation')
     validateBatchIds = mod.validateBatchIds
   })
 

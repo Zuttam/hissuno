@@ -7,7 +7,6 @@
  * For service-level operations (with embeddings), use lib/issues/issues-service.ts
  */
 
-import { cache } from 'react'
 import {
   eq,
   and,
@@ -20,6 +19,7 @@ import {
   not,
   isNotNull,
 } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import {
   issues,
@@ -30,9 +30,8 @@ import {
   entityRelationships,
   contacts,
 } from '@/lib/db/schema/app'
-import { resolveRequestContext, getUserProjectIds, sanitizeSearchInput, dateToIso } from '@/lib/db/server'
+import { sanitizeSearchInput, dateToIso } from '@/lib/db/server'
 import { linkEntities, unlinkEntities, setEntityProductScope, getRelatedIds } from '@/lib/db/queries/entity-relationships'
-import { hasProjectAccess } from '@/lib/auth/project-members'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -65,6 +64,7 @@ function rowToIssueRecord(row: typeof issues.$inferSelect): IssueRecord {
     brief: row.brief ?? null,
     brief_generated_at: dateToIso(row.brief_generated_at),
     is_archived: row.is_archived,
+    custom_fields: (row.custom_fields as Record<string, unknown>) ?? {},
     impact_score: row.impact_score ?? null,
     impact_analysis: row.impact_analysis as IssueImpactAnalysis | null,
     effort_estimate: (row.effort_estimate ?? null) as EffortEstimate | null,
@@ -104,6 +104,8 @@ export interface InsertIssueData {
   effortReasoning?: string | null
   // Product scope
   productScopeId?: string | null
+  // Custom fields
+  customFields?: Record<string, unknown>
 }
 
 /**
@@ -128,6 +130,8 @@ export async function insertIssue(data: InsertIssueData): Promise<IssueRecord> {
       // Effort estimation
       effort_estimate: data.effortEstimate ?? null,
       effort_reasoning: data.effortReasoning ?? null,
+      // Custom fields
+      custom_fields: data.customFields ?? null,
     })
     .returning()
 
@@ -168,6 +172,7 @@ export async function updateIssueById(issueId: string, data: UpdateIssueInput): 
   if (data.impact_score !== undefined) updates.impact_score = data.impact_score
   if (data.confidence_score !== undefined) updates.confidence_score = data.confidence_score
   if (data.effort_score !== undefined) updates.effort_score = data.effort_score
+  if (data.custom_fields !== undefined) updates.custom_fields = data.custom_fields
 
   const [issue] = await db
     .update(issues)
@@ -347,169 +352,163 @@ export async function updateIssueArchiveStatusById(
 }
 
 // ============================================================================
+// Shared filter builder
+// ============================================================================
+
+/**
+ * Builds filter conditions for listIssues.
+ */
+function buildIssueFilterConditions(filters: IssueFilters): SQL[] {
+  const conditions: SQL[] = []
+  if (!filters.showArchived) {
+    conditions.push(eq(issues.is_archived, false))
+  }
+  if (filters.type) {
+    conditions.push(eq(issues.type, filters.type))
+  }
+  if (filters.priority) {
+    conditions.push(eq(issues.priority, filters.priority))
+  }
+  if (filters.status) {
+    conditions.push(eq(issues.status, filters.status))
+  }
+  if (filters.productScopeIds && filters.productScopeIds.length > 0) {
+    conditions.push(
+      inArray(
+        issues.id,
+        db
+          .select({ id: entityRelationships.issue_id })
+          .from(entityRelationships)
+          .where(
+            and(
+              inArray(entityRelationships.product_scope_id, filters.productScopeIds),
+              isNotNull(entityRelationships.issue_id),
+            ),
+          ),
+      ),
+    )
+  }
+  if (filters.goalId) {
+    conditions.push(
+      inArray(
+        issues.id,
+        db
+          .select({ id: entityRelationships.issue_id })
+          .from(entityRelationships)
+          .where(
+            and(
+              isNotNull(entityRelationships.issue_id),
+              isNotNull(entityRelationships.product_scope_id),
+              sql`${entityRelationships.metadata}->>'matchedGoalId' = ${filters.goalId}`,
+            ),
+          ),
+      ),
+    )
+  }
+  if (filters.reachLevel) {
+    const [min, max] = metricLevelToRange(filters.reachLevel)
+    conditions.push(gte(issues.reach_score, min))
+    conditions.push(lte(issues.reach_score, max))
+  }
+  if (filters.impactLevel) {
+    const [min, max] = metricLevelToRange(filters.impactLevel)
+    conditions.push(gte(issues.impact_score, min))
+    conditions.push(lte(issues.impact_score, max))
+  }
+  if (filters.confidenceLevel) {
+    const [min, max] = metricLevelToRange(filters.confidenceLevel)
+    conditions.push(gte(issues.confidence_score, min))
+    conditions.push(lte(issues.confidence_score, max))
+  }
+  if (filters.effortLevel) {
+    const [min, max] = metricLevelToRange(filters.effortLevel)
+    conditions.push(gte(issues.effort_score, min))
+    conditions.push(lte(issues.effort_score, max))
+  }
+  return conditions
+}
+
+// ============================================================================
 // Query Functions (use user-authenticated client, with caching)
 // ============================================================================
 
 /**
- * Lists issues with optional filters. Requires authenticated user context.
- * Only returns issues for projects owned by the current user.
+ * Lists issues for a single project. No auth check — caller must verify access.
  */
-export const listIssues = cache(
-  async (filters: IssueFilters = {}): Promise<{ issues: IssueWithProject[]; total: number }> => {
-    try {
-      const { userId, apiKeyProjectId } = await resolveRequestContext()
-
-      if (apiKeyProjectId && !filters.projectId) {
-        throw new Error('API key requests must include a projectId filter.')
-      }
-
-      // Get projects accessible by this user
-      const projectIds = apiKeyProjectId ? [apiKeyProjectId] : await getUserProjectIds(userId)
-
-      if (projectIds.length === 0) {
-        return { issues: [], total: 0 }
-      }
-
-      // Search across issue title/description and linked session messages via database RPC
-      if (filters.search && filters.search.trim().length >= 2 && filters.projectId) {
-        const searchTerm = filters.search.trim()
-        const sanitized = sanitizeSearchInput(searchTerm)
-        const limit = filters.limit ?? 50
-        const offset = filters.offset ?? 0
-
-        // Build metric range params
-        const reachRange = filters.reachLevel ? metricLevelToRange(filters.reachLevel) : undefined
-        const impactRange = filters.impactLevel ? metricLevelToRange(filters.impactLevel) : undefined
-        const confidenceRange = filters.confidenceLevel ? metricLevelToRange(filters.confidenceLevel) : undefined
-        const effortRange = filters.effortLevel ? metricLevelToRange(filters.effortLevel) : undefined
-
-        // Phase 1: RPC handles search + filters + pagination
-        const searchResults = await db.execute<{ issue_id: string; total_count: number }>(sql`
-          SELECT * FROM search_issues_multi(
-            p_project_id := ${filters.projectId}::uuid,
-            p_query := ${searchTerm},
-            p_query_like := ${sanitized},
-            p_type := ${filters.type || null},
-            p_priority := ${filters.priority || null},
-            p_status := ${filters.status || null},
-            p_is_archived := ${filters.showArchived ?? false},
-            p_reach_min := ${reachRange?.[0] ?? null}::double precision,
-            p_reach_max := ${reachRange?.[1] ?? null}::double precision,
-            p_impact_min := ${impactRange?.[0] ?? null}::double precision,
-            p_impact_max := ${impactRange?.[1] ?? null}::double precision,
-            p_confidence_min := ${confidenceRange?.[0] ?? null}::double precision,
-            p_confidence_max := ${confidenceRange?.[1] ?? null}::double precision,
-            p_effort_min := ${effortRange?.[0] ?? null}::double precision,
-            p_effort_max := ${effortRange?.[1] ?? null}::double precision,
-            p_product_area_ids := ${filters.productScopeIds && filters.productScopeIds.length > 0 ? filters.productScopeIds : null}::uuid[],
-            p_limit := ${limit},
-            p_offset := ${offset}
-          )
-        `)
-
-        if (!searchResults.rows || searchResults.rows.length === 0) {
-          return { issues: [], total: 0 }
-        }
-
-        const matchedIds = searchResults.rows.map((r) => r.issue_id)
-        const totalCount = searchResults.rows[0].total_count
-
-        // Phase 2: Fetch full issue objects by returned IDs
-        const results = await db.query.issues.findMany({
-          where: inArray(issues.id, matchedIds),
-          with: {
-            project: { columns: { id: true, name: true } },
-          },
-          orderBy: [desc(issues.updated_at)],
-        })
-
-        const mapped = results.map((r) => toIssueWithProject(r))
-        const enriched = await enrichIssuesWithProductScope(mapped)
-        return { issues: enriched, total: Number(totalCount) }
-      }
-
-      // Build conditions for non-search queries
-      const conditions = [inArray(issues.project_id, projectIds)]
-
-      if (!filters.showArchived) {
-        conditions.push(eq(issues.is_archived, false))
-      }
-      if (filters.projectId) {
-        conditions.push(eq(issues.project_id, filters.projectId))
-      }
-      if (filters.type) {
-        conditions.push(eq(issues.type, filters.type))
-      }
-      if (filters.priority) {
-        conditions.push(eq(issues.priority, filters.priority))
-      }
-      if (filters.status) {
-        conditions.push(eq(issues.status, filters.status))
-      }
-      if (filters.productScopeIds && filters.productScopeIds.length > 0) {
-        conditions.push(
-          inArray(
-            issues.id,
-            db
-              .select({ id: entityRelationships.issue_id })
-              .from(entityRelationships)
-              .where(
-                and(
-                  inArray(entityRelationships.product_scope_id, filters.productScopeIds),
-                  isNotNull(entityRelationships.issue_id),
-                ),
-              ),
-          ),
-        )
-      }
-      if (filters.goalId) {
-        conditions.push(
-          inArray(
-            issues.id,
-            db
-              .select({ id: entityRelationships.issue_id })
-              .from(entityRelationships)
-              .where(
-                and(
-                  isNotNull(entityRelationships.issue_id),
-                  isNotNull(entityRelationships.product_scope_id),
-                  sql`${entityRelationships.metadata}->>'matchedGoalId' = ${filters.goalId}`,
-                ),
-              ),
-          ),
-        )
-      }
-      if (filters.reachLevel) {
-        const [min, max] = metricLevelToRange(filters.reachLevel)
-        conditions.push(gte(issues.reach_score, min))
-        conditions.push(lte(issues.reach_score, max))
-      }
-      if (filters.impactLevel) {
-        const [min, max] = metricLevelToRange(filters.impactLevel)
-        conditions.push(gte(issues.impact_score, min))
-        conditions.push(lte(issues.impact_score, max))
-      }
-      if (filters.confidenceLevel) {
-        const [min, max] = metricLevelToRange(filters.confidenceLevel)
-        conditions.push(gte(issues.confidence_score, min))
-        conditions.push(lte(issues.confidence_score, max))
-      }
-      if (filters.effortLevel) {
-        const [min, max] = metricLevelToRange(filters.effortLevel)
-        conditions.push(gte(issues.effort_score, min))
-        conditions.push(lte(issues.effort_score, max))
-      }
-
-      const whereClause = and(...conditions)
-
-      // Count query
-      const [{ total }] = await db.select({ total: countFn() }).from(issues).where(whereClause)
-
-      // Data query with relations
+export async function listIssues(
+  projectId: string,
+  filters: IssueFilters
+): Promise<{ issues: IssueWithProject[]; total: number }> {
+  try {
+    // Search across issue title/description and linked session messages via database RPC
+    if (filters.search && filters.search.trim().length >= 2) {
+      const searchTerm = filters.search.trim()
+      const sanitized = sanitizeSearchInput(searchTerm)
       const limit = filters.limit ?? 50
       const offset = filters.offset ?? 0
 
+      // Build metric range params
+      const reachRange = filters.reachLevel ? metricLevelToRange(filters.reachLevel) : undefined
+      const impactRange = filters.impactLevel ? metricLevelToRange(filters.impactLevel) : undefined
+      const confidenceRange = filters.confidenceLevel ? metricLevelToRange(filters.confidenceLevel) : undefined
+      const effortRange = filters.effortLevel ? metricLevelToRange(filters.effortLevel) : undefined
+
+      // Phase 1: RPC handles search + filters + pagination
+      const searchResults = await db.execute<{ issue_id: string; total_count: number }>(sql`
+        SELECT * FROM search_issues_multi(
+          p_project_id := ${projectId}::uuid,
+          p_query := ${searchTerm},
+          p_query_like := ${sanitized},
+          p_type := ${filters.type || null},
+          p_priority := ${filters.priority || null},
+          p_status := ${filters.status || null},
+          p_is_archived := ${filters.showArchived ?? false},
+          p_reach_min := ${reachRange?.[0] ?? null}::double precision,
+          p_reach_max := ${reachRange?.[1] ?? null}::double precision,
+          p_impact_min := ${impactRange?.[0] ?? null}::double precision,
+          p_impact_max := ${impactRange?.[1] ?? null}::double precision,
+          p_confidence_min := ${confidenceRange?.[0] ?? null}::double precision,
+          p_confidence_max := ${confidenceRange?.[1] ?? null}::double precision,
+          p_effort_min := ${effortRange?.[0] ?? null}::double precision,
+          p_effort_max := ${effortRange?.[1] ?? null}::double precision,
+          p_product_area_ids := ${filters.productScopeIds && filters.productScopeIds.length > 0 ? filters.productScopeIds : null}::uuid[],
+          p_limit := ${limit},
+          p_offset := ${offset}
+        )
+      `)
+
+      if (!searchResults.rows || searchResults.rows.length === 0) {
+        return { issues: [], total: 0 }
+      }
+
+      const matchedIds = searchResults.rows.map((r) => r.issue_id)
+      const totalCount = searchResults.rows[0].total_count
+
+      // Phase 2: Fetch full issue objects by returned IDs
       const results = await db.query.issues.findMany({
+        where: inArray(issues.id, matchedIds),
+        with: {
+          project: { columns: { id: true, name: true } },
+        },
+        orderBy: [desc(issues.updated_at)],
+      })
+
+      const mapped = results.map((r) => toIssueWithProject(r))
+      const enriched = await enrichIssuesWithProductScope(mapped)
+      return { issues: enriched, total: Number(totalCount) }
+    }
+
+    // Build conditions for non-search queries
+    const conditions = [eq(issues.project_id, projectId), ...buildIssueFilterConditions(filters)]
+
+    const whereClause = and(...conditions)
+    const limit = filters.limit ?? 50
+    const offset = filters.offset ?? 0
+
+    // Run count + data queries in parallel
+    const [countResult, results] = await Promise.all([
+      db.select({ total: countFn() }).from(issues).where(whereClause),
+      db.query.issues.findMany({
         where: whereClause,
         with: {
           project: { columns: { id: true, name: true } },
@@ -517,27 +516,26 @@ export const listIssues = cache(
         orderBy: [desc(issues.updated_at)],
         limit,
         offset,
-      })
+      }),
+    ])
+    const total = countResult[0].total
 
-      const mapped = results.map((r) => toIssueWithProject(r))
-      const enriched = await enrichIssuesWithProductScope(mapped)
-      return { issues: enriched, total: Number(total) }
-    } catch (error) {
-      console.error('[db.issues] unexpected error listing issues', error)
-      throw error
-    }
+    const mapped = results.map((r) => toIssueWithProject(r))
+    const enriched = await enrichIssuesWithProductScope(mapped)
+    return { issues: enriched, total: Number(total) }
+  } catch (error) {
+    console.error('[db.issues] unexpected error listing issues', error)
+    throw error
   }
-)
+}
 
 /**
  * Gets an issue by ID with linked feedback. Requires authenticated user context.
  * Only returns the issue if it belongs to a project owned by the current user.
  * Sessions are resolved via entity_relationships.
  */
-export const getIssueById = cache(async (issueId: string): Promise<IssueWithSessions | null> => {
+export async function getIssueById(issueId: string): Promise<IssueWithSessions | null> {
   try {
-    const { userId } = await resolveRequestContext()
-
     const result = await db.query.issues.findFirst({
       where: eq(issues.id, issueId),
       with: {
@@ -546,9 +544,6 @@ export const getIssueById = cache(async (issueId: string): Promise<IssueWithSess
     })
 
     if (!result) return null
-
-    const hasAccess = await hasProjectAccess(result.project_id, userId)
-    if (!hasAccess) return null
 
     // Fetch linked session IDs and product scope in parallel
     const [sessionIds, [productScopeId]] = await Promise.all([
@@ -640,35 +635,28 @@ export const getIssueById = cache(async (issueId: string): Promise<IssueWithSess
     console.error('[db.issues] unexpected error getting issue', issueId, error)
     throw error
   }
-})
+}
 
 /**
  * Gets issues for a specific project.
  */
-export const getProjectIssues = cache(
-  async (projectId: string, limit = 20): Promise<IssueWithProject[]> => {
-    try {
-      const { userId } = await resolveRequestContext()
+export async function getProjectIssues(projectId: string, limit = 20): Promise<IssueWithProject[]> {
+  try {
+    const results = await db.query.issues.findMany({
+      where: eq(issues.project_id, projectId),
+      with: {
+        project: { columns: { id: true, name: true } },
+      },
+      orderBy: [desc(issues.updated_at)],
+      limit,
+    })
 
-      const hasAccess = await hasProjectAccess(projectId, userId)
-      if (!hasAccess) return []
-
-      const results = await db.query.issues.findMany({
-        where: eq(issues.project_id, projectId),
-        with: {
-          project: { columns: { id: true, name: true } },
-        },
-        orderBy: [desc(issues.updated_at)],
-        limit,
-      })
-
-      return enrichIssuesWithProductScope(results.map((r) => toIssueWithProject(r)))
-    } catch (error) {
-      console.error('[db.issues] unexpected error getting project issues', projectId, error)
-      throw error
-    }
+    return enrichIssuesWithProductScope(results.map((r) => toIssueWithProject(r)))
+  } catch (error) {
+    console.error('[db.issues] unexpected error getting project issues', projectId, error)
+    throw error
   }
-)
+}
 
 /**
  * Gets project settings.
@@ -717,56 +705,47 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
 /**
  * Gets issues count by status for a project.
  */
-export const getProjectIssueStats = cache(
-  async (
-    projectId: string
-  ): Promise<{
-    total: number
-    open: number
-    ready: number
-    inProgress: number
-    resolved: number
-    closed: number
-  }> => {
-    try {
-      const { userId } = await resolveRequestContext()
+export async function getProjectIssueStats(
+  projectId: string
+): Promise<{
+  total: number
+  open: number
+  ready: number
+  inProgress: number
+  resolved: number
+  closed: number
+}> {
+  try {
+    const rows = await db
+      .select({ status: issues.status, cnt: countFn() })
+      .from(issues)
+      .where(eq(issues.project_id, projectId))
+      .groupBy(issues.status)
 
-      const hasAccess = await hasProjectAccess(projectId, userId)
-      if (!hasAccess) {
-        throw new Error('Access denied.')
-      }
-
-      const rows = await db
-        .select({ status: issues.status, cnt: countFn() })
-        .from(issues)
-        .where(eq(issues.project_id, projectId))
-        .groupBy(issues.status)
-
-      const counts: Record<string, number> = {}
-      for (const row of rows) {
-        counts[row.status ?? 'open'] = Number(row.cnt)
-      }
-
-      const open = counts['open'] ?? 0
-      const ready = counts['ready'] ?? 0
-      const inProgress = counts['in_progress'] ?? 0
-      const resolved = counts['resolved'] ?? 0
-      const closed = counts['closed'] ?? 0
-
-      return {
-        total: open + ready + inProgress + resolved + closed,
-        open,
-        ready,
-        inProgress,
-        resolved,
-        closed,
-      }
-    } catch (error) {
-      console.error('[db.issues] unexpected error getting issue stats', projectId, error)
-      throw error
+    const counts: Record<string, number> = {}
+    for (const row of rows) {
+      counts[row.status ?? 'open'] = Number(row.cnt)
     }
+
+    const open = counts['open'] ?? 0
+    const ready = counts['ready'] ?? 0
+    const inProgress = counts['in_progress'] ?? 0
+    const resolved = counts['resolved'] ?? 0
+    const closed = counts['closed'] ?? 0
+
+    return {
+      total: open + ready + inProgress + resolved + closed,
+      open,
+      ready,
+      inProgress,
+      resolved,
+      closed,
+    }
+  } catch (error) {
+    console.error('[db.issues] unexpected error getting issue stats', projectId, error)
+    throw error
   }
-)
+}
 
 // ============================================================================
 // Analysis helpers
@@ -1021,12 +1000,6 @@ export async function getTopRankedIssues(
   projectId: string,
   limit = 5
 ): Promise<IssueWithProject[]> {
-  try {
-    await resolveRequestContext()
-  } catch {
-    return []
-  }
-
   try {
     const results = await db.query.issues.findMany({
       where: and(

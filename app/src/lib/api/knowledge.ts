@@ -4,9 +4,9 @@ import type { KnowledgeSourceWithCodebase, KnowledgePackageWithSources } from '@
 const paths = {
   sources: '/api/knowledge/sources',
   source: (s: string) => `/api/knowledge/sources/${s}`,
-  packageAnalyze: (pkg: string) => `/api/knowledge/packages/${pkg}/analyze`,
-  packageAnalyzeCancel: (pkg: string) => `/api/knowledge/packages/${pkg}/analyze/cancel`,
-  packageAnalyzeStream: (pkg: string) => `/api/knowledge/packages/${pkg}/analyze/stream`,
+  packageAnalyze: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze`,
+  packageAnalyzeCancel: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze/cancel`,
+  packageAnalyzeStream: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze/stream`,
   sourceAnalyze: (s: string) => `/api/knowledge/sources/${s}/analyze`,
   sourceAnalyzeStream: (s: string) => `/api/knowledge/sources/${s}/analyze/stream`,
 }
@@ -97,8 +97,8 @@ export function sourceAnalyzeStreamUrl(projectId: string, sourceId: string): str
 // ---------------------------------------------------------------------------
 
 const packagePaths = {
-  list: '/api/knowledge/packages',
-  detail: (pkg: string) => `/api/knowledge/packages/${pkg}`,
+  list: '/api/settings/agents/support-agent/packages',
+  detail: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}`,
 }
 
 export async function listPackages(projectId: string) {

@@ -61,10 +61,13 @@ vi.mock('@/types/customer', () => ({
 }))
 
 const mockListCompanies = vi.fn()
-const mockInsertCompany = vi.fn()
 vi.mock('@/lib/db/queries/companies', () => ({
   listCompanies: (...args: unknown[]) => mockListCompanies(...args),
-  insertCompany: (...args: unknown[]) => mockInsertCompany(...args),
+}))
+
+const mockCreateCompany = vi.fn()
+vi.mock('@/lib/customers/customers-service', () => ({
+  createCompany: (...args: unknown[]) => mockCreateCompany(...args),
 }))
 
 // ---------------------------------------------------------------------------
@@ -152,7 +155,7 @@ describe('GET /api/companies', () => {
     expect(body.companies).toEqual(companies)
     expect(body.total).toBe(1)
 
-    const filters = mockListCompanies.mock.calls[0][0]
+    const filters = mockListCompanies.mock.calls[0][1]
     expect(filters.projectId).toBe(PROJECT_ID)
   })
 
@@ -164,7 +167,7 @@ describe('GET /api/companies', () => {
     )
     await GET(req)
 
-    const filters = mockListCompanies.mock.calls[0][0]
+    const filters = mockListCompanies.mock.calls[0][1]
     expect(filters.stage).toBe('active')
     expect(filters.search).toBe('acme')
     expect(filters.industry).toBe('SaaS')
@@ -180,7 +183,7 @@ describe('GET /api/companies', () => {
     )
     await GET(req)
 
-    const filters = mockListCompanies.mock.calls[0][0]
+    const filters = mockListCompanies.mock.calls[0][1]
     expect(filters.limit).toBe(15)
     expect(filters.offset).toBe(30)
   })
@@ -193,7 +196,7 @@ describe('GET /api/companies', () => {
     )
     await GET(req)
 
-    const filters = mockListCompanies.mock.calls[0][0]
+    const filters = mockListCompanies.mock.calls[0][1]
     expect(filters.showArchived).toBe(true)
   })
 
@@ -294,14 +297,14 @@ describe('POST /api/companies', () => {
   })
 
   it('accepts valid stage values', async () => {
-    mockInsertCompany.mockResolvedValue({ id: 'co-new' })
+    mockCreateCompany.mockResolvedValue({ id: 'co-new' })
 
     for (const stage of ['prospect', 'onboarding', 'active', 'churned', 'expansion']) {
       vi.clearAllMocks()
       mockIsDatabaseConfigured.mockReturnValue(true)
       mockRequireRequestIdentity.mockResolvedValue(MOCK_IDENTITY)
       mockAssertProjectAccess.mockResolvedValue(undefined)
-      mockInsertCompany.mockResolvedValue({ id: 'co-new' })
+      mockCreateCompany.mockResolvedValue({ id: 'co-new' })
 
       const req = createPostRequest({ ...validBody, stage })
       const res = await POST(req)
@@ -312,7 +315,7 @@ describe('POST /api/companies', () => {
 
   it('creates company with valid input and returns 201', async () => {
     const createdCompany = { id: 'co-new', ...validBody }
-    mockInsertCompany.mockResolvedValue(createdCompany)
+    mockCreateCompany.mockResolvedValue(createdCompany)
 
     const req = createPostRequest(validBody)
     const res = await POST(req)
@@ -320,10 +323,10 @@ describe('POST /api/companies', () => {
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.company.id).toBe('co-new')
-    expect(mockInsertCompany).toHaveBeenCalled()
+    expect(mockCreateCompany).toHaveBeenCalled()
   })
 
-  it('passes optional fields through to insertCompany', async () => {
+  it('passes optional fields through to createCompany', async () => {
     const fullBody = {
       ...validBody,
       arr: 100000,
@@ -338,12 +341,12 @@ describe('POST /api/companies', () => {
       notes: 'Strategic account',
       custom_fields: { region: 'west' },
     }
-    mockInsertCompany.mockResolvedValue({ id: 'co-new' })
+    mockCreateCompany.mockResolvedValue({ id: 'co-new' })
 
     const req = createPostRequest(fullBody)
     await POST(req)
 
-    const input = mockInsertCompany.mock.calls[0][0]
+    const input = mockCreateCompany.mock.calls[0][0]
     expect(input.projectId).toBe(PROJECT_ID)
     expect(input.name).toBe('Acme Corp')
     expect(input.domain).toBe('acme.com')
@@ -361,22 +364,22 @@ describe('POST /api/companies', () => {
   })
 
   it('defaults stage to prospect when not provided', async () => {
-    mockInsertCompany.mockResolvedValue({ id: 'co-new' })
+    mockCreateCompany.mockResolvedValue({ id: 'co-new' })
 
     const req = createPostRequest(validBody)
     await POST(req)
 
-    const input = mockInsertCompany.mock.calls[0][0]
+    const input = mockCreateCompany.mock.calls[0][0]
     expect(input.stage).toBe('prospect')
   })
 
   it('defaults optional fields to null or empty', async () => {
-    mockInsertCompany.mockResolvedValue({ id: 'co-new' })
+    mockCreateCompany.mockResolvedValue({ id: 'co-new' })
 
     const req = createPostRequest(validBody)
     await POST(req)
 
-    const input = mockInsertCompany.mock.calls[0][0]
+    const input = mockCreateCompany.mock.calls[0][0]
     expect(input.arr).toBeNull()
     expect(input.productUsed).toBeNull()
     expect(input.industry).toBeNull()
@@ -390,7 +393,7 @@ describe('POST /api/companies', () => {
   })
 
   it('returns 500 on unexpected error', async () => {
-    mockInsertCompany.mockRejectedValue(new Error('DB write failed'))
+    mockCreateCompany.mockRejectedValue(new Error('DB write failed'))
 
     const req = createPostRequest(validBody)
     const res = await POST(req)

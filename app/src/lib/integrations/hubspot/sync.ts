@@ -9,9 +9,6 @@
  * - Fires contact embeddings after insert
  */
 
-import { db } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { companies, contacts } from '@/lib/db/schema/app'
 import {
   HubSpotClient,
   type HubSpotCompany,
@@ -22,11 +19,9 @@ import {
 } from './client'
 import {
   getHubSpotCredentials,
-  isCompanySynced,
   getSyncedCompanyMap,
   recordSyncedCompany,
   updateSyncedCompanyTimestamp,
-  isContactSynced,
   getSyncedContactMap,
   recordSyncedContact,
   updateSyncedContactTimestamp,
@@ -36,6 +31,11 @@ import {
   type HubSpotFilterConfig,
   type OverwritePolicy,
 } from './index'
+import {
+  upsertCompanyAdmin,
+  upsertContactAdmin,
+  type MergeStrategy,
+} from '@/lib/customers/customers-service'
 
 /**
  * Progress event during sync
@@ -78,37 +78,11 @@ export interface SyncOptions {
 }
 
 /**
- * Apply merge strategy when updating an existing record.
- * Returns only the fields that should be updated based on the policy.
+ * Map HubSpot OverwritePolicy to service MergeStrategy.
  */
-function applyMergeStrategy(
-  policy: OverwritePolicy,
-  existingValues: Record<string, unknown>,
-  newValues: Record<string, unknown>
-): Record<string, unknown> {
-  if (policy === 'never_overwrite') {
-    return {}
-  }
-
-  if (policy === 'hubspot_wins') {
-    // Overwrite all non-undefined new values
-    const updates: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(newValues)) {
-      if (value !== undefined) {
-        updates[key] = value
-      }
-    }
-    return updates
-  }
-
-  // fill_nulls: only set fields that are currently null/undefined
-  const updates: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(newValues)) {
-    if (value !== undefined && value !== null && (existingValues[key] === null || existingValues[key] === undefined)) {
-      updates[key] = value
-    }
-  }
-  return updates
+function toMergeStrategy(policy: OverwritePolicy): MergeStrategy {
+  if (policy === 'hubspot_wins') return 'overwrite'
+  return policy // 'fill_nulls' | 'never_overwrite' map directly
 }
 
 /**
@@ -215,122 +189,43 @@ async function processCompany(
     return 'skipped'
   }
 
+  const mergeStrategy = toMergeStrategy(overwritePolicy)
+
   // Check if already synced via pre-fetched mapping
   const existingCompanyId = syncedCompanyMap.get(hsCompany.id)
 
-  if (existingCompanyId) {
-    // Already synced - apply merge strategy for updates
-    if (overwritePolicy === 'never_overwrite') {
-      await updateSyncedCompanyTimestamp(connectionId, hsCompany.id, hsCompany.updatedAt)
-      return 'updated'
-    }
-
-    // Fetch existing record
-    const existing = await db
-      .select()
-      .from(companies)
-      .where(eq(companies.id, existingCompanyId))
-
-    if (existing[0]) {
-      const existingRecord = existing[0]
-      const newValues: Record<string, unknown> = {
-        industry: mapped.industry,
-        country: mapped.country,
-        employee_count: mapped.employeeCount,
-        notes: mapped.notes,
-      }
-
-      const updates = applyMergeStrategy(overwritePolicy, existingRecord as unknown as Record<string, unknown>, newValues)
-      if (Object.keys(updates).length > 0) {
-        // Merge custom_fields
-        const existingCustom = (existingRecord.custom_fields as Record<string, unknown>) || {}
-        updates.custom_fields = { ...existingCustom, ...mapped.customFields }
-        updates.updated_at = new Date()
-
-        await db
-          .update(companies)
-          .set(updates)
-          .where(eq(companies.id, existingCompanyId))
-      }
-    }
-
+  if (existingCompanyId && overwritePolicy === 'never_overwrite') {
+    // Already synced and policy prevents any updates - just update timestamp
     await updateSyncedCompanyTimestamp(connectionId, hsCompany.id, hsCompany.updatedAt)
     return 'updated'
   }
 
-  // Check if company already exists by domain in this project (single SELECT with all needed fields)
-  const existingByDomain = await db
-    .select()
-    .from(companies)
-    .where(
-      and(
-        eq(companies.project_id, projectId),
-        eq(companies.domain, mapped.domain)
-      )
-    )
+  // Upsert via service - handles find-by-domain + merge internally
+  const { record } = await upsertCompanyAdmin({
+    projectId,
+    domain: mapped.domain,
+    name: mapped.name || mapped.domain,
+    industry: mapped.industry,
+    country: mapped.country,
+    employeeCount: mapped.employeeCount,
+    notes: mapped.notes,
+    customFields: mapped.customFields,
+    mergeStrategy,
+  })
 
-  if (existingByDomain[0]) {
-    // Company exists by domain - create mapping and apply merge
-    const existingRecord = existingByDomain[0]
-
-    if (overwritePolicy !== 'never_overwrite') {
-      const newValues: Record<string, unknown> = {
-        industry: mapped.industry,
-        country: mapped.country,
-        employee_count: mapped.employeeCount,
-        notes: mapped.notes,
-      }
-
-      const updates = applyMergeStrategy(overwritePolicy, existingRecord as unknown as Record<string, unknown>, newValues)
-      if (Object.keys(updates).length > 0) {
-        const existingCustom = (existingRecord.custom_fields as Record<string, unknown>) || {}
-        updates.custom_fields = { ...existingCustom, ...mapped.customFields }
-        updates.updated_at = new Date()
-
-        await db
-          .update(companies)
-          .set(updates)
-          .where(eq(companies.id, existingRecord.id))
-      }
-    }
-
-    // Record the mapping
+  // Record or update sync mapping
+  if (existingCompanyId) {
+    await updateSyncedCompanyTimestamp(connectionId, hsCompany.id, hsCompany.updatedAt)
+  } else {
     await recordSyncedCompany({
       connectionId,
       hubspotCompanyId: hsCompany.id,
-      companyId: existingRecord.id,
-      hubspotUpdatedAt: hsCompany.updatedAt,
-    })
-
-    return 'synced'
-  }
-
-  // New company - insert
-  const [inserted] = await db
-    .insert(companies)
-    .values({
-      project_id: projectId,
-      name: mapped.name || mapped.domain,
-      domain: mapped.domain,
-      industry: mapped.industry,
-      country: mapped.country,
-      employee_count: mapped.employeeCount,
-      notes: mapped.notes,
-      custom_fields: mapped.customFields,
-      is_archived: false,
-    })
-    .returning({ id: companies.id })
-
-  if (inserted) {
-    await recordSyncedCompany({
-      connectionId,
-      hubspotCompanyId: hsCompany.id,
-      companyId: inserted.id,
+      companyId: record.id,
       hubspotUpdatedAt: hsCompany.updatedAt,
     })
   }
 
-  return 'synced'
+  return existingCompanyId ? 'updated' : 'synced'
 }
 
 /**
@@ -350,130 +245,41 @@ async function processContact(
     return 'skipped'
   }
 
+  const mergeStrategy = toMergeStrategy(overwritePolicy)
+
   // Check if already synced via pre-fetched mapping
   const existingContactId = syncedContactMap.get(hsContact.id)
 
-  if (existingContactId) {
-    if (overwritePolicy === 'never_overwrite') {
-      await updateSyncedContactTimestamp(connectionId, hsContact.id, hsContact.updatedAt)
-      return 'updated'
-    }
-
-    const existing = await db
-      .select()
-      .from(contacts)
-      .where(eq(contacts.id, existingContactId))
-
-    if (existing[0]) {
-      const existingRecord = existing[0]
-      const newValues: Record<string, unknown> = {
-        name: mapped.name,
-        phone: mapped.phone,
-        title: mapped.title,
-      }
-
-      const updates = applyMergeStrategy(overwritePolicy, existingRecord as unknown as Record<string, unknown>, newValues)
-      if (Object.keys(updates).length > 0) {
-        const existingCustom = (existingRecord.custom_fields as Record<string, unknown>) || {}
-        updates.custom_fields = { ...existingCustom, ...mapped.customFields }
-        updates.updated_at = new Date()
-
-        await db
-          .update(contacts)
-          .set(updates)
-          .where(eq(contacts.id, existingContactId))
-      }
-    }
-
+  if (existingContactId && overwritePolicy === 'never_overwrite') {
+    // Already synced and policy prevents any updates - just update timestamp
     await updateSyncedContactTimestamp(connectionId, hsContact.id, hsContact.updatedAt)
     return 'updated'
   }
 
-  // Check if contact already exists by email in this project (single SELECT with all fields)
-  const existingByEmail = await db
-    .select()
-    .from(contacts)
-    .where(
-      and(
-        eq(contacts.project_id, projectId),
-        eq(contacts.email, mapped.email)
-      )
-    )
+  // Upsert via service - handles find-by-email + merge internally
+  const { record } = await upsertContactAdmin({
+    projectId,
+    email: mapped.email,
+    name: mapped.name || mapped.email,
+    phone: mapped.phone,
+    title: mapped.title,
+    customFields: mapped.customFields,
+    mergeStrategy,
+  })
 
-  if (existingByEmail[0]) {
-    const existingRecord = existingByEmail[0]
-
-    if (overwritePolicy !== 'never_overwrite') {
-      const newValues: Record<string, unknown> = {
-        name: mapped.name,
-        phone: mapped.phone,
-        title: mapped.title,
-      }
-
-      const updates = applyMergeStrategy(overwritePolicy, existingRecord as unknown as Record<string, unknown>, newValues)
-      if (Object.keys(updates).length > 0) {
-        const existingCustom = (existingRecord.custom_fields as Record<string, unknown>) || {}
-        updates.custom_fields = { ...existingCustom, ...mapped.customFields }
-        updates.updated_at = new Date()
-
-        await db
-          .update(contacts)
-          .set(updates)
-          .where(eq(contacts.id, existingRecord.id))
-      }
-    }
-
+  // Record or update sync mapping
+  if (existingContactId) {
+    await updateSyncedContactTimestamp(connectionId, hsContact.id, hsContact.updatedAt)
+  } else {
     await recordSyncedContact({
       connectionId,
       hubspotContactId: hsContact.id,
-      contactId: existingRecord.id,
+      contactId: record.id,
       hubspotUpdatedAt: hsContact.updatedAt,
     })
-
-    return 'synced'
   }
 
-  // New contact - insert
-  const [inserted] = await db
-    .insert(contacts)
-    .values({
-      project_id: projectId,
-      name: mapped.name || mapped.email,
-      email: mapped.email,
-      phone: mapped.phone,
-      title: mapped.title,
-      custom_fields: mapped.customFields,
-      is_archived: false,
-    })
-    .returning({ id: contacts.id })
-
-  if (inserted) {
-    await recordSyncedContact({
-      connectionId,
-      hubspotContactId: hsContact.id,
-      contactId: inserted.id,
-      hubspotUpdatedAt: hsContact.updatedAt,
-    })
-
-    // Fire-and-forget: create embedding for new contact
-    void (async () => {
-      try {
-        const { buildContactEmbeddingText, upsertContactEmbedding } = await import(
-          '@/lib/customers/contact-embedding-service'
-        )
-        const text = buildContactEmbeddingText({
-          name: mapped.name || mapped.email!,
-          email: mapped.email!,
-          title: mapped.title,
-        })
-        await upsertContactEmbedding(inserted.id, projectId, text)
-      } catch (err) {
-        console.warn('[hubspot.sync] Embedding failed for contact', inserted.id, err)
-      }
-    })()
-  }
-
-  return 'synced'
+  return existingContactId ? 'updated' : 'synced'
 }
 
 /**

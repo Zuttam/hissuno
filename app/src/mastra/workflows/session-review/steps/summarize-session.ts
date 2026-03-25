@@ -14,7 +14,8 @@ import { getSessionMessages } from '@/lib/db/queries/session-messages'
 import { db } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { sessions } from '@/lib/db/schema/app'
-import { upsertSessionEmbedding } from '@/lib/sessions/embedding-service'
+import { fireEmbedding } from '@/lib/utils/embeddings'
+import { buildSessionEmbeddingText } from '@/lib/sessions/embedding-service'
 
 export const summarizeSession = createStep({
   id: 'summarize-session',
@@ -63,7 +64,7 @@ export const summarizeSession = createStep({
       const tagsStr = tags.length > 0 ? tags.join(', ') : 'none'
 
       const { object } = await generateObject({
-        model: openai('gpt-4o-mini'),
+        model: openai('gpt-5.4-mini'),
         schema: z.object({
           title: z.string().describe('Concise title, max 8 words, capturing the core feedback topic'),
           description: z
@@ -88,8 +89,7 @@ Generate a concise title (max 8 words) and a 2-3 sentence description summarizin
         .where(eq(sessions.id, sessionId))
 
       // Fire-and-forget: generate embedding for semantic search
-      void upsertSessionEmbedding(sessionId, projectId, object.title, object.description)
-        .catch((err) => logger?.warn('[summarize-session] Embedding failed', { sessionId, error: err }))
+      fireEmbedding(sessionId, 'session', projectId, buildSessionEmbeddingText(object.title, object.description))
 
       logger?.info('[summarize-session] Complete', { sessionId, title: object.title })
       await writer?.write({ type: 'progress', message: `Summary: ${object.title}` })

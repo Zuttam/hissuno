@@ -14,6 +14,7 @@ export const sourceAnalysisInputSchema = z.object({
   analysisScope: z.string().nullable(),
   notionPageId: z.string().nullable().optional(),
   origin: z.string().nullable().optional(),
+  sourceName: z.string().nullable().optional(),
 })
 
 export type SourceAnalysisInput = z.infer<typeof sourceAnalysisInputSchema>

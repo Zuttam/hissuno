@@ -7,7 +7,7 @@ import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-cont
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
 import { compilationRuns, knowledgeSources } from '@/lib/db/schema/app'
-import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
+import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/utils/sse'
 import { mastra } from '@/mastra'
 import type { SourceAnalysisInput } from '@/mastra/workflows/source-analysis/schemas'
 
@@ -128,6 +128,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
             analysisScope: source.analysis_scope ?? null,
             notionPageId: source.notion_page_id ?? null,
             origin: (source as Record<string, unknown>).origin as string | null ?? null,
+            sourceName: source.name ?? null,
           }
 
           const run = await workflow.createRunAsync({ runId: sourceAnalysis.run_id })

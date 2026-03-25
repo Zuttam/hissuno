@@ -106,8 +106,35 @@ The session list supports filtering by:
 - **Human takeover**: Show only sessions where a human agent intervened
 - **Review status**: Show only sessions that have or have not been reviewed by the PM agent
 
+### CLI and API
+
+You can query and search feedback from the CLI or API:
+
+```bash
+# List recent feedback from the widget
+hissuno list feedback --source widget --limit 20
+
+# Filter by tags
+hissuno list feedback --tags bug,feature_request
+
+# Search feedback semantically
+hissuno search "users struggling with onboarding" --type feedback
+
+# Get full session details including messages
+hissuno get feedback sess_abc123
+
+# Export to JSON for analysis
+hissuno --json list feedback --status closed --limit 100 > feedback-export.json
+```
+
 ## Manual Session Creation
 
-You can create sessions manually from the dashboard by providing a name, optional tags, and one or more messages. Manual sessions have the source set to **manual** and follow the same review pipeline as automatically captured sessions.
+You can create sessions manually from the dashboard or the CLI:
+
+```bash
+hissuno add feedback
+```
+
+The interactive prompt walks you through adding messages, a session name, and tags. Manual sessions have the source set to **manual** and follow the same review pipeline as automatically captured sessions.
 
 This is useful for logging feedback received through channels that are not directly integrated, such as email threads, conference notes, or verbal conversations.

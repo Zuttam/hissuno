@@ -7,11 +7,9 @@ import { db } from '@/lib/db'
 import { eq, ne, lte, and, or, isNull } from 'drizzle-orm'
 import { posthogConnections, posthogSyncRuns } from '@/lib/db/schema/app'
 import { getRecentSyncRuns } from '@/lib/db/queries/posthog'
-
-/**
- * Sync frequency options
- */
-export type PosthogSyncFrequency = 'manual' | '1h' | '6h' | '24h'
+import { type SyncFrequency } from '@/lib/integrations/shared/sync-constants'
+export type { SyncFrequency }
+import { calculateNextSyncTime } from '@/lib/integrations/shared/sync-utils'
 
 /**
  * Filter configuration for sync behavior
@@ -40,7 +38,7 @@ export interface PosthogIntegrationStatus {
   host: string | null
   posthogProjectId: string | null
   eventConfig: PosthogEventConfig | null
-  syncFrequency: PosthogSyncFrequency | null
+  syncFrequency: SyncFrequency | null
   syncEnabled: boolean
   lastSyncAt: string | null
   lastSyncStatus: string | null
@@ -94,7 +92,7 @@ export async function hasPosthogConnection(
     host: data.host,
     posthogProjectId: data.posthog_project_id,
     eventConfig: (data.event_config as PosthogEventConfig) || null,
-    syncFrequency: data.sync_frequency as PosthogSyncFrequency,
+    syncFrequency: data.sync_frequency as SyncFrequency,
     syncEnabled: data.sync_enabled,
     lastSyncAt: data.last_sync_at?.toISOString() ?? null,
     lastSyncStatus: data.last_sync_status,
@@ -158,7 +156,7 @@ export async function storePosthogCredentials(params: {
   posthogProjectId: string
   eventConfig?: PosthogEventConfig
   filterConfig?: PosthogFilterConfig
-  syncFrequency: PosthogSyncFrequency
+  syncFrequency: SyncFrequency
 }): Promise<{ success: boolean; connectionId?: string; error?: string }> {
   const nextSyncAt = calculateNextSyncTime(params.syncFrequency)
 
@@ -211,7 +209,7 @@ export async function storePosthogCredentials(params: {
 export async function updatePosthogSettings(
   projectId: string,
   settings: {
-    syncFrequency?: PosthogSyncFrequency
+    syncFrequency?: SyncFrequency
     syncEnabled?: boolean
     eventConfig?: PosthogEventConfig
     filterConfig?: Record<string, unknown>
@@ -314,7 +312,7 @@ export async function updateSyncState(
 
     const conn = connRows[0]
     if (conn) {
-      const nextSync = calculateNextSyncTime(conn.sync_frequency as PosthogSyncFrequency)
+      const nextSync = calculateNextSyncTime(conn.sync_frequency as SyncFrequency)
       updateData.next_sync_at = nextSync ? new Date(nextSync) : null
     }
   }
@@ -393,26 +391,3 @@ export async function getConnectionsDueForSync(): Promise<Array<{ id: string; pr
   }))
 }
 
-/**
- * Calculate next sync time based on frequency
- */
-function calculateNextSyncTime(frequency: PosthogSyncFrequency): string | null {
-  if (frequency === 'manual') {
-    return null
-  }
-
-  const now = new Date()
-  switch (frequency) {
-    case '1h':
-      now.setHours(now.getHours() + 1)
-      break
-    case '6h':
-      now.setHours(now.getHours() + 6)
-      break
-    case '24h':
-      now.setDate(now.getDate() + 1)
-      break
-  }
-
-  return now.toISOString()
-}

@@ -1,10 +1,6 @@
-import { cache } from 'react'
 import { db } from '@/lib/db'
 import { and, eq, gte, inArray, isNotNull } from 'drizzle-orm'
 import { sessions, contacts, companies, issues, entityRelationships } from '@/lib/db/schema/app'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { requireRequestIdentity } from '@/lib/auth/identity'
-import { hasProjectAccess } from '@/lib/auth/project-members'
 import type {
   AnalyticsPeriod,
   CustomerSegmentationAnalytics,
@@ -16,18 +12,10 @@ import { getPeriodStartDate } from './utils'
 /**
  * Get customer segmentation analytics for a project
  */
-export const getCustomerSegmentationAnalytics = cache(async (
+export async function getCustomerSegmentationAnalytics(
   projectId: string,
   period: AnalyticsPeriod
-): Promise<CustomerSegmentationAnalytics> => {
-  const identity = await requireRequestIdentity()
-  const userId = identity.type === 'user' ? identity.userId : identity.createdByUserId
-
-  const hasAccess = await hasProjectAccess(projectId, userId)
-  if (!hasAccess) {
-    throw new UnauthorizedError('You do not have access to this project.')
-  }
-
+): Promise<CustomerSegmentationAnalytics> {
   const periodStart = getPeriodStartDate(period)
 
   const emptyResult: CustomerSegmentationAnalytics = {
@@ -303,4 +291,4 @@ export const getCustomerSegmentationAnalytics = cache(async (
       championVsNonChampion,
     },
   }
-})
+}

@@ -15,7 +15,7 @@ import {
   updateGongSettings,
   disconnectGong,
   getSyncStats,
-  type GongSyncFrequency,
+  type SyncFrequency,
   type GongFilterConfig,
 } from '@/lib/integrations/gong'
 
@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const { projectId, syncFrequency, syncEnabled, filterConfig } = body as {
       projectId: string
-      syncFrequency?: GongSyncFrequency
+      syncFrequency?: SyncFrequency
       syncEnabled?: boolean
       filterConfig?: GongFilterConfig
     }

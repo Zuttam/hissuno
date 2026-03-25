@@ -4,14 +4,10 @@
  * Pure database operations for contacts.
  */
 
-import { cache } from 'react'
 import { eq, and, desc, ilike, or, count as drizzleCount, inArray, isNotNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { contacts, companies, sessions, issues, entityRelationships } from '@/lib/db/schema/app'
-import { resolveRequestContext, getUserProjectIds, sanitizeSearchInput } from '@/lib/db/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
-import { ForbiddenError } from '@/lib/auth/authorization'
-import { fireGraphEval } from '@/lib/graph-eval'
+import { contacts, sessions, issues, entityRelationships } from '@/lib/db/schema/app'
+import { sanitizeSearchInput } from '@/lib/db/server'
 import type {
   ContactRecord,
   ContactWithCompany,
@@ -69,8 +65,6 @@ export async function insertContact(
     throw new Error('Failed to insert contact: Unknown error')
   }
 
-  fireGraphEval(data.projectId, 'contact', contact.id)
-
   return contact as unknown as ContactRecord
 }
 
@@ -102,50 +96,7 @@ export async function updateContactById(
     throw new Error('Failed to update contact: Not found')
   }
 
-  const updated = contact as unknown as ContactRecord
-
-  // Re-embed if any embedded fields changed (fire-and-forget)
-  // MD5 hash in upsertContactEmbedding handles no-op detection automatically
-  const embeddedFieldChanged =
-    data.name !== undefined ||
-    data.email !== undefined ||
-    data.role !== undefined ||
-    data.title !== undefined ||
-    data.notes !== undefined ||
-    data.company_id !== undefined
-
-  if (embeddedFieldChanged) {
-    void (async () => {
-      try {
-        const { buildContactEmbeddingText, upsertContactEmbedding } = await import(
-          '@/lib/customers/contact-embedding-service'
-        )
-        let companyName: string | null = null
-        if (updated.company_id) {
-          const companyRow = await db.query.companies.findFirst({
-            where: eq(companies.id, updated.company_id),
-            columns: { name: true },
-          })
-          companyName = companyRow?.name ?? null
-        }
-        const text = buildContactEmbeddingText({
-          name: updated.name,
-          email: updated.email,
-          role: updated.role,
-          title: updated.title,
-          companyName,
-          notes: updated.notes,
-        })
-        await upsertContactEmbedding(updated.id, updated.project_id, text)
-      } catch (err) {
-        console.warn('[db.contacts] Embedding failed', contactId, err)
-      }
-    })()
-
-    fireGraphEval(updated.project_id, 'contact', updated.id)
-  }
-
-  return updated
+  return contact as unknown as ContactRecord
 }
 
 export async function deleteContactById(
@@ -179,10 +130,11 @@ export async function updateContactArchiveStatus(
 // Query Functions (use user-authenticated client, with caching)
 // ============================================================================
 
-export const listContacts = cache(async (filters: ContactFilters = {}): Promise<{ contacts: ContactWithCompany[], total: number }> => {
+export async function listContacts(
+  projectId: string,
+  filters: ContactFilters
+): Promise<{ contacts: ContactWithCompany[]; total: number }> {
   try {
-    const { userId } = await resolveRequestContext()
-
     // Build conditions
     const conditions = []
 
@@ -191,20 +143,8 @@ export const listContacts = cache(async (filters: ContactFilters = {}): Promise<
       conditions.push(eq(contacts.is_archived, false))
     }
 
-    if (filters.projectId) {
-      const hasAccess = await hasProjectAccess(filters.projectId, userId)
-      if (!hasAccess) {
-        throw new ForbiddenError('You do not have access to this project.')
-      }
-      conditions.push(eq(contacts.project_id, filters.projectId))
-    } else {
-      // No projectId specified — scope to only projects the user can access
-      const projectIds = await getUserProjectIds(userId)
-      if (projectIds.length === 0) {
-        return { contacts: [], total: 0 }
-      }
-      conditions.push(inArray(contacts.project_id, projectIds))
-    }
+    conditions.push(eq(contacts.project_id, projectId))
+
     if (filters.companyId) {
       conditions.push(eq(contacts.company_id, filters.companyId))
     }
@@ -258,12 +198,10 @@ export const listContacts = cache(async (filters: ContactFilters = {}): Promise<
     console.error('[db.contacts] unexpected error listing contacts', error)
     throw error
   }
-})
+}
 
-export const getContactById = cache(async (contactId: string): Promise<ContactWithCompany | null> => {
+export async function getContactById(contactId: string): Promise<ContactWithCompany | null> {
   try {
-    const { userId } = await resolveRequestContext()
-
     const contact = await db.query.contacts.findFirst({
       where: eq(contacts.id, contactId),
       with: {
@@ -277,17 +215,12 @@ export const getContactById = cache(async (contactId: string): Promise<ContactWi
       return null
     }
 
-    const hasAccess = await hasProjectAccess(contact.project_id, userId)
-    if (!hasAccess) {
-      return null
-    }
-
     return contact as unknown as ContactWithCompany
   } catch (error) {
     console.error('[db.contacts] unexpected error getting contact', contactId, error)
     throw error
   }
-})
+}
 
 // ============================================================================
 // Linked Sessions & Issues for Contact Sidebar
@@ -314,21 +247,8 @@ export interface ContactLinkedIssue {
 /**
  * Get sessions linked to a contact.
  */
-export const getContactLinkedSessions = cache(async (contactId: string, limit = 20): Promise<ContactLinkedSession[]> => {
+export async function getContactLinkedSessions(contactId: string, limit = 20): Promise<ContactLinkedSession[]> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    // Look up the contact's project to verify access
-    const contact = await db.query.contacts.findFirst({
-      where: eq(contacts.id, contactId),
-      columns: { project_id: true },
-    })
-
-    if (!contact) return []
-
-    const hasAccess = await hasProjectAccess(contact.project_id, userId)
-    if (!hasAccess) return []
-
     const rows = await db
       .select({
         id: sessions.id,
@@ -367,25 +287,20 @@ export const getContactLinkedSessions = cache(async (contactId: string, limit = 
     console.error('[db.contacts] unexpected error getting contact sessions', contactId, error)
     return []
   }
-})
+}
 
 /**
  * Get issues linked to a contact (through sessions via entity_relationships).
  */
-export const getContactLinkedIssues = cache(async (contactId: string, limit = 20): Promise<ContactLinkedIssue[]> => {
+export async function getContactLinkedIssues(contactId: string, limit = 20): Promise<ContactLinkedIssue[]> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    // Look up the contact's project to verify access
+    // Look up the contact's project to get session IDs
     const contact = await db.query.contacts.findFirst({
       where: eq(contacts.id, contactId),
       columns: { project_id: true },
     })
 
     if (!contact) return []
-
-    const hasAccess = await hasProjectAccess(contact.project_id, userId)
-    if (!hasAccess) return []
 
     // Step 1: Get session IDs linked to this contact via entity_relationships
     const sessionLinks = await db
@@ -448,4 +363,4 @@ export const getContactLinkedIssues = cache(async (contactId: string, limit = 20
     console.error('[db.contacts] unexpected error getting contact issues', contactId, error)
     return []
   }
-})
+}

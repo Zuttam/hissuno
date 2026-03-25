@@ -3,9 +3,8 @@
  * Handles fetching meetings from Fathom and creating Hissuno sessions.
  */
 
-import { db } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import { sessions, sessionMessages } from '@/lib/db/schema/app'
+import crypto from 'crypto'
+import { createSessionWithMessagesAdmin } from '@/lib/sessions/sessions-service'
 import {
   FathomClient,
   type FathomMeeting,
@@ -75,10 +74,24 @@ function mapInviteeToSenderType(invitee: FathomInvitee): 'user' | 'human_agent' 
 }
 
 /**
+ * Extract speaker name from a transcript entry, handling various Fathom API formats
+ */
+function getEntrySpeakerName(entry: FathomTranscriptEntry): string | undefined {
+  return entry.speaker_name || entry.speakerName || entry.speaker?.name || undefined
+}
+
+/**
+ * Extract speaker email from a transcript entry, handling various Fathom API formats
+ */
+function getEntrySpeakerEmail(entry: FathomTranscriptEntry): string | undefined {
+  return entry.speaker_email || entry.speakerEmail || entry.speaker?.email || undefined
+}
+
+/**
  * Get display name for a transcript speaker
  */
 function getSpeakerName(entry: FathomTranscriptEntry): string {
-  return entry.speaker_name || entry.speaker_email || 'Unknown Speaker'
+  return getEntrySpeakerName(entry) || getEntrySpeakerEmail(entry) || 'Unknown Speaker'
 }
 
 /**
@@ -87,15 +100,18 @@ function getSpeakerName(entry: FathomTranscriptEntry): string {
 function getSenderType(entry: FathomTranscriptEntry, invitees: FathomInvitee[]): 'user' | 'human_agent' {
   if (!invitees.length) return 'human_agent'
 
+  const email = getEntrySpeakerEmail(entry)
+  const name = getEntrySpeakerName(entry)
+
   // Try to match by email
-  if (entry.speaker_email) {
-    const match = invitees.find((i) => i.email === entry.speaker_email)
+  if (email) {
+    const match = invitees.find((i) => i.email === email)
     if (match) return mapInviteeToSenderType(match)
   }
 
   // Try to match by name
-  if (entry.speaker_name) {
-    const match = invitees.find((i) => i.name === entry.speaker_name)
+  if (name) {
+    const match = invitees.find((i) => i.name === name)
     if (match) return mapInviteeToSenderType(match)
   }
 
@@ -103,10 +119,30 @@ function getSenderType(entry: FathomTranscriptEntry, invitees: FathomInvitee[]):
 }
 
 /**
- * Generate a session ID from Fathom meeting
+ * Extract summary text from a Fathom meeting summary field.
+ * The default_summary can be a string or an object with markdown/text fields.
  */
-function generateSessionId(meetingId: string): string {
-  return `fathom-${meetingId}-${Date.now()}`
+function extractSummaryText(summary: unknown): string | null {
+  if (!summary) return null
+  if (typeof summary === 'string') return summary
+  if (typeof summary === 'object') {
+    const obj = summary as Record<string, unknown>
+    if (typeof obj.markdown_formatted === 'string') return obj.markdown_formatted
+    if (typeof obj.markdown === 'string') return obj.markdown
+    if (typeof obj.text === 'string') return obj.text
+    if (typeof obj.summary === 'string') return obj.summary
+    // Last resort: stringify the object
+    try { return JSON.stringify(summary) } catch { return null }
+  }
+  return null
+}
+
+/**
+ * Generate a session ID from Fathom meeting.
+ * Must be a valid UUID since the sessions table uses uuid primary key.
+ */
+function generateSessionId(): string {
+  return crypto.randomUUID()
 }
 
 /**
@@ -180,7 +216,7 @@ async function createSessionFromFathomMeeting(
   transcript: FathomTranscriptEntry[] | null,
   summary: string | null
 ): Promise<{ sessionId: string; messageCount: number } | null> {
-  const sessionId = generateSessionId(meeting.id)
+  const sessionId = generateSessionId()
   const invitees = meeting.calendar_invitees || []
   const duration = calculateDuration(meeting)
 
@@ -192,43 +228,12 @@ async function createSessionFromFathomMeeting(
   const meetingStartTime = meeting.recording_start_time || meeting.scheduled_start_time || meeting.created_at
   const meetingEndTime = meeting.recording_end_time || meeting.scheduled_end_time
 
-  // Create session
-  try {
-    await db.insert(sessions).values({
-      id: sessionId,
-      project_id: projectId,
-      source: 'fathom',
-      session_type: 'meeting',
-      status: 'closed',
-      name: generateSessionName(meeting),
-      user_metadata: { ...userMetadata, ...(userId ? { userId } : {}) },
-      first_message_at: new Date(meetingStartTime),
-      last_activity_at: meetingEndTime
-        ? new Date(meetingEndTime)
-        : duration
-          ? new Date(new Date(meetingStartTime).getTime() + duration * 1000)
-          : new Date(meetingStartTime),
-      created_at: new Date(meeting.created_at),
-    })
-  } catch (sessionError) {
-    console.error('[fathom.sync] Failed to create session:', sessionError)
-    return null
-  }
-
   // Build messages from transcript
-  const messageValues: Array<{
-    session_id: string
-    project_id: string
-    sender_type: string
-    content: string
-    created_at: Date
-  }> = []
+  const messages: Array<{ sender_type: string; content: string; created_at?: Date }> = []
 
   // Add summary as first system message if available
   if (summary) {
-    messageValues.push({
-      session_id: sessionId,
-      project_id: projectId,
+    messages.push({
       sender_type: 'system',
       content: `[Meeting Summary]\n${summary}`,
       created_at: new Date(meetingStartTime),
@@ -243,14 +248,13 @@ async function createSessionFromFathomMeeting(
       const speakerName = getSpeakerName(entry)
       const senderType = getSenderType(entry, invitees)
 
-      // Use entry start time for message timestamp
-      const messageTime = entry.start_time
-        ? new Date(new Date(meetingStartTime).getTime() + entry.start_time * 1000)
+      // Use entry start time for message timestamp (handle both snake_case and camelCase)
+      const entryStartTime = entry.start_time ?? entry.startTime
+      const messageTime = entryStartTime
+        ? new Date(new Date(meetingStartTime).getTime() + entryStartTime * 1000)
         : new Date(meetingStartTime)
 
-      messageValues.push({
-        session_id: sessionId,
-        project_id: projectId,
+      messages.push({
         sender_type: senderType,
         content: `[${speakerName}]: ${text}`,
         created_at: messageTime,
@@ -263,42 +267,45 @@ async function createSessionFromFathomMeeting(
     const actionItemsText = meeting.action_items
       .map((item) => `- ${item.text}${item.assignee ? ` (${item.assignee})` : ''}`)
       .join('\n')
-    messageValues.push({
-      session_id: sessionId,
-      project_id: projectId,
+    messages.push({
       sender_type: 'system',
       content: `[Action Items]\n${actionItemsText}`,
       created_at: meetingEndTime ? new Date(meetingEndTime) : new Date(meetingStartTime),
     })
   }
 
-  // Insert messages
-  if (messageValues.length > 0) {
-    try {
-      await db.insert(sessionMessages).values(messageValues)
-    } catch (messagesError) {
-      console.error('[fathom.sync] Failed to insert messages:', messagesError)
-      // Continue anyway - session was created
-    }
-  }
+  // Create session with messages via service
+  const result = await createSessionWithMessagesAdmin({
+    id: sessionId,
+    projectId,
+    source: 'fathom',
+    sessionType: 'meeting',
+    status: 'closed',
+    name: generateSessionName(meeting),
+    userMetadata: { ...userMetadata, ...(userId ? { userId } : {}) },
+    firstMessageAt: new Date(meetingStartTime),
+    lastActivityAt: meetingEndTime
+      ? new Date(meetingEndTime)
+      : duration
+        ? new Date(new Date(meetingStartTime).getTime() + duration * 1000)
+        : new Date(meetingStartTime),
+    createdAt: new Date(meeting.created_at),
+    messages,
+  })
 
-  // Update session message count
-  await db
-    .update(sessions)
-    .set({ message_count: messageValues.length })
-    .where(eq(sessions.id, sessionId))
+  if (!result) return null
 
   // Record the sync
   await recordSyncedMeeting({
     connectionId,
     fathomMeetingId: meeting.id,
-    sessionId,
+    sessionId: result.sessionId,
     meetingCreatedAt: meeting.created_at,
     meetingDurationSeconds: duration,
-    messagesCount: messageValues.length,
+    messagesCount: result.messageCount,
   })
 
-  return { sessionId, messageCount: messageValues.length }
+  return { sessionId: result.sessionId, messageCount: result.messageCount }
 }
 
 /**
@@ -409,13 +416,19 @@ export async function syncFathomMeetings(
       const meeting = meetingsToSync[i]
 
       try {
-        // Use transcript from listing if included, otherwise fetch separately
+        // Check if listing transcript has speaker info; if not, fetch separately
         let transcript = meeting.transcript || null
-        let summary = meeting.default_summary || null
+        let summary = extractSummaryText(meeting.default_summary)
 
-        if (!transcript) {
+        // The listing API's include_transcript often omits speaker attribution.
+        // Fetch individually if transcript lacks speaker info.
+        const listingTranscriptHasSpeakers = transcript?.some(
+          (e) => e.speaker_name || e.speakerName || e.speaker?.name || e.speaker_email || e.speakerEmail || e.speaker?.email
+        )
+        if (!transcript || !listingTranscriptHasSpeakers) {
           try {
-            transcript = await fathom.getMeetingTranscript(meeting.id)
+            const fetched = await fathom.getMeetingTranscript(meeting.id)
+            if (fetched && fetched.length > 0) transcript = fetched
           } catch (err) {
             console.warn(`[fathom.sync] Failed to fetch transcript for ${meeting.id}:`, err)
           }

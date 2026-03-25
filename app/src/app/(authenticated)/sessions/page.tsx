@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { listProjects } from '@/lib/db/queries/projects'
+import { getSessionUser } from '@/lib/auth/server'
 
 interface SessionsPageParams {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -15,7 +16,8 @@ export default async function SessionsRoute({ searchParams }: SessionsPageParams
   }
 
   // Otherwise, get the first project and redirect there
-  const projects = await listProjects()
+  const user = await getSessionUser()
+  const projects = await listProjects(user!.id)
 
   if (projects.length > 0) {
     // Redirect to the first project's sessions page

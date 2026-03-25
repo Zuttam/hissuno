@@ -2,12 +2,12 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { MessageSquare, Code2, PenLine } from 'lucide-react'
 import { Spinner, CollapsibleSection } from '@/components/ui'
 import { TrimmedText } from '@/components/ui/trimmed-text'
 import type { SessionWithProject, ChatMessage, UpdateSessionInput, SessionStatus, SessionType, SessionSource } from '@/types/session'
 import { SESSION_TYPE_INFO, SESSION_SOURCE_INFO, getSessionUserDisplay } from '@/types/session'
+import { formatRelativeTime } from '@/lib/utils/format-time'
+import { getSourceIcon } from '@/lib/constants/source-icons'
 import { useSessionReview } from '@/hooks/use-session-review'
 import { SessionDetails } from './session-details'
 import { SessionContentView } from './session-content-view'
@@ -15,24 +15,6 @@ import { SessionTagEditor } from '../session-tags'
 import { SessionReviewSection } from '../session-review'
 import { archiveSession } from '@/lib/api/sessions'
 import { RelatedEntitiesSection } from '@/components/shared/related-entities-section'
-
-const SOURCE_ICON_SIZE = 14
-
-const SOURCE_ICONS: Record<SessionSource, React.ReactNode> = {
-  widget: <MessageSquare size={SOURCE_ICON_SIZE} />,
-  slack: <Image src="/logos/slack.svg" alt="Slack" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} />,
-  intercom: <Image src="/logos/intercom.svg" alt="Intercom" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} />,
-  zendesk: (
-    <>
-      <Image src="/logos/zendesk.svg" alt="Zendesk" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} className="dark:hidden" />
-      <Image src="/logos/zendesk-dark.svg" alt="Zendesk" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} className="hidden dark:block" />
-    </>
-  ),
-  gong: <Image src="/logos/gong.svg" alt="Gong" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} />,
-  posthog: <Image src="/logos/posthog.svg" alt="PostHog" width={SOURCE_ICON_SIZE} height={SOURCE_ICON_SIZE} />,
-  api: <Code2 size={SOURCE_ICON_SIZE} />,
-  manual: <PenLine size={SOURCE_ICON_SIZE} />,
-}
 
 type DropdownId = 'status'
 
@@ -59,21 +41,6 @@ function formatDateTime(dateString: string | Date | null | undefined): string {
   })
 }
 
-function formatRelativeDate(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '-'
-  const date = dateString instanceof Date ? dateString : new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60_000)
-  const diffHours = Math.floor(diffMs / 3_600_000)
-  const diffDays = Math.floor(diffMs / 86_400_000)
-
-  if (diffMins < 1) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
 
 interface SessionSidebarProps {
   session: SessionWithProject | null
@@ -295,7 +262,7 @@ export function SessionSidebar({
                     </h3>
                     {session.source && (
                       <span className="flex shrink-0 items-center text-[color:var(--text-secondary)]" title={SESSION_SOURCE_INFO[session.source as SessionSource]?.label ?? session.source}>
-                        {SOURCE_ICONS[session.source as SessionSource]}
+                        {getSourceIcon(session.source as SessionSource, 14)}
                       </span>
                     )}
                     {onUpdateSession && (
@@ -333,9 +300,9 @@ export function SessionSidebar({
                       customerName
                     )}
                     <span className="mx-1.5">&middot;</span>
-                    Created {formatRelativeDate(session.created_at)}
+                    Created {formatRelativeTime(session.created_at)}
                     <span className="mx-1.5">&middot;</span>
-                    Updated {formatRelativeDate(session.last_activity_at)}
+                    Updated {formatRelativeTime(session.last_activity_at)}
                   </p>
                 )
               })()}

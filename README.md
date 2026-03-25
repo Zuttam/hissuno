@@ -14,11 +14,11 @@ Product agents - support bots, coding assistants, sales copilots, internal tools
 
 ## The Solution
 
-Hissuno solves this by building a single **interconnected knowledge graph** from your product data, where every entity - sessions, contacts, issues, product areas, knowledge sources - is connected. Agents don't just retrieve isolated facts; they traverse relationships to build real understanding.
+Hissuno solves this by building a single **interconnected knowledge graph** from your product data, where every entity - sessions, contacts, issues, scopes, knowledge sources - is connected. Agents don't just retrieve isolated facts; they traverse relationships to build real understanding.
 
 ### The Graph
 
-Sessions link to contacts, contacts link to issues, issues link to product areas, product areas link back to code and docs. Every entity is connected through a unified relationship layer, so an agent can start from any node and navigate to the context it needs.
+Sessions link to contacts, contacts link to issues, issues link to scopes, scopes link back to code and docs. Every entity is connected through a unified relationship layer, so an agent can start from any node and navigate to the context it needs.
 
 ```
 +-----------------------------------------------------------------+
@@ -28,17 +28,27 @@ Sessions link to contacts, contacts link to issues, issues link to product areas
                                 |
                                 v
            +--------------------------------------------+
-           |      Hissuno Knowledge Graph               |
+           |         Hissuno Knowledge Graph            |
            |                                            |
-           |  Knowledge <-> Product Areas <-> Issues    |
-           |       ^                           ^        |
-           |       |                           |        |
-           |  Sessions <-----> Contacts -------+        |
+           |     Knowledge <-> Scopes <-> Issues        |
+           |          ^                     ^            |
+           |          |                     |            |
+           |     Sessions <-> Contacts -----+            |
            |                                            |
            +--------------------------------------------+
 ```
 
-A support agent answering a customer question can traverse from the contact to their past sessions, to related issues, to the relevant codebase areas - assembling full context in one query. A coding agent can go from an issue to the customers who reported it, to their actual conversations, to understand the real problem before writing a line of code.
+A support agent answering a customer question can traverse from the contact to their past sessions, to related issues, to the relevant codebase - assembling full context in one query. A coding agent can go from an issue to the customers who reported it, to their actual conversations, to understand the real problem before writing a line of code.
+
+### Product Ontology: Scopes
+
+Scopes are the organizational backbone of the graph - they define *what* your product is and give agents a structured understanding beyond raw data.
+
+- **Areas** - Permanent product domains (e.g., "Auth System", "Analytics Dashboard", "Billing")
+- **Initiatives** - Time-bound efforts (e.g., "Q1 Onboarding Revamp", "Performance Sprint")
+- **Goals** - Specific objectives within a scope that entities can be classified against
+
+Every entity in the graph - sessions, issues, knowledge sources - gets automatically linked to relevant scopes via graph evaluation. This means agents don't just see "a bug report" - they see "a bug report about the Auth System, related to the SSO Migration initiative, impacting the Reduce Login Friction goal."
 
 ### What Goes Into the Graph
 
@@ -55,11 +65,64 @@ These are compiled into searchable knowledge packages (`business`, `product`, `t
 As customer conversations flow in, Hissuno's AI agents automatically enrich the graph:
 
 1. **Classify** sessions (bug, feature request, general feedback, etc.)
-2. **Link** sessions to contacts, product areas, and existing issues
+2. **Link** sessions to contacts, scopes, and existing issues
 3. **Create or upvote** issues with proper context and priority
 4. **Generate briefs** when issues reach configurable thresholds
 
 The graph gets richer with every interaction - and every agent benefits.
+
+### How the Graph Builds Itself
+
+Two mechanisms power automatic relationship discovery:
+
+**Embeddings** - Every session, issue, contact, and knowledge chunk gets a 1536-dimension vector embedding (OpenAI). This enables semantic search across all entity types - finding related content by meaning, not just keywords. When graph evaluation runs, it uses these embeddings to find semantically similar entities across the entire graph.
+
+**Graph Evaluation** - A 3-step AI pipeline that runs whenever a new entity enters the system:
+
+1. **Extract Topics** - An LLM extracts 3-5 key topics from the entity's content
+2. **Discover Relationships** - Six parallel strategies run simultaneously: semantic vector search against sessions, issues, knowledge, and contacts, plus text matching against scopes and companies
+3. **Classify Goals** - When a scope match is found, an LLM classifies which specific goal the entity serves, storing the reasoning as relationship metadata
+
+The result: every new piece of data automatically connects to the entities it relates to. A customer conversation about login failures gets linked to the Auth scope, similar bug reports, the relevant codebase sections, and the customer's company - all without manual triage.
+
+---
+
+## Built-In Intelligence
+
+Hissuno isn't just a data layer - it ships with agents and automation flows that deliver value from day one.
+
+### Support Agent
+
+Customer-facing AI powered by your knowledge graph. Deploy via the embeddable widget or Slack.
+
+- Answers grounded in your actual product knowledge (code, docs, past conversations)
+- Automatically identifies contacts and links conversations to their history
+- Configurable tone of voice, brand guidelines, and knowledge packages per project
+- Real-time streaming responses via SSE
+
+### Product Co-Pilot
+
+Team-facing AI assistant for PMs, founders, and engineers.
+
+- Available in-app (sidebar), via Slack, or through MCP (Claude Desktop, Cursor)
+- Query issues, search feedback, explore the knowledge graph conversationally
+- Full access to all project data with semantic search
+- Record feedback on behalf of customers
+
+### Automation Flows
+
+**Feedback Triage** - When a customer session closes:
+1. Classify the conversation (bug, feature request, general feedback)
+2. Link to contact, scope, and related entities via graph evaluation
+3. Find duplicate/similar issues via semantic search
+4. AI decides: create new issue, upvote existing, or archive
+5. Execute the decision with full context preserved
+
+**Issue Analysis** - When an issue is created or upvoted:
+1. Gather all linked sessions, contacts, and product context
+2. Analyze technical impact and effort against the codebase
+3. Compute priority scores (reach, impact, confidence, effort)
+4. Generate a product brief when configurable thresholds are met
 
 ---
 
@@ -215,37 +278,10 @@ Open your Vercel URL and log in with the seeded credentials, or sign up for a ne
 - **Database**: PostgreSQL + Drizzle ORM + pgvector
 - **Auth**: AuthJS v5 (next-auth) with Google OAuth + Credentials
 - **AI Framework**: [Mastra](https://mastra.ai) - multi-agent orchestration
-- **LLM**: OpenAI (GPT-4o, GPT-5)
+- **LLM**: OpenAI (gpt-5.4, GPT-5)
 - **Storage**: Local filesystem (default) or S3-compatible
-- **Knowledge Graph**: Unified `entity_relationships` table forming a traversable graph across sessions, issues, contacts, product areas, and knowledge sources
+- **Knowledge Graph**: Unified `entity_relationships` table forming a traversable graph across sessions, issues, contacts, scopes, and knowledge sources
 - **Integrations**: Slack, Intercom, Gong, Fathom, Zendesk, GitHub, Notion, Jira, Linear, HubSpot, PostHog, Widget, MCP
-
-### AI Agents
-
-| Agent | Purpose |
-|-------|---------|
-| **Support Agent** | Powers customer conversations using knowledge tools |
-| **Codebase Analyzer** | Extracts high-level product knowledge from source code |
-| **Web Scraper** | Analyzes website content for product knowledge |
-| **Security Scanner** | Redacts sensitive information from knowledge |
-| **Tagging Agent** | Classifies sessions with appropriate labels |
-| **Product Manager** | Analyzes sessions, creates/upvotes issues |
-| **Technical Analyst** | Performs deep technical analysis on issues |
-| **Feedback Decision Agent** | Decides how to handle and route incoming feedback |
-| **Response Classifier** | Classifies and routes agent responses |
-| **Brief Writer** | Generates comprehensive product briefs |
-
-### Workflows
-
-**Knowledge Analysis Workflow**
-```
-Analyze Sources -> Source Analysis -> Compile Knowledge -> Sanitize -> Save Packages
-```
-
-**Session Review Workflow**
-```
-Classify Session -> PM Decision -> Execute Decision -> (Generate Brief if threshold met)
-```
 
 ---
 

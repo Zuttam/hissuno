@@ -58,11 +58,14 @@ vi.mock('@/lib/auth/project-context', () => ({
 
 const mockListSessions = vi.fn()
 const mockGetStats = vi.fn()
-const mockCreateManualSession = vi.fn()
 vi.mock('@/lib/db/queries/sessions', () => ({
   listSessions: (...args: unknown[]) => mockListSessions(...args),
   getProjectIntegrationStats: (...args: unknown[]) => mockGetStats(...args),
-  createManualSession: (...args: unknown[]) => mockCreateManualSession(...args),
+}))
+
+const mockCreateSession = vi.fn()
+vi.mock('@/lib/sessions/sessions-service', () => ({
+  createSession: (...args: unknown[]) => mockCreateSession(...args),
 }))
 
 vi.mock('@/types/session', () => ({
@@ -182,7 +185,7 @@ describe('GET /api/sessions', () => {
     expect(mockListSessions).toHaveBeenCalled()
 
     // The filters object passed should contain the projectId
-    const filters = mockListSessions.mock.calls[0][0]
+    const filters = mockListSessions.mock.calls[0][1]
     expect(filters.projectId).toBe(PROJECT_ID)
   })
 
@@ -195,7 +198,7 @@ describe('GET /api/sessions', () => {
     const res = await GET(req)
 
     expect(res.status).toBe(200)
-    const filters = mockListSessions.mock.calls[0][0]
+    const filters = mockListSessions.mock.calls[0][1]
     expect(filters.limit).toBe(25)
     expect(filters.offset).toBe(50)
   })
@@ -258,7 +261,7 @@ describe('POST /api/sessions', () => {
 
   it('creates session with valid input and returns 201', async () => {
     const createdSession = { id: 's-new', ...validBody }
-    mockCreateManualSession.mockResolvedValue(createdSession)
+    mockCreateSession.mockResolvedValue(createdSession)
 
     const req = createRequest(
       `http://localhost/api/sessions?projectId=${PROJECT_ID}`,
@@ -273,7 +276,7 @@ describe('POST /api/sessions', () => {
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.session.id).toBe('s-new')
-    expect(mockCreateManualSession).toHaveBeenCalled()
+    expect(mockCreateSession).toHaveBeenCalled()
   })
 
   it('filters invalid tags from body', async () => {
@@ -281,7 +284,7 @@ describe('POST /api/sessions', () => {
       ...validBody,
       tags: ['bug', 'INVALID_TAG', 'feature_request', 'not_a_real_tag'],
     }
-    mockCreateManualSession.mockResolvedValue({ id: 's-new' })
+    mockCreateSession.mockResolvedValue({ id: 's-new' })
 
     const req = createRequest(
       `http://localhost/api/sessions?projectId=${PROJECT_ID}`,
@@ -294,7 +297,7 @@ describe('POST /api/sessions', () => {
     const res = await POST(req)
 
     expect(res.status).toBe(201)
-    const input = mockCreateManualSession.mock.calls[0][0]
+    const input = mockCreateSession.mock.calls[0][0]
     // Only valid tags should remain
     expect(input.tags).toEqual(
       expect.arrayContaining(['bug', 'feature_request']),
@@ -317,11 +320,11 @@ describe('POST /api/sessions', () => {
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toContain('Invalid session_type')
-    expect(mockCreateManualSession).not.toHaveBeenCalled()
+    expect(mockCreateSession).not.toHaveBeenCalled()
   })
 
-  it('passes valid session_type to createManualSession', async () => {
-    mockCreateManualSession.mockResolvedValue({ id: 's-new' })
+  it('passes valid session_type to createSession', async () => {
+    mockCreateSession.mockResolvedValue({ id: 's-new' })
 
     const req = createRequest(
       `http://localhost/api/sessions?projectId=${PROJECT_ID}`,
@@ -334,12 +337,12 @@ describe('POST /api/sessions', () => {
     const res = await POST(req)
 
     expect(res.status).toBe(201)
-    const input = mockCreateManualSession.mock.calls[0][0]
+    const input = mockCreateSession.mock.calls[0][0]
     expect(input.session_type).toBe('meeting')
   })
 
-  it('passes name, description, contact_id, and linked_entities to createManualSession', async () => {
-    mockCreateManualSession.mockResolvedValue({ id: 's-new' })
+  it('passes name, description, contact_id, and linked_entities to createSession', async () => {
+    mockCreateSession.mockResolvedValue({ id: 's-new' })
 
     const bodyWithNewFields = {
       ...validBody,
@@ -364,7 +367,7 @@ describe('POST /api/sessions', () => {
     const res = await POST(req)
 
     expect(res.status).toBe(201)
-    const input = mockCreateManualSession.mock.calls[0][0]
+    const input = mockCreateSession.mock.calls[0][0]
     expect(input.name).toBe('My Feedback')
     expect(input.description).toBe('Detailed description')
     expect(input.session_type).toBe('chat')
@@ -376,7 +379,7 @@ describe('POST /api/sessions', () => {
   })
 
   it('omits optional new fields when not provided', async () => {
-    mockCreateManualSession.mockResolvedValue({ id: 's-new' })
+    mockCreateSession.mockResolvedValue({ id: 's-new' })
 
     const req = createRequest(
       `http://localhost/api/sessions?projectId=${PROJECT_ID}`,
@@ -388,7 +391,7 @@ describe('POST /api/sessions', () => {
     )
     await POST(req)
 
-    const input = mockCreateManualSession.mock.calls[0][0]
+    const input = mockCreateSession.mock.calls[0][0]
     expect(input.name).toBeUndefined()
     expect(input.description).toBeUndefined()
     expect(input.session_type).toBeUndefined()
@@ -407,7 +410,7 @@ describe('POST /api/sessions', () => {
         { role: 'assistant', content: 'Also valid' },
       ],
     }
-    mockCreateManualSession.mockResolvedValue({ id: 's-new' })
+    mockCreateSession.mockResolvedValue({ id: 's-new' })
 
     const req = createRequest(
       `http://localhost/api/sessions?projectId=${PROJECT_ID}`,
@@ -420,7 +423,7 @@ describe('POST /api/sessions', () => {
     const res = await POST(req)
 
     expect(res.status).toBe(201)
-    const input = mockCreateManualSession.mock.calls[0][0]
+    const input = mockCreateSession.mock.calls[0][0]
     // Only messages with both role and content should remain
     for (const msg of input.messages) {
       expect(msg).toHaveProperty('role')

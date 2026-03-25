@@ -5,18 +5,16 @@
  * Also loads knowledge_relationship_guidelines from project settings.
  */
 
-import { createStep } from '@mastra/core/workflows'
 import { db } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { sessions, issues, knowledgeSources, contacts, companies } from '@/lib/db/schema/app'
 import { getKnowledgeAnalysisSettingsAdmin } from '@/lib/db/queries/project-settings/knowledge-analysis'
-import { graphEvaluationInputSchema, entityContentSchema } from '../schemas'
 import type { GraphEntityType } from '../schemas'
 
 /**
  * Core logic for loading entity content. Exported for inline use.
  */
-export async function loadEntityContentFn(
+export async function loadEntityContent(
   projectId: string,
   entityType: GraphEntityType,
   entityId: string,
@@ -71,7 +69,7 @@ export async function loadEntityContentFn(
         with: { company: { columns: { name: true } } },
       })
       entityName = row?.name || 'Unknown contact'
-      const { buildContactEmbeddingText } = await import('@/lib/customers/contact-embedding-service')
+      const { buildContactEmbeddingText } = await import('@/lib/customers/customer-embedding-service')
       const text = buildContactEmbeddingText({
         name: row?.name || '',
         email: row?.email || '',
@@ -107,17 +105,3 @@ export async function loadEntityContentFn(
   }
 }
 
-export const loadEntityContent = createStep({
-  id: 'load-entity-content',
-  description: 'Load text content from the source entity',
-  inputSchema: graphEvaluationInputSchema,
-  outputSchema: entityContentSchema,
-  execute: async ({ inputData }) => {
-    if (!inputData) throw new Error('Input data not found')
-
-    const { projectId, entityType, entityId } = inputData
-    const result = await loadEntityContentFn(projectId, entityType, entityId)
-
-    return { ...inputData, ...result }
-  },
-})

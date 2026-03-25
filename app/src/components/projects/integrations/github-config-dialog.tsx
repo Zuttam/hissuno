@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Check, Unplug, Shield, KeyRound, Plug } from 'lucide-react'
-import { Dialog, Button, InlineAlert, Spinner } from '@/components/ui'
+import { Dialog, Button, InlineAlert, Spinner, FormField, Input } from '@/components/ui'
 import { ToggleGroup } from '@/components/ui/toggle-group'
 import { fetchGithubStatus, disconnectGithub, githubConnectUrl, connectGithubPat } from '@/lib/api/integrations'
 
@@ -175,7 +175,7 @@ export function GitHubConfigDialog({
         ) : status.connected ? (
           <div className="space-y-4">
             <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to GitHub: {status.accountLogin || 'Unknown'} <span className="text-xs opacity-75">via {authMethodLabel}</span></p>
-            <Button variant="secondary" onClick={handleRefresh}>
+            <Button variant="ghost" size="sm" onClick={handleRefresh}>
               Refresh Status
             </Button>
 
@@ -251,22 +251,9 @@ export function GitHubConfigDialog({
                 </p>
 
                 {/* Access Token */}
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-[color:var(--foreground)]">
-                    Personal Access Token
-                  </label>
-                  <input
-                    type="password"
-                    value={accessToken}
-                    onChange={(e) => {
-                      setAccessToken(e.target.value)
-                      setError(null)
-                    }}
-                    placeholder="ghp_... or github_pat_..."
-                    className="w-full rounded-[4px] border border-[color:var(--border)] bg-[color:var(--background)] px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-selected)]"
-                  />
-                  <p className="text-xs text-[color:var(--text-tertiary)]">
-                    Create a token at{' '}
+                <FormField
+                  label="Personal Access Token"
+                  supportingText={<>Create a token at{' '}
                     <a
                       href="https://github.com/settings/tokens"
                       target="_blank"
@@ -275,9 +262,18 @@ export function GitHubConfigDialog({
                     >
                       github.com/settings/tokens
                     </a>{' '}
-                    with <code className="text-xs">repo</code> scope.
-                  </p>
-                </div>
+                    with <code className="text-xs">repo</code> scope.</>}
+                >
+                  <Input
+                    type="password"
+                    value={accessToken}
+                    onChange={(e) => {
+                      setAccessToken(e.target.value)
+                      setError(null)
+                    }}
+                    placeholder="ghp_... or github_pat_..."
+                  />
+                </FormField>
 
                 <Button variant="primary" size="sm" onClick={handleConnectPat} loading={isConnecting}>
                   <Plug size={14} />

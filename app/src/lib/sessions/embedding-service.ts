@@ -1,20 +1,13 @@
 /**
  * Session Embedding Service
  *
- * Provides semantic similarity search for feedback sessions.
- * Uses shared embedding utilities and factory for upsert/batch.
+ * Provides text building, semantic search, and batch embedding for sessions.
+ * Uses the shared embedding utilities from @/lib/utils/embeddings.
  */
 
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
-import { generateEmbedding, formatEmbeddingForPgVector } from '@/lib/embeddings/shared'
-import { createEmbeddingService } from '@/lib/embeddings/create-embedding-service'
-
-const service = createEmbeddingService({
-  table: 'session_embeddings',
-  idColumn: 'session_id',
-  logPrefix: 'session-embedding',
-})
+import { generateEmbedding, formatEmbeddingForPgVector, embeddingService } from '@/lib/utils/embeddings'
 
 export interface SemanticSessionResult {
   sessionId: string
@@ -32,30 +25,14 @@ export interface SearchSessionsSemanticOptions {
 }
 
 /**
- * Generate embedding for session text (name + description)
+ * Build embedding text for a session
  */
-export async function generateSessionEmbedding(
-  name: string,
-  description: string
-): Promise<number[]> {
-  return generateEmbedding(`${name}\n\n${description}`)
+export function buildSessionEmbeddingText(name: string, description: string): string {
+  return `${name}\n\n${description}`
 }
 
 /**
- * Upsert embedding for a session.
- * Only updates if the text has changed (based on MD5 hash).
- */
-export async function upsertSessionEmbedding(
-  sessionId: string,
-  projectId: string,
-  name: string,
-  description: string
-): Promise<{ updated: boolean; error?: string }> {
-  return service.upsert(sessionId, projectId, `${name}\n\n${description}`)
-}
-
-/**
- * Search for semantically similar sessions
+ * Search for semantically similar sessions using direct vector similarity on the unified embeddings table.
  */
 export async function searchSessionsSemantic(
   projectId: string,
@@ -79,15 +56,21 @@ export async function searchSessionsSemantic(
     description: string
     similarity: number
   }>(sql`
-    SELECT * FROM search_sessions_semantic(
-      ${projectId},
-      ${embeddingStr}::vector,
-      ${limit},
-      ${threshold},
-      ${status ?? null},
-      ${source ?? null},
-      ${isArchived}
-    )
+    SELECT
+      s.id AS session_id,
+      s.name,
+      s.description,
+      1 - (e.embedding <=> ${embeddingStr}::vector) AS similarity
+    FROM embeddings e
+    JOIN sessions s ON s.id = e.entity_id
+    WHERE e.entity_type = 'session'
+      AND e.project_id = ${projectId}
+      AND 1 - (e.embedding <=> ${embeddingStr}::vector) >= ${threshold}
+      AND s.is_archived = ${isArchived}
+      ${status ? sql`AND s.status = ${status}` : sql``}
+      ${source ? sql`AND s.source = ${source}` : sql``}
+    ORDER BY e.embedding <=> ${embeddingStr}::vector
+    LIMIT ${limit}
   `)
 
   return results.rows.map((row) => ({
@@ -109,11 +92,12 @@ export async function batchEmbedSessions(
     description: string
   }>
 ): Promise<{ embedded: number; errors: string[] }> {
-  return service.batch(
+  return embeddingService.batch(
     sessions.map((s) => ({
       id: s.id,
+      entityType: 'session' as const,
       project_id: s.project_id,
-      text: `${s.name}\n\n${s.description}`,
+      text: buildSessionEmbeddingText(s.name, s.description),
     }))
   )
 }

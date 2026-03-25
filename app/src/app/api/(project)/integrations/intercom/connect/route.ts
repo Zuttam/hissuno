@@ -14,7 +14,7 @@ import { IntercomClient, IntercomApiError } from '@/lib/integrations/intercom/cl
 import { getIntercomOAuthUrl } from '@/lib/integrations/intercom/oauth'
 import {
   storeIntercomCredentials,
-  type IntercomSyncFrequency,
+  type SyncFrequency,
   type IntercomFilterConfig,
 } from '@/lib/integrations/intercom'
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     const { projectId, accessToken, syncFrequency, filterConfig } = body as {
       projectId: string
       accessToken: string
-      syncFrequency: IntercomSyncFrequency
+      syncFrequency: SyncFrequency
       filterConfig?: IntercomFilterConfig
     }
 
@@ -111,13 +111,9 @@ export async function POST(request: NextRequest) {
     if (!accessToken) {
       return NextResponse.json({ error: 'accessToken is required.' }, { status: 400 })
     }
-    if (!syncFrequency) {
-      return NextResponse.json({ error: 'syncFrequency is required.' }, { status: 400 })
-    }
-
-    // Validate sync frequency
-    const validFrequencies: IntercomSyncFrequency[] = ['manual', '1h', '6h', '24h']
-    if (!validFrequencies.includes(syncFrequency)) {
+    // Validate sync frequency (defaults to manual)
+    const validFrequencies: SyncFrequency[] = ['manual', '1h', '6h', '24h']
+    if (syncFrequency && !validFrequencies.includes(syncFrequency)) {
       return NextResponse.json({ error: 'Invalid syncFrequency.' }, { status: 400 })
     }
 
@@ -149,7 +145,7 @@ export async function POST(request: NextRequest) {
       accessToken,
       workspaceId: workspace.id,
       workspaceName: workspace.name,
-      syncFrequency,
+      syncFrequency: syncFrequency || 'manual',
       filterConfig,
     })
 

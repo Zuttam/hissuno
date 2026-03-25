@@ -110,7 +110,7 @@ export function DocsMobileNav() {
 
   return (
     <div className="sticky top-16 z-30 lg:hidden">
-      <div className="flex items-center border-b border-[color:var(--border-subtle)] bg-[color:var(--background)]/95 backdrop-blur-sm px-4 py-2.5">
+      <div className="flex items-center justify-between border-b border-[color:var(--border-subtle)] bg-[color:var(--background)]/95 backdrop-blur-sm px-4 py-2.5">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="flex items-center gap-2 text-sm font-mono text-[color:var(--foreground)]"
@@ -127,6 +127,27 @@ export function DocsMobileNav() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
           {currentTitle}
+        </button>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event('docs-search-open'))}
+          className="rounded-[4px] p-1.5 text-[color:var(--text-secondary)] transition hover:text-[color:var(--foreground)]"
+          aria-label="Search documentation"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
         </button>
       </div>
 

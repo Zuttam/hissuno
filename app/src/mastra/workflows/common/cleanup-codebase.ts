@@ -5,7 +5,7 @@
  * Each workflow should call this function at the end to cleanup.
  */
 
-import { releaseCodebase } from '@/lib/codebase/manager'
+import { releaseCodebase } from '@/lib/knowledge/codebase/manager'
 
 export interface CleanupCodebaseParams {
   codebaseLeaseId: string

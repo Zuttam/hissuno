@@ -96,5 +96,5 @@ Return the content in the same structure, with:
 - Preserve code examples by replacing only the sensitive values
 - Keep descriptions and explanations intact
 `,
-  model: 'openai/gpt-4o-mini',
+  model: 'openai/gpt-5.4-mini',
 })

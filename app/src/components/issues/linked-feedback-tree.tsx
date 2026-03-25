@@ -2,56 +2,12 @@
 
 import { useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { MessageSquare, Code2, PenLine } from 'lucide-react'
 import type { IssueWithSessions } from '@/types/issue'
 import type { SessionSource } from '@/types/session'
+import { formatRelativeTime } from '@/lib/utils/format-time'
+import { formatARR } from '@/lib/utils/format-currency'
+import { getSourceIcon } from '@/lib/constants/source-icons'
 import { AddFeedbackDialog } from './add-feedback-dialog'
-
-const ICON_SIZE = 12
-
-const SOURCE_ICONS: Record<SessionSource, React.ReactNode> = {
-  widget: <MessageSquare size={ICON_SIZE} />,
-  slack: <Image src="/logos/slack.svg" alt="Slack" width={ICON_SIZE} height={ICON_SIZE} />,
-  intercom: <Image src="/logos/intercom.svg" alt="Intercom" width={ICON_SIZE} height={ICON_SIZE} />,
-  zendesk: (
-    <>
-      <Image src="/logos/zendesk.svg" alt="Zendesk" width={ICON_SIZE} height={ICON_SIZE} className="dark:hidden" />
-      <Image src="/logos/zendesk-dark.svg" alt="Zendesk" width={ICON_SIZE} height={ICON_SIZE} className="hidden dark:block" />
-    </>
-  ),
-  gong: <Image src="/logos/gong.svg" alt="Gong" width={ICON_SIZE} height={ICON_SIZE} />,
-  posthog: <Image src="/logos/posthog.svg" alt="PostHog" width={ICON_SIZE} height={ICON_SIZE} />,
-  api: <Code2 size={ICON_SIZE} />,
-  manual: <PenLine size={ICON_SIZE} />,
-}
-
-function formatRelativeDate(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '-'
-  const date = dateString instanceof Date ? dateString : new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) {
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-    if (diffHours === 0) {
-      const diffMinutes = Math.floor(diffMs / (1000 * 60))
-      return diffMinutes <= 1 ? 'just now' : `${diffMinutes}m ago`
-    }
-    return `${diffHours}h ago`
-  }
-  if (diffDays === 1) return 'yesterday'
-  if (diffDays < 7) return `${diffDays}d ago`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
-  return `${Math.floor(diffDays / 30)}mo ago`
-}
-
-function formatARR(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
-  return `$${value}`
-}
 
 type SessionItem = IssueWithSessions['sessions'][number]
 
@@ -147,7 +103,7 @@ export function LinkedFeedbackTree({ sessions, projectId, onLinkSession, onUnlin
   }
 
   const renderSession = (session: SessionItem) => {
-    const sourceIcon = SOURCE_ICONS[session.source as SessionSource]
+    const sourceIcon = getSourceIcon(session.source as SessionSource, 12)
     return (
       <div
         key={session.id}
@@ -164,7 +120,7 @@ export function LinkedFeedbackTree({ sessions, projectId, onLinkSession, onUnlin
             {session.name || 'Unnamed Feedback'}
           </span>
           <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
-            {formatRelativeDate(session.created_at)}
+            {formatRelativeTime(session.created_at)}
           </span>
         </Link>
         {onUnlinkSession && (

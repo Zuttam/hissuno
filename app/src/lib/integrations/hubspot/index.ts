@@ -12,11 +12,9 @@ import {
   hubspotSyncedContacts,
 } from '@/lib/db/schema/app'
 import { refreshHubSpotToken } from './oauth'
-
-/**
- * Sync frequency options
- */
-export type HubSpotSyncFrequency = 'manual' | '1h' | '6h' | '24h'
+import { type SyncFrequency } from '@/lib/integrations/shared/sync-constants'
+export type { SyncFrequency }
+import { calculateNextSyncTime } from '@/lib/integrations/shared/sync-utils'
 
 /**
  * Overwrite policy for syncing into existing records
@@ -45,7 +43,7 @@ export interface HubSpotIntegrationStatus {
   hubId: string | null
   hubName: string | null
   authMethod: HubSpotAuthMethod | null
-  syncFrequency: HubSpotSyncFrequency | null
+  syncFrequency: SyncFrequency | null
   syncEnabled: boolean
   lastSyncAt: string | null
   lastSyncStatus: 'success' | 'error' | 'in_progress' | null
@@ -102,7 +100,7 @@ export async function hasHubSpotConnection(
     hubId: data.hub_id,
     hubName: data.hub_name,
     authMethod: (data.auth_method as HubSpotAuthMethod) || 'token',
-    syncFrequency: data.sync_frequency as HubSpotSyncFrequency,
+    syncFrequency: data.sync_frequency as SyncFrequency,
     syncEnabled: data.sync_enabled,
     lastSyncAt: data.last_sync_at?.toISOString() ?? null,
     lastSyncStatus: data.last_sync_status as 'success' | 'error' | 'in_progress' | null,
@@ -229,7 +227,7 @@ export async function storeHubSpotCredentials(
     hubId: string
     hubName: string | null
     authMethod: HubSpotAuthMethod
-    syncFrequency: HubSpotSyncFrequency
+    syncFrequency: SyncFrequency
     filterConfig?: HubSpotFilterConfig
   }
 ): Promise<{ success: boolean; connectionId?: string; error?: string }> {
@@ -314,7 +312,7 @@ export async function updateHubSpotTokens(
 export async function updateHubSpotSettings(
   projectId: string,
   settings: {
-    syncFrequency?: HubSpotSyncFrequency
+    syncFrequency?: SyncFrequency
     syncEnabled?: boolean
     filterConfig?: HubSpotFilterConfig
   }
@@ -594,7 +592,7 @@ export async function updateSyncState(
 
     const conn = connRows[0]
     if (conn) {
-      const nextSync = calculateNextSyncTime(conn.sync_frequency as HubSpotSyncFrequency)
+      const nextSync = calculateNextSyncTime(conn.sync_frequency as SyncFrequency)
       updateData.next_sync_at = nextSync ? new Date(nextSync) : null
     }
   }
@@ -765,26 +763,3 @@ export async function getSyncStats(
   }
 }
 
-/**
- * Calculate next sync time based on frequency
- */
-function calculateNextSyncTime(frequency: HubSpotSyncFrequency): string | null {
-  if (frequency === 'manual') {
-    return null
-  }
-
-  const now = new Date()
-  switch (frequency) {
-    case '1h':
-      now.setHours(now.getHours() + 1)
-      break
-    case '6h':
-      now.setHours(now.getHours() + 6)
-      break
-    case '24h':
-      now.setDate(now.getDate() + 1)
-      break
-  }
-
-  return now.toISOString()
-}

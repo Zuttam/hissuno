@@ -6,10 +6,7 @@
 
 import { eq, asc } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { sessionMessages, sessions } from '@/lib/db/schema/app'
-import { resolveRequestContext } from '@/lib/db/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
-import { ForbiddenError } from '@/lib/auth/authorization'
+import { sessionMessages } from '@/lib/db/schema/app'
 import type { MessageSenderType, ChatMessage } from '@/types/session'
 
 export type SessionMessageRow = typeof sessionMessages.$inferSelect
@@ -51,23 +48,6 @@ export async function saveSessionMessage(params: SaveMessageParams): Promise<Ses
  */
 export async function getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    // Verify the session belongs to a project the user can access
-    const session = await db.query.sessions.findFirst({
-      where: eq(sessions.id, sessionId),
-      columns: { project_id: true },
-    })
-
-    if (!session) {
-      return []
-    }
-
-    const hasAccess = await hasProjectAccess(session.project_id, userId)
-    if (!hasAccess) {
-      throw new ForbiddenError('You do not have access to this session.')
-    }
-
     const rows = await db
       .select()
       .from(sessionMessages)

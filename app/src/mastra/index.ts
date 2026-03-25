@@ -6,7 +6,6 @@ import { packageCompilationWorkflow } from './workflows/package-compilation';
 import { sourceAnalysisWorkflow } from './workflows/source-analysis';
 import { sessionReviewWorkflow } from './workflows/session-review';
 import { issueAnalysisWorkflow } from './workflows/issue-analysis';
-import { graphEvaluationWorkflow } from './workflows/graph-evaluation';
 import { supportAgent } from './agents/support-agent';
 import { codebaseAnalyzerAgent } from './agents/codebase-analyzer-agent';
 import { webScraperAgent } from './agents/web-scraper-agent';
@@ -37,7 +36,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const mastra = new Mastra({
-  workflows: { packageCompilationWorkflow, sourceAnalysisWorkflow, sessionReviewWorkflow, issueAnalysisWorkflow, graphEvaluationWorkflow },
+  workflows: { packageCompilationWorkflow, sourceAnalysisWorkflow, sessionReviewWorkflow, issueAnalysisWorkflow },
   agents: {
     supportAgent,
     codebaseAnalyzerAgent,

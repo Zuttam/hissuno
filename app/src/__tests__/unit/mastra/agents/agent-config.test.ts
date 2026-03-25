@@ -20,7 +20,7 @@ describe('Agent Router', () => {
   const fakeAgent = {
     name: 'fake-agent',
     instructions: 'You are a test agent.',
-    model: 'openai/gpt-4o-mini',
+    model: 'openai/gpt-5.4-mini',
     tools: {},
   }
 

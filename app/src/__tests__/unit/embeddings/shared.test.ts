@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { formatEmbeddingForPgVector, computeTextHash } from '@/lib/embeddings/shared'
+import { formatEmbeddingForPgVector, computeTextHash } from '@/lib/utils/embeddings'
 
 // ============================================================================
 // formatEmbeddingForPgVector

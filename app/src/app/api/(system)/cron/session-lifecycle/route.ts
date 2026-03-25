@@ -242,7 +242,7 @@ export async function executeSessionReview(
     }
 
     const steps = workflowResult.steps as Record<string, { output?: unknown } | undefined> | undefined
-    const pmReviewOutput = steps?.['pm-review']?.output as Partial<WorkflowOutput> | undefined
+    const pmReviewOutput = steps?.['execute-decision']?.output as Partial<WorkflowOutput> | undefined
     const classifyOutput = steps?.['classify-session']?.output as { tags?: string[]; tagsApplied?: boolean } | undefined
 
     const resultData: WorkflowOutput = {
@@ -364,7 +364,15 @@ export async function triggerPendingReviews(): Promise<PhaseResult> {
  *
  * Should be run every minute via Vercel cron.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret) {
+    const authHeader = request.headers.get('authorization')
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
+    }
+  }
+
   if (!isDatabaseConfigured()) {
     console.error(`${LOG_PREFIX} Database must be configured`)
     return NextResponse.json({ error: 'Database must be configured' }, { status: 500 })

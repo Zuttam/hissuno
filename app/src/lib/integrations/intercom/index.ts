@@ -6,11 +6,9 @@
 import { db } from '@/lib/db'
 import { eq, and, or, ne, lte, isNull, sql, count as drizzleCount } from 'drizzle-orm'
 import { intercomConnections, intercomSyncRuns, intercomSyncedConversations } from '@/lib/db/schema/app'
-
-/**
- * Sync frequency options
- */
-export type IntercomSyncFrequency = 'manual' | '1h' | '6h' | '24h'
+import { type SyncFrequency } from '@/lib/integrations/shared/sync-constants'
+export type { SyncFrequency }
+import { calculateNextSyncTime } from '@/lib/integrations/shared/sync-utils'
 
 /**
  * Filter configuration for sync
@@ -28,7 +26,7 @@ export interface IntercomConnection {
   projectId: string
   workspaceId: string
   workspaceName: string | null
-  syncFrequency: IntercomSyncFrequency
+  syncFrequency: SyncFrequency
   syncEnabled: boolean
   filterConfig: IntercomFilterConfig
   lastSyncAt: string | null
@@ -50,7 +48,7 @@ export interface IntercomIntegrationStatus {
   workspaceId: string | null
   workspaceName: string | null
   authMethod: IntercomAuthMethod | null
-  syncFrequency: IntercomSyncFrequency | null
+  syncFrequency: SyncFrequency | null
   syncEnabled: boolean
   lastSyncAt: string | null
   lastSyncStatus: 'success' | 'error' | 'in_progress' | null
@@ -104,7 +102,7 @@ export async function hasIntercomConnection(
     workspaceId: data.workspace_id,
     workspaceName: data.workspace_name,
     authMethod: (data.auth_method as IntercomAuthMethod) || 'token',
-    syncFrequency: data.sync_frequency as IntercomSyncFrequency,
+    syncFrequency: data.sync_frequency as SyncFrequency,
     syncEnabled: data.sync_enabled,
     lastSyncAt: data.last_sync_at?.toISOString() ?? null,
     lastSyncStatus: data.last_sync_status as 'success' | 'error' | 'in_progress' | null,
@@ -153,7 +151,7 @@ export async function storeIntercomCredentials(
     accessToken: string
     workspaceId: string
     workspaceName: string | null
-    syncFrequency: IntercomSyncFrequency
+    syncFrequency: SyncFrequency
     filterConfig?: IntercomFilterConfig
     authMethod?: IntercomAuthMethod
   }
@@ -209,7 +207,7 @@ export async function storeIntercomCredentials(
 export async function updateIntercomSettings(
   projectId: string,
   settings: {
-    syncFrequency?: IntercomSyncFrequency
+    syncFrequency?: SyncFrequency
     syncEnabled?: boolean
     filterConfig?: IntercomFilterConfig
   }
@@ -305,6 +303,20 @@ export async function isConversationSynced(
 }
 
 /**
+ * Get all synced conversation IDs for a connection (batch pre-fetch to avoid N+1)
+ */
+export async function getSyncedConversationIds(
+  connectionId: string
+): Promise<Set<string>> {
+  const rows = await db
+    .select({ intercom_conversation_id: intercomSyncedConversations.intercom_conversation_id })
+    .from(intercomSyncedConversations)
+    .where(eq(intercomSyncedConversations.connection_id, connectionId))
+
+  return new Set(rows.map((row) => row.intercom_conversation_id))
+}
+
+/**
  * Record a synced conversation
  */
 export async function recordSyncedConversation(
@@ -361,7 +373,7 @@ export async function updateSyncState(
 
     const conn = connRows[0]
     if (conn) {
-      const nextSync = calculateNextSyncTime(conn.sync_frequency as IntercomSyncFrequency)
+      const nextSync = calculateNextSyncTime(conn.sync_frequency as SyncFrequency)
       updateData.next_sync_at = nextSync ? new Date(nextSync) : null
     }
   }
@@ -506,26 +518,3 @@ export async function getSyncStats(
   }
 }
 
-/**
- * Calculate next sync time based on frequency
- */
-function calculateNextSyncTime(frequency: IntercomSyncFrequency): string | null {
-  if (frequency === 'manual') {
-    return null
-  }
-
-  const now = new Date()
-  switch (frequency) {
-    case '1h':
-      now.setHours(now.getHours() + 1)
-      break
-    case '6h':
-      now.setHours(now.getHours() + 6)
-      break
-    case '24h':
-      now.setDate(now.getDate() + 1)
-      break
-  }
-
-  return now.toISOString()
-}

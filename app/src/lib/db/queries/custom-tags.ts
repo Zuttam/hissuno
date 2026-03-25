@@ -2,14 +2,10 @@
  * Custom Tags Queries (Drizzle)
  */
 
-import { cache } from 'react'
 import { eq, asc } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { customTags } from '@/lib/db/schema/app'
 import { isUniqueViolation } from '@/lib/db/errors'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { resolveRequestContext } from '@/lib/db/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
 import type { CustomTagRecord } from '@/types/session'
 
 export type CustomTagRow = typeof customTags.$inferSelect
@@ -18,18 +14,10 @@ export type CustomTagInsert = typeof customTags.$inferInsert
 const MAX_TAGS_PER_PROJECT = 10
 
 /**
- * Lists custom tags for a project. Requires authenticated user context.
- * Only returns tags for projects the current user has access to.
+ * Lists custom tags for a project.
  */
-export const listProjectCustomTags = cache(async (projectId: string): Promise<CustomTagRecord[]> => {
+export async function listProjectCustomTags(projectId: string): Promise<CustomTagRecord[]> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have access to this project.')
-    }
-
     const rows = await db
       .select()
       .from(customTags)
@@ -41,7 +29,7 @@ export const listProjectCustomTags = cache(async (projectId: string): Promise<Cu
     console.error('[db.custom-tags] unexpected error listing custom tags', error)
     throw error
   }
-})
+}
 
 /**
  * Gets custom tags for a project using admin client (no auth).
@@ -96,13 +84,6 @@ export async function syncCustomTags(
   incomingTags: SyncTagInput[]
 ): Promise<SyncTagsResult> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have access to this project.')
-    }
-
     // Get existing tags
     const existingRows = await db
       .select()

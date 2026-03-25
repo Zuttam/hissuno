@@ -29,11 +29,20 @@ Companies represent the organizations that use your product. Each company belong
 
 ### Creating a Company
 
+From the dashboard:
+
 1. Navigate to **Customers** in the sidebar and select the **Companies** tab.
 2. Click **Add Company**.
 3. Fill in the company name and domain at minimum.
 4. Set the lifecycle stage and ARR if known.
 5. Click **Save**.
+
+From the CLI:
+
+```bash
+hissuno add customers
+# Select "company" when prompted, then enter: name, domain, industry, ARR, stage...
+```
 
 You can also import companies in bulk via CSV. See the import section below.
 
@@ -61,11 +70,20 @@ Contacts are the individual people at your customer companies who provide feedba
 
 ### Creating a Contact
 
+From the dashboard:
+
 1. Navigate to **Customers** in the sidebar and select the **Contacts** tab.
 2. Click **Add Contact**.
 3. Enter the contact's name and email.
 4. Optionally select their company from the dropdown.
 5. Click **Save**.
+
+From the CLI:
+
+```bash
+hissuno add customers
+# Select "contact" when prompted, then enter: name, email, role, company_id...
+```
 
 ### Editing a Contact
 
@@ -119,6 +137,27 @@ For teams with existing customer data, Hissuno supports bulk import via CSV file
 5. Click **Import**.
 
 The import process creates new records and updates existing ones (matched by email for contacts or domain for companies). A summary is displayed after import showing the number of records created, updated, and any rows that encountered errors.
+
+## CLI Reference
+
+Common CLI commands for working with customers:
+
+```bash
+# List all companies
+hissuno list customers
+
+# List contacts at a specific company
+hissuno list customers --company-id comp_abc123
+
+# Search customers by name or email
+hissuno search "acme" --type customers
+
+# View full company or contact details
+hissuno get customers comp_abc123
+
+# Export customer data to JSON
+hissuno --json list customers > customers.json
+```
 
 ## Analytics
 

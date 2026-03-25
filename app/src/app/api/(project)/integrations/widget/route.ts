@@ -3,6 +3,7 @@ import { getProjectById } from '@/lib/projects/keys'
 import { getProjectSettings } from '@/lib/db/queries/issues'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { isOriginAllowed } from '@/lib/utils/widget-auth'
+import { getWidgetRequestOrigin, addWidgetCorsHeaders, createWidgetOptionsResponse } from '@/lib/utils/widget-cors'
 
 export const runtime = 'nodejs'
 
@@ -12,14 +13,6 @@ const DEFAULT_WIDGET_SETTINGS = {
   display: 'sidepanel' as const,
   shortcut: 'mod+k',
   drawerBadgeLabel: 'Support',
-}
-
-/**
- * Get the request origin from headers
- * Uses Origin header if present, otherwise falls back to request URL origin
- */
-function getRequestOrigin(request: NextRequest): string {
-  return request.headers.get('Origin') || request.nextUrl.origin
 }
 
 /**
@@ -36,7 +29,7 @@ export async function GET(request: NextRequest) {
   }
 
   const projectId = request.nextUrl.searchParams.get('projectId')
-  const origin = getRequestOrigin(request)
+  const origin = getWidgetRequestOrigin(request)
 
   if (!projectId) {
     return NextResponse.json({ error: 'Missing projectId parameter.' }, { status: 400 })
@@ -72,10 +65,7 @@ export async function GET(request: NextRequest) {
       tokenRequired: settings?.widget_token_required ?? false,
     })
 
-    // Add CORS headers
-    response.headers.set('Access-Control-Allow-Origin', origin)
-
-    return response
+    return addWidgetCorsHeaders(response, origin)
   } catch (error) {
     console.error('[integrations/widget] unexpected error', error)
     return NextResponse.json({ error: 'Failed to load settings.' }, { status: 500 })
@@ -84,15 +74,5 @@ export async function GET(request: NextRequest) {
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  const origin = getRequestOrigin(request)
-
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-    },
-  })
+  return createWidgetOptionsResponse(request)
 }

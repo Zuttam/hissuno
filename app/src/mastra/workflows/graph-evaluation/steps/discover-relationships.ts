@@ -7,16 +7,15 @@
  * 3. Semantic issue search (skip if entityType=issue)
  * 4. Semantic knowledge search (skip if entityType=knowledge_source)
  * 5. Semantic contact search (skip if entityType=contact)
- * 6. Company text match (skip for contacts, skip if entityType=company)
+ * 6. Semantic company search (skip for contacts, skip if entityType=company)
+ * 7. Company text match fallback (skip for contacts, skip if entityType=company)
  */
 
-import { createStep } from '@mastra/core/workflows'
 import { db } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { productScopes, companies } from '@/lib/db/schema/app'
 import { linkEntities, getRelatedIds } from '@/lib/db/queries/entity-relationships'
 import { classifyGoal } from './classify-goal'
-import { topicsExtractedSchema, graphEvaluationOutputSchema } from '../schemas'
 import type { GraphEntityType } from '../schemas'
 import type { ProductScopeGoal } from '@/types/product-scope'
 
@@ -34,7 +33,7 @@ interface DiscoverInput {
 /**
  * Core logic for discovering relationships. Exported for inline use.
  */
-export async function discoverRelationshipsFn(input: DiscoverInput): Promise<{
+export async function discoverRelationships(input: DiscoverInput): Promise<{
   relationshipsCreated: number
   productScopeId: string | null
   errors: string[]
@@ -170,7 +169,7 @@ export async function discoverRelationshipsFn(input: DiscoverInput): Promise<{
   // 5. Semantic contact search (skip if entityType=contact)
   if (entityType !== 'contact' && combinedQuery) {
     try {
-      const { searchContactsSemantic } = await import('@/lib/customers/contact-embedding-service')
+      const { searchContactsSemantic } = await import('@/lib/customers/customer-embedding-service')
       const results = await searchContactsSemantic(projectId, combinedQuery, {
         limit: 10,
         threshold: 0.6,
@@ -186,7 +185,26 @@ export async function discoverRelationshipsFn(input: DiscoverInput): Promise<{
     }
   }
 
-  // 6. Company text match (skip for contacts and company=self)
+  // 6. Semantic company search (skip for contacts and company=self)
+  if (entityType !== 'contact' && entityType !== 'company' && combinedQuery) {
+    try {
+      const { searchCompaniesSemantic } = await import('@/lib/customers/customer-embedding-service')
+      const results = await searchCompaniesSemantic(projectId, combinedQuery, {
+        limit: 10,
+        threshold: 0.6,
+      })
+      const linkResults = await Promise.allSettled(
+        results.slice(0, 5).map((company) =>
+          linkEntities(projectId, entityType, entityId, 'company', company.companyId)
+        )
+      )
+      relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+    } catch (err) {
+      errors.push(`Company semantic search failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+    }
+  }
+
+  // 7. Company text match fallback (skip for contacts and company=self)
   if (entityType !== 'contact' && entityType !== 'company') {
     try {
       const allCompanies = await db
@@ -210,38 +228,10 @@ export async function discoverRelationshipsFn(input: DiscoverInput): Promise<{
       )
       relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
     } catch (err) {
-      errors.push(`Company matching failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+      errors.push(`Company text match failed: ${err instanceof Error ? err.message : 'Unknown'}`)
     }
   }
 
   return { relationshipsCreated, productScopeId, errors }
 }
 
-export const discoverRelationships = createStep({
-  id: 'discover-relationships',
-  description: 'Run discovery strategies to find and link related entities',
-  inputSchema: topicsExtractedSchema,
-  outputSchema: graphEvaluationOutputSchema,
-  execute: async ({ inputData }) => {
-    if (!inputData) throw new Error('Input data not found')
-
-    const { projectId, entityType, entityId, topics, combinedQuery, contentForTextMatch, entityName, contentForSearch } = inputData
-    const result = await discoverRelationshipsFn({
-      projectId,
-      entityType,
-      entityId,
-      topics,
-      combinedQuery,
-      contentForTextMatch,
-      entityName,
-      contentForSearch,
-    })
-
-    return {
-      projectId,
-      entityType,
-      entityId,
-      ...result,
-    }
-  },
-})

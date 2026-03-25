@@ -14,7 +14,7 @@ The weather agent serves as a reference implementation for Mastra integration. I
 
 The weather agent (`src/mastra/agents/weather-agent.ts`) provides weather information and activity suggestions:
 
-- **Model**: GPT-4o-mini
+- **Model**: gpt-5.4-mini
 - **Tools**: Weather tool for fetching real-time weather data
 - **Memory**: Persisted with LibSQL for conversation history
 

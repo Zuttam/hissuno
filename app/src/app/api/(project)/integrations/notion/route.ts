@@ -10,9 +10,20 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
-import { hasNotionConnection, disconnectNotion } from '@/lib/integrations/notion'
+import { hasNotionConnection, disconnectNotion, getNotionSyncConfig, type NotionSyncConfigRow } from '@/lib/integrations/notion'
 
 export const runtime = 'nodejs'
+
+function serializeSyncStatus(config: NotionSyncConfigRow | null) {
+  if (!config) return null
+  return {
+    lastSyncAt: config.last_sync_at?.toISOString() ?? null,
+    lastSyncStatus: config.last_sync_status,
+    lastSyncCount: config.last_sync_count,
+    syncEnabled: config.sync_enabled,
+    syncFrequency: config.sync_frequency,
+  }
+}
 
 /**
  * GET /api/integrations/notion?projectId=xxx
@@ -31,11 +42,31 @@ export async function GET(request: NextRequest) {
 
     const status = await hasNotionConnection(projectId)
 
+    let issueSyncConfigured = false
+    let knowledgeSyncConfigured = false
+    let issueSyncStatus = null
+    let knowledgeSyncStatus = null
+
+    if (status.connected) {
+      const [issueConfig, knowledgeConfig] = await Promise.all([
+        getNotionSyncConfig(projectId, 'issues'),
+        getNotionSyncConfig(projectId, 'knowledge'),
+      ])
+      issueSyncConfigured = !!issueConfig
+      knowledgeSyncConfigured = !!knowledgeConfig
+      issueSyncStatus = serializeSyncStatus(issueConfig)
+      knowledgeSyncStatus = serializeSyncStatus(knowledgeConfig)
+    }
+
     return NextResponse.json({
       connected: status.connected,
       workspaceId: status.workspaceId,
       workspaceName: status.workspaceName,
       authMethod: status.authMethod,
+      issueSyncConfigured,
+      knowledgeSyncConfigured,
+      issueSyncStatus,
+      knowledgeSyncStatus,
     })
   } catch (error) {
     if (error instanceof UnauthorizedError) {

@@ -6,11 +6,9 @@
 import { db } from '@/lib/db'
 import { eq, and, or, ne, lte, isNull } from 'drizzle-orm'
 import type { PgTable, PgColumn } from 'drizzle-orm/pg-core'
+import type { SyncFrequency } from './sync-constants'
 
-/**
- * Standard sync frequency type shared across all integrations.
- */
-export type SyncFrequency = 'manual' | '1h' | '6h' | '24h'
+export type { SyncFrequency } from './sync-constants'
 
 /**
  * Calculate next sync time based on frequency.
@@ -76,4 +74,11 @@ export async function getConnectionsDueForSync(
     id: row.id as string,
     projectId: row.project_id as string,
   }))
+}
+
+/**
+ * Strip HTML tags from a string.
+ */
+export function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim()
 }

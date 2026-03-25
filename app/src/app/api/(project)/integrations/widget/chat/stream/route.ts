@@ -13,10 +13,10 @@ import {
   type BaseSSEEvent,
   createSSEStreamWithExecutor,
   createSSEEvent,
-  createCorsHeaders,
-} from '@/lib/sse'
+} from '@/lib/utils/sse'
 import { resolveAgent } from '@/mastra/agents/router'
 import { isOriginAllowed } from '@/lib/utils/widget-auth'
+import { getWidgetRequestOrigin, createWidgetCorsHeaders, createWidgetOptionsResponse } from '@/lib/utils/widget-cors'
 import type { SupportAgentContext } from '@/types/agent'
 
 export const runtime = 'nodejs'
@@ -40,33 +40,25 @@ interface ChatSSEEvent extends BaseSSEEvent {
 }
 
 /**
- * Get the request origin from headers
- * Uses Origin header if present, otherwise falls back to request URL origin
- */
-function getRequestOrigin(request: NextRequest): string {
-  return request.headers.get('Origin') || request.nextUrl.origin
-}
-
-/**
  * GET /api/integrations/widget/chat/stream?projectId=xxx&sessionId=xxx
  * SSE endpoint for real-time chat streaming
  */
 export async function GET(request: NextRequest) {
-  const origin = getRequestOrigin(request)
+  const origin = getWidgetRequestOrigin(request)
   const projectId = request.nextUrl.searchParams.get('projectId')
   const sessionId = request.nextUrl.searchParams.get('sessionId')
 
   if (!projectId) {
     return NextResponse.json(
       { error: 'projectId is required' },
-      { status: 400, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 400, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
   if (!sessionId) {
     return NextResponse.json(
       { error: 'sessionId is required' },
-      { status: 400, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 400, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
@@ -75,7 +67,7 @@ export async function GET(request: NextRequest) {
   if (!project) {
     return NextResponse.json(
       { error: 'Invalid project ID' },
-      { status: 401, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 401, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
@@ -83,7 +75,7 @@ export async function GET(request: NextRequest) {
   if (!isOriginAllowed(origin, project.allowed_origins)) {
     return NextResponse.json(
       { error: 'Origin not allowed' },
-      { status: 403, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 403, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
@@ -93,7 +85,7 @@ export async function GET(request: NextRequest) {
   if (!chatRun) {
     return NextResponse.json(
       { error: 'No running chat found. Start a new chat first.' },
-      { status: 404, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 404, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
@@ -104,7 +96,7 @@ export async function GET(request: NextRequest) {
   if (!messages.length) {
     return NextResponse.json(
       { error: 'No messages found for this chat run.' },
-      { status: 400, headers: { 'Access-Control-Allow-Origin': origin } }
+      { status: 400, headers: createWidgetCorsHeaders(origin) }
     )
   }
 
@@ -112,7 +104,7 @@ export async function GET(request: NextRequest) {
   const widgetContactId = (metadata?.contactId as string) ?? null
 
   // Create SSE stream with CORS headers using shared utilities
-  const corsHeaders = createCorsHeaders(origin)
+  const corsHeaders = createWidgetCorsHeaders(origin)
 
   return createSSEStreamWithExecutor<ChatSSEEvent>({
     logPrefix: LOG_PREFIX,
@@ -312,15 +304,5 @@ export async function GET(request: NextRequest) {
 
 // Handle OPTIONS for CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  const origin = getRequestOrigin(request)
-
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-    },
-  })
+  return createWidgetOptionsResponse(request)
 }

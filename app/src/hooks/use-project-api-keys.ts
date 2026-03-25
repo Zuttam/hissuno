@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { ApiKeyRecord } from '@/types/project-members'
 import { listApiKeys } from '@/lib/api/api-keys'
+import { useFetchData } from './use-fetch-data'
 
 interface UseProjectApiKeysState {
   apiKeys: ApiKeyRecord[]
@@ -12,42 +13,16 @@ interface UseProjectApiKeysState {
 }
 
 export function useProjectApiKeys(projectId: string | undefined): UseProjectApiKeysState {
-  const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([])
-  const [isLoading, setIsLoading] = useState<boolean>(Boolean(projectId))
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchApiKeys = useCallback(async () => {
-    if (!projectId) {
-      setApiKeys([])
-      setIsLoading(false)
-      return
-    }
-
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const result = await listApiKeys(projectId)
-      setApiKeys(result)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unexpected error loading API keys.'
-      setError(message)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [projectId])
-
-  useEffect(() => {
-    void fetchApiKeys()
-  }, [fetchApiKeys])
+  const { data, isLoading, error, refresh } = useFetchData<ApiKeyRecord[]>({
+    fetchFn: () => listApiKeys(projectId!),
+    deps: [projectId],
+    initialLoading: Boolean(projectId),
+    skip: !projectId,
+    errorPrefix: 'Unexpected error loading API keys',
+  })
 
   return useMemo(
-    () => ({
-      apiKeys,
-      isLoading,
-      error,
-      refresh: fetchApiKeys,
-    }),
-    [apiKeys, isLoading, error, fetchApiKeys]
+    () => ({ apiKeys: data ?? [], isLoading, error, refresh }),
+    [data, isLoading, error, refresh]
   )
 }

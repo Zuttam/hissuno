@@ -156,7 +156,8 @@ function blockToMarkdown(block: NotionBlock): string | null {
     case 'child_page': {
       const data = block[type] as Record<string, unknown> | undefined
       const title = data?.title as string || 'Untitled'
-      return `**[Child Page: ${title}]**`
+      const pageId = block.id.replace(/-/g, '')
+      return `**[${title}](https://www.notion.so/${pageId})**`
     }
 
     case 'child_database': {

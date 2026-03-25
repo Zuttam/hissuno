@@ -5,9 +5,6 @@
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { widgetIntegrations } from '@/lib/db/schema/app'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { resolveRequestContext } from '@/lib/db/server'
-import { hasProjectAccess } from '@/lib/auth/project-members'
 import type { WidgetSettings, WidgetSettingsInput } from '@/lib/db/queries/project-settings/types'
 import { DEFAULT_WIDGET_SETTINGS } from '@/lib/db/queries/project-settings/types'
 
@@ -17,13 +14,6 @@ import { DEFAULT_WIDGET_SETTINGS } from '@/lib/db/queries/project-settings/types
  */
 export async function getWidgetSettings(projectId: string): Promise<WidgetSettings> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have access to this project.')
-    }
-
     const row = await db.query.widgetIntegrations.findFirst({
       where: eq(widgetIntegrations.project_id, projectId),
       columns: {
@@ -45,9 +35,6 @@ export async function getWidgetSettings(projectId: string): Promise<WidgetSettin
 
     return row as WidgetSettings
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      throw error
-    }
     console.error('[widget-integration] unexpected error', projectId, error)
     throw error
   }
@@ -61,13 +48,6 @@ export async function updateWidgetSettings(
   settings: WidgetSettingsInput
 ): Promise<WidgetSettings> {
   try {
-    const { userId } = await resolveRequestContext()
-
-    const hasAccess = await hasProjectAccess(projectId, userId)
-    if (!hasAccess) {
-      throw new UnauthorizedError('You do not have access to this project.')
-    }
-
     const [row] = await db
       .insert(widgetIntegrations)
       .values({
@@ -100,9 +80,6 @@ export async function updateWidgetSettings(
 
     return row as WidgetSettings
   } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      throw error
-    }
     console.error('[widget-integration] unexpected error updating', projectId, error)
     throw error
   }

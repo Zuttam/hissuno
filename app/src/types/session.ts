@@ -12,7 +12,7 @@ export type AnalysisStatus = (typeof ANALYSIS_STATUSES)[number]
 /**
  * Session source channels
  */
-export type SessionSource = 'widget' | 'slack' | 'intercom' | 'zendesk' | 'gong' | 'posthog' | 'api' | 'manual'
+export type SessionSource = 'widget' | 'slack' | 'intercom' | 'zendesk' | 'gong' | 'posthog' | 'fathom' | 'api' | 'manual'
 
 /**
  * Session content type (determines how content is rendered)
@@ -37,6 +37,7 @@ export const SESSION_TYPE_INFO: Record<
 export function getDefaultSessionType(source: SessionSource): SessionType {
   switch (source) {
     case 'gong':
+    case 'fathom':
       return 'meeting'
     case 'posthog':
       return 'behavioral'
@@ -57,6 +58,7 @@ export const SESSION_SOURCE_INFO: Record<
   intercom: { label: 'Intercom', variant: 'success' },
   zendesk: { label: 'Zendesk', variant: 'success' },
   gong: { label: 'Gong', variant: 'default' },
+  fathom: { label: 'Fathom', variant: 'default' },
   posthog: { label: 'PostHog', variant: 'warning' },
   api: { label: 'API', variant: 'default' },
   manual: { label: 'Manual', variant: 'default' },
@@ -113,6 +115,7 @@ export interface SessionRecord {
   message_count: number
   status: SessionStatus
   tags: SessionTag[]
+  custom_fields: Record<string, unknown>
   tags_auto_applied_at: string | null
   first_message_at: string | null
   last_activity_at: string
@@ -262,6 +265,7 @@ export interface CreateSessionInput {
     product_scopes?: string[]
   }
   tags?: SessionTag[]
+  custom_fields?: Record<string, unknown>
   messages?: CreateMessageInput[]
 }
 
@@ -275,6 +279,7 @@ export interface UpdateSessionInput {
   is_human_takeover?: boolean
   /** Contact ID - routed to entity_relationships */
   contact_id?: string | null
+  custom_fields?: Record<string, unknown>
 }
 
 /**

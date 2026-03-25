@@ -6,6 +6,9 @@
  */
 
 import { createStep } from '@mastra/core/workflows'
+import { eq } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { knowledgeSources } from '@/lib/db/schema/app'
 import { sourceAnalysisInputSchema, fetchedContentSchema } from '../schemas'
 import { prepareCodebaseForWorkflow } from '../../common/prepare-codebase'
 import { stripLLMPreamble } from '../utils'
@@ -258,6 +261,24 @@ Please extract and organize:
         }
 
         case 'notion': {
+          // Check if content was already fetched by Notion sync
+          const [existingSource] = await db
+            .select({ analyzed_content: knowledgeSources.analyzed_content })
+            .from(knowledgeSources)
+            .where(eq(knowledgeSources.id, sourceId))
+            .limit(1)
+
+          if (existingSource?.analyzed_content) {
+            await writer?.write({ type: 'progress', message: 'Using pre-fetched Notion content' })
+            return {
+              ...codebaseDefaults,
+              ...inputData,
+              fetchedContent: existingSource.analyzed_content,
+              hasContent: true,
+            }
+          }
+
+          // Fallback: fetch directly from Notion API
           const notionPageId = (inputData as Record<string, unknown>).notionPageId as string | null
           if (!notionPageId) {
             return { ...codebaseDefaults, ...inputData, fetchedContent: '', hasContent: false }

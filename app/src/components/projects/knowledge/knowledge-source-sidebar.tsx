@@ -541,7 +541,7 @@ function CreateModeSidebar({
                 <div className="flex flex-col gap-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Repository</label>
+                      <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">Repository</label>
                       <Select
                         value={selectedRepo}
                         onChange={handleRepoChange}
@@ -560,7 +560,7 @@ function CreateModeSidebar({
                     </div>
 
                     <div>
-                      <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Branch</label>
+                      <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">Branch</label>
                       <Select
                         value={selectedBranch}
                         onChange={(e) => setSelectedBranch(e.target.value)}
@@ -581,7 +581,7 @@ function CreateModeSidebar({
 
                   {selectedRepo && (
                     <div>
-                      <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Analysis Scope</label>
+                      <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">Analysis Scope</label>
                       <Input
                         value={analysisScope}
                         onChange={(e) => setAnalysisScope(e.target.value)}
@@ -596,7 +596,7 @@ function CreateModeSidebar({
               <div className="flex flex-col gap-3">
                 {/* Source selector */}
                 <div>
-                  <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Source</label>
+                  <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">Source</label>
                   <Select
                     value={docOrigin}
                     onChange={(e) => {
@@ -625,7 +625,7 @@ function CreateModeSidebar({
 
                 {docOrigin === 'upload' ? (
                   <div>
-                    <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">File</label>
+                    <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">File</label>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -655,7 +655,7 @@ function CreateModeSidebar({
                   </div>
                 ) : (
                   <div>
-                    <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Page</label>
+                    <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">Page</label>
                     {selectedNotionPage ? (
                       <div className="mt-1 flex items-center gap-2 rounded-[4px] border border-[color:var(--border-subtle)] px-3 py-2">
                         <Image src="/logos/notion.svg" alt="Notion" width={14} height={14} className="dark:invert" />
@@ -709,7 +709,7 @@ function CreateModeSidebar({
               </div>
             ) : createType === 'raw_text' ? (
               <div>
-                <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">
                   Content <span className="text-[color:var(--accent-danger)]">*</span>
                 </label>
                 <Textarea
@@ -722,7 +722,7 @@ function CreateModeSidebar({
               </div>
             ) : (
               <div>
-                <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+                <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">
                   URL <span className="text-[color:var(--accent-danger)]">*</span>
                 </label>
                 <Input
@@ -736,7 +736,7 @@ function CreateModeSidebar({
 
             {/* Name */}
             <div>
-              <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+              <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">
                 Name <span className="text-[color:var(--accent-danger)]">*</span>
               </label>
               <Input
@@ -749,7 +749,7 @@ function CreateModeSidebar({
 
             {/* Description */}
             <div>
-              <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
+              <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">
                 Description <span className="text-[color:var(--accent-danger)]">*</span>
               </label>
               <Textarea
@@ -791,7 +791,7 @@ function CreateModeSidebar({
 function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">{label}</label>
+      <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">{label}</label>
       <div className="text-[color:var(--foreground)]">{children}</div>
     </div>
   )
@@ -850,7 +850,7 @@ function EditableDetailField({
   if (isEditing) {
     return (
       <div className="flex flex-col gap-1">
-        <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">{label}{required && <span className="text-[color:var(--accent-danger)] ml-0.5">*</span>}</label>
+        <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">{label}{required && <span className="text-[color:var(--accent-danger)] ml-0.5">*</span>}</label>
         <div className="flex items-center gap-1">
           {type === 'textarea' ? (
             <textarea
@@ -860,7 +860,7 @@ function EditableDetailField({
               autoFocus
               rows={3}
               placeholder={placeholder}
-              className="flex-1 rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-2 py-1 text-xs text-[color:var(--foreground)] outline-none focus:border-[color:var(--accent-selected)]"
+              className="flex-1 rounded-md border border-[color:var(--border-subtle)] bg-transparent px-2.5 py-1.5 text-xs text-[color:var(--foreground)] outline-none focus:border-[color:var(--accent-selected)]"
             />
           ) : (
             <input
@@ -870,7 +870,7 @@ function EditableDetailField({
               onKeyDown={handleKeyDown}
               autoFocus
               placeholder={placeholder}
-              className="flex-1 rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-2 py-1 text-xs text-[color:var(--foreground)] outline-none focus:border-[color:var(--accent-selected)]"
+              className="flex-1 rounded-md border border-[color:var(--border-subtle)] bg-transparent px-2.5 py-1.5 text-xs text-[color:var(--foreground)] outline-none focus:border-[color:var(--accent-selected)]"
             />
           )}
           <button
@@ -901,7 +901,7 @@ function EditableDetailField({
 
   return (
     <div className="group flex flex-col gap-1">
-      <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">{label}{required && <span className="text-[color:var(--accent-danger)] ml-0.5">*</span>}</label>
+      <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">{label}{required && <span className="text-[color:var(--accent-danger)] ml-0.5">*</span>}</label>
       <div className="flex items-center gap-1">
         <p className="flex-1 text-[color:var(--foreground)]">
           {value || <span className="text-[color:var(--text-tertiary)]">{placeholder || '-'}</span>}
@@ -928,7 +928,7 @@ function ContentPreviewField({ content, sourceName }: { content: string; sourceN
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="font-mono uppercase tracking-wide text-[color:var(--text-secondary)]">Content Preview</label>
+      <label className="font-mono text-xs font-medium text-[color:var(--text-secondary)]">Content Preview</label>
       <div className="relative max-h-[300px] overflow-hidden rounded-[4px] border border-[color:var(--border-subtle)] p-2">
         <button
           type="button"
@@ -1003,6 +1003,31 @@ function TypeSpecificField({ source }: { source: KnowledgeSourceWithCodebase }) 
         <DetailField label="Content Preview">
           <span className="text-[color:var(--text-secondary)]">-</span>
         </DetailField>
+      )
+    case 'notion':
+      return (
+        <>
+          {source.url && (
+            <DetailField label="Notion Page">
+              <a
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[color:var(--accent-primary)] hover:underline break-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                Open in Notion
+              </a>
+            </DetailField>
+          )}
+          {source.analyzed_content && (
+            <ContentPreviewField content={source.analyzed_content} sourceName={source.name} />
+          )}
+        </>
       )
     default:
       return null

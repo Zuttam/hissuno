@@ -233,8 +233,7 @@ describe('public paths', () => {
     '/api/integrations/linear/callback',
     '/api/integrations/hubspot/callback',
     '/api/integrations/notion/callback',
-    '/api/integrations/widget',
-    '/api/integrations/widget/init',
+    '/api/integrations/widget/chat',
   ]
 
   for (const path of publicPaths) {

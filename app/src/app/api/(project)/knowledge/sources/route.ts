@@ -7,11 +7,14 @@ import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
 import { knowledgeSources, entityRelationships } from '@/lib/db/schema/app'
 import { uploadDocument, validateUploadedFile } from '@/lib/knowledge/storage'
-import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/codebase'
+import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/knowledge/codebase'
 import { hasGitHubInstallation } from '@/lib/integrations/github'
 import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
-import { setEntityProductScope } from '@/lib/db/queries/entity-relationships'
+import {
+  createKnowledgeSource,
+  createKnowledgeSourceBulkAdmin,
+} from '@/lib/knowledge/knowledge-service'
 
 export const runtime = 'nodejs'
 
@@ -311,19 +314,13 @@ export async function POST(request: NextRequest) {
         }
 
         const values = (pages as Array<{ pageId: string; title: string; url: string }>).map((page) => ({
-          project_id: projectId,
           type: 'notion' as const,
-          notion_page_id: page.pageId,
+          notionPageId: page.pageId,
           name: page.title,
           url: page.url,
-          status: 'pending' as const,
-          enabled: true,
         }))
 
-        const inserted = await db
-          .insert(knowledgeSources)
-          .values(values)
-          .returning()
+        const inserted = await createKnowledgeSourceBulkAdmin(projectId, values)
 
         return NextResponse.json({ sources: inserted }, { status: 201 })
       }
@@ -358,19 +355,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const [data] = await db
-      .insert(knowledgeSources)
-      .values(sourceData)
-      .returning()
+    const data = await createKnowledgeSource({
+      projectId,
+      type: sourceData.type,
+      name: sourceData.name ?? null,
+      description: sourceData.description ?? null,
+      url: sourceData.url ?? null,
+      content: sourceData.content ?? null,
+      storagePath: sourceData.storage_path ?? null,
+      notionPageId: sourceData.notion_page_id ?? null,
+      origin: sourceData.origin ?? null,
+      productScopeId,
+    })
 
     if (!data) {
       console.error('[knowledge-sources.post] failed to create source')
       return NextResponse.json({ error: 'Failed to create knowledge source.' }, { status: 500 })
-    }
-
-    // Write product scope to entity_relationships
-    if (productScopeId) {
-      await setEntityProductScope(projectId, 'knowledge_source', data.id, productScopeId)
     }
 
     return NextResponse.json({ source: data }, { status: 201 })

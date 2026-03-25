@@ -8,7 +8,7 @@ import { isDatabaseConfigured } from '@/lib/db/config'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
-import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/sse'
+import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/utils/sse'
 import { hasFathomConnection } from '@/lib/integrations/fathom'
 import { syncFathomMeetings, type SyncProgressEvent, type SyncMode } from '@/lib/integrations/fathom/sync'
 

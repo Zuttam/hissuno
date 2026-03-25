@@ -2,7 +2,7 @@
  * Project Members Tests
  *
  * Tests addProjectMember, removeProjectMember, updateMemberRole,
- * hasProjectAccess, hasProjectRole, transferOwnership.
+ * isProjectMember, hasProjectRole, transferOwnership.
  *
  * Focuses on:
  *   - Last-owner protection (cannot remove or demote the last owner)
@@ -126,7 +126,7 @@ import {
   addProjectMember,
   removeProjectMember,
   updateMemberRole,
-  hasProjectAccess,
+  isProjectMember,
   hasProjectRole,
   transferOwnership,
 } from '@/lib/auth/project-members'
@@ -145,14 +145,14 @@ beforeEach(() => {
 })
 
 // ============================================================================
-// hasProjectAccess
+// isProjectMember
 // ============================================================================
 
-describe('hasProjectAccess', () => {
+describe('isProjectMember', () => {
   it('returns true when user is an active member', async () => {
     enqueueSelect([{ id: MEMBER_ID }], true)
 
-    const result = await hasProjectAccess(PROJECT_ID, USER_ID)
+    const result = await isProjectMember(PROJECT_ID, USER_ID)
 
     expect(result).toBe(true)
   })
@@ -160,7 +160,7 @@ describe('hasProjectAccess', () => {
   it('returns false when user is not a member', async () => {
     enqueueSelect([], true)
 
-    const result = await hasProjectAccess(PROJECT_ID, USER_ID)
+    const result = await isProjectMember(PROJECT_ID, USER_ID)
 
     expect(result).toBe(false)
   })

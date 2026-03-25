@@ -7,7 +7,7 @@ import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
 import { contacts } from '@/lib/db/schema/app'
 import { eq } from 'drizzle-orm'
-import { validateBatchIds, BatchValidationError } from '@/lib/batch/validation'
+import { validateBatchIds, BatchValidationError } from '@/lib/utils/batch/validation'
 import { setSessionContact } from '@/lib/db/queries/entity-relationships'
 
 export const runtime = 'nodejs'

@@ -34,20 +34,54 @@ npm install -g hissuno
 hissuno config
 ```
 
-Use `hissuno config` to configure your API key and endpoint, then create projects, manage feedback, issues, contacts, and knowledge directly from the command line.
+Once connected, you can add data directly from the command line:
+
+```bash
+# Add a customer company
+hissuno add customers
+# Interactive prompts: name, domain, ARR, stage, industry...
+
+# Add a feedback session with messages
+hissuno add feedback
+# Interactive prompts: messages, name, tags...
+
+# Create an issue manually
+hissuno add issues
+# Interactive prompts: type, title, description, priority...
+
+# List recent feedback sessions
+hissuno list feedback --source widget --limit 10
+
+# Search across all data
+hissuno search "login issues" --type feedback
+```
+
+For scripting and automation, add `--json` before any command to get raw JSON output:
+
+```bash
+hissuno --json list issues --priority high | jq '.issues[] | .title'
+```
 
 ## From the API
 
-The [Hissuno API](/docs/api/overview) provides programmatic access to all project data. Authenticate with an API key from the **Access** page and call endpoints to create sessions, import customers, add knowledge sources, and more.
+The [Hissuno API](/docs/api/overview) provides programmatic access to all project data. Authenticate with an API key from the **Access** page and call endpoints to create sessions, import customers, and more.
 
 ```bash
-curl -X POST /api/projects/:projectId/sessions \
-  -H "Authorization: Bearer hss_your_api_key_here" \
+# Create a feedback session with messages
+curl -X POST "https://your-instance.com/api/sessions?projectId=YOUR_PROJECT_ID" \
+  -H "Authorization: Bearer hiss_your_api_key" \
   -H "Content-Type: application/json" \
-  -d '{"customer_email": "jane@example.com", "message": "How do I export data?"}'
+  -d '{
+    "name": "Support chat - Jane",
+    "session_type": "chat",
+    "messages": [
+      { "role": "user", "content": "How do I export my data to CSV?" },
+      { "role": "assistant", "content": "You can export from the Reports page using the Export button." }
+    ]
+  }'
 ```
 
-See [API Authentication](/docs/api/authentication) for details on generating and managing keys.
+See the [Sessions API](/docs/api/sessions), [Issues API](/docs/api/issues), and [Search API](/docs/api/search) for full endpoint reference.
 
 ## Through Integrations
 

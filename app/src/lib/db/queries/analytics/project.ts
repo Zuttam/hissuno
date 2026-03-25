@@ -1,10 +1,6 @@
-import { cache } from 'react'
 import { db } from '@/lib/db'
 import { and, eq, gte, lte, isNotNull, sql } from 'drizzle-orm'
 import { sessions, issues, knowledgeSources, entityRelationships } from '@/lib/db/schema/app'
-import { UnauthorizedError } from '@/lib/auth/server'
-import { requireRequestIdentity } from '@/lib/auth/identity'
-import { hasProjectAccess } from '@/lib/auth/project-members'
 import type { AnalyticsPeriod, ProjectAnalytics, TimeSeriesPoint } from './types'
 import {
   buildDistribution,
@@ -18,18 +14,10 @@ import {
 /**
  * Get project-specific analytics
  */
-export const getProjectAnalytics = cache(async (
+export async function getProjectAnalytics(
   projectId: string,
   period: AnalyticsPeriod
-): Promise<ProjectAnalytics> => {
-  const identity = await requireRequestIdentity()
-  const userId = identity.type === 'user' ? identity.userId : identity.createdByUserId
-
-  const hasAccess = await hasProjectAccess(projectId, userId)
-  if (!hasAccess) {
-    throw new UnauthorizedError('You do not have access to this project.')
-  }
-
+): Promise<ProjectAnalytics> {
   const periodStart = getPeriodStartDate(period)
   const comparisonPeriod = getComparisonPeriod(period)
 
@@ -188,7 +176,7 @@ export const getProjectAnalytics = cache(async (
       issuesByPriority,
     },
   }
-})
+}
 
 /**
  * Get issue velocity data for the dashboard (created vs resolved per day + cumulative open)
@@ -197,14 +185,6 @@ export async function getIssueVelocityData(
   projectId: string,
   period: AnalyticsPeriod
 ): Promise<{ created: TimeSeriesPoint[]; resolved: TimeSeriesPoint[]; cumulativeOpen: number }> {
-  const identity = await requireRequestIdentity()
-  const userId = identity.type === 'user' ? identity.userId : identity.createdByUserId
-
-  const hasAccess = await hasProjectAccess(projectId, userId)
-  if (!hasAccess) {
-    return { created: [], resolved: [], cumulativeOpen: 0 }
-  }
-
   const periodStart = getPeriodStartDate(period)
 
   const conditions = [

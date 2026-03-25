@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!, 10) : undefined,
     }
 
-    const { issues, total } = await listIssues(filters)
+    const { issues, total } = await listIssues(projectId, filters)
 
     return NextResponse.json({ issues, total })
   } catch (error) {
@@ -99,6 +99,7 @@ export async function POST(request: NextRequest) {
       description: body.description,
       priority: body.priority || undefined,
       product_scope_id: body.product_scope_id || undefined,
+      custom_fields: body.custom_fields || undefined,
     }
 
     if (!input.type) {

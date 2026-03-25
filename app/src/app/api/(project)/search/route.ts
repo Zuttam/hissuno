@@ -4,31 +4,60 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { isDatabaseConfigured } from '@/lib/db/config'
-import { RESOURCE_TYPES, type ResourceType, type ResourceAdapter } from '@/mcp/resources/types'
-import { knowledgeAdapter } from '@/mcp/resources/knowledge'
-import { feedbackAdapter } from '@/mcp/resources/feedback'
-import { issuesAdapter } from '@/mcp/resources/issues'
-import { customersAdapter } from '@/mcp/resources/customers'
+import { searchSessions } from '@/lib/sessions/sessions-service'
+import { searchIssues } from '@/lib/issues/issues-service'
+import { searchCustomers } from '@/lib/customers/customers-service'
+import { searchKnowledge } from '@/lib/knowledge/knowledge-service'
 
 export const runtime = 'nodejs'
 
+const RESOURCE_TYPES = ['knowledge', 'feedback', 'issues', 'customers'] as const
+type ResourceType = (typeof RESOURCE_TYPES)[number]
+
 const VALID_TYPES = new Set<string>(RESOURCE_TYPES)
 
-const adapters: Record<ResourceType, ResourceAdapter> = {
-  knowledge: knowledgeAdapter,
-  feedback: feedbackAdapter,
-  issues: issuesAdapter,
-  customers: customersAdapter,
+interface SearchResult {
+  id: string
+  type: ResourceType
+  name: string
+  snippet: string
+  score?: number
+}
+
+async function searchByType(
+  type: ResourceType,
+  projectId: string,
+  query: string,
+  limit: number
+): Promise<SearchResult[]> {
+  switch (type) {
+    case 'feedback': {
+      const results = await searchSessions(projectId, query, limit)
+      return results.map((r) => ({ ...r, type: 'feedback' as const }))
+    }
+    case 'issues': {
+      const results = await searchIssues(projectId, query, limit)
+      return results.map((r) => ({ ...r, type: 'issues' as const }))
+    }
+    case 'customers': {
+      const results = await searchCustomers(projectId, query, limit)
+      return results.map((r) => ({ ...r, type: 'customers' as const }))
+    }
+    case 'knowledge': {
+      const results = await searchKnowledge(projectId, query, limit)
+      return results.map((r) => ({ ...r, type: 'knowledge' as const }))
+    }
+  }
 }
 
 /**
  * GET /api/search?projectId=...&q=...&type=...&limit=...
  *
- * Searches across project resources using the MCP resource adapters.
+ * Searches across project resources using the service layer.
  *
  * Query params:
  * - q (required) - search query
- * - type (optional) - knowledge|feedback|issues|contacts
+ * - type (optional) - knowledge|feedback|issues|customers
  * - limit (optional, default 10, max 20)
  */
 export async function GET(request: NextRequest) {
@@ -68,18 +97,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    let allResults: Array<{ id: string; type: ResourceType; name: string; snippet: string; score?: number }>
+    let allResults: SearchResult[]
 
     if (typeParam) {
-      const adapter = adapters[typeParam as ResourceType]
-      allResults = await adapter.search(projectId, query.trim(), limit)
+      allResults = await searchByType(typeParam as ResourceType, projectId, query.trim(), limit)
     } else {
       // Search all types in parallel
       const results = await Promise.allSettled(
-        RESOURCE_TYPES.map(async (type) => {
-          const adapter = adapters[type]
-          return adapter.search(projectId, query.trim(), limit)
-        })
+        RESOURCE_TYPES.map((type) => searchByType(type, projectId, query.trim(), limit))
       )
 
       allResults = []

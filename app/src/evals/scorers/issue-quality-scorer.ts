@@ -49,7 +49,7 @@ export const issueQualityScorer = createScorer<
   name: 'Issue Quality',
   description: 'Evaluates the quality of issues created by the PM agent',
   judge: {
-    model: openai('gpt-4o-mini'),
+    model: openai('gpt-5.4-mini'),
     instructions: `You are an expert Product Manager evaluating the quality of issue reports.
     
 Your job is to assess whether an issue created from a support conversation is:

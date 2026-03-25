@@ -6,8 +6,11 @@ import { sessions } from '@/lib/db/schema/app'
 import { eq } from 'drizzle-orm'
 import { getProjectById } from '@/lib/projects/keys'
 import { isOriginAllowed, verifyWidgetJWT } from '@/lib/utils/widget-auth'
+import { getWidgetRequestOrigin, addWidgetCorsHeaders, createWidgetOptionsResponse } from '@/lib/utils/widget-cors'
 
 export const runtime = 'nodejs'
+
+const CORS_METHODS = 'POST, OPTIONS'
 
 interface CloseRequestBody {
   sessionId: string
@@ -16,39 +19,11 @@ interface CloseRequestBody {
 }
 
 /**
- * Get the request origin from headers
- * Uses Origin header if present, otherwise falls back to request URL origin
- */
-function getRequestOrigin(request: NextRequest): string {
-  return request.headers.get('Origin') || request.nextUrl.origin
-}
-
-/**
- * Add CORS headers to response
- */
-function addCorsHeaders(response: NextResponse, origin: string): NextResponse {
-  response.headers.set('Access-Control-Allow-Origin', origin)
-  response.headers.set('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type')
-  return response
-}
-
-/**
  * OPTIONS /api/integrations/widget/chat/close
  * Handle CORS preflight requests
  */
 export async function OPTIONS(request: NextRequest) {
-  const origin = getRequestOrigin(request)
-
-  return new NextResponse(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': origin,
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-    },
-  })
+  return createWidgetOptionsResponse(request, CORS_METHODS)
 }
 
 /**
@@ -64,13 +39,13 @@ export async function OPTIONS(request: NextRequest) {
  * - success: boolean
  */
 export async function POST(request: NextRequest) {
-  const origin = getRequestOrigin(request)
+  const origin = getWidgetRequestOrigin(request)
 
   if (!isDatabaseConfigured()) {
     console.error('[widget/chat/close] Database must be configured')
-    return addCorsHeaders(
+    return addWidgetCorsHeaders(
       NextResponse.json({ error: 'Database must be configured.' }, { status: 500 }),
-      origin
+      origin, CORS_METHODS
     )
   }
 
@@ -79,40 +54,40 @@ export async function POST(request: NextRequest) {
     const { sessionId, projectId, widgetToken } = body
 
     if (!sessionId) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'sessionId is required' }, { status: 400 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     if (!projectId) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'projectId is required' }, { status: 400 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // Validate project
     const project = await getProjectById(projectId)
     if (!project) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Invalid project ID' }, { status: 401 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // Check origin
     if (!isOriginAllowed(origin, project.allowed_origins)) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
     // JWT verification if required
     if (project.secret_key) {
       if (project.widget_token_required && !widgetToken) {
-        return addCorsHeaders(
+        return addWidgetCorsHeaders(
           NextResponse.json({ error: 'Widget token is required' }, { status: 401 }),
           origin
         )
@@ -121,7 +96,7 @@ export async function POST(request: NextRequest) {
       if (widgetToken) {
         const verifyResult = verifyWidgetJWT(widgetToken, project.secret_key)
         if (!verifyResult.valid) {
-          return addCorsHeaders(
+          return addWidgetCorsHeaders(
             NextResponse.json({ error: verifyResult.error }, { status: 401 }),
             origin
           )
@@ -131,9 +106,9 @@ export async function POST(request: NextRequest) {
 
     // Non-UUID session IDs can't exist in the database — return success (idempotent)
     if (!UUID_REGEX.test(sessionId)) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ success: true }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
@@ -147,9 +122,9 @@ export async function POST(request: NextRequest) {
     // If session doesn't exist, return success (idempotent close)
     // This handles the case where close is called before any message was sent
     if (!session) {
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ success: true }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
@@ -164,21 +139,21 @@ export async function POST(request: NextRequest) {
         .where(eq(sessions.id, sessionId))
     } catch (updateError) {
       console.error('[widget/chat/close] Failed to close session:', updateError)
-      return addCorsHeaders(
+      return addWidgetCorsHeaders(
         NextResponse.json({ error: 'Failed to close session.' }, { status: 500 }),
-        origin
+        origin, CORS_METHODS
       )
     }
 
-    return addCorsHeaders(
+    return addWidgetCorsHeaders(
       NextResponse.json({ success: true }),
-      origin
+      origin, CORS_METHODS
     )
   } catch (error) {
     console.error('[widget/chat/close] unexpected error', error)
-    return addCorsHeaders(
+    return addWidgetCorsHeaders(
       NextResponse.json({ error: 'Unable to close session.' }, { status: 500 }),
-      origin
+      origin, CORS_METHODS
     )
   }
 }

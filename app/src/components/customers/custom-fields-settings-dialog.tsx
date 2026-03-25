@@ -5,6 +5,10 @@ import { Button, Input, Select, IconButton, FormField } from '@/components/ui'
 import { useCustomFields } from '@/hooks/use-custom-fields'
 import type { CustomerEntityType, CustomFieldType, CustomFieldDefinition } from '@/types/customer'
 import { CUSTOM_FIELD_TYPES } from '@/types/customer'
+import {
+  Type, Hash, Calendar, Check, ChevronDown, Link, List, Tag, AlertCircle,
+  type LucideIcon,
+} from 'lucide-react'
 
 const MAX_FIELDS = 10
 const MAX_LABEL_LENGTH = 50
@@ -15,6 +19,23 @@ const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   date: 'Date',
   boolean: 'Yes/No',
   select: 'Select',
+}
+
+const FIELD_TYPE_ICONS: Record<string, LucideIcon> = {
+  text: Type,
+  number: Hash,
+  date: Calendar,
+  'yes/no': Check,
+  boolean: Check,
+  select: ChevronDown,
+  relation: Link,
+  'multi-select': List,
+  tag: Tag,
+}
+
+export function FieldTypeIcon({ type, className = '' }: { type: string; className?: string }) {
+  const Icon = FIELD_TYPE_ICONS[type.toLowerCase()] ?? AlertCircle
+  return <Icon size={12} className={`shrink-0 ${className}`} />
 }
 
 interface FieldFormState {
@@ -31,104 +52,33 @@ const EMPTY_FORM: FieldFormState = {
   required: false,
 }
 
-interface FieldFormProps {
-  formState: FieldFormState
-  onLabelChange: (e: ChangeEvent<HTMLInputElement>) => void
-  onTypeChange: (e: ChangeEvent<HTMLSelectElement>) => void
-  onOptionsChange: (e: ChangeEvent<HTMLInputElement>) => void
-  onRequiredChange: (e: ChangeEvent<HTMLInputElement>) => void
-  formError: string | null
-}
-
-function FieldForm({
-  formState,
-  onLabelChange,
-  onTypeChange,
-  onOptionsChange,
-  onRequiredChange,
-  formError,
-}: FieldFormProps) {
-  return (
-    <div className="space-y-4">
-      {formError && (
-        <div className="rounded-md bg-[color:var(--background-danger)] p-2 text-xs text-[color:var(--text-danger)]">
-          {formError}
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-4">
-        <FormField label="Label">
-          <Input
-            value={formState.label}
-            onChange={onLabelChange}
-            placeholder="e.g. Contract Value"
-            maxLength={MAX_LABEL_LENGTH}
-          />
-        </FormField>
-
-        <FormField label="Type">
-          <Select value={formState.type} onChange={onTypeChange}>
-            {CUSTOM_FIELD_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {FIELD_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-      </div>
-
-      {formState.type === 'select' && (
-        <FormField label="Options" description="Comma-separated list of options">
-          <Input
-            value={formState.options}
-            onChange={onOptionsChange}
-            placeholder="Option A, Option B, Option C"
-          />
-        </FormField>
-      )}
-
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          id="field-required"
-          checked={formState.required}
-          onChange={onRequiredChange}
-          className="h-4 w-4 rounded border-[color:var(--border)] accent-[color:var(--accent-selected)]"
-        />
-        <label htmlFor="field-required" className="text-xs text-[color:var(--text-secondary)]">
-          Required
-        </label>
-      </div>
-    </div>
-  )
+export interface BuiltInField {
+  label: string
+  type: string
 }
 
 interface FieldsEditorProps {
   projectId: string
   entityType: CustomerEntityType
+  builtInFields?: BuiltInField[]
+  title?: string
 }
 
-export function FieldsEditor({ projectId, entityType }: FieldsEditorProps) {
+export function FieldsEditor({ projectId, entityType, builtInFields = [], title }: FieldsEditorProps) {
   const { fields, isLoading, createField, updateField, deleteField } = useCustomFields({
     projectId,
     entityType,
   })
 
-  const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formState, setFormState] = useState<FieldFormState>(EMPTY_FORM)
   const [formError, setFormError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-
-  const handleStartAdd = useCallback(() => {
-    setIsAdding(true)
-    setEditingId(null)
-    setFormState(EMPTY_FORM)
-    setFormError(null)
-  }, [])
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [addLabel, setAddLabel] = useState('')
+  const [addType, setAddType] = useState<CustomFieldType>('text')
 
   const handleStartEdit = useCallback((field: CustomFieldDefinition) => {
-    setIsAdding(false)
     setEditingId(field.id)
     setFormState({
       label: field.field_label,
@@ -140,262 +90,249 @@ export function FieldsEditor({ projectId, entityType }: FieldsEditorProps) {
   }, [])
 
   const handleCancel = useCallback(() => {
-    setIsAdding(false)
     setEditingId(null)
     setFormState(EMPTY_FORM)
     setFormError(null)
   }, [])
 
-  const handleLabelChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const label = e.target.value.substring(0, MAX_LABEL_LENGTH)
-    setFormState((prev) => ({ ...prev, label }))
-  }, [])
-
-  const handleTypeChange = useCallback((e: ChangeEvent<HTMLSelectElement>) => {
-    setFormState((prev) => ({ ...prev, type: e.target.value as CustomFieldType }))
-  }, [])
-
-  const handleOptionsChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setFormState((prev) => ({ ...prev, options: e.target.value }))
-  }, [])
-
-  const handleRequiredChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setFormState((prev) => ({ ...prev, required: e.target.checked }))
-  }, [])
-
   const generateFieldKey = (label: string): string =>
-    label
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '_')
-      .replace(/^_|_$/g, '')
+    label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 
-  const validateForm = useCallback((): string | null => {
-    if (!formState.label.trim()) {
-      return 'Label is required.'
-    }
-    const fieldKey = generateFieldKey(formState.label)
-    if (!fieldKey) {
-      return 'Label must contain at least one alphanumeric character.'
-    }
-    // Check for duplicate field_keys (skip the field being edited)
-    const duplicate = fields.find((f) => f.field_key === fieldKey && f.id !== editingId)
+  const handleInlineAdd = useCallback(async () => {
+    const label = addLabel.trim()
+    if (!label) return
+    const fieldKey = generateFieldKey(label)
+    if (!fieldKey) return
+
+    const duplicate = fields.find((f) => f.field_key === fieldKey)
     if (duplicate) {
-      return 'A field with this key already exists.'
-    }
-    if (formState.type === 'select') {
-      const options = formState.options
-        .split(',')
-        .map((o) => o.trim())
-        .filter(Boolean)
-      if (options.length < 2) {
-        return 'Select type requires at least 2 options.'
-      }
-    }
-    return null
-  }, [formState, fields, editingId])
-
-  const handleSave = useCallback(async () => {
-    const validationError = validateForm()
-    if (validationError) {
-      setFormError(validationError)
+      setFormError('A field with this key already exists.')
       return
     }
 
     setIsSaving(true)
     setFormError(null)
 
+    const result = await createField({
+      project_id: projectId,
+      entity_type: entityType,
+      field_key: fieldKey,
+      field_label: label,
+      field_type: addType,
+    })
+
+    setIsSaving(false)
+
+    if (result) {
+      setAddLabel('')
+      setAddType('text')
+      setIsAddOpen(false)
+    } else {
+      setFormError('Failed to create field.')
+    }
+  }, [addLabel, addType, fields, projectId, entityType, createField])
+
+  const handleEditSave = useCallback(async () => {
+    if (!editingId) return
+    if (!formState.label.trim()) {
+      setFormError('Label is required.')
+      return
+    }
+
     const fieldKey = generateFieldKey(formState.label)
-    const selectOptions =
-      formState.type === 'select'
-        ? formState.options
-            .split(',')
-            .map((o) => o.trim())
-            .filter(Boolean)
-        : undefined
-
-    if (isAdding) {
-      const result = await createField({
-        project_id: projectId,
-        entity_type: entityType,
-        field_key: fieldKey,
-        field_label: formState.label.trim(),
-        field_type: formState.type,
-        select_options: selectOptions,
-        is_required: formState.required,
-      })
-
-      setIsSaving(false)
-
-      if (result) {
-        handleCancel()
-      } else {
-        setFormError('Failed to create field. You may have reached the maximum of 10 fields.')
-      }
-    } else if (editingId) {
-      const success = await updateField(editingId, {
-        field_label: formState.label.trim(),
-        field_type: formState.type,
-        select_options: selectOptions,
-        is_required: formState.required,
-      })
-
-      setIsSaving(false)
-
-      if (success) {
-        handleCancel()
-      } else {
-        setFormError('Failed to update field.')
+    if (!fieldKey) {
+      setFormError('Label must contain at least one alphanumeric character.')
+      return
+    }
+    const duplicate = fields.find((f) => f.field_key === fieldKey && f.id !== editingId)
+    if (duplicate) {
+      setFormError('A field with this key already exists.')
+      return
+    }
+    if (formState.type === 'select') {
+      const options = formState.options.split(',').map((o) => o.trim()).filter(Boolean)
+      if (options.length < 2) {
+        setFormError('Select type requires at least 2 options.')
+        return
       }
     }
-  }, [validateForm, isAdding, editingId, formState, projectId, entityType, createField, updateField, handleCancel])
+
+    setIsSaving(true)
+    setFormError(null)
+
+    const selectOptions =
+      formState.type === 'select'
+        ? formState.options.split(',').map((o) => o.trim()).filter(Boolean)
+        : undefined
+
+    const success = await updateField(editingId, {
+      field_label: formState.label.trim(),
+      field_type: formState.type,
+      select_options: selectOptions,
+      is_required: formState.required,
+    })
+
+    setIsSaving(false)
+
+    if (success) {
+      handleCancel()
+    } else {
+      setFormError('Failed to update field.')
+    }
+  }, [editingId, formState, fields, updateField, handleCancel])
 
   const handleDelete = useCallback(
     async (field: CustomFieldDefinition) => {
-      if (!confirm(`Delete "${field.field_label}"? This cannot be undone.`)) {
-        return
-      }
+      if (!confirm(`Delete "${field.field_label}"? This cannot be undone.`)) return
       await deleteField(field.id)
     },
     [deleteField]
   )
 
-  const isEditing = isAdding || editingId !== null
+  const canAdd = fields.length < MAX_FIELDS && editingId === null
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <span className="text-sm text-[color:var(--text-secondary)]">Loading...</span>
+      <div className="flex items-center justify-center py-4">
+        <span className="text-xs text-[color:var(--text-secondary)]">Loading...</span>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Fields list */}
-      <div className="space-y-1">
-        {fields.map((field) => (
-          <div
-            key={field.id}
-            className="flex items-center gap-3 rounded-lg bg-[color:var(--background-secondary)] p-2"
-          >
-            {editingId === field.id ? (
-              <div className="flex-1 space-y-4 py-1">
-                <FieldForm
-                  formState={formState}
-                  onLabelChange={handleLabelChange}
-                  onTypeChange={handleTypeChange}
-                  onOptionsChange={handleOptionsChange}
-                  onRequiredChange={handleRequiredChange}
-                  formError={formError}
-                />
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={handleCancel}>
-                    Cancel
-                  </Button>
-                  <Button size="sm" onClick={() => void handleSave()} loading={isSaving}>
-                    Save
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  <span className="text-sm text-[color:var(--foreground)]">{field.field_label}</span>
-                  <span className="rounded bg-[color:var(--background-secondary)] px-1.5 py-0.5 text-xs text-[color:var(--text-secondary)]">
-                    {FIELD_TYPE_LABELS[field.field_type]}
-                  </span>
-                  {field.field_type === 'select' && field.select_options && (
-                    <span className="text-xs text-[color:var(--text-tertiary)]">
-                      {field.select_options.length} options
-                    </span>
-                  )}
-                  {field.is_required && (
-                    <span className="text-xs text-[color:var(--text-tertiary)]">Required</span>
-                  )}
-                </div>
-                <div className="flex shrink-0 gap-1">
-                  <IconButton
-                    size="sm"
-                    aria-label="Edit field"
-                    onClick={() => handleStartEdit(field)}
-                    disabled={isEditing}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                    </svg>
-                  </IconButton>
-                  <IconButton
-                    size="sm"
-                    aria-label="Delete field"
-                    onClick={() => void handleDelete(field)}
-                    disabled={isEditing}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                  </IconButton>
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {fields.length === 0 && !isAdding && (
-        <p className="py-4 text-center text-sm text-[color:var(--text-secondary)]">
-          No custom fields defined yet.
-        </p>
-      )}
-
-      {/* Add new field form */}
-      {isAdding && (
-        <div className="space-y-4">
-          <FieldForm
-            formState={formState}
-            onLabelChange={handleLabelChange}
-            onTypeChange={handleTypeChange}
-            onOptionsChange={handleOptionsChange}
-            onRequiredChange={handleRequiredChange}
-            formError={formError}
-          />
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={handleCancel}>
-              Cancel
-            </Button>
-            <Button size="sm" onClick={() => void handleSave()} loading={isSaving}>
-              Add Field
-            </Button>
-          </div>
+    <div className="space-y-1">
+      {/* Title */}
+      {title && (
+        <div className="pb-1">
+          <span className="font-mono text-base font-semibold uppercase">{title}</span>
         </div>
       )}
 
-      {/* Footer: add button + counter */}
-      {!isEditing && (
-        <div className="flex items-center justify-between">
+      {/* Built-in fields (readonly) */}
+      {builtInFields.map((field) => (
+        <div
+          key={field.label}
+          className="flex items-center gap-2 px-2 py-1.5"
+        >
+          <span className="text-sm text-[color:var(--text-secondary)]">{field.label}</span>
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 text-[color:var(--text-tertiary)]">
+            <FieldTypeIcon type={field.type} />
+            <span className="text-xs">{field.type}</span>
+          </div>
+        </div>
+      ))}
+
+      {/* Custom fields (editable) */}
+      {fields.map((field) => (
+        <div key={field.id}>
+          {editingId === field.id ? (
+            <div className="rounded-md border border-[color:var(--border-subtle)] p-3 space-y-3">
+              {formError && (
+                <div className="rounded-md bg-[color:var(--background-danger)] p-2 text-xs text-[color:var(--text-danger)]">
+                  {formError}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Label">
+                  <Input
+                    value={formState.label}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setFormState((prev) => ({ ...prev, label: e.target.value.substring(0, MAX_LABEL_LENGTH) }))
+                    }
+                    maxLength={MAX_LABEL_LENGTH}
+                  />
+                </FormField>
+                <FormField label="Type">
+                  <Select
+                    value={formState.type}
+                    onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                      setFormState((prev) => ({ ...prev, type: e.target.value as CustomFieldType }))
+                    }
+                  >
+                    {CUSTOM_FIELD_TYPES.map((t) => (
+                      <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
+                    ))}
+                  </Select>
+                </FormField>
+              </div>
+              {formState.type === 'select' && (
+                <FormField label="Options" description="Comma-separated">
+                  <Input
+                    value={formState.options}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setFormState((prev) => ({ ...prev, options: e.target.value }))
+                    }
+                    placeholder="Option A, Option B"
+                  />
+                </FormField>
+              )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`field-required-${field.id}`}
+                    checked={formState.required}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setFormState((prev) => ({ ...prev, required: e.target.checked }))
+                    }
+                    className="h-3.5 w-3.5 rounded border-[color:var(--border)] accent-[color:var(--accent-selected)]"
+                  />
+                  <label htmlFor={`field-required-${field.id}`} className="text-xs text-[color:var(--text-secondary)]">
+                    Required
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="ghost" onClick={handleCancel}>Cancel</Button>
+                  <Button size="sm" onClick={() => void handleEditSave()} loading={isSaving}>Save</Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[color:var(--background-secondary)] group">
+              <span className="text-sm text-[color:var(--foreground)] min-w-0 truncate">{field.field_label}</span>
+              {field.is_required && (
+                <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">*</span>
+              )}
+              <div className="ml-auto flex shrink-0 items-center gap-1.5 text-[color:var(--text-tertiary)]">
+                <FieldTypeIcon type={field.field_type} />
+                <span className="text-xs">{FIELD_TYPE_LABELS[field.field_type]}</span>
+              </div>
+              <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100">
+                <IconButton
+                  size="sm"
+                  aria-label="Edit field"
+                  onClick={() => handleStartEdit(field)}
+                  disabled={editingId !== null}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </IconButton>
+                <IconButton
+                  size="sm"
+                  aria-label="Delete field"
+                  onClick={() => void handleDelete(field)}
+                  disabled={editingId !== null}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </IconButton>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Add custom field */}
+      {canAdd && !isAddOpen && (
+        <div className="flex items-center justify-between pt-1">
           <Button
             size="sm"
             variant="secondary"
-            onClick={handleStartAdd}
-            disabled={fields.length >= MAX_FIELDS}
+            onClick={() => setIsAddOpen(true)}
           >
             + Add Custom Field
           </Button>
@@ -405,10 +342,62 @@ export function FieldsEditor({ projectId, entityType }: FieldsEditorProps) {
         </div>
       )}
 
-      {fields.length >= MAX_FIELDS && !isEditing && (
-        <p className="text-xs text-[color:var(--text-tertiary)]">
-          Maximum of {MAX_FIELDS} custom fields reached.
-        </p>
+      {canAdd && isAddOpen && (
+        <div className="flex items-center gap-2 px-2 py-1">
+          <input
+            value={addLabel}
+            onChange={(e) => setAddLabel(e.target.value.substring(0, MAX_LABEL_LENGTH))}
+            placeholder="Field name"
+            maxLength={MAX_LABEL_LENGTH}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && addLabel.trim()) void handleInlineAdd()
+              if (e.key === 'Escape') { setIsAddOpen(false); setAddLabel(''); setFormError(null) }
+            }}
+            autoFocus
+            className="flex-1 bg-transparent border-b border-[color:var(--border-subtle)] px-0.5 py-0.5 text-sm text-[color:var(--foreground)] placeholder:text-[color:var(--text-tertiary)] focus:border-[color:var(--accent-primary)] focus:outline-none"
+          />
+          <div className="relative flex shrink-0 items-center text-[color:var(--text-tertiary)]">
+            <FieldTypeIcon type={addType} className="pointer-events-none" />
+            <select
+              value={addType}
+              onChange={(e) => setAddType(e.target.value as CustomFieldType)}
+              className="ml-1 appearance-none bg-transparent py-0.5 pr-3.5 text-xs text-[color:var(--text-secondary)] focus:outline-none cursor-pointer"
+            >
+              {CUSTOM_FIELD_TYPES.map((t) => (
+                <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
+              ))}
+            </select>
+            <svg className="pointer-events-none absolute right-0 h-3 w-3 text-[color:var(--text-tertiary)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleInlineAdd()}
+            disabled={!addLabel.trim() || isSaving}
+            className="rounded-[4px] p-0.5 text-[color:var(--accent-success)] transition hover:bg-[color:var(--surface-hover)] disabled:opacity-30"
+            aria-label="Add field"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setIsAddOpen(false); setAddLabel(''); setFormError(null) }}
+            className="rounded-[4px] p-0.5 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
+            aria-label="Cancel"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Inline error for add */}
+      {formError && editingId === null && (
+        <div className="px-2 text-xs text-[color:var(--text-danger)]">{formError}</div>
       )}
     </div>
   )
