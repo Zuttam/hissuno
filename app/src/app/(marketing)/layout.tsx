@@ -6,9 +6,9 @@ import { CookieConsentBanner } from '@/components/consent'
 
 
 export const metadata: Metadata = {
-  title: 'Hissuno — The Unified Context Layer for Product Agents',
+  title: 'Hissuno — Your Agents Don\'t Know Your Product. Hissuno Fixes That.',
   description:
-    'Ingest your codebase, docs, and customer signals into an interconnected knowledge graph. MCP, CLI, API — any AI agent can traverse and query your product intelligence natively.',
+    'Connect your customer signals, product goals, issues, docs, and codebase into one knowledge graph. Any AI agent can traverse it to build real understanding of your product.',
 }
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {

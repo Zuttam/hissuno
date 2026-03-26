@@ -185,17 +185,36 @@ export class FathomClient {
   }
 
   /**
-   * Get the account name by fetching the first team member's name
+   * Get the account identifier (email) for display in integration details.
+   * Falls back to recorded_by from the most recent meeting if team_members fails.
    */
   async getAccountName(): Promise<string | null> {
+    // Try team_members endpoint first
     try {
       const response = await this.request<{
-        items: Array<{ name: string; email: string }>
-      }>('GET', '/team_members', { params: { limit: 1 } })
-      return response.items[0]?.name || null
-    } catch {
-      return null
+        items: Array<{ name?: string; email?: string; email_domain?: string }>
+      }>('GET', '/team_members')
+      const member = response.items?.[0]
+      if (member?.email) {
+        return member.email
+      }
+    } catch (error) {
+      console.warn('[FathomClient] Failed to fetch team_members for account name:', error instanceof Error ? error.message : error)
     }
+
+    // Fallback: use recorded_by from the most recent meeting
+    try {
+      const response = await this.request<{
+        items: Array<{ recorded_by?: string }>
+      }>('GET', '/meetings', { params: { limit: 1 } })
+      if (response.items[0]?.recorded_by) {
+        return response.items[0].recorded_by
+      }
+    } catch (error) {
+      console.warn('[FathomClient] Failed to fetch meetings for account name:', error instanceof Error ? error.message : error)
+    }
+
+    return null
   }
 
   /**

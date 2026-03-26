@@ -12,14 +12,17 @@ export interface SidebarState {
   closeMobile: () => void
 }
 
-function getInitialCollapsedState(): boolean {
-  if (typeof window === 'undefined') return false
-  return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
-}
-
 export function useSidebarState(): SidebarState {
-  const [isCollapsed, setIsCollapsed] = useState(getInitialCollapsedState)
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  // Sync collapsed state from localStorage after hydration
+  useEffect(() => {
+    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY)
+    if (stored === 'true') {
+      setIsCollapsed(true)
+    }
+  }, [])
 
   const toggleCollapsed = useCallback(() => {
     setIsCollapsed((prev) => {

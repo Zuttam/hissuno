@@ -5,7 +5,7 @@
 
 import { db } from '@/lib/db'
 import { eq, and, or, ne, lte, isNull, sql, count as drizzleCount } from 'drizzle-orm'
-import { fathomConnections, fathomSyncRuns, fathomSyncedMeetings } from '@/lib/db/schema/app'
+import { fathomConnections, fathomSyncRuns, fathomSyncedMeetings, sessions } from '@/lib/db/schema/app'
 import { type SyncFrequency } from '@/lib/integrations/shared/sync-constants'
 export type { SyncFrequency }
 import { calculateNextSyncTime } from '@/lib/integrations/shared/sync-utils'
@@ -32,6 +32,23 @@ export interface FathomIntegrationStatus {
   lastSyncMeetingsCount: number
   nextSyncAt: string | null
   filterConfig: FathomFilterConfig | null
+}
+
+/**
+ * Parse stored account_name which may be a plain string or a JSON object string.
+ * Extracts email for display.
+ */
+function parseAccountName(raw: string | null): string | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed.email || parsed.name || raw
+    }
+  } catch {
+    // Not JSON, return as-is
+  }
+  return raw
 }
 
 /**
@@ -74,7 +91,7 @@ export async function hasFathomConnection(
 
   return {
     connected: true,
-    accountName: data.account_name,
+    accountName: parseAccountName(data.account_name),
     syncFrequency: data.sync_frequency as SyncFrequency,
     syncEnabled: data.sync_enabled,
     lastSyncAt: data.last_sync_at?.toISOString() ?? null,
@@ -152,6 +169,10 @@ export async function storeFathomCredentials(
           sync_enabled: params.syncFrequency !== 'manual',
           filter_config: params.filterConfig || {},
           next_sync_at: nextSyncAt ? new Date(nextSyncAt) : null,
+          last_sync_at: null,
+          last_sync_status: null,
+          last_sync_error: null,
+          last_sync_meetings_count: null,
           updated_at: new Date(),
         },
       })
@@ -461,8 +482,8 @@ export async function getSyncStats(
   const [countRows, runs] = await Promise.all([
     db
       .select({ count: drizzleCount() })
-      .from(fathomSyncedMeetings)
-      .where(eq(fathomSyncedMeetings.connection_id, connection.id)),
+      .from(sessions)
+      .where(and(eq(sessions.project_id, projectId), eq(sessions.source, 'fathom'))),
     db
       .select({
         status: fathomSyncRuns.status,

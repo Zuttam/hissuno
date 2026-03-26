@@ -52,14 +52,14 @@ export function HeroSection() {
         className="relative z-10 mx-auto max-w-4xl text-center">
 
         <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
-          One Intelligence Layer.
+          Your Agents Don&apos;t Know Your Product.
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            Every Product Agent.
+            Hissuno Fixes That.
           </span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
-          Hissuno ingests your codebase, docs, and customer signals into an interconnected knowledge graph where every entity is linked. Agents don&apos;t just retrieve facts - they traverse relationships to build real understanding.
+          Hissuno connects your customer signals, product goals, issues, docs, and codebase into an interconnected knowledge graph. Any agent can traverse it to build real understanding - not just retrieve snippets.
         </p>
 
         {/* Integration logos row */}

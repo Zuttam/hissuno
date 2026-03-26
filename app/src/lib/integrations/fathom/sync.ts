@@ -4,6 +4,9 @@
  */
 
 import crypto from 'crypto'
+import { db } from '@/lib/db'
+import { eq, and, sql } from 'drizzle-orm'
+import { sessions } from '@/lib/db/schema/app'
 import { createSessionWithMessagesAdmin } from '@/lib/sessions/sessions-service'
 import {
   FathomClient,
@@ -15,7 +18,6 @@ import {
 } from './client'
 import {
   getFathomCredentials,
-  getSyncedMeetingIds,
   recordSyncedMeeting,
   updateSyncState,
   createSyncRun,
@@ -370,8 +372,13 @@ export async function syncFathomMeetings(
   let meetingsSkipped = 0
 
   try {
-    // Pre-fetch all synced meeting IDs to avoid N+1 queries
-    const syncedMeetingIds = await getSyncedMeetingIds(credentials.connectionId)
+    // Pre-fetch all synced fathom meeting IDs from actual sessions (not tracking table)
+    // This ensures dedup works even after disconnect/reconnect cycles
+    const syncedRows = await db
+      .select({ fathom_id: sql<string>`user_metadata->>'fathom_meeting_id'` })
+      .from(sessions)
+      .where(and(eq(sessions.project_id, projectId), eq(sessions.source, 'fathom')))
+    const syncedMeetingIds = new Set(syncedRows.map((r) => r.fathom_id).filter(Boolean))
 
     // Collect meetings to sync
     const meetingsToSync: FathomMeeting[] = []

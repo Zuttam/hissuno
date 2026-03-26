@@ -77,7 +77,7 @@ export function LineChart({
             borderRadius: '4px',
             fontSize: '12px',
           }}
-          labelFormatter={tickFormatter}
+          labelFormatter={(label) => tickFormatter(String(label))}
           formatter={(value) => [valueFormatter(Number(value ?? 0)), label]}
         />
         {showLegend && <Legend />}
