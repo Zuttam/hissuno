@@ -37,8 +37,8 @@ export function VelocityChart({ velocity }: VelocityChartProps) {
 
   const hasData = data.some((d) => d.created > 0 || d.resolved > 0)
 
-  const formatDate = (date: string) => {
-    const d = new Date(date)
+  const formatDate = (date: unknown) => {
+    const d = new Date(date as string | number)
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
