@@ -6,11 +6,11 @@
   "description": "Customer intelligence platform - the knowledge and context layer for product AI agents",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hissuno/hissuno.git"
+    "url": "https://github.com/zuttam/hissuno.git"
   },
   "homepage": "https://hissuno.com",
   "bugs": {
-    "url": "https://github.com/hissuno/hissuno/issues"
+    "url": "https://github.com/zuttam/hissuno/issues"
   },
   "author": "Hissuno",
   "keywords": [

@@ -214,7 +214,7 @@ See [CLI README](app/packages/cli/README.md) for full documentation.
 If you prefer to set things up manually, see the [Prerequisites](#prerequisites) section above, then:
 
 ```bash
-git clone https://github.com/hissuno/hissuno.git
+git clone https://github.com/zuttam/hissuno.git
 cd hissuno/app
 npm install
 cp env.example .env.local

@@ -8,13 +8,33 @@ import { CookieConsentBanner } from '@/components/consent'
 export const metadata: Metadata = {
   title: 'Hissuno — Your Agents Don\'t Know Your Product. Hissuno Fixes That.',
   description:
-    'Connect your customer signals, product goals, issues, docs, and codebase into one knowledge graph. Any AI agent can traverse it to build real understanding of your product.',
+    'Organizational knowledge graph for AI agents. Connect customer signals, product goals, issues, docs, and codebase - any agent can query and traverse it via MCP, CLI, or API.',
+}
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Hissuno',
+  applicationCategory: 'DeveloperApplication',
+  description:
+    'Organizational knowledge graph for AI agents. Connects customer signals, product goals, issues, docs, and codebase into one traversable graph queryable via MCP, CLI, or API.',
+  url: 'https://hissuno.com',
+  operatingSystem: 'Any',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+  },
 }
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
     <WaterWebGLProvider enableClickRipples>
       <div className="min-h-screen" suppressHydrationWarning>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <WaterCanvas />
 
         {/* Navigation */}

@@ -13,7 +13,7 @@ Thank you for your interest in contributing to Hissuno - the open-source unified
 
 ```bash
 # Clone the repository
-git clone https://github.com/hissuno/hissuno.git
+git clone https://github.com/zuttam/hissuno.git
 cd hissuno
 
 # Install dependencies
@@ -99,7 +99,7 @@ If your changes require database schema modifications:
 
 ## Reporting Issues
 
-- Use the [GitHub issue tracker](https://github.com/hissuno/hissuno/issues).
+- Use the [GitHub issue tracker](https://github.com/zuttam/hissuno/issues).
 - Search existing issues before opening a new one.
 - Use the provided issue templates for bug reports and feature requests.
 

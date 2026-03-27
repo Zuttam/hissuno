@@ -59,7 +59,7 @@ export function HeroSection() {
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
-          Hissuno connects your customer signals, product goals, issues, docs, and codebase into an interconnected knowledge graph. Any agent can traverse it to build real understanding - not just retrieve snippets.
+          Hissuno builds the organizational knowledge layer your AI agents are missing - connecting customer signals, product goals, issues, docs, and codebase into one traversable graph.
         </p>
 
         {/* Integration logos row */}

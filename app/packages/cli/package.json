@@ -1,6 +1,6 @@
 {
   "name": "hissuno",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Hissuno CLI — set up, connect, and query your product intelligence platform",
   "type": "module",
   "bin": {
@@ -44,11 +44,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hissuno/hissuno.git",
+    "url": "git+https://github.com/zuttam/hissuno.git",
     "directory": "app/packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/hissuno/hissuno/issues"
+    "url": "https://github.com/zuttam/hissuno/issues"
   },
-  "homepage": "https://github.com/hissuno/hissuno/tree/main/app/packages/cli#readme"
+  "homepage": "https://github.com/zuttam/hissuno/tree/main/app/packages/cli#readme"
 }

@@ -1,6 +1,6 @@
 {
   "name": "@hissuno/widget",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Embeddable AI-powered support chat widget for Hissuno platform",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -54,12 +54,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hissuno/hissuno.git",
+    "url": "git+https://github.com/zuttam/hissuno.git",
     "directory": "app/packages/widget"
   },
   "bugs": {
-    "url": "https://github.com/hissuno/hissuno/issues"
+    "url": "https://github.com/zuttam/hissuno/issues"
   },
-  "homepage": "https://github.com/hissuno/hissuno/tree/main/app/packages/widget#readme"
+  "homepage": "https://github.com/zuttam/hissuno/tree/main/app/packages/widget#readme"
 }
 
