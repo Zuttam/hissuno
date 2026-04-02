@@ -98,14 +98,20 @@ profileCommand
 profileCommand
   .command('create <name>')
   .description('Create a new profile via config wizard')
-  .action(async (name: string, _, cmd) => {
+  .option('--api-key <key>', 'API key (hiss_...)')
+  .option('--url <url>', 'Hissuno instance URL')
+  .action(async (name: string, opts, cmd) => {
     const json = getJson(cmd)
     migrateToMultiProfile()
 
     console.log(`\n${BOLD}${CYAN}Create Profile: ${name}${RESET}`)
     console.log(`${DIM}Configure connection for this profile.${RESET}\n`)
 
-    const config = await runConfigWizard()
+    const wizardOpts: { apiKey?: string; url?: string } = {}
+    if (opts.apiKey) wizardOpts.apiKey = opts.apiKey
+    if (opts.url) wizardOpts.url = opts.url
+
+    const config = await runConfigWizard(Object.keys(wizardOpts).length > 0 ? wizardOpts : undefined)
 
     try {
       createProfile(name, config)

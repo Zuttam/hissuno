@@ -30,6 +30,7 @@ import { batchEmbedIssues } from '@/lib/issues/embedding-service'
 import { batchEmbedSessions } from '@/lib/sessions/embedding-service'
 import { batchEmbedContacts } from '@/lib/customers/customer-embedding-service'
 import { embedKnowledgeSource } from '@/lib/knowledge/embedding-service'
+import { batchEmbedProductScopes } from '@/lib/product-scopes/embedding-service'
 
 import { DEMO_PRODUCT_SCOPES } from './demo-data/product-scopes'
 import { DEMO_KNOWLEDGE_SOURCES } from './demo-data/knowledge-sources'
@@ -200,7 +201,6 @@ export async function createDemoProjectData({
           source: 'manual',
           session_type: 'chat',
           status: 'active',
-          analysis_status: 'analyzed',
           message_count: messageCount,
           tags: demo.tags ?? [],
           is_archived: false,
@@ -277,13 +277,11 @@ export async function createDemoProjectData({
 
       // If this session has a linked issue, close the session and create the issue
       if (demo.issue) {
-        // Mark session as closed and PM reviewed
+        // Mark session as closed
         await db
           .update(sessionsTable)
           .set({
             status: 'closed',
-            pm_reviewed_at: new Date(),
-            analysis_status: 'analyzed',
           })
           .where(
             and(
@@ -299,21 +297,18 @@ export async function createDemoProjectData({
             projectId,
             sessionId: session.id,
             type: demo.issue.type,
-            title: demo.issue.title,
+            name: demo.issue.name,
             description: demo.issue.description,
             priority: demo.issue.priority,
             productScopeId: issuePaId,
           })
           issuesCreated++
 
-          // Update brief, upvote count, and RICE scores if defined
+          // Update brief and RICE scores if defined
           const updates: Record<string, unknown> = {}
           if (demo.issue.brief) {
             updates.brief = demo.issue.brief
             updates.brief_generated_at = new Date()
-          }
-          if (demo.issue.upvoteCount && demo.issue.upvoteCount > 1) {
-            updates.upvote_count = demo.issue.upvoteCount
           }
           if (demo.issue.reach != null) {
             updates.reach_score = demo.issue.reach
@@ -387,7 +382,7 @@ async function generateDemoEmbeddings(projectId: string): Promise<void> {
       .select({
         id: issuesTable.id,
         project_id: issuesTable.project_id,
-        title: issuesTable.title,
+        name: issuesTable.name,
         description: issuesTable.description,
       })
       .from(issuesTable)
@@ -398,7 +393,7 @@ async function generateDemoEmbeddings(projectId: string): Promise<void> {
         issueRows.map((r) => ({
           id: r.id,
           project_id: r.project_id,
-          title: r.title,
+          name: r.name,
           description: r.description ?? '',
         }))
       )
@@ -485,6 +480,33 @@ async function generateDemoEmbeddings(projectId: string): Promise<void> {
     }
     if (knowledgeRows.length > 0) {
       console.log(`[demo-data-service] embedded ${knowledgeChunksEmbedded} knowledge chunks from ${knowledgeRows.length} sources`)
+    }
+
+    // 5. Product Scopes
+    const productScopeRows = await db
+      .select({
+        id: productScopes.id,
+        project_id: productScopes.project_id,
+        name: productScopes.name,
+        description: productScopes.description,
+        type: productScopes.type,
+        goals: productScopes.goals,
+      })
+      .from(productScopes)
+      .where(eq(productScopes.project_id, projectId))
+
+    if (productScopeRows.length > 0) {
+      const scopeResult = await batchEmbedProductScopes(
+        productScopeRows.map((r) => ({
+          id: r.id,
+          project_id: r.project_id,
+          name: r.name,
+          description: r.description ?? '',
+          type: r.type,
+          goals: r.goals as Array<{ id: string; text: string }> | null,
+        }))
+      )
+      console.log(`[demo-data-service] embedded ${scopeResult.embedded} product scopes`)
     }
   } catch (err) {
     console.error('[demo-data-service] embedding generation failed (non-fatal):', err)

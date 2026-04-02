@@ -119,7 +119,7 @@ export function FathomConfigDialog({
     }
   }
 
-  const status = sync.status as { connected?: boolean; lastSyncAt?: string; lastSyncStatus?: string; lastSyncMeetingsCount?: number; nextSyncAt?: string; stats?: { totalSynced: number } }
+  const status = sync.status as { connected?: boolean; accountName?: string; lastSyncAt?: string; lastSyncStatus?: string; lastSyncMeetingsCount?: number; nextSyncAt?: string; stats?: { totalSynced: number } }
 
   return (
     <Dialog open={open} onClose={onClose} title="Fathom Integration" size="lg">
@@ -152,7 +152,7 @@ export function FathomConfigDialog({
           <div className="flex flex-col gap-6">
             <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]">
               <Check size={14} />
-              Connected to Fathom
+              Connected to Fathom{status.accountName ? ` (${status.accountName})` : ''}
             </p>
 
             <div className="flex flex-col gap-2">

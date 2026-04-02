@@ -10,6 +10,8 @@ export interface IntegrationType {
   inlineSvg?: boolean
   /** true if icon needs dark:invert treatment */
   invertInDark?: boolean
+  /** Label shown on marketplace card for first-party integrations (e.g., "Setup") */
+  setupLabel?: string
 }
 
 export const INTEGRATION_TYPES: IntegrationType[] = [
@@ -20,6 +22,7 @@ export const INTEGRATION_TYPES: IntegrationType[] = [
     category: 'interactive',
     iconSrc: '',
     inlineSvg: true,
+    setupLabel: 'Setup',
   },
   {
     id: 'slack',

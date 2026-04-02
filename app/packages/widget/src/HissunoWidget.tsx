@@ -263,10 +263,29 @@ export function HissunoWidget({
     return <div className="hissuno-widget hissuno-widget-loading" />;
   }
 
-  // If origin is blocked, don't render the widget
+  // If origin is blocked, show a developer-facing error indicator
   if (blocked) {
-    console.warn('[HissunoWidget] Widget blocked: origin not allowed for this project');
-    return null;
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'unknown';
+    console.error(
+      `[HissunoWidget] Widget blocked: origin not in allowed list.\n`
+      + `Origin: ${origin}\n`
+      + `Fix: Add this origin to allowed origins in your Hissuno dashboard (Integrations > Widget),\n`
+      + `or via CLI: hissuno integrations widget --origins ${origin}`
+    );
+    return (
+      <div
+        className="hissuno-widget hissuno-widget-blocked"
+        style={{
+          position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
+          background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8,
+          padding: '8px 12px', fontSize: 12, color: '#991b1b', maxWidth: 320,
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <strong>Widget blocked</strong>: origin not in allowed list.
+        Check console for setup instructions.
+      </div>
+    );
   }
 
   // Don't render if settings fetch failed and we have no settings
@@ -401,8 +420,8 @@ function useWidgetSettings(
     setLoading(true);
     setError(false);
 
-    // Widget settings endpoint is at /api/integrations/widget (separate from chat API)
-    const settingsUrl = `${apiUrl.replace(/\/chat\/?$/, '')}?projectId=${encodeURIComponent(projectId)}`;
+    // Widget settings endpoint: replace /chat with /embed
+    const settingsUrl = `${apiUrl.replace(/\/chat\/?$/, '/embed')}?projectId=${encodeURIComponent(projectId)}`;
 
     const controller = new AbortController();
 
@@ -411,8 +430,14 @@ function useWidgetSettings(
     })
       .then((res) => {
         if (res.status === 403) {
-          // Origin blocked
-          console.warn('[HissunoWidget] Origin not allowed for this project');
+          // Origin blocked - parse reason/help from response if available
+          res.json().then((body) => {
+            const reason = body?.reason || 'Origin not allowed for this project';
+            const help = body?.help || '';
+            console.error(`[HissunoWidget] ${reason}${help ? '\n' + help : ''}`);
+          }).catch(() => {
+            console.error('[HissunoWidget] Origin not allowed for this project');
+          });
           setBlocked(true);
           return null;
         }

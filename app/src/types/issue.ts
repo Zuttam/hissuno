@@ -47,11 +47,10 @@ export interface IssueRecord {
   id: string
   project_id: string
   type: IssueType
-  title: string
+  name: string
   description: string
   priority: IssuePriority
   priority_manual_override: boolean
-  upvote_count: number
   status: IssueStatus
   brief: string | null
   brief_generated_at: string | null
@@ -76,9 +75,14 @@ export interface IssueRecord {
 }
 
 /**
+ * Issue enriched with session count (derived from entity_relationships, not a DB column)
+ */
+export type IssueWithSessionCount = IssueRecord & { session_count: number }
+
+/**
  * Issue with project details for display
  */
-export interface IssueWithProject extends IssueRecord {
+export interface IssueWithProject extends IssueWithSessionCount {
   project: {
     id: string
     name: string
@@ -149,8 +153,6 @@ export type WidgetTheme = 'light' | 'dark' | 'auto'
  */
 export interface ProjectSettingsRecord {
   project_id: string
-  issue_tracking_enabled: boolean
-  pm_dedup_include_closed: boolean
   // Widget settings (trigger/display model)
   widget_trigger_type: WidgetTrigger
   widget_display_type: WidgetDisplay
@@ -174,7 +176,7 @@ export interface CreateIssueInput {
   project_id: string
   session_ids?: string[]
   type: IssueType
-  title: string
+  name: string
   description: string
   priority?: IssuePriority
   product_scope_id?: string | null
@@ -185,7 +187,7 @@ export interface CreateIssueInput {
  * Input for updating an issue
  */
 export interface UpdateIssueInput {
-  title?: string
+  name?: string
   description?: string
   type?: IssueType
   priority?: IssuePriority
@@ -230,7 +232,7 @@ export interface IssueFilters {
 export interface SessionAnalysisResult {
   isActionable: boolean
   type?: IssueType
-  title?: string
+  name?: string
   description?: string
   userQuotes?: string[]
   suggestedPriority?: IssuePriority
@@ -249,21 +251,12 @@ export interface SimilarIssueResult {
 }
 
 /**
- * Result of upvoting an issue
- */
-export interface UpvoteResult {
-  issueId: string
-  newUpvoteCount: number
-  newPriority: IssuePriority
-}
-
-/**
  * PM Review result for API response
  */
 export interface PMReviewResult {
-  action: 'created' | 'upvoted' | 'skipped'
+  action: 'created' | 'linked' | 'skipped'
   issueId?: string
-  issueTitle?: string
+  issueName?: string
   skipReason?: string
   // Enriched fields from multi-step workflow
   impactScore?: number

@@ -78,7 +78,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   // Note: allowed_origins and token_required are now in widget_integrations
-  // Use PATCH /api/integrations/widget/settings to update them
+  // Use PATCH /api/integrations/widget to update them
 
   // Handle source code updates (for GitHub repos)
   if (typeof payload.repositoryUrl === 'string') {

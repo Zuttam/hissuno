@@ -8,7 +8,7 @@ import type { UpdateContactInput } from '@/types/customer'
 import type { ContactLinkedSession, ContactLinkedIssue } from '@/lib/db/queries/contacts'
 import { listCompanies } from '@/lib/api/companies'
 import { RelatedEntitiesSection } from '@/components/shared/related-entities-section'
-import { formatRelativeTime } from '@/lib/utils/format-time'
+import { formatRelativeTime, formatDateTime } from '@/lib/utils/format-time'
 import { listContactSessions, listContactIssues } from '@/lib/api/contacts'
 
 interface ContactSidebarProps {
@@ -165,7 +165,7 @@ export function ContactSidebar({
               projectId={projectId}
               entityType="contact"
               entityId={contactId}
-              allowedTypes={['issue', 'knowledge_source', 'product_scope']}
+              allowedTypes={['session', 'company', 'issue', 'knowledge_source', 'product_scope']}
             />
 
             {/* Details */}
@@ -469,13 +469,6 @@ function EditableCompanyField({
   )
 }
 
-function formatDateTime(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '-'
-  const d = dateString instanceof Date ? dateString : new Date(dateString)
-  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-
 const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
   widget: 'info',
   slack: 'warning',
@@ -580,7 +573,7 @@ function ContactActivitySections({ contactId, projectId }: { contactId: string; 
                       {TYPE_LABELS[issue.type] ?? issue.type}
                     </Badge>
                     <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
-                      {issue.title}
+                      {issue.name}
                     </span>
                     <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
                       {issue.status}

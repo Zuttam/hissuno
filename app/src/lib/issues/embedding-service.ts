@@ -8,14 +8,15 @@
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
 import { generateEmbedding, formatEmbeddingForPgVector, embeddingService } from '@/lib/utils/embeddings'
+import { batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
 
 export interface SimilarIssue {
   issueId: string
-  title: string
+  name: string
   description: string
   type: string
   status: string
-  upvoteCount: number
+  sessionCount: number
   similarity: number
 }
 
@@ -30,8 +31,8 @@ export interface SearchSimilarIssuesOptions {
 /**
  * Build embedding text for an issue
  */
-export function buildIssueEmbeddingText(title: string, description: string): string {
-  return `${title}\n\n${description}`
+export function buildIssueEmbeddingText(name: string, description: string): string {
+  return `${name}\n\n${description}`
 }
 
 /**
@@ -39,7 +40,7 @@ export function buildIssueEmbeddingText(title: string, description: string): str
  */
 export async function searchSimilarIssues(
   projectId: string,
-  title: string,
+  name: string,
   description: string,
   options: SearchSimilarIssuesOptions = {}
 ): Promise<SimilarIssue[]> {
@@ -51,25 +52,23 @@ export async function searchSimilarIssues(
     includeClosed = false,
   } = options
 
-  const queryEmbedding = await generateEmbedding(buildIssueEmbeddingText(title, description))
+  const queryEmbedding = await generateEmbedding(buildIssueEmbeddingText(name, description))
   const embeddingStr = formatEmbeddingForPgVector(queryEmbedding)
 
   const results = await db.execute<{
     issue_id: string
-    title: string
+    name: string
     description: string
     type: string
     status: string
-    upvote_count: number
     similarity: number
   }>(sql`
     SELECT
       i.id AS issue_id,
-      i.title,
+      i.name,
       i.description,
       i.type,
       i.status,
-      i.upvote_count,
       1 - (e.embedding <=> ${embeddingStr}::vector) AS similarity
     FROM embeddings e
     JOIN issues i ON i.id = e.entity_id
@@ -83,13 +82,16 @@ export async function searchSimilarIssues(
     LIMIT ${limit}
   `)
 
+  const issueIds = results.rows.map((r) => r.issue_id as string)
+  const sessionCounts = issueIds.length > 0 ? await batchGetIssueSessionCounts(issueIds) : new Map<string, number>()
+
   return results.rows.map((row) => ({
     issueId: row.issue_id,
-    title: row.title,
+    name: row.name,
     description: row.description,
     type: row.type,
     status: row.status,
-    upvoteCount: row.upvote_count,
+    sessionCount: sessionCounts.get(row.issue_id as string) ?? 0,
     similarity: row.similarity,
   }))
 }
@@ -101,7 +103,7 @@ export async function batchEmbedIssues(
   issues: Array<{
     id: string
     project_id: string
-    title: string
+    name: string
     description: string
   }>
 ): Promise<{ embedded: number; errors: string[] }> {
@@ -110,7 +112,7 @@ export async function batchEmbedIssues(
       id: issue.id,
       entityType: 'issue' as const,
       project_id: issue.project_id,
-      text: buildIssueEmbeddingText(issue.title, issue.description),
+      text: buildIssueEmbeddingText(issue.name, issue.description),
     }))
   )
 }

@@ -48,6 +48,8 @@ export interface KnowledgeSourceRecord {
   notion_page_id: string | null
   /** Origin of document content (upload, notion, google_drive) - only for uploaded_doc type */
   origin: KnowledgeSourceOrigin | null
+  /** Custom field values */
+  custom_fields: Record<string, unknown> | null
 }
 
 /**
@@ -74,6 +76,7 @@ export interface KnowledgeSourceInsert {
   analyzed_content?: string | null
   notion_page_id?: string | null
   origin?: KnowledgeSourceOrigin | null
+  custom_fields?: Record<string, unknown> | null
 }
 
 /**
@@ -100,6 +103,7 @@ export interface KnowledgeSourceUpdate {
   analyzed_content?: string | null
   notion_page_id?: string | null
   origin?: KnowledgeSourceOrigin | null
+  custom_fields?: Record<string, unknown> | null
 }
 
 /**

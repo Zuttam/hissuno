@@ -4,15 +4,10 @@
 export type SessionStatus = 'active' | 'closing_soon' | 'awaiting_idle_response' | 'closed'
 
 /**
- * Analysis status values
- */
-export const ANALYSIS_STATUSES = ['pending', 'analyzed'] as const
-export type AnalysisStatus = (typeof ANALYSIS_STATUSES)[number]
-
-/**
  * Session source channels
  */
-export type SessionSource = 'widget' | 'slack' | 'intercom' | 'zendesk' | 'gong' | 'posthog' | 'fathom' | 'api' | 'manual'
+export const SESSION_SOURCES = ['widget', 'slack', 'intercom', 'zendesk', 'gong', 'posthog', 'fathom', 'api', 'manual'] as const
+export type SessionSource = (typeof SESSION_SOURCES)[number]
 
 /**
  * Session content type (determines how content is rendered)
@@ -109,17 +104,15 @@ export interface SessionRecord {
   page_title: string | null
   name: string | null
   description: string | null
-  analysis_status: AnalysisStatus
   source: SessionSource
   session_type: SessionType
   message_count: number
   status: SessionStatus
   tags: SessionTag[]
   custom_fields: Record<string, unknown>
-  tags_auto_applied_at: string | null
+  base_processed_at: string | null
   first_message_at: string | null
   last_activity_at: string
-  pm_reviewed_at: string | null
   goodbye_detected_at: string | null
   idle_prompt_sent_at: string | null
   scheduled_close_at: string | null
@@ -138,10 +131,10 @@ export interface SessionRecord {
  */
 export interface SessionLinkedIssue {
   id: string
-  title: string
+  name: string
   type: 'bug' | 'feature_request' | 'change_request'
   status: string
-  upvote_count: number
+  session_count: number
   priority: 'low' | 'medium' | 'high'
 }
 
@@ -251,6 +244,7 @@ export interface CreateMessageInput {
  */
 export interface CreateSessionInput {
   project_id: string
+  status?: 'active' | 'closed'
   user_metadata?: Record<string, string>
   page_url?: string
   page_title?: string
@@ -274,6 +268,7 @@ export interface CreateSessionInput {
  */
 export interface UpdateSessionInput {
   name?: string | null
+  description?: string | null
   status?: SessionStatus
   user_metadata?: Record<string, string> | null
   is_human_takeover?: boolean
@@ -322,21 +317,6 @@ export function getSessionUserDisplay(session: SessionWithProject): {
 }
 
 /**
- * Custom tag record from database
- */
-export interface CustomTagRecord {
-  id: string
-  project_id: string
-  name: string
-  slug: string
-  description: string
-  color: string
-  position: number
-  created_at: string
-  updated_at: string
-}
-
-/**
  * Badge color variants for tags
  */
 export type TagColorVariant = 'info' | 'success' | 'danger' | 'warning' | 'default'
@@ -349,26 +329,15 @@ export function isNativeTag(tag: string): tag is SessionTag {
 }
 
 /**
- * Get display info for a tag (native or custom)
+ * Get display info for a native tag
  */
 export function getTagInfo(
   tag: string,
-  customTags: CustomTagRecord[] = []
-): { label: string; variant: TagColorVariant; isCustom: boolean } {
+): { label: string; variant: TagColorVariant } {
   if (isNativeTag(tag)) {
     return {
       label: SESSION_TAG_INFO[tag].label,
       variant: SESSION_TAG_INFO[tag].variant,
-      isCustom: false,
-    }
-  }
-
-  const customTag = customTags.find((t) => t.slug === tag)
-  if (customTag) {
-    return {
-      label: customTag.name,
-      variant: (customTag.color as TagColorVariant) || 'default',
-      isCustom: true,
     }
   }
 
@@ -376,6 +345,5 @@ export function getTagInfo(
   return {
     label: tag,
     variant: 'default',
-    isCustom: false,
   }
 }

@@ -38,17 +38,17 @@ vi.mock('@/lib/auth/authorization', () => ({
 const mockReturning = vi.fn()
 const mockOnConflictDoUpdate = vi.fn(() => ({ returning: mockReturning }))
 const mockValues = vi.fn(() => ({ onConflictDoUpdate: mockOnConflictDoUpdate }))
-const mockInsert = vi.fn(() => ({ values: mockValues }))
+const mockInsert = vi.fn((..._args: any[]) => ({ values: mockValues }))
 
 const mockLimit = vi.fn()
 const mockWhere = vi.fn(() => ({ limit: mockLimit }))
 const mockSelectFrom = vi.fn(() => ({ where: mockWhere }))
-const mockSelect = vi.fn(() => ({ from: mockSelectFrom }))
+const mockSelect = vi.fn((..._args: any[]) => ({ from: mockSelectFrom }))
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: (...args: unknown[]) => mockSelect(...args),
-    insert: (...args: unknown[]) => mockInsert(...args),
+    select: (...args: any[]) => mockSelect(...args),
+    insert: (...args: any[]) => mockInsert(...args),
   },
 }))
 

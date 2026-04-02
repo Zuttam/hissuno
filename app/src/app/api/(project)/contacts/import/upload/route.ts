@@ -5,8 +5,12 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { validateCSVFileName, createCSVUploadUrl, uploadCSVDirect, MAX_CSV_FILE_SIZE } from '@/lib/customers/csv-storage'
+import { getRateLimiter } from '@/lib/utils/rate-limiter'
 
 export const runtime = 'nodejs'
+
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX_UPLOADS = 20
 
 function validateCSVFile(filename: string, fileSize?: number | null): string | null {
   const filenameError = validateCSVFileName(filename)
@@ -17,29 +21,6 @@ function validateCSVFile(filename: string, fileSize?: number | null): string | n
     return `File too large (${sizeMB}MB). Maximum size is 5MB.`
   }
   return null
-}
-
-/**
- * Simple in-memory per-user upload rate limiter.
- * Max 20 uploads per 60-second window.
- */
-const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_MAX_UPLOADS = 20
-const uploadTimestamps = new Map<string, number[]>()
-
-function checkUploadRateLimit(userId: string): boolean {
-  const now = Date.now()
-  const timestamps = uploadTimestamps.get(userId) ?? []
-  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
-
-  if (recent.length >= RATE_LIMIT_MAX_UPLOADS) {
-    uploadTimestamps.set(userId, recent)
-    return false
-  }
-
-  recent.push(now)
-  uploadTimestamps.set(userId, recent)
-  return true
 }
 
 /**
@@ -62,11 +43,16 @@ export async function POST(request: NextRequest) {
     await assertProjectAccess(identity, projectId)
     const actingUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
-    // Rate limit
-    if (!checkUploadRateLimit(actingUserId)) {
+    // Rate limit (configurable via RATE_LIMITER env var: "memory" | "db")
+    const allowed = await getRateLimiter().check(
+      `csv-upload:${actingUserId}`,
+      RATE_LIMIT_WINDOW_MS,
+      RATE_LIMIT_MAX_UPLOADS,
+    )
+    if (!allowed) {
       return NextResponse.json(
         { error: 'Upload rate limit exceeded. Please wait before uploading more files.' },
-        { status: 429 }
+        { status: 429 },
       )
     }
 

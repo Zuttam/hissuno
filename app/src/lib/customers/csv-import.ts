@@ -11,11 +11,11 @@ import { companies, contacts } from '@/lib/db/schema/app'
 import { eq, and, inArray } from 'drizzle-orm'
 import { COMPANY_STAGES } from '@/types/customer'
 import type {
-  CustomerEntityType,
-  CustomFieldDefinition,
   CSVImportMapping,
   CSVImportResult,
 } from '@/types/customer'
+import type { CustomFieldDefinition } from '@/types/ontology'
+import type { EntityType } from '@/lib/db/queries/types'
 import { isValidEmail } from '@/lib/customers/contact-resolution'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
 
@@ -100,7 +100,7 @@ const CONTACT_FIELD_ALIASES: Record<string, string[]> = {
  */
 export function suggestMappings(
   headers: string[],
-  entityType: CustomerEntityType,
+  entityType: EntityType,
   customFields: CustomFieldDefinition[] = []
 ): CSVImportMapping[] {
   const aliases = entityType === 'company' ? COMPANY_FIELD_ALIASES : CONTACT_FIELD_ALIASES
@@ -142,7 +142,7 @@ export function suggestMappings(
  */
 export async function validateAndImportRows(
   projectId: string,
-  entityType: CustomerEntityType,
+  entityType: EntityType,
   rows: Record<string, string>[],
   mappings: CSVImportMapping[],
   options: { createMissingCompanies?: boolean } = {}

@@ -10,6 +10,7 @@ import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { eq, and, asc, desc, inArray, isNotNull } from 'drizzle-orm'
+import { batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
 import { sessions, sessionMessages, issues, entityRelationships } from '@/lib/db/schema/app'
 import { getDataContext } from './helpers'
 
@@ -32,11 +33,11 @@ Shows issues that were created or upvoted from your feedback sessions.`,
   outputSchema: z.object({
     issues: z.array(z.object({
       id: z.string(),
-      title: z.string(),
+      name: z.string(),
       type: z.string(),
       status: z.string(),
       priority: z.string(),
-      upvoteCount: z.number(),
+      sessionCount: z.number(),
     })),
     total: z.number(),
     error: z.string().optional(),
@@ -86,22 +87,25 @@ Shows issues that were created or upvoted from your feedback sessions.`,
       const issueRows = await db
         .select({
           id: issues.id,
-          title: issues.title,
+          name: issues.name,
           type: issues.type,
           status: issues.status,
           priority: issues.priority,
-          upvote_count: issues.upvote_count,
         })
         .from(issues)
         .where(and(...conditions))
 
-      const issueList = issueRows.slice(0, context.limit ?? 10).map((issue) => ({
+      const sliced = issueRows.slice(0, context.limit ?? 10)
+      const issueIds = sliced.map((i) => i.id)
+      const sessionCounts = issueIds.length > 0 ? await batchGetIssueSessionCounts(issueIds) : new Map<string, number>()
+
+      const issueList = sliced.map((issue) => ({
         id: issue.id,
-        title: issue.title,
+        name: issue.name,
         type: issue.type,
         status: issue.status ?? 'open',
         priority: issue.priority,
-        upvoteCount: issue.upvote_count ?? 0,
+        sessionCount: sessionCounts.get(issue.id) ?? 0,
       }))
 
       return { issues: issueList, total: issueRows.length }

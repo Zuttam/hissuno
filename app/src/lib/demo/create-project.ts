@@ -63,7 +63,6 @@ export async function createProjectWithDemoData(params: {
       session_idle_timeout_minutes: 5,
       session_goodbye_delay_seconds: 90,
       session_idle_response_timeout_seconds: 60,
-      issue_tracking_enabled: true,
     })
     .onConflictDoUpdate({
       target: projectSettings.project_id,
@@ -71,7 +70,6 @@ export async function createProjectWithDemoData(params: {
         session_idle_timeout_minutes: 5,
         session_goodbye_delay_seconds: 90,
         session_idle_response_timeout_seconds: 60,
-        issue_tracking_enabled: true,
         updated_at: new Date(),
       },
     })

@@ -26,13 +26,13 @@ export function CTASection() {
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         <WaterReveal preset="text" parallax parallaxDepth={0.1}>
           <h2 className="font-mono text-3xl font-bold text-[var(--foreground)] md:text-4xl">
-            Give Every Agent a Shared Context Layer
+            Stop Rebuilding Product Context for Every Agent
           </h2>
         </WaterReveal>
 
         <WaterReveal preset="text" delay={0.15}>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-            One interconnected knowledge graph. Every product agent traverses it natively.
+            Open source product intelligence. One graph. Every agent.
           </p>
         </WaterReveal>
 

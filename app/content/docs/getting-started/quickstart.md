@@ -74,5 +74,5 @@ hissuno search "how does pricing work" --type knowledge
 
 - [Add Your Data](/docs/getting-started/add-your-data) - Connect more data sources like GitHub repos, documents, and customer conversations.
 - [Connect Your Tools](/docs/connect/overview) - Set up MCP, CLI, or API access for external agents and workflows.
-- [Configure Agents](/docs/agents/overview) - Customize agent behavior, tone, and knowledge priorities.
+- [Architecture Overview](/docs/architecture/overview) - Understand the 3-layer architecture and how agents work.
 - [Production Deployment](/docs/getting-started/production-deployment) - Deploy to Vercel + Neon for a production-ready setup.

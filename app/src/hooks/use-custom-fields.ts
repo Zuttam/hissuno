@@ -3,16 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   CustomFieldDefinition,
-  CustomerEntityType,
   CreateCustomFieldInput,
   UpdateCustomFieldInput,
-} from '@/types/customer'
+} from '@/types/ontology'
+import type { EntityType } from '@/lib/db/queries/types'
 import {
   listCustomFields,
   createCustomField,
   updateCustomField,
   deleteCustomField,
-} from '@/lib/api/customers'
+} from '@/lib/api/ontology'
 
 interface UseCustomFieldsState {
   fields: CustomFieldDefinition[]
@@ -26,7 +26,7 @@ interface UseCustomFieldsState {
 
 interface UseCustomFieldsOptions {
   projectId?: string | null
-  entityType?: CustomerEntityType
+  entityType?: EntityType
 }
 
 export function useCustomFields({

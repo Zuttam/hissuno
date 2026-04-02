@@ -14,16 +14,17 @@
  */
 
 import crypto from 'crypto'
-import { eq, sql, inArray } from 'drizzle-orm'
+import { eq, and, or, ilike, desc, sql, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { sessions, sessionMessages } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
+import { fireSessionProcessing } from '@/lib/utils/session-processing'
 import { setSessionContact, linkEntities } from '@/lib/db/queries/entity-relationships'
 import { rowToSessionRecord, enrichSessionsWithEntityRelationships, toSessionWithProject } from '@/lib/db/queries/sessions'
 import { saveSessionMessage } from '@/lib/db/queries/session-messages'
 import { generateDefaultName } from '@/lib/sessions/name-generator'
 import { searchSessionsSemantic } from '@/lib/sessions/embedding-service'
-import { searchWithFallback } from '@/lib/search/search-with-fallback'
+import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import type {
   SessionSource,
   SessionType,
@@ -137,8 +138,13 @@ export async function createSessionWithMessagesAdmin(
     }
   }
 
-  // 5. Fire graph evaluation (non-blocking)
-  fireGraphEval(input.projectId, 'session', sessionId)
+  // 5. Fire session processing if created as closed (non-blocking)
+  // Session processing includes graph evaluation, so skip standalone graph eval
+  if (input.status === 'closed') {
+    fireSessionProcessing(sessionId, input.projectId)
+  } else {
+    fireGraphEval(input.projectId, 'session', sessionId)
+  }
 
   return { sessionId, messageCount: input.messages.length }
 }
@@ -175,7 +181,7 @@ export async function createSessionAdmin(
         description: input.description || null,
         source: input.source ?? 'api',
         session_type: input.session_type || 'chat',
-        status: 'active',
+        status: input.status ?? (messageCount > 0 ? 'closed' : 'active'),
         message_count: messageCount,
         tags: input.tags ?? [],
         custom_fields: input.custom_fields ?? null,
@@ -227,8 +233,13 @@ export async function createSessionAdmin(
       console.error('[sessions-service] Failed to link entities:', linkError)
     }
 
-    // Fire graph evaluation (non-blocking)
-    fireGraphEval(input.project_id, 'session', sessionId)
+    // Fire processing (if closed) or just graph eval (if active)
+    const resolvedStatus = input.status ?? (messageCount > 0 ? 'closed' : 'active')
+    if (resolvedStatus === 'closed') {
+      fireSessionProcessing(sessionId, input.project_id)
+    } else {
+      fireGraphEval(input.project_id, 'session', sessionId)
+    }
 
     // Fetch the session with relations
     const result = await db.query.sessions.findFirst({
@@ -254,10 +265,11 @@ export async function createSessionAdmin(
 // ============================================================================
 
 /**
- * Creates a session with source 'manual'. Delegates to createSessionAdmin.
+ * Creates a session. Delegates to createSessionAdmin.
+ * Source defaults to 'api' if not provided.
  */
-export async function createSession(input: CreateSessionInput): Promise<SessionWithProject | null> {
-  return createSessionAdmin({ ...input, source: 'manual' })
+export async function createSession(input: CreateSessionInput & { source?: SessionSource }): Promise<SessionWithProject | null> {
+  return createSessionAdmin(input)
 }
 
 // ============================================================================
@@ -277,14 +289,16 @@ export interface SearchSessionResult {
 export async function searchSessions(
   projectId: string,
   query: string,
-  limit: number = 10
+  limit: number = 10,
+  options?: { mode?: SearchMode; threshold?: number }
 ): Promise<SearchSessionResult[]> {
-  return searchWithFallback<SearchSessionResult>({
+  return searchByMode<SearchSessionResult>({
     logPrefix: '[sessions-service]',
+    mode: options?.mode,
     semanticSearch: async () => {
       const semanticResults = await searchSessionsSemantic(projectId, query, {
         limit,
-        threshold: 0.5,
+        threshold: options?.threshold ?? 0.5,
         isArchived: false,
       })
       return semanticResults.map((r) => ({
@@ -294,42 +308,35 @@ export async function searchSessions(
         score: r.similarity,
       }))
     },
-    textFallback: async () => {
-      const searchResults = await db.execute(sql`
-        SELECT * FROM search_sessions_multi(
-          ${projectId},
-          ${query},
-          ${query},
-          ${false},
-          ${limit},
-          ${0}
-        )
-      `)
-
-      if (!searchResults.rows || searchResults.rows.length === 0) {
-        return []
-      }
-
-      const sessionIds = searchResults.rows.map((r: Record<string, unknown>) => r.session_id as string)
-
-      const nameMap = new Map<string, string | null>()
-      if (sessionIds.length > 0) {
-        const nameRows = await db
-          .select({ id: sessions.id, name: sessions.name })
-          .from(sessions)
-          .where(inArray(sessions.id, sessionIds))
-        for (const s of nameRows) {
-          nameMap.set(s.id, s.name)
-        }
-      }
-
-      return searchResults.rows.map(
-        (r: Record<string, unknown>): SearchSessionResult => ({
-          id: r.session_id as string,
-          name: nameMap.get(r.session_id as string) ?? 'Unnamed feedback',
-          snippet: `Match in: ${r.match_source}`,
+    keywordSearch: async () => {
+      const s = `%${query}%`
+      const data = await db
+        .select({
+          id: sessions.id,
+          name: sessions.name,
+          description: sessions.description,
+          updated_at: sessions.updated_at,
         })
-      )
+        .from(sessions)
+        .where(
+          and(
+            eq(sessions.project_id, projectId),
+            eq(sessions.is_archived, false),
+            or(
+              ilike(sessions.name, s),
+              ilike(sessions.description, s)
+            )
+          )
+        )
+        .orderBy(desc(sessions.updated_at))
+        .limit(limit)
+
+      return data.map((r) => ({
+        id: r.id,
+        name: r.name ?? 'Unnamed feedback',
+        snippet: (r.description ?? '').slice(0, 200),
+        score: 0,
+      }))
     },
   })
 }

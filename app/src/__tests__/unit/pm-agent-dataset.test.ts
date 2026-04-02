@@ -147,7 +147,7 @@ describe('PM Agent Evaluation Dataset', () => {
         expect(seedIssue.id).toBeDefined()
         expect(seedIssue.type).toBeDefined()
         expect(['bug', 'feature_request', 'change_request']).toContain(seedIssue.type)
-        expect(seedIssue.title).toBeDefined()
+        expect(seedIssue.name).toBeDefined()
         expect(seedIssue.description).toBeDefined()
         expect(seedIssue.priority).toBeDefined()
         expect(['low', 'medium', 'high']).toContain(seedIssue.priority)

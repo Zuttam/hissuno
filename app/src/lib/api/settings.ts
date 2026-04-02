@@ -1,38 +1,8 @@
 import { fetchApi, buildUrl } from './fetch'
-import type { CustomTagRecord } from '@/types/session'
 import type { ProductScopeRecord } from '@/types/product-scope'
 
 const paths = {
-  customTags: '/api/settings/custom-tags',
-  feedbackIssues: '/api/settings/feedback-issues',
   productScopes: '/api/product-scopes',
-}
-
-// ---------------------------------------------------------------------------
-// Custom Tags
-// ---------------------------------------------------------------------------
-
-export async function listCustomTags(projectId: string): Promise<CustomTagRecord[]> {
-  const url = buildUrl(paths.customTags, { projectId })
-  const { tags } = await fetchApi<{ tags: CustomTagRecord[] }>(url, {
-    errorMessage: 'Failed to load custom tags.',
-  })
-  return tags ?? []
-}
-
-// ---------------------------------------------------------------------------
-// Unified Feedback & Issues Settings
-// ---------------------------------------------------------------------------
-
-export interface FeedbackIssuesSettings {
-  customTags: CustomTagRecord[]
-}
-
-export async function getFeedbackIssuesSettings(projectId: string): Promise<FeedbackIssuesSettings> {
-  const url = buildUrl(paths.feedbackIssues, { projectId })
-  return fetchApi<FeedbackIssuesSettings>(url, {
-    errorMessage: 'Failed to load feedback & issues settings.',
-  })
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +32,7 @@ export interface CreateProductScopeParams {
   color?: string
   type?: 'product_area' | 'initiative'
   goals?: Array<{ id: string; text: string }> | null
+  custom_fields?: Record<string, unknown>
 }
 
 export async function createProductScope(
@@ -84,6 +55,7 @@ export interface UpdateProductScopeParams {
   color?: string
   type?: 'product_area' | 'initiative'
   goals?: Array<{ id: string; text: string }> | null
+  custom_fields?: Record<string, unknown>
 }
 
 export async function updateProductScope(
@@ -157,10 +129,6 @@ const supportAgent = createSettingsAccessor('agents/support-agent', 'support age
 export const getSupportAgentSettings = supportAgent.get
 export const updateSupportAgentSettings = supportAgent.update
 
-const feedbackReview = createSettingsAccessor('agents/feedback-review', 'feedback review')
-export const getFeedbackReviewSettings = feedbackReview.get
-export const updateFeedbackReviewSettings = feedbackReview.update
-
 const issueAnalysis = createSettingsAccessor('agents/issue-analysis', 'issue analysis')
 export const getIssueAnalysisSettings = issueAnalysis.get
 export const updateIssueAnalysisSettings = issueAnalysis.update
@@ -169,18 +137,7 @@ const knowledgeAnalysis = createSettingsAccessor('agents/knowledge-analysis', 'k
 export const getKnowledgeAnalysisSettings = knowledgeAnalysis.get
 export const updateKnowledgeAnalysisSettings = knowledgeAnalysis.update
 
-// ---------------------------------------------------------------------------
-// Feedback & Issues Settings (unified write)
-// ---------------------------------------------------------------------------
+const graphEvaluation = createSettingsAccessor('graph-evaluation', 'graph evaluation')
+export const getGraphEvaluationSettingsClient = graphEvaluation.get
+export const updateGraphEvaluationSettingsClient = graphEvaluation.update
 
-export async function updateFeedbackIssuesSettings(
-  projectId: string,
-  body: { custom_tags?: unknown[] },
-) {
-  const url = buildUrl(paths.feedbackIssues, { projectId })
-  return fetchApi<Record<string, unknown>>(url, {
-    method: 'PATCH',
-    body,
-    errorMessage: 'Failed to save feedback & issues settings.',
-  })
-}

@@ -98,14 +98,14 @@ describe('formatResourceList', () => {
 
   it('formats issue items with type and priority', () => {
     const items = [
-      { id: 'iss-1', title: 'Fix crash', type: 'bug', priority: 'high', status: 'open', upvote_count: 3 },
+      { id: 'iss-1', title: 'Fix crash', type: 'bug', priority: 'high', status: 'open', session_count: 3 },
     ]
     const result = formatResourceList('issues', items, 1)
     expect(result).toContain('Issues (1 total)')
     expect(result).toContain('Fix crash')
     expect(result).toContain('bug')
     expect(result).toContain('high')
-    expect(result).toContain('3 upvotes')
+    expect(result).toContain('3 sessions')
   })
 
   it('formats contact items with email', () => {

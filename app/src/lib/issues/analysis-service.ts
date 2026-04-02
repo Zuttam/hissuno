@@ -45,7 +45,7 @@ export async function triggerIssueAnalysis(
 
   // Verify issue exists and belongs to this project
   const issueRows = await db
-    .select({ id: issues.id, title: issues.title, project_id: issues.project_id })
+    .select({ id: issues.id, name: issues.name, project_id: issues.project_id })
     .from(issues)
     .where(
       and(
@@ -101,7 +101,7 @@ export async function triggerIssueAnalysis(
         status: 'running',
         started_at: new Date(),
         metadata: {
-          issueTitle: issue.title,
+          issueName: issue.name,
         },
       })
       .returning()

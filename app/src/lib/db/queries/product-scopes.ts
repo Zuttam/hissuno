@@ -29,24 +29,8 @@ export async function listProjectProductScopes(projectId: string): Promise<Produ
   }
 }
 
-/**
- * Gets product scopes for a project using admin client (no auth).
- * Used by workflows and internal services.
- */
-export async function getProjectProductScopes(projectId: string): Promise<ProductScopeRecord[]> {
-  try {
-    const rows = await db
-      .select()
-      .from(productScopes)
-      .where(eq(productScopes.project_id, projectId))
-      .orderBy(asc(productScopes.position))
-
-    return rows as unknown as ProductScopeRecord[]
-  } catch (error) {
-    console.error('[db.product-scopes] unexpected error getting product scopes', error)
-    return []
-  }
-}
+/** @deprecated Use `listProjectProductScopes` instead. */
+export const getProjectProductScopes = listProjectProductScopes
 
 /**
  * Input for syncing product scopes
@@ -86,6 +70,7 @@ export interface UpdateProductScopeInput {
   color?: string
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
+  custom_fields?: Record<string, unknown>
 }
 
 /**
@@ -130,6 +115,7 @@ export async function updateProductScope(
   if (input.color !== undefined) updates.color = input.color
   if (input.type !== undefined) updates.type = input.type
   if (input.goals !== undefined) updates.goals = input.goals as unknown as Record<string, unknown>
+  if (input.custom_fields !== undefined) updates.custom_fields = input.custom_fields
 
   if (Object.keys(updates).length === 0) {
     return existing

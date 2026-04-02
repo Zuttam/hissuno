@@ -51,10 +51,16 @@ export function HeroSection() {
         transition={{ duration: 1.2, ease: WATER_EASINGS.float, delay: 0.2 }}
         className="relative z-10 mx-auto max-w-4xl text-center">
 
-        <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
+        <div className="mt-12 flex justify-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-teal)]/30 bg-[var(--accent-teal)]/5 px-3 py-1 font-mono text-xs text-[var(--accent-teal)]">
+            Open Source
+          </span>
+        </div>
+
+        <h1 className="mt-4 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
           Your Agents Don&apos;t Know Your Product.
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            Hissuno Fixes That.
+            We Built the Missing Layer.
           </span>
         </h1>
 

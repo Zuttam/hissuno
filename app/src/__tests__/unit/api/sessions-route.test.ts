@@ -399,37 +399,50 @@ describe('POST /api/sessions', () => {
     expect(input.linked_entities).toBeUndefined()
   })
 
-  it('filters invalid messages from body', async () => {
-    const bodyWithBadMessages = {
+  it('rejects messages with missing content', async () => {
+    const body = {
       ...validBody,
       messages: [
         { role: 'user', content: 'Valid message' },
         { role: 'user' }, // missing content
-        { content: 'missing role' }, // missing role
-        { role: 'invalid_role', content: 'Bad role' }, // invalid role
-        { role: 'assistant', content: 'Also valid' },
       ],
     }
-    mockCreateSession.mockResolvedValue({ id: 's-new' })
 
     const req = createRequest(
       `http://localhost/api/sessions?projectId=${PROJECT_ID}`,
       {
         method: 'POST',
-        body: JSON.stringify(bodyWithBadMessages),
+        body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json' },
       },
     )
     const res = await POST(req)
 
-    expect(res.status).toBe(201)
-    const input = mockCreateSession.mock.calls[0][0]
-    // Only messages with both role and content should remain
-    for (const msg of input.messages) {
-      expect(msg).toHaveProperty('role')
-      expect(msg).toHaveProperty('content')
-      expect(typeof msg.role).toBe('string')
-      expect(typeof msg.content).toBe('string')
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/content/i)
+  })
+
+  it('rejects messages with invalid role', async () => {
+    const body = {
+      ...validBody,
+      messages: [
+        { role: 'invalid_role', content: 'Bad role' },
+      ],
     }
+
+    const req = createRequest(
+      `http://localhost/api/sessions?projectId=${PROJECT_ID}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+      },
+    )
+    const res = await POST(req)
+
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json.error).toMatch(/role/i)
   })
 })

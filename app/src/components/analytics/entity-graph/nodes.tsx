@@ -40,7 +40,7 @@ export const CATEGORY_LABELS: Record<EntityGraphCategory, string> = {
   issue: 'Issues',
   session: 'Feedback',
   knowledge_source: 'Knowledge',
-  product_scope: 'Product Scopes',
+  product_scope: 'Scopes',
 }
 
 /** Build a detail URL for an individual entity */

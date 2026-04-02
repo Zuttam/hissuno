@@ -226,7 +226,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
               case 'workflow-finish':
               case 'workflow-canceled': {
-                // Check if the workflow finished with an error
+                // Run record is marked completed/failed by the workflow's
+                // completeAnalysisRun step - no DB update needed here.
                 const workflowStatus = payload?.workflowStatus as string | undefined
                 const isError = workflowStatus === 'error' || workflowStatus === 'failed'
 
@@ -234,15 +235,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
                   const errorDetails = payload?.error as string | undefined
                   throw new Error(errorDetails || 'Workflow failed during execution')
                 } else {
-                  // Update analysis run as completed
-                  await db
-                    .update(issueAnalysisRuns)
-                    .set({
-                      status: 'completed',
-                      completed_at: new Date(),
-                    })
-                    .where(eq(issueAnalysisRuns.id, analysisRun.id))
-
                   emitEvent('workflow-finish', {
                     message: 'Analysis completed successfully',
                   })
@@ -256,20 +248,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
           cleanup()
         } catch (error) {
           console.error(`${LOG_PREFIX} stream error`, error)
-
-          // Mark the analysis run as failed in the database
-          try {
-            await db
-              .update(issueAnalysisRuns)
-              .set({
-                status: 'failed',
-                completed_at: new Date(),
-                error_message: error instanceof Error ? error.message : 'Stream error',
-              })
-              .where(eq(issueAnalysisRuns.id, analysisRun.id))
-          } catch (dbError) {
-            console.error(`${LOG_PREFIX} Failed to update analysis run record:`, dbError)
-          }
 
           // Send user-friendly error event
           emitEvent('error', {

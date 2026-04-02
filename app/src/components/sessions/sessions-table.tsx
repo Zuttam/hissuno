@@ -250,7 +250,7 @@ function SessionRow({
         className="px-3 py-2 text-center"
         style={useColumnStyle(columnWidths, 'analyzed', columns)}
       >
-        {session.analysis_status === 'analyzed' ? (
+        {session.base_processed_at != null ? (
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="16"

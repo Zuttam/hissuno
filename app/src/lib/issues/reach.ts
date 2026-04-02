@@ -1,7 +1,7 @@
 /**
  * Reach Score Computation
  *
- * Pure algorithm, no AI. Computes reach from session timestamps and upvote count.
+ * Pure algorithm, no AI. Computes reach from session timestamps and session count.
  * Measures how many users/customers an issue is affecting and how quickly it spreads.
  */
 
@@ -9,7 +9,7 @@ const DEFAULT_WINDOW_DAYS = 14
 
 interface ReachInput {
   sessionTimestamps: Date[]
-  upvoteCount: number
+  sessionCount: number
   windowDays?: number
 }
 
@@ -19,17 +19,17 @@ interface ReachResult {
 }
 
 /**
- * Compute reach score from session timestamps and upvote count.
+ * Compute reach score from session timestamps and session count.
  *
  * Score 1-5:
  * - 5: density >= 1.0/day with positive acceleration
- * - 4: density >= 0.5/day OR 5+ upvotes
- * - 3: density >= 0.25/day OR 3-4 upvotes
+ * - 4: density >= 0.5/day OR 5+ sessions
+ * - 3: density >= 0.25/day OR 3-4 sessions
  * - 2: 2+ sessions in window
  * - 1: single mention or stale
  */
 export function computeReach(input: ReachInput): ReachResult {
-  const { sessionTimestamps, upvoteCount, windowDays = DEFAULT_WINDOW_DAYS } = input
+  const { sessionTimestamps, sessionCount, windowDays = DEFAULT_WINDOW_DAYS } = input
 
   if (sessionTimestamps.length === 0) {
     return { score: 1, reasoning: 'No session data available' }
@@ -59,14 +59,14 @@ export function computeReach(input: ReachInput): ReachResult {
   if (density >= 1.0 && acceleration > 0) {
     score = 5
     reasons.push(`High density (${density.toFixed(2)}/day) with positive acceleration`)
-  } else if (density >= 0.5 || upvoteCount >= 5) {
+  } else if (density >= 0.5 || sessionCount >= 5) {
     score = 4
     if (density >= 0.5) reasons.push(`Moderate-high density (${density.toFixed(2)}/day)`)
-    if (upvoteCount >= 5) reasons.push(`${upvoteCount} upvotes`)
-  } else if (density >= 0.25 || (upvoteCount >= 3 && upvoteCount < 5)) {
+    if (sessionCount >= 5) reasons.push(`${sessionCount} linked sessions`)
+  } else if (density >= 0.25 || (sessionCount >= 3 && sessionCount < 5)) {
     score = 3
     if (density >= 0.25) reasons.push(`Moderate density (${density.toFixed(2)}/day)`)
-    if (upvoteCount >= 3) reasons.push(`${upvoteCount} upvotes`)
+    if (sessionCount >= 3) reasons.push(`${sessionCount} linked sessions`)
   } else if (sessionsInWindow.length >= 2) {
     score = 2
     reasons.push(`${sessionsInWindow.length} sessions in ${windowDays}-day window`)

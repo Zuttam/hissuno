@@ -112,7 +112,7 @@ const PROJECT_NAV_ITEMS: NavItemConfig[] = [
   { href: '/projects/[id]/sessions', label: 'Feedback', icon: <SessionsIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/customers', label: 'Customers', icon: <CustomersIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/knowledge', label: 'Knowledge', icon: <KnowledgeIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/products', label: 'Product Scopes', icon: <ProductsIcon className="h-4 w-4" /> },
+  { href: '/projects/[id]/products', label: 'Scopes', icon: <ProductsIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/integrations', label: 'Integrations', icon: <IntegrationsIcon className="h-4 w-4" /> },
   { href: '/projects/[id]/configuration', label: 'Configuration', icon: <ConfigurationIcon className="h-4 w-4" /> },
 ]

@@ -59,8 +59,7 @@ export interface PmAgentSettings {
   classification_guidelines: string | null
   brief_guidelines: string | null
   analysis_guidelines: string | null
-  issue_tracking_enabled: boolean
-  pm_dedup_include_closed: boolean
+  issue_analysis_enabled: boolean
 }
 
 /**
@@ -87,8 +86,7 @@ export const DEFAULT_PM_AGENT_SETTINGS: PmAgentSettings = {
   classification_guidelines: null,
   brief_guidelines: null,
   analysis_guidelines: null,
-  issue_tracking_enabled: true,
-  pm_dedup_include_closed: false,
+  issue_analysis_enabled: true,
 }
 
 /**

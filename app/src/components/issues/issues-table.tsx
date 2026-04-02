@@ -89,7 +89,7 @@ export function IssuesTable({
               Type
             </th>
             <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
-              Upvotes
+              Sessions
             </th>
             <th className="px-3 py-2 text-center text-xs font-bold uppercase tracking-wider text-[color:var(--text-secondary)]">
               Reach
@@ -156,9 +156,9 @@ function IssueRow({ issue, isSelected, onSelect, onArchive, isChecked, onToggleC
   const scope = issue.product_scope_id
     ? scopeMap.get(issue.product_scope_id)
     : [...scopeMap.values()].find((a) => a.is_default)
-  const truncatedTitle = issue.title.length > 50
-    ? `${issue.title.slice(0, 50)}...`
-    : issue.title
+  const truncatedTitle = issue.name.length > 50
+    ? `${issue.name.slice(0, 50)}...`
+    : issue.name
 
   return (
     <tr
@@ -182,7 +182,7 @@ function IssueRow({ issue, isSelected, onSelect, onArchive, isChecked, onToggleC
       )}
       <td className="px-3 py-2">
         <span className="inline-flex items-center gap-2">
-          <span className="text-[color:var(--foreground)]" title={issue.title}>
+          <span className="text-[color:var(--foreground)]" title={issue.name}>
             {truncatedTitle}
           </span>
           {issue.is_archived && (
@@ -202,7 +202,7 @@ function IssueRow({ issue, isSelected, onSelect, onArchive, isChecked, onToggleC
       </td>
       <td className="px-3 py-2 text-center">
         <span className="font-bold text-[color:var(--foreground)]">
-          {issue.upvote_count}
+          {issue.session_count}
         </span>
       </td>
       <td className="px-3 py-2 text-center">

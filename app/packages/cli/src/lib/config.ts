@@ -10,7 +10,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 export interface HissunoConfig {
-  api_key: string
+  api_key?: string
+  auth_token?: string
   base_url: string
   project_id?: string
   username?: string
@@ -25,6 +26,7 @@ export interface MultiProfileConfig {
 
 interface LegacyConfig {
   api_key?: string
+  auth_token?: string
   endpoint?: string
   base_url?: string
   project_id?: string
@@ -43,7 +45,7 @@ function isMultiProfileConfig(raw: RawConfig): raw is MultiProfileConfig {
 }
 
 function parseLegacyProfile(parsed: LegacyConfig): HissunoConfig | null {
-  if (!parsed.api_key) return null
+  if (!parsed.api_key && !parsed.auth_token) return null
 
   let baseUrl = parsed.base_url
   if (!baseUrl && parsed.endpoint) {
@@ -52,7 +54,8 @@ function parseLegacyProfile(parsed: LegacyConfig): HissunoConfig | null {
   if (!baseUrl) return null
 
   return {
-    api_key: parsed.api_key,
+    ...(parsed.api_key ? { api_key: parsed.api_key } : {}),
+    ...(parsed.auth_token ? { auth_token: parsed.auth_token } : {}),
     base_url: baseUrl,
     ...(parsed.project_id ? { project_id: parsed.project_id } : {}),
     ...(parsed.username ? { username: parsed.username } : {}),
@@ -106,7 +109,8 @@ export function saveConfig(config: HissunoConfig): void {
 
   if (raw && isMultiProfileConfig(raw)) {
     raw.profiles[raw.active_profile] = {
-      api_key: config.api_key,
+      ...(config.api_key ? { api_key: config.api_key } : {}),
+      ...(config.auth_token ? { auth_token: config.auth_token } : {}),
       base_url: config.base_url,
       ...(config.project_id ? { project_id: config.project_id } : {}),
       ...(config.username ? { username: config.username } : {}),
@@ -119,8 +123,8 @@ export function saveConfig(config: HissunoConfig): void {
 
 export function requireConfig(): HissunoConfig {
   const config = loadConfig()
-  if (!config) {
-    console.error('Not configured. Run `hissuno config` to set up your API key and URL.')
+  if (!config || (!config.api_key && !config.auth_token)) {
+    console.error('Not configured. Run `hissuno login` or `hissuno config` to set up.')
     process.exit(1)
   }
   return config

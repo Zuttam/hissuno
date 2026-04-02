@@ -1,4 +1,12 @@
-import type { companies, contacts, customerCustomFieldDefinitions } from '@/lib/db/schema/app'
+import type { companies, contacts } from '@/lib/db/schema/app'
+
+// ============================================================================
+// Re-exports (moved to @/types/ontology - keep for backward compat)
+// ============================================================================
+
+export { CUSTOM_FIELD_TYPES } from './ontology'
+export type { CustomFieldType, CustomFieldDefinition, CreateCustomFieldInput, UpdateCustomFieldInput } from './ontology'
+export type { EntityType as CustomerEntityType } from '@/lib/db/queries/types'
 
 // ============================================================================
 // Constants
@@ -7,18 +15,12 @@ import type { companies, contacts, customerCustomFieldDefinitions } from '@/lib/
 export const COMPANY_STAGES = ['prospect', 'onboarding', 'active', 'churned', 'expansion'] as const
 export type CompanyStage = (typeof COMPANY_STAGES)[number]
 
-export const CUSTOM_FIELD_TYPES = ['text', 'number', 'date', 'boolean', 'select'] as const
-export type CustomFieldType = (typeof CUSTOM_FIELD_TYPES)[number]
-
-export type CustomerEntityType = 'company' | 'contact' | 'issue' | 'session'
-
 // ============================================================================
 // Base Row Types (from Drizzle schema)
 // ============================================================================
 
 type CompanyRow = typeof companies.$inferSelect
 type ContactRow = typeof contacts.$inferSelect
-type CustomFieldRow = typeof customerCustomFieldDefinitions.$inferSelect
 
 // ============================================================================
 // Company Types
@@ -144,38 +146,6 @@ export interface ContactFilters {
   showArchived?: boolean
   limit?: number
   offset?: number
-}
-
-// ============================================================================
-// Custom Field Types
-// ============================================================================
-
-/**
- * Custom field definition with stricter types than raw database row.
- */
-export interface CustomFieldDefinition extends Omit<CustomFieldRow, 'entity_type' | 'field_type' | 'is_required'> {
-  entity_type: CustomerEntityType
-  field_type: CustomFieldType
-  is_required: boolean
-}
-
-export interface CreateCustomFieldInput {
-  project_id: string
-  entity_type: CustomerEntityType
-  field_key: string
-  field_label: string
-  field_type: CustomFieldType
-  select_options?: string[]
-  position?: number
-  is_required?: boolean
-}
-
-export interface UpdateCustomFieldInput {
-  field_label?: string
-  field_type?: CustomFieldType
-  select_options?: string[]
-  position?: number
-  is_required?: boolean
 }
 
 // ============================================================================

@@ -34,15 +34,15 @@ export type WorkflowContextWithCodebase = z.infer<typeof workflowContextWithCode
 // ============================================================================
 
 /**
- * Context prepared for issue analysis
+ * Context prepared for issue analysis (includes product scope from entity relationships)
  */
 export const preparedContextSchema = workflowContextWithCodebaseSchema.extend({
   issue: z.object({
     id: z.string(),
     type: z.string(),
-    title: z.string(),
+    name: z.string(),
     description: z.string(),
-    upvoteCount: z.number(),
+    sessionCount: z.number(),
     impactScore: z.number().nullable(),
     effortEstimate: z.string().nullable(),
     priorityManualOverride: z.boolean(),
@@ -56,23 +56,15 @@ export const preparedContextSchema = workflowContextWithCodebaseSchema.extend({
     companyStage: z.string().nullable(),
   })),
   sessionTimestamps: z.array(z.string()),
+  productScopeId: z.string().nullable(),
 })
 
 export type PreparedContext = z.infer<typeof preparedContextSchema>
 
 /**
- * Context with graph evaluation results (product scope + relationships discovered)
- */
-export const graphEvalContextSchema = preparedContextSchema.extend({
-  productScopeId: z.string().nullable(),
-})
-
-export type GraphEvalContext = z.infer<typeof graphEvalContextSchema>
-
-/**
  * Output after technical impact/effort analysis
  */
-export const analyzeOutputSchema = graphEvalContextSchema.extend({
+export const analyzeOutputSchema = preparedContextSchema.extend({
   technicalImpactScore: z.number().min(1).max(5).nullable(),
   technicalImpactReasoning: z.string().nullable(),
   technicalEffortEstimate: z.string().nullable(),

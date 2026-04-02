@@ -140,9 +140,9 @@ export interface PMEvalSeedIssue {
   type: IssueType
 
   /**
-   * Issue title
+   * Issue name
    */
-  title: string
+  name: string
 
   /**
    * Issue description

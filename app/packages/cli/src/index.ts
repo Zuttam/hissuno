@@ -16,6 +16,8 @@ import { profileCommand } from './commands/profile.js'
 import { skillsCommand } from './commands/skills.js'
 import { statusCommand } from './commands/status.js'
 import { membersCommand } from './commands/members.js'
+import { loginCommand } from './commands/login.js'
+import { logoutCommand } from './commands/logout.js'
 
 const program = new Command()
   .name('hissuno')
@@ -23,6 +25,8 @@ const program = new Command()
   .version('0.2.0')
   .option('--json', 'Output as JSON')
 
+program.addCommand(loginCommand)
+program.addCommand(logoutCommand)
 program.addCommand(setupCommand)
 program.addCommand(configCommand)
 program.addCommand(profileCommand)

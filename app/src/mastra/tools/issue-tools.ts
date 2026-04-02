@@ -13,6 +13,7 @@
 import { createTool } from '@mastra/core/tools'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
 import { eq, and, inArray, desc } from 'drizzle-orm'
 import { sessions, issues, projects } from '@/lib/db/schema/app'
 import { getSessionMessages } from '@/lib/db/queries/session-messages'
@@ -37,7 +38,6 @@ Use this to retrieve the conversation history before analyzing a session.`,
       pageTitle: z.string().nullable(),
       messageCount: z.number(),
       status: z.enum(['active', 'closed']),
-      pmReviewedAt: z.string().nullable(),
     }),
     messages: z.array(z.object({
       role: z.enum(['user', 'assistant', 'system']),
@@ -66,7 +66,6 @@ Use this to retrieve the conversation history before analyzing a session.`,
           page_title: sessions.page_title,
           message_count: sessions.message_count,
           status: sessions.status,
-          pm_reviewed_at: sessions.pm_reviewed_at,
         })
         .from(sessions)
         .where(eq(sessions.id, sessionId))
@@ -82,7 +81,6 @@ Use this to retrieve the conversation history before analyzing a session.`,
             pageTitle: null,
             messageCount: 0,
             status: 'closed' as const,
-            pmReviewedAt: null,
           },
           messages: [],
           project: { id: '', name: '', description: null },
@@ -114,7 +112,6 @@ Use this to retrieve the conversation history before analyzing a session.`,
           pageTitle: session.page_title,
           messageCount: session.message_count ?? 0,
           status: (session.status as 'active' | 'closed') ?? 'closed',
-          pmReviewedAt: session.pm_reviewed_at?.toISOString() ?? null,
         },
         messages,
         project: {
@@ -136,7 +133,6 @@ Use this to retrieve the conversation history before analyzing a session.`,
           pageTitle: null,
           messageCount: 0,
           status: 'closed' as const,
-          pmReviewedAt: null,
         },
         messages: [],
         project: { id: '', name: '', description: null },
@@ -157,7 +153,7 @@ Uses AI-powered semantic similarity to find potential duplicates.
 Returns ranked list with similarity scores (0.7+ is a definitive match).`,
   inputSchema: z.object({
     projectId: z.string().describe('The project ID to search within'),
-    title: z.string().describe('The proposed issue title'),
+    name: z.string().describe('The proposed issue name'),
     description: z.string().describe('The proposed issue description'),
     type: z
       .enum(['bug', 'feature_request', 'change_request'])
@@ -171,9 +167,9 @@ Returns ranked list with similarity scores (0.7+ is a definitive match).`,
     similarIssues: z.array(
       z.object({
         issueId: z.string(),
-        title: z.string(),
+        name: z.string(),
         description: z.string(),
-        upvoteCount: z.number(),
+        sessionCount: z.number(),
         status: z.string(),
         similarityScore: z.number(),
         matchReason: z.string(),
@@ -183,12 +179,12 @@ Returns ranked list with similarity scores (0.7+ is a definitive match).`,
     error: z.string().optional(),
   }),
   execute: async ({ context }) => {
-    const { projectId, title, description, type, includeClosed = false } = context
+    const { projectId, name, description, type, includeClosed = false } = context
 
     try {
       const { searchSimilarIssues } = await import('@/lib/issues/embedding-service')
 
-      const results = await searchSimilarIssues(projectId, title, description, {
+      const results = await searchSimilarIssues(projectId, name, description, {
         type,
         limit: 5,
         threshold: 0.5, // Return anything above 50% for consideration
@@ -205,9 +201,9 @@ Returns ranked list with similarity scores (0.7+ is a definitive match).`,
 
         return {
           issueId: r.issueId,
-          title: r.title,
+          name: r.name,
           description: r.description,
-          upvoteCount: r.upvoteCount,
+          sessionCount: r.sessionCount,
           status: r.status,
           similarityScore: Math.round(r.similarity * 100) / 100,
           matchReason,
@@ -227,9 +223,8 @@ Returns ranked list with similarity scores (0.7+ is a definitive match).`,
         const fallbackIssues = await db
           .select({
             id: issues.id,
-            title: issues.title,
+            name: issues.name,
             description: issues.description,
-            upvote_count: issues.upvote_count,
             status: issues.status,
             type: issues.type,
           })
@@ -241,7 +236,7 @@ Returns ranked list with similarity scores (0.7+ is a definitive match).`,
               inArray(issues.status, ['open', 'in_progress'])
             )
           )
-          .orderBy(desc(issues.upvote_count))
+          .orderBy(desc(issues.updated_at))
           .limit(10)
 
         if (fallbackIssues.length === 0) {
@@ -249,10 +244,13 @@ Returns ranked list with similarity scores (0.7+ is a definitive match).`,
         }
 
         // Fallback to Jaccard similarity
-        const newIssueText = `${title} ${description}`
+        const newIssueText = `${name} ${description}`
+        const fallbackIds = fallbackIssues.map((i) => i.id)
+        const sessionCounts = fallbackIds.length > 0 ? await batchGetIssueSessionCounts(fallbackIds) : new Map<string, number>()
+
         const scoredIssues = fallbackIssues
           .map((issue) => {
-            const existingText = `${issue.title} ${issue.description}`
+            const existingText = `${issue.name} ${issue.description}`
             const score = calculateNaiveSimilarity(newIssueText, existingText)
 
             let matchReason = 'Low keyword overlap'
@@ -261,9 +259,9 @@ Returns ranked list with similarity scores (0.7+ is a definitive match).`,
 
             return {
               issueId: issue.id,
-              title: issue.title,
+              name: issue.name,
               description: issue.description,
-              upvoteCount: issue.upvote_count ?? 0,
+              sessionCount: sessionCounts.get(issue.id) ?? 0,
               status: issue.status ?? 'open',
               similarityScore: Math.round(score * 100) / 100,
               matchReason,

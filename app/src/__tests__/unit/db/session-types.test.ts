@@ -13,7 +13,7 @@ import {
   SESSION_TYPE_INFO,
   SESSION_SOURCE_INFO,
 } from '@/types/session'
-import type { SessionSource, SessionWithProject, CustomTagRecord } from '@/types/session'
+import type { SessionSource, SessionWithProject } from '@/types/session'
 
 // ---------------------------------------------------------------------------
 // getDefaultSessionType
@@ -71,7 +71,6 @@ describe('getTagInfo', () => {
     expect(result).toEqual({
       label: 'Bug',
       variant: 'danger',
-      isCustom: false,
     })
   })
 
@@ -80,29 +79,6 @@ describe('getTagInfo', () => {
     expect(result).toEqual({
       label: 'Feature Request',
       variant: 'warning',
-      isCustom: false,
-    })
-  })
-
-  it('returns custom tag info when matching custom tag slug', () => {
-    const customTags: CustomTagRecord[] = [
-      {
-        id: 'ct-1',
-        project_id: 'p-1',
-        name: 'High Priority',
-        slug: 'high_priority',
-        description: 'High priority items',
-        color: 'danger',
-        position: 0,
-        created_at: '2025-01-01',
-        updated_at: '2025-01-01',
-      },
-    ]
-    const result = getTagInfo('high_priority', customTags)
-    expect(result).toEqual({
-      label: 'High Priority',
-      variant: 'danger',
-      isCustom: true,
     })
   })
 
@@ -111,47 +87,7 @@ describe('getTagInfo', () => {
     expect(result).toEqual({
       label: 'totally_unknown',
       variant: 'default',
-      isCustom: false,
     })
-  })
-
-  it('prefers native over custom when slug matches a native tag', () => {
-    const customTags: CustomTagRecord[] = [
-      {
-        id: 'ct-1',
-        project_id: 'p-1',
-        name: 'Custom Bug',
-        slug: 'bug',
-        description: 'overridden',
-        color: 'info',
-        position: 0,
-        created_at: '2025-01-01',
-        updated_at: '2025-01-01',
-      },
-    ]
-    const result = getTagInfo('bug', customTags)
-    // Native tags take precedence
-    expect(result.isCustom).toBe(false)
-    expect(result.label).toBe('Bug')
-  })
-
-  it('defaults variant to "default" when custom tag has empty color', () => {
-    const customTags: CustomTagRecord[] = [
-      {
-        id: 'ct-1',
-        project_id: 'p-1',
-        name: 'No Color',
-        slug: 'no_color',
-        description: '',
-        color: '',
-        position: 0,
-        created_at: '2025-01-01',
-        updated_at: '2025-01-01',
-      },
-    ]
-    const result = getTagInfo('no_color', customTags)
-    expect(result.variant).toBe('default')
-    expect(result.isCustom).toBe(true)
   })
 })
 
@@ -169,17 +105,14 @@ describe('getSessionUserDisplay', () => {
       page_title: null,
       name: null,
       description: null,
-      analysis_status: 'pending',
       source: 'widget',
       session_type: 'chat',
       message_count: 0,
       status: 'active',
       tags: [],
       custom_fields: {},
-      tags_auto_applied_at: null,
       first_message_at: null,
       last_activity_at: '2025-01-01T00:00:00Z',
-      pm_reviewed_at: null,
       goodbye_detected_at: null,
       idle_prompt_sent_at: null,
       scheduled_close_at: null,
@@ -189,6 +122,7 @@ describe('getSessionUserDisplay', () => {
       human_takeover_user_id: null,
       human_takeover_slack_channel_id: null,
       human_takeover_slack_thread_ts: null,
+      base_processed_at: null,
       created_at: '2025-01-01T00:00:00Z',
       updated_at: '2025-01-01T00:00:00Z',
       project: null,

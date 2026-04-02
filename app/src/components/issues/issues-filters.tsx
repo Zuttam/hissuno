@@ -328,7 +328,7 @@ export function IssuesFilters({
         ))}
       </div>
 
-      {/* Row 4: Product Scope */}
+      {/* Row 4: Scope */}
       {productScopes.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <FilterLabel>Scope:</FilterLabel>

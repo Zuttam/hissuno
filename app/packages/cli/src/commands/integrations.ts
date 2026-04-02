@@ -22,8 +22,6 @@ export const PLATFORMS = ['intercom', 'gong', 'zendesk', 'slack', 'github', 'jir
 export type Platform = (typeof PLATFORMS)[number]
 
 export const OAUTH_PLATFORMS: Platform[] = ['slack', 'github', 'jira', 'linear']
-const TOKEN_PLATFORMS: Platform[] = ['gong', 'zendesk', 'fathom']
-const HYBRID_PLATFORMS: Platform[] = ['intercom', 'hubspot', 'notion'] // support both token and OAuth
 const SYNCABLE_PLATFORMS: Platform[] = ['intercom', 'gong', 'zendesk', 'fathom', 'hubspot']
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
@@ -369,11 +367,12 @@ export async function connectNotion(config: HissunoConfig, projectId: string, op
 // Configure flow
 // ---------------------------------------------------------------------------
 
-async function configureIntegration(config: HissunoConfig, platform: Platform, projectId: string): Promise<void> {
+async function configureIntegration(config: HissunoConfig, platform: Platform, projectId: string, opts?: { syncFrequency?: string; autoSync?: boolean }): Promise<void> {
   if (SYNCABLE_PLATFORMS.includes(platform)) {
-    const syncFrequency = await promptSyncFrequency()
+    const syncFrequency = await promptSyncFrequency(opts?.syncFrequency)
 
-    const result = await apiCall(config, 'PATCH', `/api/integrations/${platform}?projectId=${projectId}`, {
+    const result = await apiCall(config, 'PATCH', `/api/integrations/${platform}`, {
+      projectId,
       syncFrequency,
     })
 
@@ -387,9 +386,12 @@ async function configureIntegration(config: HissunoConfig, platform: Platform, p
   }
 
   if (platform === 'jira' || platform === 'linear') {
-    const autoSyncEnabled = await confirm({ message: 'Enable auto-sync of issues?', default: true })
+    const autoSyncEnabled = opts?.autoSync !== undefined
+      ? opts.autoSync
+      : await confirm({ message: 'Enable auto-sync of issues?', default: true })
 
-    const result = await apiCall(config, 'PATCH', `/api/integrations/${platform}?projectId=${projectId}`, {
+    const result = await apiCall(config, 'PATCH', `/api/integrations/${platform}`, {
+      projectId,
       autoSyncEnabled,
     })
 
@@ -432,7 +434,7 @@ async function syncIntegration(config: HissunoConfig, platform: Platform, projec
 
   try {
     const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${config.api_key}` },
+      headers: { Authorization: `Bearer ${config.auth_token ?? config.api_key}` },
     })
 
     if (!response.ok) {
@@ -491,8 +493,8 @@ async function syncIntegration(config: HissunoConfig, platform: Platform, projec
 // Disconnect flow
 // ---------------------------------------------------------------------------
 
-async function disconnectIntegration(config: HissunoConfig, platform: Platform, projectId: string): Promise<void> {
-  const confirmed = await confirm({
+async function disconnectIntegration(config: HissunoConfig, platform: Platform, projectId: string, skipConfirm = false): Promise<void> {
+  const confirmed = skipConfirm || await confirm({
     message: `Disconnect ${PLATFORM_LABELS[platform]}? This cannot be undone.`,
     default: false,
   })
@@ -644,7 +646,7 @@ const addSubcommand = new Command('add')
   .option('--api-key <key>', 'Fathom API key')
   .option('--overwrite-policy <policy>', 'HubSpot overwrite policy: fill_nulls, hubspot_wins, never_overwrite')
   .option('--sync-frequency <freq>', 'Sync frequency: manual, 1h, 6h, 24h')
-  .action(async (platformArg, opts, cmd) => {
+  .action(async (platformArg, opts) => {
     const config = requireConfig()
     const platform = validatePlatform(platformArg)
     const projectId = await resolveProjectId(config)
@@ -721,7 +723,10 @@ const statusSubcommand = new Command('status')
 const configureSubcommand = new Command('configure')
   .description('Update integration settings')
   .argument('<platform>', `Platform to configure (${PLATFORMS.join(', ')})`)
-  .action(async (platformArg) => {
+  .option('--sync-frequency <freq>', 'Sync frequency: manual, 1h, 6h, 24h')
+  .option('--auto-sync', 'Enable auto-sync (jira/linear)')
+  .option('--no-auto-sync', 'Disable auto-sync (jira/linear)')
+  .action(async (platformArg, opts) => {
     const config = requireConfig()
     const platform = validatePlatform(platformArg)
     const projectId = await resolveProjectId(config)
@@ -731,7 +736,14 @@ const configureSubcommand = new Command('configure')
       error(`${PLATFORM_LABELS[platform]} is not connected. Run 'hissuno integrations add ${platform}' first.`)
       process.exit(1)
     }
-    await configureIntegration(config, platform, projectId)
+    // Commander sets autoSync to true by default when --no-auto-sync is defined.
+    // Detect if the user explicitly passed either flag by checking raw args.
+    const rawArgs = process.argv
+    const autoSyncExplicit = rawArgs.includes('--auto-sync') || rawArgs.includes('--no-auto-sync')
+    await configureIntegration(config, platform, projectId, {
+      syncFrequency: opts.syncFrequency,
+      autoSync: autoSyncExplicit ? opts.autoSync : undefined,
+    })
   })
 
 const syncSubcommand = new Command('sync')
@@ -754,7 +766,8 @@ const syncSubcommand = new Command('sync')
 const disconnectSubcommand = new Command('disconnect')
   .description('Disconnect an integration')
   .argument('<platform>', `Platform to disconnect (${PLATFORMS.join(', ')})`)
-  .action(async (platformArg) => {
+  .option('--yes', 'Skip confirmation prompt')
+  .action(async (platformArg, opts) => {
     const config = requireConfig()
     const platform = validatePlatform(platformArg)
     const projectId = await resolveProjectId(config)
@@ -764,7 +777,187 @@ const disconnectSubcommand = new Command('disconnect')
       error(`${PLATFORM_LABELS[platform]} is not connected.`)
       return
     }
-    await disconnectIntegration(config, platform, projectId)
+    await disconnectIntegration(config, platform, projectId, opts.yes)
+  })
+
+// ---------------------------------------------------------------------------
+// Widget settings subcommand
+// ---------------------------------------------------------------------------
+
+interface WidgetSettings {
+  trigger_type: string
+  display_type: string
+  shortcut: string | null
+  drawer_badge_label: string
+  theme: string
+  title: string
+  initial_message: string
+  allowed_origins: string[] | null
+  token_required: boolean | null
+}
+
+function formatWidgetSettings(settings: WidgetSettings): string {
+  const lines: string[] = ['# Widget Settings', '']
+  lines.push(`**Theme:** ${settings.theme}`)
+  lines.push(`**Title:** ${settings.title}`)
+  lines.push(`**Initial Message:** ${settings.initial_message}`)
+  lines.push(`**Trigger:** ${settings.trigger_type}`)
+  lines.push(`**Display:** ${settings.display_type}`)
+  if (settings.shortcut) lines.push(`**Shortcut:** ${settings.shortcut}`)
+  lines.push(`**Drawer Badge Label:** ${settings.drawer_badge_label}`)
+  const origins = settings.allowed_origins
+  if (!origins || origins.length === 0) {
+    lines.push('**Allowed Origins:** None (widget will be blocked)')
+  } else if (origins.length === 1 && origins[0] === '*') {
+    lines.push('**Allowed Origins:** * (all origins)')
+  } else {
+    lines.push(`**Allowed Origins:** ${origins.join(', ')}`)
+  }
+  lines.push(`**JWT Token Required:** ${settings.token_required ? 'Yes' : 'No'}`)
+  return lines.join('\n')
+}
+
+async function getWidgetSettings(config: HissunoConfig, projectId: string): Promise<WidgetSettings | null> {
+  const result = await apiCall<{ settings: WidgetSettings }>(config, 'GET', `/api/integrations/widget?projectId=${projectId}`)
+  if (!result.ok) {
+    const data = result.data as { error?: string }
+    error(`Failed to get widget settings: ${data.error || `HTTP ${result.status}`}`)
+    return null
+  }
+  return (result.data as { settings: WidgetSettings }).settings
+}
+
+async function updateWidgetSettings(config: HissunoConfig, projectId: string, updates: Record<string, unknown>): Promise<WidgetSettings | null> {
+  const result = await apiCall<{ settings: WidgetSettings }>(config, 'PATCH', `/api/integrations/widget?projectId=${projectId}`, updates)
+  if (!result.ok) {
+    const data = result.data as { error?: string }
+    error(`Update failed: ${data.error || `HTTP ${result.status}`}`)
+    return null
+  }
+  return (result.data as { settings: WidgetSettings }).settings
+}
+
+function parseOrigins(raw: string): string[] {
+  const trimmed = raw.trim()
+  if (trimmed === '*') return ['*']
+  if (trimmed === '' || trimmed === '""') return []
+  return trimmed.split(',').map((o) => o.trim()).filter(Boolean)
+}
+
+const widgetSubcommand = new Command('widget')
+  .description('View or update widget settings')
+  .option('--show', 'Show current widget settings')
+  .option('--origins <list>', 'Set allowed origins (comma-separated, * for all, "" to clear)')
+  .option('--theme <theme>', 'Set theme (light, dark, auto)')
+  .option('--title <title>', 'Set widget title')
+  .option('--token-required', 'Require JWT token for widget access')
+  .option('--no-token-required', 'Do not require JWT token for widget access')
+  .action(async (opts, cmd) => {
+    const config = requireConfig()
+    const jsonMode = cmd.parent?.parent?.opts().json
+    const projectId = await resolveProjectId(config)
+
+    // Detect whether --token-required or --no-token-required was explicitly passed
+    const rawArgs = process.argv
+    const tokenRequiredExplicit = rawArgs.includes('--token-required') || rawArgs.includes('--no-token-required')
+
+    const hasFlags = opts.show || opts.origins !== undefined || opts.theme || opts.title || tokenRequiredExplicit
+
+    if (opts.show) {
+      // Non-interactive: just show settings
+      const settings = await getWidgetSettings(config, projectId)
+      if (!settings) process.exit(1)
+      if (jsonMode) {
+        console.log(renderJson(settings))
+      } else {
+        console.log(renderMarkdown(formatWidgetSettings(settings)))
+      }
+      return
+    }
+
+    if (hasFlags) {
+      // Non-interactive: apply flag-based updates
+      const updates: Record<string, unknown> = {}
+      if (opts.origins !== undefined) updates.allowed_origins = parseOrigins(opts.origins)
+      if (opts.theme) {
+        if (!['light', 'dark', 'auto'].includes(opts.theme)) {
+          error('Invalid theme. Must be one of: light, dark, auto')
+          process.exit(1)
+        }
+        updates.theme = opts.theme
+      }
+      if (opts.title) updates.title = opts.title
+      if (tokenRequiredExplicit) updates.token_required = opts.tokenRequired
+
+      if (Object.keys(updates).length === 0) {
+        warn('No changes specified.')
+        return
+      }
+
+      const settings = await updateWidgetSettings(config, projectId, updates)
+      if (!settings) process.exit(1)
+      success('Widget settings updated!')
+      if (jsonMode) {
+        console.log(renderJson(settings))
+      } else {
+        console.log(renderMarkdown(formatWidgetSettings(settings)))
+      }
+      return
+    }
+
+    // Interactive mode: show current settings, prompt to modify
+    const settings = await getWidgetSettings(config, projectId)
+    if (!settings) process.exit(1)
+
+    console.log(renderMarkdown(formatWidgetSettings(settings)))
+
+    const shouldEdit = await confirm({ message: 'Modify widget settings?', default: true })
+    if (!shouldEdit) return
+
+    const updates: Record<string, unknown> = {}
+
+    const newTheme = await select({
+      message: 'Theme:',
+      choices: [
+        { value: 'light', name: 'Light' },
+        { value: 'dark', name: 'Dark' },
+        { value: 'auto', name: 'Auto' },
+      ],
+      default: settings.theme,
+    })
+    if (newTheme !== settings.theme) updates.theme = newTheme
+
+    const newTitle = await input({
+      message: 'Title:',
+      default: settings.title,
+    })
+    if (newTitle !== settings.title) updates.title = newTitle
+
+    const currentOrigins = settings.allowed_origins
+    const originsDisplay = !currentOrigins || currentOrigins.length === 0 ? '' : currentOrigins.join(', ')
+    const newOriginsRaw = await input({
+      message: 'Allowed origins (comma-separated, * for all, empty to clear):',
+      default: originsDisplay,
+    })
+    const newOrigins = parseOrigins(newOriginsRaw)
+    const originsChanged = JSON.stringify(newOrigins) !== JSON.stringify(currentOrigins ?? [])
+    if (originsChanged) updates.allowed_origins = newOrigins
+
+    const currentTokenReq = settings.token_required ?? false
+    const newTokenReq = await confirm({
+      message: 'Require JWT token?',
+      default: currentTokenReq,
+    })
+    if (newTokenReq !== currentTokenReq) updates.token_required = newTokenReq
+
+    if (Object.keys(updates).length === 0) {
+      console.log('No changes.')
+      return
+    }
+
+    const updated = await updateWidgetSettings(config, projectId, updates)
+    if (!updated) process.exit(1)
+    success('Widget settings updated!')
   })
 
 // ---------------------------------------------------------------------------
@@ -784,6 +977,9 @@ export const integrationsCommand = new Command('integrations')
       return
     }
 
+    // 'widget' is handled by its own subcommand, not the platform wizard
+    if (platformArg === 'widget') return
+
     // Platform specified without subcommand: interactive wizard
     const platform = validatePlatform(platformArg)
     const projectId = await resolveProjectId(config)
@@ -796,3 +992,4 @@ integrationsCommand.addCommand(statusSubcommand)
 integrationsCommand.addCommand(configureSubcommand)
 integrationsCommand.addCommand(syncSubcommand)
 integrationsCommand.addCommand(disconnectSubcommand)
+integrationsCommand.addCommand(widgetSubcommand)

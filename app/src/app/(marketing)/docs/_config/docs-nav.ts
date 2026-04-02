@@ -28,6 +28,7 @@ export const DOCS_NAV: DocNavCategory[] = [
       { title: 'Account Setup', slug: 'account-setup', href: '/docs/getting-started/account-setup' },
       { title: 'First Project', slug: 'first-project', href: '/docs/getting-started/first-project' },
       { title: 'Add Your Data', slug: 'add-your-data', href: '/docs/getting-started/add-your-data' },
+      { title: 'How To', slug: 'how-to', href: '/docs/getting-started/how-to' },
       { title: 'Production Deployment', slug: 'production-deployment', href: '/docs/getting-started/production-deployment' },
     ],
     subsections: [
@@ -49,66 +50,33 @@ export const DOCS_NAV: DocNavCategory[] = [
     ],
   },
   {
-    title: 'Concepts',
-    slug: 'concepts',
-    description: 'Core concepts: knowledge graph, product ontology, embeddings, and graph evaluation.',
+    title: 'Architecture',
+    slug: 'architecture',
+    description: 'The 3-layer architecture: base graph, automation, and execution.',
     items: [
-      { title: 'Overview', slug: 'overview', href: '/docs/concepts/overview' },
-      { title: 'Knowledge Graph', slug: 'knowledge-graph', href: '/docs/concepts/knowledge-graph' },
-      { title: 'Scopes', slug: 'scopes', href: '/docs/concepts/scopes' },
-      { title: 'Embeddings', slug: 'embeddings', href: '/docs/concepts/embeddings' },
-      { title: 'Graph Evaluation', slug: 'graph-evaluation', href: '/docs/concepts/graph-evaluation' },
+      { title: 'Overview', slug: 'overview', href: '/docs/architecture/overview' },
+      { title: 'Knowledge Graph', slug: 'knowledge-graph', href: '/docs/architecture/knowledge-graph' },
+      { title: 'Embeddings', slug: 'embeddings', href: '/docs/architecture/embeddings' },
+      { title: 'Graph Evaluation', slug: 'graph-evaluation', href: '/docs/architecture/graph-evaluation' },
     ],
-  },
-  {
-    title: 'Hissuno Agent',
-    slug: 'agents',
-    description: 'AI agents that power customer support and product management.',
-    items: [
-      { title: 'Overview', slug: 'overview', href: '/docs/agents/overview' },
-      { title: 'Support Agent', slug: 'support-agent', href: '/docs/agents/support-agent' },
-      { title: 'Knowledge Packages', slug: 'knowledge-packages', href: '/docs/agents/knowledge-packages' },
-      { title: 'PM Copilot', slug: 'pm-copilot', href: '/docs/agents/pm-copilot' },
-    ],
-  },
-  {
-    title: 'Knowledge',
-    slug: 'knowledge',
-    description: 'Teach your AI agent about your product using knowledge sources.',
-    items: [
-      { title: 'Sources', slug: 'sources', href: '/docs/knowledge/sources' },
-      { title: 'Analysis', slug: 'analysis', href: '/docs/knowledge/analysis' },
-    ],
-  },
-  {
-    title: 'Feedback',
-    slug: 'feedback',
-    description: 'Collect, review, and act on customer feedback automatically.',
-    items: [
-      { title: 'Overview', slug: 'overview', href: '/docs/feedback/overview' },
-      { title: 'Sources', slug: 'sources', href: '/docs/feedback/sources' },
-      { title: 'Review Workflow', slug: 'review-workflow', href: '/docs/feedback/review-workflow' },
-    ],
-  },
-  {
-    title: 'Issues',
-    slug: 'issues',
-    description: 'Automatic issue creation, deduplication, prioritization, and spec writing.',
-    items: [
-      { title: 'Auto Creation', slug: 'auto-creation', href: '/docs/issues/auto-creation' },
-      { title: 'Deduplication', slug: 'deduplication', href: '/docs/issues/deduplication' },
-      { title: 'Priority', slug: 'priority', href: '/docs/issues/priority' },
-      { title: 'Specs', slug: 'specs', href: '/docs/issues/specs' },
-    ],
-  },
-  {
-    title: 'Customers',
-    slug: 'customers',
-    description: 'Manage companies, contacts, and customer data.',
-    items: [
-      { title: 'Companies & Contacts', slug: 'companies-contacts', href: '/docs/customers/companies-contacts' },
-      { title: 'Custom Fields', slug: 'custom-fields', href: '/docs/customers/custom-fields' },
-      { title: 'Lifecycle', slug: 'lifecycle', href: '/docs/customers/lifecycle' },
+    subsections: [
+      {
+        title: 'Automation',
+        href: '/docs/architecture/resource-ingestion',
+        items: [
+          { title: 'Resource Ingestion', slug: 'resource-ingestion', href: '/docs/architecture/resource-ingestion' },
+          { title: 'Issue Triage', slug: 'issue-triage', href: '/docs/architecture/issue-triage' },
+        ],
+      },
+      {
+        title: 'Execution',
+        href: '/docs/architecture/support-agent',
+        items: [
+          { title: 'Support Agent', slug: 'support-agent', href: '/docs/architecture/support-agent' },
+          { title: 'PM Copilot', slug: 'pm-copilot', href: '/docs/architecture/pm-copilot' },
+          { title: 'Interfaces', slug: 'interfaces', href: '/docs/architecture/interfaces' },
+        ],
+      },
     ],
   },
   {
@@ -138,6 +106,15 @@ export const DOCS_NAV: DocNavCategory[] = [
           { title: 'Custom Hook', slug: 'widget-custom-hook', href: '/docs/integrations/widget-custom-hook' },
         ],
       },
+    ],
+  },
+  {
+    title: 'Examples',
+    slug: 'examples',
+    description: 'End-to-end workflow examples showcasing autonomous product agents.',
+    items: [
+      { title: 'Autonomous Q2 Planning', slug: 'autonomous-q2-planning', href: '/docs/examples/autonomous-q2-planning' },
+      { title: 'Churn Pattern Investigation', slug: 'churn-pattern-investigation', href: '/docs/examples/churn-pattern-investigation' },
     ],
   },
 ]

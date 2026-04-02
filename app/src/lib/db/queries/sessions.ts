@@ -5,6 +5,7 @@
 import {
   eq,
   and,
+  or,
   desc,
   sql,
   count as countFn,
@@ -12,6 +13,7 @@ import {
   ilike,
   gte,
   lte,
+  isNull,
   isNotNull,
 } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
@@ -23,7 +25,7 @@ import {
   issues,
 } from '@/lib/db/schema/app'
 import { sanitizeSearchInput, dateToIso } from '@/lib/db/server'
-import { setSessionContact, setEntityProductScope, getSessionLinkedIssueIds, getRelatedIds } from '@/lib/db/queries/entity-relationships'
+import { setSessionContact, setEntityProductScope, getSessionLinkedIssueIds, getRelatedIds, batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
 import { ensureSessionName } from '@/lib/sessions/name-generator'
 import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-notifications'
 import type {
@@ -47,17 +49,15 @@ export function rowToSessionRecord(row: typeof sessions.$inferSelect): SessionRe
   return {
     ...row,
     user_metadata: row.user_metadata as Record<string, string> | null,
-    analysis_status: (row.analysis_status ?? 'pending') as SessionRecord['analysis_status'],
     source: (row.source ?? 'widget') as SessionSource,
     session_type: (row.session_type ?? 'chat') as SessionType,
     message_count: row.message_count ?? 0,
     status: (row.status ?? 'active') as SessionRecord['status'],
     tags: (row.tags ?? []) as SessionTag[],
     custom_fields: (row.custom_fields as Record<string, unknown>) ?? {},
-    tags_auto_applied_at: dateToIso(row.tags_auto_applied_at),
+    base_processed_at: dateToIso(row.base_processed_at),
     first_message_at: dateToIso(row.first_message_at),
     last_activity_at: row.last_activity_at?.toISOString() ?? new Date().toISOString(),
-    pm_reviewed_at: dateToIso(row.pm_reviewed_at),
     goodbye_detected_at: dateToIso(row.goodbye_detected_at),
     idle_prompt_sent_at: dateToIso(row.idle_prompt_sent_at),
     scheduled_close_at: dateToIso(row.scheduled_close_at),
@@ -219,7 +219,7 @@ function buildSessionFilterConditions(filters: SessionFilters): SQL[] {
     )
   }
   if (filters.isAnalyzed) {
-    conditions.push(eq(sessions.analysis_status, 'analyzed'))
+    conditions.push(isNotNull(sessions.base_processed_at))
   }
   if (filters.productScopeIds && filters.productScopeIds.length > 0) {
     conditions.push(
@@ -252,60 +252,18 @@ export async function listSessions(
   filters: SessionFilters
 ): Promise<{ sessions: SessionWithProject[]; total: number }> {
   try {
-    // Search across message content, session name, and contact name via database RPC
+    // Build conditions array (with optional search ILIKE on name/description)
+    const conditions: SQL[] = [eq(sessions.project_id, projectId), ...buildSessionFilterConditions(filters)]
+
     if (filters.search && filters.search.trim().length >= 2) {
-      const searchTerm = filters.search.trim()
-      const sanitized = sanitizeSearchInput(searchTerm)
-      const limit = filters.limit ?? 50
-      const offset = filters.offset ?? 0
-
-      // Phase 1: RPC handles search + filters + pagination
-      const searchResults = await db.execute<{ session_id: string; total_count: number }>(sql`
-        SELECT * FROM search_sessions_multi(
-          p_project_id := ${projectId}::uuid,
-          p_query := ${searchTerm},
-          p_query_like := ${sanitized},
-          p_status := ${filters.status || null},
-          p_source := ${filters.source || null},
-          p_session_type := ${filters.sessionType || null},
-          p_is_human_takeover := ${filters.isHumanTakeover || null}::boolean,
-          p_is_archived := ${filters.showArchived ?? false},
-          p_is_analyzed := ${filters.isAnalyzed || null}::boolean,
-          p_tags := ${filters.tags && filters.tags.length > 0 ? filters.tags : null}::text[],
-          p_date_from := ${filters.dateFrom || null}::timestamptz,
-          p_date_to := ${filters.dateTo || null}::timestamptz,
-          p_contact_id := ${filters.contactId || null}::uuid,
-          p_company_id := ${filters.companyId || null}::uuid,
-          p_product_area_ids := ${filters.productScopeIds && filters.productScopeIds.length > 0 ? filters.productScopeIds : null}::uuid[],
-          p_limit := ${limit},
-          p_offset := ${offset}
-        )
-      `)
-
-      if (!searchResults.rows || searchResults.rows.length === 0) {
-        return { sessions: [], total: 0 }
-      }
-
-      const matchedIds = searchResults.rows.map((r) => r.session_id)
-      const totalCount = searchResults.rows[0].total_count
-
-      // Phase 2: Fetch full session data for this page of IDs
-      const results = await db.query.sessions.findMany({
-        where: inArray(sessions.id, matchedIds),
-        with: {
-          project: { columns: { id: true, name: true } },
-        },
-        orderBy: [desc(sessions.last_activity_at)],
-      })
-
-      // Batch-fetch contacts and issue counts from entity_relationships
-      const enrichedResults = await enrichSessionsWithEntityRelationships(results)
-      const mapped = enrichedResults.map((r) => toSessionWithProject(r))
-      return { sessions: mapped, total: Number(totalCount) }
+      const sanitized = sanitizeSearchInput(filters.search.trim())
+      const s = `%${sanitized}%`
+      const searchCondition = or(
+        ilike(sessions.name, s),
+        ilike(sessions.description, s)
+      )
+      if (searchCondition) conditions.push(searchCondition)
     }
-
-    // Build conditions array for non-search queries
-    const conditions = [eq(sessions.project_id, projectId), ...buildSessionFilterConditions(filters)]
 
     if (filters.companyId) {
       conditions.push(
@@ -378,18 +336,23 @@ export async function getSessionById(sessionId: string): Promise<SessionWithProj
     ])
     let linked_issues: SessionLinkedIssue[] = []
     if (linkedIssueIds.length > 0) {
-      const issueRows = await db
-        .select({
-          id: issues.id,
-          title: issues.title,
-          type: issues.type,
-          status: issues.status,
-          upvote_count: issues.upvote_count,
-          priority: issues.priority,
-        })
-        .from(issues)
-        .where(inArray(issues.id, linkedIssueIds))
-      linked_issues = issueRows as SessionLinkedIssue[]
+      const [issueRows, sessionCounts] = await Promise.all([
+        db
+          .select({
+            id: issues.id,
+            name: issues.name,
+            type: issues.type,
+            status: issues.status,
+            priority: issues.priority,
+          })
+          .from(issues)
+          .where(inArray(issues.id, linkedIssueIds)),
+        batchGetIssueSessionCounts(linkedIssueIds),
+      ])
+      linked_issues = issueRows.map((row) => ({
+        ...row,
+        session_count: sessionCounts.get(row.id) ?? 0,
+      })) as SessionLinkedIssue[]
     }
     let contactData: SessionWithProject['contact'] = null
     const contactId = contactIds.length > 0 ? contactIds[0] : null
@@ -469,17 +432,12 @@ export async function getProjectSessions(projectId: string, limit = 5): Promise<
 export async function updateSessionTags(
   sessionId: string,
   tags: string[],
-  autoApplied = false
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const now = new Date()
     const updates: Record<string, unknown> = {
       tags,
       updated_at: now,
-    }
-
-    if (autoApplied) {
-      updates.tags_auto_applied_at = now
     }
 
     await db.update(sessions).set(updates).where(eq(sessions.id, sessionId))
@@ -610,6 +568,7 @@ export async function updateSession(
     }
 
     if (input.name !== undefined) updates.name = input.name
+    if (input.description !== undefined) updates.description = input.description
     if (input.status !== undefined) updates.status = input.status
     if (input.user_metadata !== undefined) updates.user_metadata = input.user_metadata
     if (input.is_human_takeover !== undefined) {
@@ -638,6 +597,12 @@ export async function updateSession(
       const { fireEmbedding } = await import('@/lib/utils/embeddings')
       const { buildSessionEmbeddingText } = await import('@/lib/sessions/embedding-service')
       fireEmbedding(sessionId, 'session', result.project_id, buildSessionEmbeddingText(result.name, result.description))
+    }
+
+    // Fire session processing when status transitions to closed (fire-and-forget)
+    if (input.status === 'closed') {
+      const { fireSessionProcessing } = await import('@/lib/utils/session-processing')
+      fireSessionProcessing(sessionId, result.project_id)
     }
 
     return result
@@ -701,7 +666,7 @@ export async function getPendingPMReviews(
   try {
     const whereClause = and(
       eq(sessions.project_id, projectId),
-      eq(sessions.analysis_status, 'pending'),
+      isNull(sessions.base_processed_at),
       eq(sessions.status, 'closed'),
       eq(sessions.is_archived, false),
     )

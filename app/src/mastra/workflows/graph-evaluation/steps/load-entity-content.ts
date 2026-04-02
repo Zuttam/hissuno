@@ -43,10 +43,10 @@ export async function loadEntityContent(
     case 'issue': {
       const row = await db.query.issues.findFirst({
         where: eq(issues.id, entityId),
-        columns: { title: true, description: true },
+        columns: { name: true, description: true },
       })
-      entityName = row?.title || 'Unnamed issue'
-      const text = [row?.title, row?.description].filter(Boolean).join('\n\n')
+      entityName = row?.name || 'Unnamed issue'
+      const text = [row?.name, row?.description].filter(Boolean).join('\n\n')
       contentForSearch = text.slice(0, 3000)
       contentForTextMatch = text
       break

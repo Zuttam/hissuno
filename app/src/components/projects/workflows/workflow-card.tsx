@@ -9,11 +9,12 @@ interface WorkflowCardProps {
   description: string
   steps: string[]
   onClick: () => void
+  enabled?: boolean
 }
 
-export function WorkflowCard({ icon, title, description, steps, onClick }: WorkflowCardProps) {
+export function WorkflowCard({ icon, title, description, steps, onClick, enabled = true }: WorkflowCardProps) {
   return (
-    <Card className="cursor-pointer transition hover:border-[color:var(--accent-selected)]">
+    <Card className={`cursor-pointer transition hover:border-[color:var(--accent-selected)] ${!enabled ? 'opacity-60' : ''}`}>
       <div
         onClick={onClick}
         role="button"
@@ -27,10 +28,17 @@ export function WorkflowCard({ icon, title, description, steps, onClick }: Workf
       >
         <div className="flex items-start gap-3 mb-4">
           <span className="text-2xl">{icon}</span>
-          <div>
-            <Heading as="h3" size="subsection">
-              {title}
-            </Heading>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Heading as="h3" size="subsection">
+                {title}
+              </Heading>
+              {!enabled && (
+                <span className="rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-[color:var(--text-tertiary)] bg-[color:var(--surface-hover)]">
+                  Off
+                </span>
+              )}
+            </div>
             <p className="text-sm text-[color:var(--text-secondary)] mt-0.5">{description}</p>
           </div>
         </div>

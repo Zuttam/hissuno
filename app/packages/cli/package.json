@@ -14,7 +14,7 @@
     "README.md"
   ],
   "scripts": {
-    "prebuild": "rm -rf skills && cp -r ../skills/hissuno skills",
+    "prebuild": "rm -rf skills && cp -r ../skills skills",
     "build": "tsup",
     "dev": "tsup --watch",
     "prepublishOnly": "npm run build",

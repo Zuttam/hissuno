@@ -29,10 +29,15 @@ const {
   mockSearchIssues,
   mockSearchCustomers,
   mockSearchKnowledge,
+  mockSearchScopes,
   mockCreateSessionAdmin,
   mockCreateIssueAdmin,
   mockCreateContactAdmin,
   mockCreateCompanyAdmin,
+  mockCreateProductScopeAdmin,
+  mockListProjectProductScopes,
+  mockGetProductScopeById,
+  mockGenerateSlugFromName,
   mockDb,
 } = vi.hoisted(() => ({
   mockGetContext: vi.fn<() => McpContext>(),
@@ -46,10 +51,15 @@ const {
   mockSearchIssues: vi.fn(),
   mockSearchCustomers: vi.fn(),
   mockSearchKnowledge: vi.fn(),
+  mockSearchScopes: vi.fn(),
   mockCreateSessionAdmin: vi.fn(),
   mockCreateIssueAdmin: vi.fn(),
   mockCreateContactAdmin: vi.fn(),
   mockCreateCompanyAdmin: vi.fn(),
+  mockCreateProductScopeAdmin: vi.fn(),
+  mockListProjectProductScopes: vi.fn(),
+  mockGetProductScopeById: vi.fn(),
+  mockGenerateSlugFromName: vi.fn((name: string) => name.toLowerCase().replace(/\s+/g, '_')),
   mockDb: {
     select: vi.fn().mockReturnThis(),
     from: vi.fn().mockReturnThis(),
@@ -80,7 +90,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/db/schema/app', () => ({
   sessions: { id: 'sessions.id', name: 'sessions.name', project_id: 'sessions.project_id', source: 'sessions.source', status: 'sessions.status', message_count: 'sessions.message_count', tags: 'sessions.tags', created_at: 'sessions.created_at', last_activity_at: 'sessions.last_activity_at' },
   sessionMessages: { session_id: 'sessionMessages.session_id', sender_type: 'sessionMessages.sender_type', content: 'sessionMessages.content', created_at: 'sessionMessages.created_at' },
-  issues: { id: 'issues.id', title: 'issues.title', description: 'issues.description', type: 'issues.type', priority: 'issues.priority', status: 'issues.status', upvote_count: 'issues.upvote_count', created_at: 'issues.created_at', updated_at: 'issues.updated_at', project_id: 'issues.project_id', is_archived: 'issues.is_archived' },
+  issues: { id: 'issues.id', name: 'issues.name', description: 'issues.description', type: 'issues.type', priority: 'issues.priority', status: 'issues.status', session_count: 'issues.session_count', created_at: 'issues.created_at', updated_at: 'issues.updated_at', project_id: 'issues.project_id', is_archived: 'issues.is_archived' },
   contacts: { id: 'contacts.id', name: 'contacts.name', email: 'contacts.email', role: 'contacts.role', title: 'contacts.title', phone: 'contacts.phone', is_champion: 'contacts.is_champion', notes: 'contacts.notes', last_contacted_at: 'contacts.last_contacted_at', company_id: 'contacts.company_id', project_id: 'contacts.project_id', is_archived: 'contacts.is_archived' },
   companies: { id: 'companies.id', name: 'companies.name', domain: 'companies.domain', project_id: 'companies.project_id' },
   knowledgeSources: { id: 'knowledgeSources.id', name: 'knowledgeSources.name', type: 'knowledgeSources.type', description: 'knowledgeSources.description', analyzed_content: 'knowledgeSources.analyzed_content', analyzed_at: 'knowledgeSources.analyzed_at', status: 'knowledgeSources.status', project_id: 'knowledgeSources.project_id', created_at: 'knowledgeSources.created_at', enabled: 'knowledgeSources.enabled' },
@@ -138,6 +148,20 @@ vi.mock('@/lib/customers/customers-service', () => ({
 
 vi.mock('@/lib/knowledge/knowledge-service', () => ({
   searchKnowledge: (...args: unknown[]) => mockSearchKnowledge(...args),
+}))
+
+vi.mock('@/lib/db/queries/product-scopes', () => ({
+  listProjectProductScopes: (...args: unknown[]) => mockListProjectProductScopes(...args),
+  getProductScopeById: (...args: unknown[]) => mockGetProductScopeById(...args),
+}))
+
+vi.mock('@/lib/product-scopes/product-scopes-service', () => ({
+  searchScopes: (...args: unknown[]) => mockSearchScopes(...args),
+  createProductScopeAdmin: (...args: unknown[]) => mockCreateProductScopeAdmin(...args),
+}))
+
+vi.mock('@/lib/security/sanitize', () => ({
+  generateSlugFromName: (name: string) => mockGenerateSlugFromName(name),
 }))
 
 // ============================================================================
@@ -211,7 +235,7 @@ describe('MCP Resource Tools', () => {
   // --------------------------------------------------------------------------
 
   describe('list_resource_types', () => {
-    it('returns all 4 resource types', async () => {
+    it('returns all 5 resource types', async () => {
       const result = await capturedHandlers.list_resource_types({})
 
       expect(result.isError).toBeUndefined()
@@ -220,6 +244,7 @@ describe('MCP Resource Tools', () => {
       expect(text).toContain('feedback')
       expect(text).toContain('issues')
       expect(text).toContain('customers')
+      expect(text).toContain('scopes')
     })
   })
 
@@ -233,11 +258,11 @@ describe('MCP Resource Tools', () => {
       mockListIssuesInternal.mockResolvedValue({
         issues: [{
           id: 'i-1',
-          title: 'Login bug',
+          name: 'Login bug',
           type: 'bug',
           priority: 'high',
           status: 'open',
-          upvote_count: 0,
+          session_count: 0,
           updated_at: '2024-01-01',
         }],
         total: 1,
@@ -259,6 +284,46 @@ describe('MCP Resource Tools', () => {
       expect(result.isError).toBeUndefined()
       expect(result.content[0].text).toContain('Login bug')
       expect(result.content[0].text).toContain('i-1')
+    })
+
+    it('lists scopes with type filter', async () => {
+      mockGetContext.mockReturnValue(userContext())
+      mockListProjectProductScopes.mockResolvedValue([
+        {
+          id: 's-1',
+          name: 'Payments',
+          slug: 'payments',
+          description: 'Payment processing',
+          type: 'product_area',
+          color: 'blue',
+          position: 0,
+          is_default: false,
+          goals: null,
+          updated_at: '2024-01-01',
+        },
+        {
+          id: 's-2',
+          name: 'Q1 Launch',
+          slug: 'q1_launch',
+          description: 'Q1 initiative',
+          type: 'initiative',
+          color: '',
+          position: 1,
+          is_default: false,
+          goals: null,
+          updated_at: '2024-01-02',
+        },
+      ])
+
+      const result = await capturedHandlers.list_resources({
+        type: 'scopes',
+        filters: { type: 'product_area' },
+      })
+
+      expect(mockListProjectProductScopes).toHaveBeenCalledWith('proj-1')
+      expect(result.isError).toBeUndefined()
+      expect(result.content[0].text).toContain('Payments')
+      expect(result.content[0].text).not.toContain('Q1 Launch')
     })
 
     it('returns error when query function throws', async () => {
@@ -284,12 +349,12 @@ describe('MCP Resource Tools', () => {
       // db.select()...where() for session links, then batchGetSessionContacts
       const mockIssue = {
         id: 'i-1',
-        title: 'Login Bug',
+        name: 'Login Bug',
         description: 'Users cannot log in.',
         type: 'bug',
         priority: 'high',
         status: 'open',
-        upvote_count: 3,
+        session_count: 3,
         created_at: new Date('2024-01-01'),
         updated_at: new Date('2024-01-02'),
       }
@@ -303,6 +368,34 @@ describe('MCP Resource Tools', () => {
 
       expect(result.isError).toBeUndefined()
       expect(result.content[0].text).toContain('# Login Bug')
+    })
+
+    it('returns markdown for a scope', async () => {
+      mockGetContext.mockReturnValue(userContext())
+      mockGetProductScopeById.mockResolvedValue({
+        id: 's-1',
+        project_id: 'proj-1',
+        name: 'Payments',
+        slug: 'payments',
+        description: 'Payment processing area',
+        type: 'product_area',
+        color: 'blue',
+        position: 0,
+        is_default: false,
+        goals: [{ id: 'g-1', text: 'Reduce churn by 10%' }],
+        created_at: '2024-01-01',
+        updated_at: '2024-01-02',
+      })
+
+      const result = await capturedHandlers.get_resource({ type: 'scopes', id: 's-1' })
+
+      expect(result.isError).toBeUndefined()
+      const text = result.content[0].text
+      expect(text).toContain('# Payments')
+      expect(text).toContain('payments')
+      expect(text).toContain('product_area')
+      expect(text).toContain('Payment processing area')
+      expect(text).toContain('Reduce churn by 10%')
     })
 
     it('returns error when resource is not found', async () => {
@@ -343,7 +436,7 @@ describe('MCP Resource Tools', () => {
       expect(result.content[0].text).toContain('85%')
     })
 
-    it('searches all 4 types in parallel when no type specified', async () => {
+    it('searches all 5 types in parallel when no type specified', async () => {
       mockGetContext.mockReturnValue(userContext())
       mockSearchKnowledge.mockResolvedValue([
         { id: 'k-1', name: 'Auth docs', snippet: 'Setup auth', score: 0.9 },
@@ -355,6 +448,7 @@ describe('MCP Resource Tools', () => {
         { id: 'i-1', name: 'Auth bug', snippet: 'Login fails', score: 0.7 },
       ])
       mockSearchCustomers.mockResolvedValue([])
+      mockSearchScopes.mockResolvedValue([])
 
       const result = await capturedHandlers.search_resources({ query: 'auth' })
 
@@ -362,6 +456,7 @@ describe('MCP Resource Tools', () => {
       expect(mockSearchSessions).toHaveBeenCalled()
       expect(mockSearchIssues).toHaveBeenCalled()
       expect(mockSearchCustomers).toHaveBeenCalled()
+      expect(mockSearchScopes).toHaveBeenCalled()
 
       const text = result.content[0].text
       expect(text).toContain('3 results')
@@ -381,6 +476,7 @@ describe('MCP Resource Tools', () => {
       ])
       mockSearchIssues.mockResolvedValue([])
       mockSearchCustomers.mockResolvedValue([])
+      mockSearchScopes.mockResolvedValue([])
 
       const result = await capturedHandlers.search_resources({ query: 'test' })
 
@@ -399,18 +495,18 @@ describe('MCP Resource Tools', () => {
     it('creates resource in user mode', async () => {
       mockGetContext.mockReturnValue(userContext())
       mockCreateIssueAdmin.mockResolvedValue({
-        issue: { id: 'i-new', title: 'New Bug' },
+        issue: { id: 'i-new', name: 'New Bug' },
       })
 
       const result = await capturedHandlers.add_resource({
         type: 'issues',
-        data: { type: 'bug', title: 'New Bug', description: 'Something broke' },
+        data: { type: 'bug', name: 'New Bug', description: 'Something broke' },
       })
 
       expect(mockCreateIssueAdmin).toHaveBeenCalledWith({
         projectId: 'proj-1',
         type: 'bug',
-        title: 'New Bug',
+        name: 'New Bug',
         description: 'Something broke',
         priority: undefined,
       })
@@ -424,12 +520,38 @@ describe('MCP Resource Tools', () => {
 
       const result = await capturedHandlers.add_resource({
         type: 'issues',
-        data: { type: 'bug', title: 'Test', description: 'desc' },
+        data: { type: 'bug', name: 'Test', description: 'desc' },
       })
 
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('not available in contact mode')
       expect(mockCreateIssueAdmin).not.toHaveBeenCalled()
+    })
+
+    it('creates scope with auto-generated slug', async () => {
+      mockGetContext.mockReturnValue(userContext())
+      mockCreateProductScopeAdmin.mockResolvedValue({
+        id: 's-new',
+        name: 'User Onboarding',
+      })
+
+      const result = await capturedHandlers.add_resource({
+        type: 'scopes',
+        data: { name: 'User Onboarding', description: 'Onboarding flow' },
+      })
+
+      expect(mockGenerateSlugFromName).toHaveBeenCalledWith('User Onboarding')
+      expect(mockCreateProductScopeAdmin).toHaveBeenCalledWith('proj-1', {
+        name: 'User Onboarding',
+        slug: 'user_onboarding',
+        description: 'Onboarding flow',
+        color: undefined,
+        type: undefined,
+        goals: null,
+      })
+      expect(result.isError).toBeUndefined()
+      expect(result.content[0].text).toContain('User Onboarding')
+      expect(result.content[0].text).toContain('s-new')
     })
 
     it('surfaces validation error from inline validation', async () => {
@@ -442,7 +564,7 @@ describe('MCP Resource Tools', () => {
 
       expect(result.isError).toBe(true)
       expect(result.content[0].text).toContain('Validation error')
-      expect(result.content[0].text).toContain('"title" is required')
+      expect(result.content[0].text).toContain('"name" is required')
     })
   })
 })

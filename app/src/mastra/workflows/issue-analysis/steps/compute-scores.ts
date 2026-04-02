@@ -45,7 +45,7 @@ export const computeScores = createStep({
     // 1. Compute reach
     const reach = computeReach({
       sessionTimestamps: sessionTimestamps.map((t) => new Date(t)),
-      upvoteCount: issue.upvoteCount,
+      sessionCount: issue.sessionCount,
     })
     logger?.info('[compute-scores] Reach computed', { score: reach.score })
 

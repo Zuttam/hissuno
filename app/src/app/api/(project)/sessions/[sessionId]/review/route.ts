@@ -41,9 +41,14 @@ export interface SessionReviewResult {
   tags: SessionTag[]
   tagsApplied: boolean
   // PM Review
-  action: 'created' | 'upvoted' | 'skipped'
+  action: 'created' | 'linked' | 'skipped'
   issueId?: string
-  issueTitle?: string
+  issueName?: string
+  issueResults?: Array<{
+    action: 'created' | 'linked' | 'skipped'
+    issueId?: string
+    issueName?: string
+  }>
   skipReason?: string
 }
 

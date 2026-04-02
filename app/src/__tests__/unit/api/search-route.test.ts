@@ -60,6 +60,7 @@ const mockSearchSessions = vi.fn()
 const mockSearchIssues = vi.fn()
 const mockSearchCustomers = vi.fn()
 const mockSearchKnowledge = vi.fn()
+const mockSearchScopes = vi.fn()
 
 vi.mock('@/lib/sessions/sessions-service', () => ({
   searchSessions: (...args: unknown[]) => mockSearchSessions(...args),
@@ -75,6 +76,10 @@ vi.mock('@/lib/customers/customers-service', () => ({
 
 vi.mock('@/lib/knowledge/knowledge-service', () => ({
   searchKnowledge: (...args: unknown[]) => mockSearchKnowledge(...args),
+}))
+
+vi.mock('@/lib/product-scopes/product-scopes-service', () => ({
+  searchScopes: (...args: unknown[]) => mockSearchScopes(...args),
 }))
 
 // ---------------------------------------------------------------------------
@@ -175,7 +180,8 @@ describe('GET /api/search', () => {
     expect(body.results[0].id).toBe('i-1')
     expect(body.total).toBe(1)
 
-    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'login', 10)
+    const defaultOpts = { mode: undefined, threshold: undefined }
+    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'login', 10, defaultOpts)
     expect(mockSearchKnowledge).not.toHaveBeenCalled()
     expect(mockSearchSessions).not.toHaveBeenCalled()
     expect(mockSearchCustomers).not.toHaveBeenCalled()
@@ -195,6 +201,7 @@ describe('GET /api/search', () => {
       { id: 'i-1', name: 'Login bug', snippet: 'Cannot login', score: 0.95 },
     ])
     mockSearchCustomers.mockResolvedValue([])
+    mockSearchScopes.mockResolvedValue([])
 
     const res = await GET(makeRequest({ projectId: 'p-1', q: 'login' }))
     expect(res.status).toBe(200)
@@ -207,10 +214,12 @@ describe('GET /api/search', () => {
     expect(body.total).toBe(2)
 
     // All service functions were called
-    expect(mockSearchKnowledge).toHaveBeenCalledWith('p-1', 'login', 10)
-    expect(mockSearchSessions).toHaveBeenCalledWith('p-1', 'login', 10)
-    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'login', 10)
-    expect(mockSearchCustomers).toHaveBeenCalledWith('p-1', 'login', 10)
+    const defaultOpts = { mode: undefined, threshold: undefined }
+    expect(mockSearchKnowledge).toHaveBeenCalledWith('p-1', 'login', 10, defaultOpts)
+    expect(mockSearchSessions).toHaveBeenCalledWith('p-1', 'login', 10, defaultOpts)
+    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'login', 10, defaultOpts)
+    expect(mockSearchCustomers).toHaveBeenCalledWith('p-1', 'login', 10, defaultOpts)
+    expect(mockSearchScopes).toHaveBeenCalledWith('p-1', 'login', 10, defaultOpts)
   })
 
   it('respects limit parameter', async () => {
@@ -218,7 +227,7 @@ describe('GET /api/search', () => {
     mockSearchIssues.mockResolvedValue([])
 
     await GET(makeRequest({ projectId: 'p-1', q: 'test', type: 'issues', limit: '5' }))
-    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'test', 5)
+    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'test', 5, { mode: undefined, threshold: undefined })
   })
 
   it('caps limit at 20', async () => {
@@ -226,7 +235,7 @@ describe('GET /api/search', () => {
     mockSearchIssues.mockResolvedValue([])
 
     await GET(makeRequest({ projectId: 'p-1', q: 'test', type: 'issues', limit: '100' }))
-    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'test', 20)
+    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'test', 20, { mode: undefined, threshold: undefined })
   })
 
   it('handles service failures gracefully in cross-type search', async () => {
@@ -237,6 +246,7 @@ describe('GET /api/search', () => {
     ])
     mockSearchIssues.mockResolvedValue([])
     mockSearchCustomers.mockResolvedValue([])
+    mockSearchScopes.mockResolvedValue([])
 
     const res = await GET(makeRequest({ projectId: 'p-1', q: 'login' }))
     expect(res.status).toBe(200)
@@ -245,5 +255,96 @@ describe('GET /api/search', () => {
     // Knowledge failed but others succeeded
     expect(body.results).toHaveLength(1)
     expect(body.results[0].id).toBe('f-1')
+  })
+
+  it('searches scopes when type is specified', async () => {
+    setupAuth()
+    mockSearchScopes.mockResolvedValue([
+      { id: 's-1', name: 'Payments', snippet: 'Payment processing', score: 0.85 },
+    ])
+
+    const res = await GET(makeRequest({ projectId: 'p-1', q: 'payments', type: 'scopes' }))
+    expect(res.status).toBe(200)
+
+    const body = await res.json()
+    expect(body.results).toHaveLength(1)
+    expect(body.results[0].type).toBe('scopes')
+    expect(body.results[0].name).toBe('Payments')
+    expect(mockSearchScopes).toHaveBeenCalledWith('p-1', 'payments', 10, { mode: undefined, threshold: undefined })
+  })
+
+  // -----------------------------------------------------------------------
+  // Mode parameter
+  // -----------------------------------------------------------------------
+
+  it('returns 400 for invalid mode parameter', async () => {
+    setupAuth()
+    const res = await GET(makeRequest({ projectId: 'p-1', q: 'test', mode: 'invalid' }))
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain('mode')
+  })
+
+  it('passes mode parameter to service functions', async () => {
+    setupAuth()
+    mockSearchIssues.mockResolvedValue([
+      { id: 'i-1', name: 'Bug', snippet: 'desc', score: 0.9 },
+    ])
+
+    const res = await GET(makeRequest({ projectId: 'p-1', q: 'test', type: 'issues', mode: 'keyword' }))
+    expect(res.status).toBe(200)
+    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'test', 10, { mode: 'keyword', threshold: undefined })
+  })
+
+  it('passes both mode to all services in cross-type search', async () => {
+    setupAuth()
+    mockSearchKnowledge.mockResolvedValue([])
+    mockSearchSessions.mockResolvedValue([])
+    mockSearchIssues.mockResolvedValue([])
+    mockSearchCustomers.mockResolvedValue([])
+    mockSearchScopes.mockResolvedValue([])
+
+    await GET(makeRequest({ projectId: 'p-1', q: 'test', mode: 'both' }))
+
+    const opts = { mode: 'both', threshold: undefined }
+    expect(mockSearchKnowledge).toHaveBeenCalledWith('p-1', 'test', 10, opts)
+    expect(mockSearchSessions).toHaveBeenCalledWith('p-1', 'test', 10, opts)
+    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'test', 10, opts)
+    expect(mockSearchCustomers).toHaveBeenCalledWith('p-1', 'test', 10, opts)
+    expect(mockSearchScopes).toHaveBeenCalledWith('p-1', 'test', 10, opts)
+  })
+
+  // -----------------------------------------------------------------------
+  // Threshold parameter
+  // -----------------------------------------------------------------------
+
+  it('returns 400 for invalid threshold parameter', async () => {
+    setupAuth()
+    const res = await GET(makeRequest({ projectId: 'p-1', q: 'test', threshold: '1.5' }))
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toContain('threshold')
+  })
+
+  it('returns 400 for non-numeric threshold', async () => {
+    setupAuth()
+    const res = await GET(makeRequest({ projectId: 'p-1', q: 'test', threshold: 'abc' }))
+    expect(res.status).toBe(400)
+  })
+
+  it('passes threshold parameter to service functions', async () => {
+    setupAuth()
+    mockSearchIssues.mockResolvedValue([])
+
+    await GET(makeRequest({ projectId: 'p-1', q: 'test', type: 'issues', threshold: '0.3' }))
+    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'test', 10, { mode: undefined, threshold: 0.3 })
+  })
+
+  it('passes both mode and threshold together', async () => {
+    setupAuth()
+    mockSearchIssues.mockResolvedValue([])
+
+    await GET(makeRequest({ projectId: 'p-1', q: 'test', type: 'issues', mode: 'semantic', threshold: '0.7' }))
+    expect(mockSearchIssues).toHaveBeenCalledWith('p-1', 'test', 10, { mode: 'semantic', threshold: 0.7 })
   })
 })

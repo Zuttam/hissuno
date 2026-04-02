@@ -1,51 +1,15 @@
-import { fetchApi, fetchApiRaw, buildUrl } from './fetch'
+import { fetchApi, buildUrl } from './fetch'
 import type {
-  CustomFieldDefinition,
-  CustomerEntityType,
-  CreateCustomFieldInput,
-  UpdateCustomFieldInput,
   CustomersStripAnalytics,
   CSVImportMapping,
   CSVImportResult,
 } from '@/types/customer'
+import type { EntityType } from '@/lib/db/queries/types'
 
 const paths = {
-  customFields: '/api/settings/customers/custom-fields',
-  customField: (fieldId: string) => `/api/settings/customers/custom-fields/${fieldId}`,
-
   importUpload: '/api/contacts/import/upload',
   importParse: '/api/contacts/import/parse',
   import: '/api/contacts/import',
-}
-
-export async function listCustomFields(projectId: string, entityType?: CustomerEntityType): Promise<CustomFieldDefinition[]> {
-  const url = buildUrl(paths.customFields, { projectId, entity_type: entityType })
-  const { fields } = await fetchApi<{ fields: CustomFieldDefinition[] }>(url, {
-    errorMessage: 'Failed to load custom fields.',
-  })
-  return fields ?? []
-}
-
-export async function createCustomField(projectId: string, input: CreateCustomFieldInput): Promise<CustomFieldDefinition> {
-  const { field } = await fetchApi<{ field: CustomFieldDefinition }>(buildUrl(paths.customFields, { projectId }), {
-    method: 'POST',
-    body: input,
-    errorMessage: 'Failed to create custom field.',
-  })
-  return field
-}
-
-export async function updateCustomField(projectId: string, fieldId: string, updates: UpdateCustomFieldInput): Promise<CustomFieldDefinition> {
-  const { field } = await fetchApi<{ field: CustomFieldDefinition }>(buildUrl(paths.customField(fieldId), { projectId }), {
-    method: 'PATCH',
-    body: updates,
-    errorMessage: 'Failed to update custom field.',
-  })
-  return field
-}
-
-export async function deleteCustomField(projectId: string, fieldId: string): Promise<void> {
-  await fetchApiRaw(buildUrl(paths.customField(fieldId), { projectId }), { method: 'DELETE' })
 }
 
 export async function getCustomerAnalytics(projectId: string): Promise<CustomersStripAnalytics | null> {
@@ -105,7 +69,7 @@ export async function directImportUpload(projectId: string, file: File) {
   )
 }
 
-export async function parseImportCSV(projectId: string, storagePath: string, entityType: CustomerEntityType) {
+export async function parseImportCSV(projectId: string, storagePath: string, entityType: EntityType) {
   return fetchApi<{ rowCount: number; sampleRows: Record<string, string>[]; suggestedMappings: CSVImportMapping[] }>(
     buildUrl(paths.importParse, { projectId }),
     { method: 'POST', body: { storagePath, entityType }, errorMessage: 'Failed to parse CSV.' },
@@ -115,7 +79,7 @@ export async function parseImportCSV(projectId: string, storagePath: string, ent
 export async function executeImport(
   projectId: string,
   storagePath: string,
-  entityType: CustomerEntityType,
+  entityType: EntityType,
   mappings: CSVImportMapping[],
   createMissingCompanies: boolean,
 ) {

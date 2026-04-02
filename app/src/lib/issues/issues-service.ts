@@ -18,10 +18,7 @@ import {
   insertIssue,
   updateIssueById,
   deleteIssueById,
-  updateIssueUpvote,
   linkSessionToIssue,
-  markSessionPMReviewed,
-  getIssueForUpvote,
   getIssueForEmbedding,
   updateIssueArchiveStatusById,
   getIssueProjectId,
@@ -30,18 +27,20 @@ import {
 import { getProjectById } from '@/lib/db/queries/projects'
 import { searchSimilarIssues, buildIssueEmbeddingText } from './embedding-service'
 import { fireEmbedding } from '@/lib/utils/embeddings'
-import { searchWithFallback } from '@/lib/search/search-with-fallback'
+import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import { db } from '@/lib/db'
 import { eq, and, desc, ilike, or } from 'drizzle-orm'
 import { issues } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
+import { linkEntities } from '@/lib/db/queries/entity-relationships'
+import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings'
+import { triggerIssueAnalysis } from './analysis-service'
 import type {
   IssueRecord,
   IssueWithProject,
   CreateIssueInput,
   UpdateIssueInput,
   IssuePriority,
-  UpvoteResult,
 } from '@/types/issue'
 
 // ============================================================================
@@ -52,34 +51,51 @@ import type {
 export { calculateRICEScore, riceScoreToPriority } from './rice'
 
 /**
- * Calculate priority based on upvote count
- */
-export function calculatePriority(upvoteCount: number): IssuePriority {
-  if (upvoteCount >= 5) return 'high'
-  if (upvoteCount >= 3) return 'medium'
-  return 'low'
-}
-
-/**
- * Fire embedding update for an issue if title or description changed.
+ * Fire embedding update for an issue if name or description changed.
  * Uses the shared fireEmbedding() for consistent fire-and-forget pattern.
  */
 function maybeFireIssueEmbedding(
   issueId: string,
   projectId: string,
-  currentTitle: string,
+  currentName: string,
   currentDescription: string,
-  newTitle: string | undefined,
+  newName: string | undefined,
   newDescription: string | undefined
 ): void {
-  const titleChanged = newTitle !== undefined && newTitle !== currentTitle
+  const nameChanged = newName !== undefined && newName !== currentName
   const descriptionChanged = newDescription !== undefined && newDescription !== currentDescription
 
-  if (!titleChanged && !descriptionChanged) return
+  if (!nameChanged && !descriptionChanged) return
 
-  const finalTitle = newTitle ?? currentTitle
+  const finalName = newName ?? currentName
   const finalDescription = newDescription ?? currentDescription
-  fireEmbedding(issueId, 'issue', projectId, buildIssueEmbeddingText(finalTitle, finalDescription))
+  fireEmbedding(issueId, 'issue', projectId, buildIssueEmbeddingText(finalName, finalDescription))
+}
+
+/**
+ * Fire-and-forget: check the project's issue_analysis_enabled setting
+ * and kick off issue analysis via the analysis service (creates a run record).
+ * The workflow itself marks the run as completed/failed in its final step.
+ */
+function maybeFireIssueAnalysis(issueId: string, projectId: string): void {
+  void (async () => {
+    try {
+      const settings = await getPmAgentSettingsAdmin(projectId)
+      if (!settings.issue_analysis_enabled) return
+
+      const result = await triggerIssueAnalysis({ projectId, issueId })
+      if (!result.success) return
+
+      const { mastra } = await import('@/mastra')
+      const workflow = mastra.getWorkflow('issueAnalysisWorkflow')
+      if (!workflow) return
+
+      const run = await workflow.createRunAsync({ runId: result.runId })
+      void run.start({ inputData: { issueId, projectId, runId: result.runId } })
+    } catch {
+      // Non-blocking
+    }
+  })()
 }
 
 // ============================================================================
@@ -105,11 +121,10 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
   const issue = await insertIssue({
     projectId: input.project_id,
     type: input.type,
-    title: input.title,
+    name: input.name,
     description: input.description,
     priority: input.priority ?? 'low',
     priorityManualOverride: true, // Manual creation always overrides
-    upvoteCount: 1,
     status: 'open',
     productScopeId: input.product_scope_id ?? null,
     customFields: input.custom_fields ?? undefined,
@@ -122,11 +137,12 @@ export async function createIssue(input: CreateIssueInput): Promise<IssueWithPro
     }
   }
 
-  fireEmbedding(issue.id, 'issue', input.project_id, buildIssueEmbeddingText(input.title, input.description))
+  fireEmbedding(issue.id, 'issue', input.project_id, buildIssueEmbeddingText(input.name, input.description))
   fireGraphEval(input.project_id, 'issue', issue.id)
 
   return {
     ...issue,
+    session_count: 0, // New issues have no linked sessions yet
     project,
   }
 }
@@ -139,7 +155,7 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
     throw new Error('Database must be configured.')
   }
 
-  // Get project_id + current title/description in a single query
+  // Get project_id + current name/description in a single query
   const current = await getIssueForEmbedding(issueId)
   if (!current) {
     throw new Error('Issue not found.')
@@ -152,7 +168,7 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
 
   // Update embedding if text changed
   if (current) {
-    maybeFireIssueEmbedding(issueId, projectId, current.title, current.description, input.title, input.description)
+    maybeFireIssueEmbedding(issueId, projectId, current.name, current.description, input.name, input.description)
   }
 
   fireGraphEval(projectId, 'issue', issueId)
@@ -210,7 +226,7 @@ export interface CreateIssueAdminInput {
   projectId: string
   sessionId?: string
   type: 'bug' | 'feature_request' | 'change_request'
-  title: string
+  name: string
   description: string
   priority?: IssuePriority
   status?: 'open' | 'ready' | 'in_progress' | 'resolved' | 'closed'
@@ -236,11 +252,10 @@ export async function createIssueAdmin(
   const insertData: InsertIssueData = {
     projectId: input.projectId,
     type: input.type,
-    title: input.title,
+    name: input.name,
     description: input.description,
     priority: input.priority ?? 'low',
     priorityManualOverride: false, // Agent-created issues use automatic priority
-    upvoteCount: 1,
     status: input.status ?? 'open',
     productScopeId: input.productScopeId ?? null,
     customFields: input.customFields,
@@ -250,14 +265,12 @@ export async function createIssueAdmin(
 
   // Link session if provided
   if (input.sessionId) {
-    await Promise.all([
-      linkSessionToIssue(issue.id, input.sessionId),
-      markSessionPMReviewed(input.sessionId),
-    ])
+    await linkSessionToIssue(issue.id, input.sessionId)
   }
 
-  fireEmbedding(issue.id, 'issue', input.projectId, buildIssueEmbeddingText(input.title, input.description))
+  fireEmbedding(issue.id, 'issue', input.projectId, buildIssueEmbeddingText(input.name, input.description))
   fireGraphEval(input.projectId, 'issue', issue.id)
+  maybeFireIssueAnalysis(issue.id, input.projectId)
 
   return { issue }
 }
@@ -271,58 +284,34 @@ export async function updateIssueAdmin(
   projectId: string,
   input: UpdateIssueInput
 ): Promise<IssueRecord> {
+  // Fetch current name/description BEFORE update for embedding comparison
+  const current = await getIssueForEmbedding(issueId)
+
   const issue = await updateIssueById(issueId, input)
 
   // Update embedding if text changed
-  const current = await getIssueForEmbedding(issueId)
   if (current) {
-    maybeFireIssueEmbedding(issueId, projectId, current.title, current.description, input.title, input.description)
+    maybeFireIssueEmbedding(issueId, projectId, current.name, current.description, input.name, input.description)
   }
 
   fireGraphEval(projectId, 'issue', issueId)
+  maybeFireIssueAnalysis(issueId, projectId)
 
   return issue
 }
 
 /**
- * Upvotes an issue and links a session. Uses admin client.
- * Returns upvote result with threshold information.
+ * Links a session to an existing issue. No user auth required.
+ * Use this for creation policies and workflows that link sessions to existing issues.
  */
-export async function upvoteIssueAdmin(
+export async function linkSessionToIssueAdmin(
   issueId: string,
-  sessionId: string
-): Promise<UpvoteResult> {
-  // Get current issue state
-  const issue = await getIssueForUpvote(issueId)
-  if (!issue) {
-    throw new Error(`Issue not found: ${issueId}`)
-  }
-
-  // Calculate new values
-  const newUpvoteCount = issue.upvoteCount + 1
-  const newPriority = issue.priorityManualOverride
-    ? issue.priority
-    : calculatePriority(newUpvoteCount)
-
-  // Update issue, link session, and mark reviewed in parallel (independent operations)
-  await Promise.all([
-    updateIssueUpvote(issueId, newUpvoteCount, newPriority),
-    linkSessionToIssue(issueId, sessionId),
-    markSessionPMReviewed(sessionId),
-  ])
-
-  return {
-    issueId,
-    newUpvoteCount,
-    newPriority,
-  }
-}
-
-/**
- * Marks a session as PM reviewed. Uses admin client.
- */
-export async function markSessionReviewedAdmin(sessionId: string): Promise<void> {
-  await markSessionPMReviewed(sessionId)
+  sessionId: string,
+  projectId: string,
+): Promise<void> {
+  await linkSessionToIssue(issueId, sessionId)
+  await linkEntities(projectId, 'issue', issueId, 'session', sessionId)
+  maybeFireIssueAnalysis(issueId, projectId)
 }
 
 // ============================================================================
@@ -342,29 +331,31 @@ export interface SearchIssueResult {
 export async function searchIssues(
   projectId: string,
   query: string,
-  limit: number = 10
+  limit: number = 10,
+  options?: { mode?: SearchMode; threshold?: number }
 ): Promise<SearchIssueResult[]> {
-  return searchWithFallback<SearchIssueResult>({
+  return searchByMode<SearchIssueResult>({
     logPrefix: '[issues-service]',
+    mode: options?.mode,
     semanticSearch: async () => {
       const results = await searchSimilarIssues(projectId, query, query, {
         limit,
-        threshold: 0.4,
+        threshold: options?.threshold ?? 0.4,
         includeClosed: true,
       })
       return results.map((r) => ({
         id: r.issueId,
-        name: r.title,
+        name: r.name,
         snippet: r.description.slice(0, 200),
         score: r.similarity,
       }))
     },
-    textFallback: async () => {
+    keywordSearch: async () => {
       const s = `%${query}%`
       const data = await db
         .select({
           id: issues.id,
-          title: issues.title,
+          name: issues.name,
           description: issues.description,
           updated_at: issues.updated_at,
         })
@@ -374,7 +365,7 @@ export async function searchIssues(
             eq(issues.project_id, projectId),
             eq(issues.is_archived, false),
             or(
-              ilike(issues.title, s),
+              ilike(issues.name, s),
               ilike(issues.description, s)
             )
           )
@@ -384,7 +375,7 @@ export async function searchIssues(
 
       return data.map((r) => ({
         id: r.id,
-        name: r.title,
+        name: r.name,
         snippet: (r.description ?? '').slice(0, 200),
         score: 0,
       }))

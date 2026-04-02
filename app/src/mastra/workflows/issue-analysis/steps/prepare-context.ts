@@ -8,6 +8,9 @@
  */
 
 import { createStep } from '@mastra/core/workflows'
+import { and, eq, isNotNull } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { entityRelationships } from '@/lib/db/schema/app'
 import { getIssueForAnalysisAdmin, getIssueSessionTimestamps } from '@/lib/db/queries/issues'
 import { workflowContextWithCodebaseSchema, preparedContextSchema } from '../schemas'
 
@@ -46,14 +49,28 @@ export const prepareContext = createStep({
       companyStage: s.contact?.company?.stage ?? null,
     }))
 
+    // Look up product scope from entity relationships (assigned at issue creation)
+    const scopeRows = await db
+      .select({ product_scope_id: entityRelationships.product_scope_id })
+      .from(entityRelationships)
+      .where(
+        and(
+          eq(entityRelationships.issue_id, issueId),
+          isNotNull(entityRelationships.product_scope_id),
+        )
+      )
+      .limit(1)
+    const productScopeId = scopeRows[0]?.product_scope_id ?? null
+
     await writer?.write({
       type: 'progress',
-      message: `Context prepared: ${sessions.length} sessions`,
+      message: `Context prepared: ${sessions.length} sessions${productScopeId ? ' + product scope' : ''}`,
     })
 
     logger?.info('[prepare-context] Completed', {
       sessionCount: sessions.length,
       timestampCount: timestamps.length,
+      productScopeId,
     })
 
     return {
@@ -68,15 +85,16 @@ export const prepareContext = createStep({
       issue: {
         id: issue.id,
         type: issue.type,
-        title: issue.title,
+        name: issue.name,
         description: issue.description,
-        upvoteCount: issue.upvoteCount,
+        sessionCount: issue.sessionCount,
         impactScore: issue.impactScore,
         effortEstimate: issue.effortEstimate,
         priorityManualOverride: issue.priorityManualOverride,
       },
       sessions,
       sessionTimestamps: timestamps.map((t) => t.toISOString()),
+      productScopeId,
     }
   },
 })

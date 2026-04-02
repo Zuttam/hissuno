@@ -3,16 +3,16 @@ import { users } from './auth'
 import {
   projects,
   projectSettings,
+  graphEvaluationSettings,
   widgetIntegrations,
   projectMembers,
   projectApiKeys,
   compilationRuns,
   userProfiles,
   productScopes,
-  customTags,
   companies,
   contacts,
-  customerCustomFieldDefinitions,
+  customFieldDefinitions,
   sessions,
   sessionMessages,
   sessionReviews,
@@ -74,11 +74,11 @@ export const usersRelations = relations(users, ({ one, many }) => ({
 
 export const projectsRelations = relations(projects, ({ one, many }) => ({
   settings: one(projectSettings, { fields: [projects.id], references: [projectSettings.project_id] }),
+  graphEvaluationSettings: one(graphEvaluationSettings, { fields: [projects.id], references: [graphEvaluationSettings.project_id] }),
   members: many(projectMembers),
   apiKeys: many(projectApiKeys),
   compilationRuns: many(compilationRuns),
   productScopes: many(productScopes),
-  customTags: many(customTags),
   companies: many(companies),
   contacts: many(contacts),
   sessions: many(sessions),
@@ -104,6 +104,10 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
   project: one(projects, { fields: [projectSettings.project_id], references: [projects.id] }),
   supportAgentPackage: one(knowledgePackages, { fields: [projectSettings.support_agent_package_id], references: [knowledgePackages.id] }),
+}))
+
+export const graphEvaluationSettingsRelations = relations(graphEvaluationSettings, ({ one }) => ({
+  project: one(projects, { fields: [graphEvaluationSettings.project_id], references: [projects.id] }),
 }))
 
 export const widgetIntegrationsRelations = relations(widgetIntegrations, ({ one }) => ({
@@ -141,10 +145,6 @@ export const productScopesRelations = relations(productScopes, ({ one, many }) =
   entityRelationships: many(entityRelationships),
 }))
 
-export const customTagsRelations = relations(customTags, ({ one }) => ({
-  project: one(projects, { fields: [customTags.project_id], references: [projects.id] }),
-}))
-
 // ---------------------------------------------------------------------------
 // Customers
 // ---------------------------------------------------------------------------
@@ -162,8 +162,8 @@ export const contactsRelations = relations(contacts, ({ one, many }) => ({
   entityRelationships: many(entityRelationships),
 }))
 
-export const customerCustomFieldDefinitionsRelations = relations(customerCustomFieldDefinitions, ({ one }) => ({
-  project: one(projects, { fields: [customerCustomFieldDefinitions.project_id], references: [projects.id] }),
+export const customFieldDefinitionsRelations = relations(customFieldDefinitions, ({ one }) => ({
+  project: one(projects, { fields: [customFieldDefinitions.project_id], references: [projects.id] }),
 }))
 
 // ---------------------------------------------------------------------------

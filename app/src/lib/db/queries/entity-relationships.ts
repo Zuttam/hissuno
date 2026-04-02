@@ -6,7 +6,7 @@
  * Each row has exactly 2 non-null entity FK columns = one edge.
  */
 
-import { eq, and, isNotNull, inArray } from 'drizzle-orm'
+import { eq, and, isNotNull, inArray, count as drizzleCount } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { isUniqueViolation } from '@/lib/db/errors'
 import {
@@ -114,11 +114,16 @@ export async function getRelatedIds(
 // Detail fetch (grouped by type)
 // ---------------------------------------------------------------------------
 
+export interface ViaAttribution {
+  type: EntityType
+  ids: string[]
+}
+
 export interface RelatedEntitiesResult {
-  companies: Array<{ id: string; name: string; domain: string }>
-  contacts: Array<{ id: string; name: string; email: string }>
-  issues: Array<{ id: string; title: string; type: string; status: string | null }>
-  sessions: Array<{ id: string; name: string | null; source: string | null; created_at: Date | null }>
+  companies: Array<{ id: string; name: string; domain: string; via?: ViaAttribution }>
+  contacts: Array<{ id: string; name: string; email: string; via?: ViaAttribution }>
+  issues: Array<{ id: string; name: string; type: string; status: string | null; via?: ViaAttribution }>
+  sessions: Array<{ id: string; name: string | null; source: string | null; created_at: Date | null; via?: ViaAttribution }>
   knowledgeSources: Array<{ id: string; name: string | null; type: string; status: string }>
   productScopes: Array<{ id: string; name: string; color: string; metadata?: Record<string, unknown> | null }>
 }
@@ -181,7 +186,7 @@ export async function getRelatedEntitiesWithDetails(
           .from(contacts).where(inArray(contacts.id, idsByType.contact))
       : [],
     idsByType.issue.length > 0
-      ? db.select({ id: issues.id, title: issues.title, type: issues.type, status: issues.status })
+      ? db.select({ id: issues.id, name: issues.name, type: issues.type, status: issues.status })
           .from(issues).where(inArray(issues.id, idsByType.issue))
       : [],
     idsByType.session.length > 0
@@ -198,11 +203,131 @@ export async function getRelatedEntitiesWithDetails(
       : [],
   ])
 
+  // -------------------------------------------------------------------------
+  // 2-hop traversal: discover indirect connections through intermediate types
+  // For each target type, query through intermediate types that have 1st-degree
+  // links to find 2nd-degree connections. Tracks attribution (which intermediates
+  // contributed each connection).
+  // -------------------------------------------------------------------------
+  const TRAVERSABLE_TARGETS: EntityType[] = ['contact', 'company', 'issue', 'session']
+
+  const secondDegreeByTarget: Record<string, Set<string>> = {
+    contact: new Set(),
+    company: new Set(),
+    issue: new Set(),
+    session: new Set(),
+  }
+
+  // Per-target: targetId -> { intermediateType -> Set<intermediateId> }
+  const viaMapByTarget = new Map<EntityType, Map<string, Map<EntityType, Set<string>>>>()
+
+  for (const target of TRAVERSABLE_TARGETS) {
+    if (target === entityType) continue
+    const directIds = new Set(idsByType[target])
+    const targetVia = new Map<string, Map<EntityType, Set<string>>>()
+
+    for (const intermediate of RELATED_TYPES) {
+      if (intermediate === target || intermediate === entityType) continue
+      if (idsByType[intermediate].length === 0) continue
+
+      const hopRows = await db
+        .select({
+          targetId: ENTITY_COLUMNS[target],
+          intermediateId: ENTITY_COLUMNS[intermediate],
+        })
+        .from(entityRelationships)
+        .where(
+          and(
+            eq(entityRelationships.project_id, projectId),
+            inArray(ENTITY_COLUMNS[intermediate], idsByType[intermediate]),
+            isNotNull(ENTITY_COLUMNS[target]),
+          ),
+        )
+
+      for (const row of hopRows) {
+        const tid = row.targetId as string | null
+        const iid = row.intermediateId as string | null
+        if (!tid || !iid || tid === entityId) continue
+
+        if (!directIds.has(tid)) {
+          secondDegreeByTarget[target].add(tid)
+        }
+
+        if (!targetVia.has(tid)) {
+          targetVia.set(tid, new Map())
+        }
+        const byType = targetVia.get(tid)!
+        if (!byType.has(intermediate)) {
+          byType.set(intermediate, new Set())
+        }
+        byType.get(intermediate)!.add(iid)
+      }
+    }
+
+    viaMapByTarget.set(target, targetVia)
+  }
+
+  // Batch-fetch 2nd-degree details
+  const newContactIds = [...secondDegreeByTarget.contact]
+  const newCompanyIds = [...secondDegreeByTarget.company]
+  const newIssueIds = [...secondDegreeByTarget.issue]
+  const newSessionIds = [...secondDegreeByTarget.session]
+
+  const [newContacts, newCompanies, newIssues, newSessions] = await Promise.all([
+    newContactIds.length > 0
+      ? db.select({ id: contacts.id, name: contacts.name, email: contacts.email })
+          .from(contacts).where(inArray(contacts.id, newContactIds))
+      : [],
+    newCompanyIds.length > 0
+      ? db.select({ id: companies.id, name: companies.name, domain: companies.domain })
+          .from(companies).where(inArray(companies.id, newCompanyIds))
+      : [],
+    newIssueIds.length > 0
+      ? db.select({ id: issues.id, name: issues.name, type: issues.type, status: issues.status })
+          .from(issues).where(inArray(issues.id, newIssueIds))
+      : [],
+    newSessionIds.length > 0
+      ? db.select({ id: sessions.id, name: sessions.name, source: sessions.source, created_at: sessions.created_at })
+          .from(sessions).where(inArray(sessions.id, newSessionIds))
+      : [],
+  ])
+
+  // Helper to build ViaAttribution from the per-target viaMap
+  function buildVia(target: EntityType, id: string): ViaAttribution | undefined {
+    const targetVia = viaMapByTarget.get(target)
+    if (!targetVia) return undefined
+    const byType = targetVia.get(id)
+    if (!byType) return undefined
+    // Pick the intermediate type with the most connections
+    let bestType: EntityType | null = null
+    let bestIds: Set<string> | null = null
+    for (const [iType, iIds] of byType) {
+      if (!bestIds || iIds.size > bestIds.size) {
+        bestType = iType
+        bestIds = iIds
+      }
+    }
+    if (!bestType || !bestIds) return undefined
+    return { type: bestType, ids: [...bestIds] }
+  }
+
   return {
-    companies: companyRows,
-    contacts: contactRows,
-    issues: issueRows,
-    sessions: sessionRows,
+    companies: [
+      ...companyRows,
+      ...newCompanies.map(c => ({ ...c, via: buildVia('company', c.id) })),
+    ],
+    contacts: [
+      ...contactRows,
+      ...newContacts.map(c => ({ ...c, via: buildVia('contact', c.id) })),
+    ],
+    issues: [
+      ...issueRows,
+      ...newIssues.map(i => ({ ...i, via: buildVia('issue', i.id) })),
+    ],
+    sessions: [
+      ...sessionRows,
+      ...newSessions.map(s => ({ ...s, via: buildVia('session', s.id) })),
+    ],
     knowledgeSources: ksRows,
     productScopes: paRows.map((ps) => ({
       ...ps,
@@ -395,6 +520,65 @@ export async function setEntityProductScope(
       }
     }
   })
+}
+
+// ---------------------------------------------------------------------------
+// Issue session counts (replaces deprecated upvote_count)
+// ---------------------------------------------------------------------------
+
+/**
+ * Count the number of sessions linked to an issue via entity_relationships.
+ */
+export async function getIssueSessionCount(issueId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: drizzleCount() })
+    .from(entityRelationships)
+    .where(
+      and(
+        eq(entityRelationships.issue_id, issueId),
+        isNotNull(entityRelationships.session_id),
+      ),
+    )
+
+  return row?.count ?? 0
+}
+
+/**
+ * Batch-fetch session counts for multiple issues in a single query.
+ * Returns a Map from issueId to count (0 for issues with no sessions).
+ */
+export async function batchGetIssueSessionCounts(
+  issueIds: string[],
+): Promise<Map<string, number>> {
+  const result = new Map<string, number>()
+  if (issueIds.length === 0) return result
+
+  // Pre-fill all requested IDs with 0
+  for (const id of issueIds) {
+    result.set(id, 0)
+  }
+
+  const rows = await db
+    .select({
+      issue_id: entityRelationships.issue_id,
+      count: drizzleCount(),
+    })
+    .from(entityRelationships)
+    .where(
+      and(
+        inArray(entityRelationships.issue_id, issueIds),
+        isNotNull(entityRelationships.session_id),
+      ),
+    )
+    .groupBy(entityRelationships.issue_id)
+
+  for (const row of rows) {
+    if (row.issue_id) {
+      result.set(row.issue_id, row.count)
+    }
+  }
+
+  return result
 }
 
 // ---------------------------------------------------------------------------

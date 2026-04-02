@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { getBaseUrl, apiCall, buildPath } from '../../lib/api.js'
 import type { HissunoConfig } from '../../lib/config.js'
 
-function makeConfig(base_url: string): HissunoConfig {
-  return { api_key: 'test-key-123', base_url }
+function makeConfig(base_url: string, overrides?: Partial<HissunoConfig>): HissunoConfig {
+  return { api_key: 'test-key-123', base_url, ...overrides }
 }
 
 describe('getBaseUrl', () => {
@@ -93,5 +93,43 @@ describe('apiCall', () => {
 
     const result = await apiCall(makeConfig('http://localhost:3000'), 'DELETE', '/api/test')
     expect(result).toEqual({ ok: true, status: 204, data: {} })
+  })
+
+  it('prefers auth_token over api_key for Authorization header', async () => {
+    const mockResponse = { ok: true, status: 200, json: () => Promise.resolve({}) }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as Response)
+
+    const config = makeConfig('http://localhost:3000', { auth_token: 'jwt-token-abc', api_key: 'hiss_key' })
+    await apiCall(config, 'GET', '/api/projects')
+
+    expect(fetchSpy).toHaveBeenCalledWith('http://localhost:3000/api/projects', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer jwt-token-abc' },
+      body: undefined,
+    })
+  })
+
+  it('uses auth_token when api_key is absent', async () => {
+    const mockResponse = { ok: true, status: 200, json: () => Promise.resolve({}) }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse as Response)
+
+    const config = makeConfig('http://localhost:3000', { auth_token: 'jwt-only', api_key: undefined })
+    await apiCall(config, 'GET', '/api/projects')
+
+    expect(fetchSpy).toHaveBeenCalledWith('http://localhost:3000/api/projects', {
+      method: 'GET',
+      headers: { Authorization: 'Bearer jwt-only' },
+      body: undefined,
+    })
+  })
+
+  it('returns early with ok=false when neither token exists', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    const config = makeConfig('http://localhost:3000', { api_key: undefined })
+    const result = await apiCall(config, 'GET', '/api/projects')
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(result).toEqual({ ok: false, status: 0, data: {} })
   })
 })

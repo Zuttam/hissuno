@@ -13,74 +13,121 @@ interface ScopeGoal {
   text: string
 }
 
+interface UpdateScopeOpts {
+  name?: string
+  type?: string
+  description?: string
+  goals?: string
+  goalsAction?: string
+}
+
 async function updateScope(
   existing: Record<string, unknown>,
+  opts: UpdateScopeOpts,
 ): Promise<Record<string, unknown>> {
   const data: Record<string, unknown> = {}
 
-  const changeName = await confirm({ message: `Change name? (current: ${existing.name})`, default: false })
-  if (changeName) {
-    data.name = await input({ message: 'New name:', validate: (v) => v.length > 0 || 'Required' })
-  }
+  // Skip interactive prompts for fields not provided when any flag is set
+  const nonInteractive = opts.name !== undefined || opts.type !== undefined || opts.description !== undefined || opts.goals !== undefined || opts.goalsAction === 'clear'
 
-  const changeType = await confirm({ message: `Change type? (current: ${existing.type})`, default: false })
-  if (changeType) {
-    data.type = await select({
-      message: 'New type:',
-      choices: [
-        { value: 'product_area', name: 'Product Area' },
-        { value: 'initiative', name: 'Initiative' },
-      ],
-    })
-  }
-
-  const changeDesc = await confirm({ message: 'Change description?', default: false })
-  if (changeDesc) {
-    data.description = await input({ message: 'New description:' })
-  }
-
-  const manageGoals = await confirm({ message: 'Manage goals?', default: false })
-  if (manageGoals) {
-    const existingGoals = (Array.isArray(existing.goals) ? existing.goals : []) as ScopeGoal[]
-
-    if (existingGoals.length > 0) {
-      console.log(`\nCurrent goals (${existingGoals.length}):`)
-      for (let i = 0; i < existingGoals.length; i++) {
-        console.log(`  ${i + 1}. ${existingGoals[i].text}`)
-      }
-      console.log('')
+  // Name
+  if (opts.name !== undefined) {
+    data.name = opts.name
+  } else if (!nonInteractive) {
+    const changeName = await confirm({ message: `Change name? (current: ${existing.name})`, default: false })
+    if (changeName) {
+      data.name = await input({ message: 'New name:', validate: (v) => v.length > 0 || 'Required' })
     }
+  }
 
-    const goalAction = await select({
-      message: 'Goal action:',
-      choices: [
-        { value: 'add', name: 'Add new goals' },
-        { value: 'replace', name: 'Replace all goals' },
-        { value: 'clear', name: 'Clear all goals' },
-        { value: 'skip', name: 'Keep current goals' },
-      ],
-    })
+  // Type
+  if (opts.type !== undefined) {
+    data.type = opts.type
+  } else if (!nonInteractive) {
+    const changeType = await confirm({ message: `Change type? (current: ${existing.type})`, default: false })
+    if (changeType) {
+      data.type = await select({
+        message: 'New type:',
+        choices: [
+          { value: 'product_area', name: 'Product Area' },
+          { value: 'initiative', name: 'Initiative' },
+        ],
+      })
+    }
+  }
 
-    if (goalAction === 'clear') {
+  // Description
+  if (opts.description !== undefined) {
+    data.description = opts.description
+  } else if (!nonInteractive) {
+    const changeDesc = await confirm({ message: 'Change description?', default: false })
+    if (changeDesc) {
+      data.description = await input({ message: 'New description:' })
+    }
+  }
+
+  // Goals
+  if (opts.goals !== undefined || opts.goalsAction === 'clear') {
+    const goalsAction = opts.goalsAction || 'replace'
+
+    if (goalsAction === 'clear') {
       data.goals = null
-    } else if (goalAction === 'replace') {
-      const goals: ScopeGoal[] = []
-      console.log('Enter new goals (empty text to finish).\n')
-      while (goals.length < 10) {
-        const text = await input({ message: `Goal ${goals.length + 1} (empty to finish):` })
-        if (!text) break
-        goals.push({ id: `g_${Date.now()}_${goals.length}`, text })
+    } else if (opts.goals) {
+      const goalTexts = opts.goals.split(',').map(g => g.trim()).filter(Boolean)
+      const goals = goalTexts.map((text, i) => ({ id: `g_${Date.now()}_${i}`, text }))
+
+      if (goalsAction === 'add') {
+        const existingGoals = (Array.isArray(existing.goals) ? existing.goals : []) as ScopeGoal[]
+        data.goals = [...existingGoals, ...goals]
+      } else {
+        // replace (default)
+        data.goals = goals.length > 0 ? goals : null
       }
-      data.goals = goals.length > 0 ? goals : null
-    } else if (goalAction === 'add') {
-      const goals: ScopeGoal[] = [...existingGoals]
-      console.log('Enter additional goals (empty text to finish).\n')
-      while (goals.length < 10) {
-        const text = await input({ message: `Goal ${goals.length + 1} (empty to finish):` })
-        if (!text) break
-        goals.push({ id: `g_${Date.now()}_${goals.length}`, text })
+    }
+  } else if (!nonInteractive) {
+    const manageGoals = await confirm({ message: 'Manage goals?', default: false })
+    if (manageGoals) {
+      const existingGoals = (Array.isArray(existing.goals) ? existing.goals : []) as ScopeGoal[]
+
+      if (existingGoals.length > 0) {
+        console.log(`\nCurrent goals (${existingGoals.length}):`)
+        for (let i = 0; i < existingGoals.length; i++) {
+          console.log(`  ${i + 1}. ${existingGoals[i].text}`)
+        }
+        console.log('')
       }
-      data.goals = goals
+
+      const goalAction = await select({
+        message: 'Goal action:',
+        choices: [
+          { value: 'add', name: 'Add new goals' },
+          { value: 'replace', name: 'Replace all goals' },
+          { value: 'clear', name: 'Clear all goals' },
+          { value: 'skip', name: 'Keep current goals' },
+        ],
+      })
+
+      if (goalAction === 'clear') {
+        data.goals = null
+      } else if (goalAction === 'replace') {
+        const goals: ScopeGoal[] = []
+        console.log('Enter new goals (empty text to finish).\n')
+        while (goals.length < 10) {
+          const text = await input({ message: `Goal ${goals.length + 1} (empty to finish):` })
+          if (!text) break
+          goals.push({ id: `g_${Date.now()}_${goals.length}`, text })
+        }
+        data.goals = goals.length > 0 ? goals : null
+      } else if (goalAction === 'add') {
+        const goals: ScopeGoal[] = [...existingGoals]
+        console.log('Enter additional goals (empty text to finish).\n')
+        while (goals.length < 10) {
+          const text = await input({ message: `Goal ${goals.length + 1} (empty to finish):` })
+          if (!text) break
+          goals.push({ id: `g_${Date.now()}_${goals.length}`, text })
+        }
+        data.goals = goals
+      }
     }
   }
 
@@ -99,7 +146,12 @@ export const updateCommand = new Command('update')
   .description('Update an existing resource')
   .argument('<type>', 'Resource type: scopes')
   .argument('<id>', 'Resource ID')
-  .action(async (type, id, _opts, cmd) => {
+  .option('--name <text>', 'New name')
+  .option('--type <type>', 'New type (product_area, initiative)')
+  .option('--description <text>', 'New description')
+  .option('--goals <goals>', 'Comma-separated goals')
+  .option('--goals-action <action>', 'Goal action: add, replace, clear', 'replace')
+  .action(async (type, id, opts, cmd) => {
     const config = requireConfig()
     const jsonMode = cmd.parent?.opts().json
 
@@ -131,7 +183,7 @@ export const updateCommand = new Command('update')
 
     switch (type) {
       case 'scopes':
-        updates = await updateScope(existing)
+        updates = await updateScope(existing, opts)
         break
       default:
         error(`Unsupported type: ${type}`)

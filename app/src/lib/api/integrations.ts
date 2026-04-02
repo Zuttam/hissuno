@@ -96,7 +96,7 @@ const paths = {
   fathomSync: '/api/integrations/fathom/sync',
 
   // Widget Settings
-  widgetSettings: '/api/integrations/widget/settings',
+  widgetSettings: '/api/integrations/widget',
 }
 
 // ---------------------------------------------------------------------------

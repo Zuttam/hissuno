@@ -5,17 +5,8 @@ import Link from 'next/link'
 import { Badge, Combobox } from '@/components/ui'
 import { useContacts } from '@/hooks/use-contacts'
 import { useProductScopes } from '@/hooks/use-product-scopes'
-import type { SessionWithProject, SessionSource, SessionType, UpdateSessionInput } from '@/types/session'
-import { SESSION_SOURCE_INFO, SESSION_TYPE_INFO, getSessionUserDisplay } from '@/types/session'
-
-function formatDateTime(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '-'
-  const date = dateString instanceof Date ? dateString : new Date(dateString)
-  return date.toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
-}
+import type { SessionWithProject, UpdateSessionInput } from '@/types/session'
+import { getSessionUserDisplay } from '@/types/session'
 
 interface SessionDetailsProps {
   session: SessionWithProject
@@ -24,7 +15,6 @@ interface SessionDetailsProps {
 }
 
 export function SessionDetails({ session, onUpdateSession, onSessionUpdated }: SessionDetailsProps) {
-  const sourceInfo = SESSION_SOURCE_INFO[session.source as SessionSource] || SESSION_SOURCE_INFO.widget
   const { scopes: productScopes } = useProductScopes({ projectId: session.project_id })
   const [isSaving, setIsSaving] = useState(false)
   const [isChangingCustomer, setIsChangingCustomer] = useState(false)
@@ -118,8 +108,6 @@ export function SessionDetails({ session, onUpdateSession, onSessionUpdated }: S
   }, [session.contact_id])
 
   const contactItems = contacts.map((c) => ({ value: c.id, label: c.name }))
-
-  const isExternalSource = session.source === 'gong' || session.source === 'intercom'
 
   return (
     <div className="flex flex-col gap-4">
@@ -414,7 +402,7 @@ export function SessionDetails({ session, onUpdateSession, onSessionUpdated }: S
         </div>
       )}
 
-      {/* Product Scope */}
+      {/* Scope */}
       {(() => {
         const scope = session.product_scope_id
           ? productScopes.find((a) => a.id === session.product_scope_id)
@@ -422,7 +410,7 @@ export function SessionDetails({ session, onUpdateSession, onSessionUpdated }: S
         return (
           <div className="flex flex-col gap-1">
             <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-              Product Scope
+              Scope
             </label>
             {scope ? (
               <Badge variant={scope.color as 'info' | 'success' | 'warning' | 'danger' | 'default'}>

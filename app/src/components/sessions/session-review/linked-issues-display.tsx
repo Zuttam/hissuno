@@ -35,11 +35,10 @@ export function LinkedIssuesDisplay({ issues, projectId }: LinkedIssuesDisplayPr
           >
             <TypeIcon size={14} className={iconClassName} />
             <span className="flex-1 truncate font-mono text-xs text-[color:var(--foreground)]">
-              {issue.title}
+              {issue.name}
             </span>
             <span className="flex items-center gap-0.5 font-mono text-[10px] text-[color:var(--text-secondary)]">
-              <span>&uarr;</span>
-              {issue.upvote_count}
+              {issue.session_count} session{issue.session_count !== 1 ? 's' : ''}
             </span>
             {issue.priority && (
               <Badge variant={PRIORITY_VARIANTS[issue.priority]}>

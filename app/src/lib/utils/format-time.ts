@@ -23,3 +23,16 @@ export function formatRelativeTime(date: string | Date | null | undefined): stri
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
   return `${Math.floor(diffDays / 30)}mo ago`
 }
+
+/**
+ * Format a date as a localized date+time string (e.g., "Mar 15, 2024, 2:30 PM")
+ * Returns "-" if the date is null/undefined
+ */
+export function formatDateTime(dateString: string | Date | null | undefined): string {
+  if (!dateString) return '-'
+  const date = dateString instanceof Date ? dateString : new Date(dateString)
+  return date.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}

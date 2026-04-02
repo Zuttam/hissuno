@@ -78,10 +78,10 @@ const mockDelete = vi.fn(() => ({ where: mockDeleteWhere }))
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: (...args: unknown[]) => mockDbSelect(...args),
-    insert: (...args: unknown[]) => mockInsert(...args),
-    update: (...args: unknown[]) => mockUpdate(...args),
-    delete: (...args: unknown[]) => mockDelete(...args),
+    select: (...args: Parameters<typeof mockDbSelect>) => mockDbSelect(...args),
+    insert: (...args: Parameters<typeof mockInsert>) => mockInsert(...args),
+    update: (...args: Parameters<typeof mockUpdate>) => mockUpdate(...args),
+    delete: (...args: Parameters<typeof mockDelete>) => mockDelete(...args),
   },
 }))
 
@@ -387,12 +387,16 @@ describe('transferOwnership', () => {
   it('promotes target and demotes source when multiple owners exist after promotion', async () => {
     // target member lookup -> found
     enqueueSelect([{ id: 'target-member-id' }], true)
-    // promote target: db.update().set().where() (first update)
-    mockUpdateWhere.mockReturnValueOnce(Promise.resolve(undefined))
+    // promote target: db.update().set().where() (first update) - awaited directly, no .returning()
+    mockUpdateWhere.mockReturnValueOnce(
+      Object.assign(Promise.resolve(undefined), { returning: mockUpdateReturning }),
+    )
     // owner count after promotion -> 2
     enqueueSelect([{ count: 2 }], false)
     // demote source: db.update().set().where() (second update)
-    mockUpdateWhere.mockReturnValueOnce(Promise.resolve(undefined))
+    mockUpdateWhere.mockReturnValueOnce(
+      Object.assign(Promise.resolve(undefined), { returning: mockUpdateReturning }),
+    )
 
     await expect(
       transferOwnership(PROJECT_ID, FROM_USER, TO_USER),
@@ -404,8 +408,10 @@ describe('transferOwnership', () => {
   it('does not demote source when they would be the only owner (count <= 1)', async () => {
     // target member lookup -> found
     enqueueSelect([{ id: 'target-member-id' }], true)
-    // promote target
-    mockUpdateWhere.mockReturnValueOnce(Promise.resolve(undefined))
+    // promote target - awaited directly, no .returning()
+    mockUpdateWhere.mockReturnValueOnce(
+      Object.assign(Promise.resolve(undefined), { returning: mockUpdateReturning }),
+    )
     // owner count -> 1 (only newly promoted target)
     enqueueSelect([{ count: 1 }], false)
 

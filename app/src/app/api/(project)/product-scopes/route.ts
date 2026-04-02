@@ -68,13 +68,14 @@ export async function POST(request: NextRequest) {
     await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
-    const { name, slug, description, color, type, goals } = body as {
+    const { name, slug, description, color, type, goals, custom_fields } = body as {
       name?: string
       slug?: string
       description?: string
       color?: string
       type?: string
       goals?: ProductScopeGoal[]
+      custom_fields?: Record<string, unknown>
     }
 
     if (!name || typeof name !== 'string') {
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
       color,
       type: type as CreateProductScopeAdminInput['type'],
       goals: goals ?? null,
+      custom_fields: custom_fields,
     }
 
     const scope = await createProductScope(projectId, input)

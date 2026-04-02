@@ -38,6 +38,8 @@ function makeSource(overrides: Partial<KnowledgeSourceRecord> = {}): KnowledgeSo
     description: null,
     analyzed_content: null,
     notion_page_id: null,
+    origin: null,
+    custom_fields: null,
     ...overrides,
   }
 }

@@ -10,11 +10,10 @@ export interface DemoSession {
   productScopeIndex: number // index into DEMO_PRODUCT_SCOPES
   issue?: {
     type: 'bug' | 'feature_request' | 'change_request'
-    title: string
+    name: string
     description: string
     priority: 'low' | 'medium' | 'high'
     brief?: string
-    upvoteCount?: number
     // RICE scores (1-5 scale)
     reach?: number
     impact?: number
@@ -46,7 +45,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'bug',
-      title: 'Login page crashes on mobile Safari (iOS 17+)',
+      name: 'Login page crashes on mobile Safari (iOS 17+)',
       description: 'The login page freezes and reloads when tapping the password field on iOS Safari. Likely caused by autofill handling interfering with the input focus event. Affects iPhone 14 Pro on iOS 17.2, possibly other devices. Workaround: Sign in with Google.',
       priority: 'high',
       reach: 4, impact: 5, confidence: 4, effort: 2,
@@ -56,7 +55,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       effortReasoning: 'Focused fix in the login form autofill handler. Requires iOS-specific event handling and testing on multiple devices.',
       impactReasoning: 'Login is a critical path - users cannot access the product at all when this crashes. Affects all iOS Safari users, roughly 25% of the active user base.',
       brief: '## Fix: Mobile Safari Login Crash\n\n### Problem\nPassword field tap causes page freeze/reload on iOS Safari 17+.\n\n### Root Cause\nAutofill handler conflicts with iOS keyboard focus events.\n\n### Solution\n1. Debounce autofill detection on iOS\n2. Use `inputmode="text"` with manual password toggle\n3. Add iOS-specific focus event handling\n\n### Testing\n- iPhone 14 Pro, iOS 17.2\n- iPhone 13, iOS 17.1\n- iPad Pro, iPadOS 17',
-      upvoteCount: 4,
     },
   },
 
@@ -76,7 +74,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'feature_request',
-      title: 'Bulk CSV export with date range and status filters',
+      name: 'Bulk CSV export with date range and status filters',
       description: 'Users need the ability to export filtered subsets of tasks to CSV for quarterly reviews. Should support filtering by date range, status, and tags. Currently only individual task list export is available.',
       priority: 'medium',
       reach: 3, impact: 3, confidence: 4, effort: 3,
@@ -87,7 +85,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       impactReasoning: 'Directly enables non-technical users to pull their own data without engineering help. Removes a key blocker for self-serve reporting workflows.',
       goalAlignments: [{ goalId: 'ra-g1', reasoning: 'CSV export is a foundational self-serve reporting capability that lets non-technical users extract data without engineering support.' }],
       brief: '## Feature: Bulk CSV Export\n\n### Overview\nAllow users to export filtered task data to CSV for reporting.\n\n### Requirements\n- Filter by date range, tags, status, and assignee\n- Columns: task name, assignee, status, dates, priority\n- Max 10,000 rows per export\n- Background job for large exports with email notification\n\n### UX\n1. Add "Export" button to task list toolbar\n2. Show filter summary before export\n3. Download starts automatically\n\n### API\n`POST /api/projects/:id/exports` with filter params, returns CSV stream.',
-      upvoteCount: 7,
     },
   },
 
@@ -107,7 +104,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'change_request',
-      title: 'Increase API rate limits for Enterprise plans',
+      name: 'Increase API rate limits for Enterprise plans',
       description: 'Enterprise customers are hitting rate limits during CI/CD deployment windows with 500+ API calls/minute. Current limits are too restrictive for legitimate automation use cases. Batch endpoint helps but higher base limits would provide a better developer experience.',
       priority: 'medium',
       reach: 2, impact: 3, confidence: 5, effort: 2,
@@ -117,7 +114,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       effortReasoning: 'Rate limiter configuration change plus load testing to validate new thresholds. Low code complexity but requires careful capacity planning.',
       impactReasoning: 'Rate limit errors during CI/CD windows cause deployment failures and erode developer trust. Fixing this directly supports API reliability targets.',
       goalAlignments: [{ goalId: 'ia-g2', reasoning: 'Appropriate rate limits prevent cascading failures during high-traffic windows, supporting the 99.9% uptime and latency targets.' }],
-      upvoteCount: 3,
     },
   },
 
@@ -153,7 +149,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'bug',
-      title: 'Webhook timeouts not retried (only 5xx responses trigger retry)',
+      name: 'Webhook timeouts not retried (only 5xx responses trigger retry)',
       description: 'Webhook delivery retries only trigger for 5xx HTTP responses. Timeouts (10s limit) silently fail without retries, causing ~30% event loss for endpoints with slower processing. Should treat timeouts as retriable failures with the same exponential backoff logic.',
       priority: 'high',
       reach: 3, impact: 5, confidence: 5, effort: 1,
@@ -163,7 +159,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       effortReasoning: 'Small change to webhook retry logic to treat timeouts the same as 5xx errors. Well-scoped fix.',
       impactReasoning: 'Silent event loss undermines webhook reliability. Customers building automation on webhooks lose ~30% of events, causing data sync gaps and broken workflows.',
       goalAlignments: [{ goalId: 'ia-g2', reasoning: 'Fixing silent timeout failures directly improves API reliability and reduces event loss, supporting the 99.9% uptime target.' }],
-      upvoteCount: 5,
     },
   },
 
@@ -183,7 +178,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'bug',
-      title: 'Timeline view: rescheduling parent task does not cascade to dependent tasks',
+      name: 'Timeline view: rescheduling parent task does not cascade to dependent tasks',
       description: 'In timeline view, dragging a parent task to a new date does not automatically shift dependent (child) tasks. Dependency arrows remain but child task dates are unchanged, creating impossible scheduling. Works correctly in list view. Affects teams with complex task dependency chains.',
       priority: 'high',
       reach: 4, impact: 4, confidence: 5, effort: 3,
@@ -194,7 +189,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       impactReasoning: 'Breaking dependency chains blocks downstream tasks and delays project milestones. High impact on teams using dependency-heavy workflows.',
       goalAlignments: [{ goalId: 'tm-g1', reasoning: 'Automatic dependency cascading eliminates manual rescheduling overhead, directly reducing average task completion time.' }],
       brief: '## Fix: Timeline Dependency Cascade\n\n### Problem\nRescheduling a parent task in timeline view does not cascade date changes to dependent tasks.\n\n### Root Cause\nThe timeline drag handler calls `updateTaskDate()` directly without triggering the dependency cascade logic that the list view uses.\n\n### Solution\n1. Extract cascade logic from list view into shared `cascadeDependencyDates()` function\n2. Call it from both list view and timeline view after date updates\n3. Add visual feedback showing which tasks will shift before confirming\n\n### Testing\n- Create chain: Task A > Task B > Task C with dependencies\n- Reschedule Task A in timeline view\n- Verify Task B and C shift by the same delta\n- Verify undo works correctly for cascaded changes',
-      upvoteCount: 6,
     },
   },
 
@@ -213,7 +207,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'feature_request',
-      title: 'Export timeline/Gantt view as presentation-ready PDF',
+      name: 'Export timeline/Gantt view as presentation-ready PDF',
       description: 'Enterprise customers need to share project timelines with external stakeholders (regulators, clients) in clean PDF format. Current workaround is browser print-to-PDF which includes UI elements. Need a dedicated export that produces clean Gantt charts with task names, dates, dependencies, and milestones.',
       priority: 'medium',
       reach: 2, impact: 4, confidence: 3, effort: 4,
@@ -223,7 +217,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       effortReasoning: 'Requires server-side PDF rendering of timeline view, handling large projects, and ensuring visual fidelity. Significant frontend and backend work.',
       impactReasoning: 'External stakeholders (regulators, clients) need clean Gantt exports. Currently blocked by browser print artifacts. Enables self-serve reporting for a high-value use case.',
       goalAlignments: [{ goalId: 'ra-g1', reasoning: 'PDF export lets non-technical stakeholders generate presentation-ready reports without developer assistance.' }],
-      upvoteCount: 4,
     },
   },
 
@@ -243,7 +236,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'bug',
-      title: 'Android push notifications delayed 10-30 minutes due to batching',
+      name: 'Android push notifications delayed 10-30 minutes due to batching',
       description: 'Push notifications on Android are consistently delayed 10-30 minutes. Root cause appears to be notification batching for battery optimization. iOS notifications arrive within 1-2 minutes. Critical for healthcare and other time-sensitive use cases. Need to add urgent notification category that bypasses batching.',
       priority: 'high',
       reach: 3, impact: 4, confidence: 4, effort: 3,
@@ -253,7 +246,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       effortReasoning: 'Requires implementing notification priority categories in Android SDK, server-side priority routing, and testing across Android versions.',
       impactReasoning: 'Delayed notifications in time-sensitive industries like healthcare create real operational risk. A top complaint driving negative Android reviews.',
       goalAlignments: [{ goalId: 'ma-g2', reasoning: 'Notification delays are the #1 driver of negative Android app reviews. Fixing this directly protects the App Store rating.' }],
-      upvoteCount: 3,
     },
   },
 
@@ -304,7 +296,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'feature_request',
-      title: 'Configurable custom fields on board view cards',
+      name: 'Configurable custom fields on board view cards',
       description: 'Board view cards only show fixed fields (title, assignee, priority, due date). Users want to configure which custom fields appear on cards. Use case: showing Story Points and Sprint on Kanban cards for agile teams. Should be a per-project setting under board view configuration.',
       priority: 'medium',
       reach: 4, impact: 3, confidence: 4, effort: 3,
@@ -314,7 +306,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       effortReasoning: 'Requires card layout configuration UI, per-project settings storage, and dynamic card rendering. Moderate complexity.',
       impactReasoning: 'Custom fields on cards reduce the need to open task details, enabling faster board scanning for large teams working concurrently.',
       goalAlignments: [{ goalId: 'tm-g2', reasoning: 'Configurable card layouts improve board usability for large teams, supporting the goal of 50+ concurrent collaborators per board.' }],
-      upvoteCount: 8,
     },
   },
 
@@ -334,7 +325,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'bug',
-      title: 'SAML SSO ignores IdP session duration, defaults to 30-minute expiry',
+      name: 'SAML SSO ignores IdP session duration, defaults to 30-minute expiry',
       description: 'SSO sessions expire after 30 minutes regardless of the IdP-configured session length. The SessionNotOnOrAfter SAML assertion attribute is not being read correctly. Affects all SSO customers. Secondary issue: re-authentication causes loss of unsaved work.',
       priority: 'high',
       reach: 3, impact: 5, confidence: 5, effort: 2,
@@ -344,7 +335,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       effortReasoning: 'SAML parser fix is straightforward. Session warning and draft preservation are additional but well-scoped tasks.',
       impactReasoning: 'Forced re-authentication every 30 minutes disrupts all 550+ SSO users and causes data loss. Critical for Enterprise retention.',
       brief: '## Fix: SAML Session Duration\n\n### Problem\nSSO sessions expire every 30 minutes instead of honoring the IdP session duration.\n\n### Root Cause\nSAML response parser is not reading the `SessionNotOnOrAfter` attribute. Falls back to hardcoded 30-minute default.\n\n### Solution\n1. Parse `SessionNotOnOrAfter` from SAML assertion\n2. Use parsed value for session expiry, with 12-hour max cap\n3. Add "session about to expire" warning 5 minutes before expiry\n4. Auto-save form state before redirect to re-auth\n\n### Testing\n- Test with Okta (12h session)\n- Test with Azure AD (8h session)\n- Test session expiry warning timing\n- Test draft preservation across re-auth',
-      upvoteCount: 5,
     },
   },
 
@@ -364,7 +354,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'change_request',
-      title: 'Granular notification preferences with digest option',
+      name: 'Granular notification preferences with digest option',
       description: 'Users want per-category notification controls: real-time for @mentions and own task changes, digest for everything else. Current system is all-or-nothing. Needed especially for users in high-activity workspaces who get notification fatigue. Should support daily/weekly digest frequency.',
       priority: 'medium',
       reach: 5, impact: 3, confidence: 4, effort: 4,
@@ -372,7 +362,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       confidenceReasoning: 'Consistent demand across customer segments. Clear requirements from multiple conversations.',
       effortEstimate: '2-3 weeks',
       effortReasoning: 'Requires notification preferences UI, per-category routing logic, digest aggregation service, and email template work.',
-      upvoteCount: 6,
     },
   },
 
@@ -391,7 +380,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'bug',
-      title: 'Calendar view renders dates in UTC instead of user timezone',
+      name: 'Calendar view renders dates in UTC instead of user timezone',
       description: 'Calendar view grid uses UTC midnight for day boundaries instead of the user\'s local timezone. Tasks appear on the wrong day for users in positive UTC offsets (e.g., AEST shows Friday tasks on Thursday). Task detail views show correct dates. Fix needed in the calendar rendering layer.',
       priority: 'medium',
       reach: 3, impact: 3, confidence: 5, effort: 2,
@@ -417,7 +406,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'feature_request',
-      title: 'Two-way Slack integration with comments, reactions, and slash commands',
+      name: 'Two-way Slack integration with comments, reactions, and slash commands',
       description: 'Current Slack integration is one-way (notifications only). Engineers want to reply to create task comments, use emoji reactions to change task status, and create tasks via slash commands - all without leaving Slack. Key for reducing context switching for engineering-heavy teams.',
       priority: 'high',
       reach: 5, impact: 4, confidence: 4, effort: 5,
@@ -427,7 +416,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       effortReasoning: 'Major integration effort: Slack app manifest, event subscriptions, slash commands, reaction handlers, comment sync, and bidirectional state management.',
       impactReasoning: 'Slack is where ~60% of customers spend their day. Two-way sync eliminates the biggest context-switching friction and is the highest-voted feature request.',
       goalAlignments: [{ goalId: 'ia-g1', reasoning: 'A full two-way Slack integration counts as a major native integration milestone toward the 25-integration target.' }],
-      upvoteCount: 9,
     },
   },
 
@@ -480,7 +468,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'bug',
-      title: 'PDF preview infinite loading for files over 5 MB',
+      name: 'PDF preview infinite loading for files over 5 MB',
       description: 'PDF file previews in task attachments show infinite spinner for files larger than approximately 5 MB. Smaller PDFs and other file types preview normally. Regression from approximately one week ago. Likely related to PDF rendering service memory limits.',
       priority: 'medium',
       reach: 3, impact: 2, confidence: 4, effort: 2,
@@ -507,7 +495,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'feature_request',
-      title: 'Built-in time tracking with start/stop timer and reporting',
+      name: 'Built-in time tracking with start/stop timer and reporting',
       description: 'Consulting firms need built-in time tracking for client billing. Requirements: start/stop timer on task cards, manual time entry for retroactive logging, rollup reports by task/project/team member. Currently requires third-party integrations that are hard to keep in sync.',
       priority: 'low',
       reach: 2, impact: 3, confidence: 3, effort: 5,
@@ -515,7 +503,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       confidenceReasoning: 'Clear use case but existing third-party integrations partially address the need.',
       effortEstimate: '4-6 weeks',
       effortReasoning: 'Full feature build: timer UI on task cards, time entry forms, data model, rollup aggregation, and reporting views. Large scope.',
-      upvoteCount: 5,
     },
   },
 
@@ -534,7 +521,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'change_request',
-      title: 'Add WIP limits to board view columns',
+      name: 'Add WIP limits to board view columns',
       description: 'Kanban practitioners need work-in-progress limits on board columns. Requirements: configurable per-column limit, visual indicators (yellow at limit, red over), optional hard blocking (prevent drag if over limit). Core feature for teams practicing strict Kanban methodology.',
       priority: 'low',
       reach: 2, impact: 2, confidence: 4, effort: 2,
@@ -542,7 +529,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       confidenceReasoning: 'Well-defined requirements. Standard feature in dedicated Kanban tools.',
       effortEstimate: '3-5 days',
       effortReasoning: 'Per-column configuration, visual indicators, and optional drag blocking. Moderate UI work with straightforward logic.',
-      upvoteCount: 4,
     },
   },
 
@@ -608,7 +594,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'feature_request',
-      title: 'Recurring task templates with completion-triggered creation',
+      name: 'Recurring task templates with completion-triggered creation',
       description: 'Healthcare customers need recurring task groups for compliance workflows. Requirements: task template with subtasks, recurrence on monthly/quarterly/annual schedules, "create next on completion" trigger option, full audit trail of creation and completion dates. Use case: monthly compliance reviews with 15+ step checklists.',
       priority: 'high',
       reach: 4, impact: 4, confidence: 4, effort: 4,
@@ -616,7 +602,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       confidenceReasoning: '7 upvotes across regulated industries. HIPAA audit trail requirement well-documented.',
       effortEstimate: '3-4 weeks',
       effortReasoning: 'Template engine, recurrence scheduler, completion-triggered creation logic, subtask cloning, and audit trail. Significant feature build.',
-      upvoteCount: 7,
     },
   },
 
@@ -636,7 +621,7 @@ export const DEMO_SESSIONS: DemoSession[] = [
     ],
     issue: {
       type: 'change_request',
-      title: 'Add Contributor role between Member and Admin permissions',
+      name: 'Add Contributor role between Member and Admin permissions',
       description: 'Current 3-tier permission model (Admin/Member/Viewer) is too coarse for enterprise teams. Need a Contributor role that can manage tasks and content but not project settings, members, or billing. Affects organizations with 100+ users where only a few should have admin access but most need task management capabilities.',
       priority: 'medium',
       reach: 3, impact: 3, confidence: 5, effort: 3,
@@ -644,7 +629,6 @@ export const DEMO_SESSIONS: DemoSession[] = [
       confidenceReasoning: 'Very clear requirements. Standard RBAC pattern. Multiple Enterprise customers have requested this.',
       effortEstimate: '1-2 weeks',
       effortReasoning: 'New role definition, permission checks across all endpoints, UI for role assignment, and migration for existing users. Well-scoped but touches many surfaces.',
-      upvoteCount: 5,
     },
   },
 ]

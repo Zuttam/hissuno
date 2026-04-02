@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { SESSION_TAGS, SESSION_TAG_INFO, type CustomTagRecord } from '@/types/session'
+import { SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
+import { type TagOption, getVariantColor } from './utils'
 
 function ChevronDownIcon({ className }: { className?: string }) {
   return (
@@ -38,51 +39,30 @@ function XIcon({ className }: { className?: string }) {
   )
 }
 
-interface TagOption {
-  slug: string
-  label: string
-  variant: 'info' | 'success' | 'danger' | 'warning' | 'default'
-  isCustom: boolean
-}
-
 interface SessionTagFilterProps {
   /** Currently selected tag slugs */
   selectedTags: string[]
   /** Callback when selection changes */
   onChange: (tags: string[]) => void
-  /** Custom tags for the project (optional) */
-  customTags?: CustomTagRecord[]
 }
 
 /**
  * Multi-select filter component for filtering sessions by tags.
- * Supports both native tags and custom tags.
  */
 export function SessionTagFilter({
   selectedTags,
   onChange,
-  customTags = [],
 }: SessionTagFilterProps) {
   const [isOpen, setIsOpen] = useState(false)
 
-  // Build combined list of all tags (native + custom)
+  // Build list of all native tags
   const allTags = useMemo((): TagOption[] => {
-    const nativeTags: TagOption[] = SESSION_TAGS.map((tag) => ({
+    return SESSION_TAGS.map((tag) => ({
       slug: tag,
       label: SESSION_TAG_INFO[tag].label,
       variant: SESSION_TAG_INFO[tag].variant,
-      isCustom: false,
     }))
-
-    const customTagOptions: TagOption[] = customTags.map((tag) => ({
-      slug: tag.slug,
-      label: tag.name,
-      variant: (tag.color as TagOption['variant']) || 'default',
-      isCustom: true,
-    }))
-
-    return [...nativeTags, ...customTagOptions]
-  }, [customTags])
+  }, [])
 
   const handleToggleTag = useCallback(
     (slug: string) => {
@@ -98,21 +78,6 @@ export function SessionTagFilter({
   const handleClear = useCallback(() => {
     onChange([])
   }, [onChange])
-
-  const getVariantColor = (variant: TagOption['variant']) => {
-    switch (variant) {
-      case 'success':
-        return 'bg-[color:var(--accent-success)]'
-      case 'danger':
-        return 'bg-[color:var(--accent-danger)]'
-      case 'warning':
-        return 'bg-[color:var(--accent-warning)]'
-      case 'default':
-        return 'bg-[color:var(--text-tertiary)]'
-      default:
-        return 'bg-[color:var(--accent-primary)]'
-    }
-  }
 
   return (
     <div className="relative">
@@ -153,8 +118,7 @@ export function SessionTagFilter({
           />
           {/* Dropdown */}
           <div className="absolute left-0 top-full z-20 mt-1 w-full min-w-[200px] max-h-[300px] overflow-y-auto rounded-[4px] border-2 border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-lg">
-            {/* Native tags section */}
-            {allTags.filter(t => !t.isCustom).map((tag) => {
+            {allTags.map((tag) => {
               const isSelected = selectedTags.includes(tag.slug)
               return (
                 <button
@@ -176,38 +140,6 @@ export function SessionTagFilter({
                 </button>
               )
             })}
-
-            {/* Custom tags section */}
-            {customTags.length > 0 && (
-              <>
-                <div className="border-t border-[color:var(--border-subtle)] my-1" />
-                <div className="px-3 py-1 text-[10px] font-medium text-[color:var(--text-tertiary)] uppercase">
-                  Custom Tags
-                </div>
-                {allTags.filter(t => t.isCustom).map((tag) => {
-                  const isSelected = selectedTags.includes(tag.slug)
-                  return (
-                    <button
-                      key={tag.slug}
-                      type="button"
-                      onClick={() => handleToggleTag(tag.slug)}
-                      className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-[color:var(--surface-hover)] ${
-                        isSelected ? 'bg-[color:var(--surface-hover)]' : ''
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => {}}
-                        className="h-3 w-3 rounded border-[color:var(--border)] accent-[color:var(--accent-primary)]"
-                      />
-                      <span className={`h-2 w-2 rounded-full ${getVariantColor(tag.variant)}`} />
-                      {tag.label}
-                    </button>
-                  )
-                })}
-              </>
-            )}
           </div>
         </>
       )}

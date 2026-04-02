@@ -78,6 +78,7 @@ export function WidgetConfigDialog({
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isFirstSetup, setIsFirstSetup] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   // Fetch current settings when dialog opens
@@ -96,6 +97,9 @@ export function WidgetConfigDialog({
             ...DEFAULT_SETTINGS,
             ...data.settings,
           })
+          setIsFirstSetup(!data.settings.allowed_origins?.length)
+        } else {
+          setIsFirstSetup(true)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load widget settings')
@@ -198,6 +202,36 @@ import '@hissuno/widget/styles.css';
         ) : (
           <div className="max-h-[60vh] overflow-y-auto pr-1">
             <div className="flex flex-col gap-6">
+              {isFirstSetup && (
+                <InlineAlert variant="info">
+                  <strong>Setup required</strong> - Add at least one allowed origin below to enable the widget on your site.
+                </InlineAlert>
+              )}
+
+              {/* Integration - first so origins aren't missed */}
+              <div className="flex flex-col gap-4">
+                <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
+                  Integration
+                </h4>
+
+                <FormField
+                  label="Allowed Origins"
+                  description="Domains where the widget can be embedded (e.g., example.com, *.example.com). Required - the widget won't load without at least one origin. Use * to allow all origins."
+                >
+                  <ChipInput
+                    values={settings.allowed_origins}
+                    onChange={handleAllowedOriginsChange}
+                    placeholder="Add domain (e.g., example.com)"
+                  />
+                </FormField>
+
+                <Checkbox
+                  checked={settings.token_required}
+                  onChange={handleTokenRequiredChange}
+                  label="Require JWT token for widget requests"
+                />
+              </div>
+
               {/* Installation Snippet */}
               <div>
                 <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)] mb-2">
@@ -313,29 +347,6 @@ import '@hissuno/widget/styles.css';
                 </FormField>
               </div>
 
-              {/* Integration */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-medium text-[color:var(--text-secondary)] uppercase tracking-wide">
-                  Integration
-                </h4>
-
-                <FormField
-                  label="Allowed Origins"
-                  description="Domains where the widget can be embedded. Leave empty to allow all in development."
-                >
-                  <ChipInput
-                    values={settings.allowed_origins}
-                    onChange={handleAllowedOriginsChange}
-                    placeholder="Add domain (e.g., example.com)"
-                  />
-                </FormField>
-
-                <Checkbox
-                  checked={settings.token_required}
-                  onChange={handleTokenRequiredChange}
-                  label="Require JWT token for widget requests"
-                />
-              </div>
 
             </div>
           </div>
@@ -347,7 +358,7 @@ import '@hissuno/widget/styles.css';
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSave} loading={isSaving} disabled={isSaving}>
-            Save
+            {isFirstSetup ? 'Complete Setup' : 'Save'}
           </Button>
         </div>
       </div>

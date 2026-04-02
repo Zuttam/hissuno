@@ -229,11 +229,11 @@ export default function ProjectIssuesPage() {
     const itemsToExport = selection.selectedCount > 0 ? selection.selectedItems : issues
     const columns: CSVColumn<IssueWithProject>[] = [
       { key: 'id', header: 'ID' },
-      { key: 'title', header: 'Title' },
+      { key: 'name', header: 'Name' },
       { key: 'type', header: 'Type' },
       { key: 'priority', header: 'Priority' },
       { key: 'status', header: 'Status' },
-      { key: 'upvote_count', header: 'Upvotes' },
+      { key: 'session_count', header: 'Sessions' },
       { key: 'reach_score', header: 'Reach' },
       { key: 'impact_score', header: 'Impact' },
       { key: 'confidence_score', header: 'Confidence' },

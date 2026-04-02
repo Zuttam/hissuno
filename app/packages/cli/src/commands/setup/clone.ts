@@ -15,7 +15,7 @@ export async function cloneRepo(): Promise<string> {
     'clone',
     '--depth',
     '1',
-    'https://github.com/hissuno/hissuno.git',
+    'https://github.com/zuttam/hissuno.git',
     projectDir,
   ])
 

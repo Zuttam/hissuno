@@ -4,16 +4,13 @@ import { useState, useCallback, useEffect, useMemo, useRef, type JSX } from 'rea
 import { Bug, Lightbulb, RefreshCcw, type LucideIcon } from 'lucide-react'
 import { Spinner, CollapsibleSection, Badge } from '@/components/ui'
 import { archiveIssue } from '@/lib/api/issues'
-import { TrimmedText } from '@/components/ui/trimmed-text'
 import type { IssueStatus, IssuePriority, IssueType } from '@/types/issue'
 import { formatRelativeTime } from '@/lib/utils/format-time'
 import { useIssueDetail } from '@/hooks/use-issues'
 import { useProductScopes } from '@/hooks/use-product-scopes'
-import { useEntityRelationships } from '@/hooks/use-entity-relationships'
 import { useIssueAnalysis } from '@/hooks/use-issue-analysis'
 import { BriefView } from './brief-view'
 import { WorkflowProgress } from './workflow-progress'
-import { LinkedFeedbackTree } from './linked-feedback-tree'
 import { calculateRICEScore, riceScoreToPriority } from '@/lib/issues/rice'
 import { RelatedEntitiesSection } from '@/components/shared/related-entities-section'
 
@@ -97,15 +94,8 @@ export function IssueSidebar({
     isLoading,
     updateIssue,
     refresh: refreshIssue,
-    linkSession,
-    unlinkSession,
   } = useIssueDetail({ projectId, issueId })
   const { scopes: productScopes } = useProductScopes({ projectId })
-  const { relationships: issueRelationships } = useEntityRelationships({
-    projectId,
-    entityType: 'issue',
-    entityId: issue?.id ?? null,
-  })
   const [isArchiving, setIsArchiving] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<DropdownId | null>(null)
@@ -249,20 +239,23 @@ export function IssueSidebar({
           {issue && (
             <div className="mt-1">
               <h3 className="text-lg font-semibold text-[color:var(--foreground)]">
-                {issue.title}
+                {issue.name}
               </h3>
-              {issue.description && (
-                <TrimmedText text={issue.description} maxLength={150} className="mt-1" />
-              )}
+              <EditableIssueDescription
+                description={issue.description}
+                onSave={async (desc) => {
+                  const ok = await updateIssue({ description: desc })
+                  if (ok) onIssueUpdated?.()
+                  return ok
+                }}
+              />
             </div>
           )}
 
           {/* Row 2.5: Inline metadata */}
           {issue && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-[color:var(--text-tertiary)]">
-              <span>{issue.upvote_count} upvote{issue.upvote_count !== 1 ? 's' : ''}</span>
-              <span>&middot;</span>
-              <span>{issue.sessions?.length || 0} session{(issue.sessions?.length || 0) !== 1 ? 's' : ''}</span>
+              <span>{issue.session_count} session{issue.session_count !== 1 ? 's' : ''}</span>
               <span>&middot;</span>
               <span>Created {formatRelativeTime(issue.created_at)}</span>
               <span>&middot;</span>
@@ -271,15 +264,6 @@ export function IssueSidebar({
                 const scope = issue.product_scope_id
                   ? productScopes.find((a) => a.id === issue.product_scope_id)
                   : productScopes.find((a) => a.is_default) ?? null
-                const scopeRel = issueRelationships.productScopes.find(
-                  (ps) => ps.id === issue.product_scope_id
-                )
-                const scopeMeta = (scopeRel?.metadata ?? null) as {
-                  matchedGoalId?: string
-                  matchedGoalText?: string
-                  reasoning?: string
-                } | null
-
                 if (scope) {
                   return (
                     <>
@@ -287,11 +271,6 @@ export function IssueSidebar({
                       <Badge variant={scope.color as 'info' | 'success' | 'warning' | 'danger' | 'default'}>
                         {scope.name}
                       </Badge>
-                      {scopeMeta?.matchedGoalText && (
-                        <span title={scopeMeta.reasoning} className="cursor-help text-[color:var(--text-tertiary)]">
-                          Goal: {scopeMeta.matchedGoalText}
-                        </span>
-                      )}
                     </>
                   )
                 }
@@ -524,22 +503,12 @@ export function IssueSidebar({
               </CollapsibleSection>
             </div>
 
-            {/* Linked Feedback */}
-            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <LinkedFeedbackTree
-                sessions={issue.sessions ?? []}
-                projectId={projectId}
-                onLinkSession={linkSession}
-                onUnlinkSession={unlinkSession}
-              />
-            </div>
-
             {/* Related Entities */}
             <RelatedEntitiesSection
               projectId={projectId}
               entityType="issue"
               entityId={issueId}
-              allowedTypes={['company', 'contact', 'knowledge_source']}
+              allowedTypes={['session', 'company', 'contact', 'knowledge_source', 'product_scope']}
             />
 
             {/* Brief */}
@@ -552,7 +521,7 @@ export function IssueSidebar({
                 {issue.brief ? (
                   <BriefView
                     brief={issue.brief}
-                    issueTitle={issue.title}
+                    issueTitle={issue.name}
                   />
                 ) : (
                   <p className="text-sm text-[color:var(--text-secondary)]">
@@ -729,6 +698,96 @@ function EditableScoreRow({
           </svg>
         </button>
       </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Editable Issue Description (click-to-edit in header)
+// ============================================================================
+
+function EditableIssueDescription({
+  description,
+  onSave,
+}: {
+  description: string | null | undefined
+  onSave: (newValue: string) => Promise<boolean>
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(description ?? '')
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleStartEdit = () => {
+    setEditValue(description ?? '')
+    setIsEditing(true)
+  }
+
+  const handleCancel = () => {
+    setEditValue(description ?? '')
+    setIsEditing(false)
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    const success = await onSave(editValue)
+    setIsSaving(false)
+    if (success) setIsEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') handleCancel()
+  }
+
+  if (isEditing) {
+    return (
+      <div className="mt-1 flex items-start gap-1">
+        <textarea
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          rows={2}
+          className="flex-1 rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-2 py-1 text-sm text-[color:var(--foreground)] outline-none focus:border-[color:var(--accent-selected)]"
+          placeholder="Add a description..."
+        />
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={isSaving}
+          className="rounded-[4px] p-1 text-[color:var(--accent-success)] transition hover:bg-[color:var(--surface-hover)] disabled:opacity-50"
+          aria-label="Save"
+        >
+          {isSaving ? (
+            <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" /></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="rounded-[4px] p-1 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
+          aria-label="Cancel"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group mt-1 flex items-start gap-1">
+      <p className={`flex-1 text-sm ${description ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-tertiary)]'}`}>
+        {description || 'Add a description...'}
+      </p>
+      <button
+        type="button"
+        onClick={handleStartEdit}
+        className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+        aria-label="Edit description"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+      </button>
     </div>
   )
 }

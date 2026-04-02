@@ -10,14 +10,14 @@ import { formatSearchResults, renderJson, error } from '../lib/output.js'
 export const searchCommand = new Command('search')
   .description('Search across resources using natural language')
   .argument('<query>', 'Search query')
-  .option('--type <type>', 'Limit to one resource type (knowledge|feedback|issues|customers)')
+  .option('--type <type>', 'Limit to one resource type (knowledge|feedback|issues|customers|scopes)')
   .option('--limit <n>', 'Max results (default: 10)', '10')
   .action(async (query, opts, cmd) => {
     const config = requireConfig()
     const jsonMode = cmd.parent?.opts().json
 
     if (opts.type) {
-      const validTypes = ['knowledge', 'feedback', 'issues', 'customers']
+      const validTypes = ['knowledge', 'feedback', 'issues', 'customers', 'scopes']
       if (!validTypes.includes(opts.type)) {
         error(`Invalid type "${opts.type}". Must be one of: ${validTypes.join(', ')}`)
         process.exit(1)

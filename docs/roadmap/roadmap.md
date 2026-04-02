@@ -10,3 +10,7 @@ Upcoming features and improvements for Hissuno. Each plan links to a detailed de
 | [Hissuno Setup Skill](plans/hissuno-setup-skill.md) | Planned | Claude Code skill for automated Neon + Vercel environment provisioning |
 | [Multi-Provider Model Support](plans/multi-provider-model-support.md) | Planned | Configure AI provider and model per agent via env vars with tier-based fallbacks |
 | [Multi-Instance Integrations](plans/multi-instance-integrations.md) | Planned | Support multiple connections of the same integration type per project (e.g., two Fathom accounts) |
+| [Audit Trail](plans/audit-trail.md) | Planned | Append-only audit events table tracking which identity performed what action on which resource |
+| [Agent Identity](plans/agent-identity.md) | Planned | Agent registry with token linkage for traceable agent-as-identity under user scope (depends on Audit Trail) |
+| [Rename knowledge_package to support_package](plans/rename-knowledge-package-to-support-package.md) | Planned | Rename DB tables and code references to disambiguate support packages from general knowledge sources |
+| [GitHub Issues as Feedback](plans/github-issues-as-feedback.md) | Planned | Extend GitHub integration to sync issues as feedback sessions, with multi-resource mapping pattern from Notion |

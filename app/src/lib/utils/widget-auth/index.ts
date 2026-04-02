@@ -25,7 +25,8 @@ export type JWTVerificationResult =
  * @returns true if origin is allowed, false otherwise
  *
  * Behavior:
- * - If allowedOrigins is null/empty → allow all (development mode)
+ * - If allowedOrigins is null/empty -> deny all (secure-by-default)
+ * - If allowedOrigins contains "*" -> allow all origins (explicit opt-in)
  * - Supports wildcard matching: "*.example.com" matches "sub.example.com"
  * - Case-insensitive comparison
  */
@@ -33,12 +34,21 @@ export function isOriginAllowed(
   requestOrigin: string | null,
   allowedOrigins: string[] | null
 ): boolean {
-  // If no allowed origins configured, allow all (dev mode)
+  // Secure-by-default: deny when no origins are configured
   if (!allowedOrigins || allowedOrigins.length === 0) {
+    console.warn(
+      `[widget-auth] No allowed_origins configured. Origin "${requestOrigin}" denied. `
+      + 'Configure via dashboard (Integrations > Widget) or CLI: hissuno integrations widget --origins <domain>',
+    )
+    return false
+  }
+
+  // Explicit wildcard: allow all origins (opt-in)
+  if (allowedOrigins.includes('*')) {
     return true
   }
 
-  // If no origin, reject (shouldn't happen with getRequestOrigin helper)
+  // If no origin header, reject
   if (!requestOrigin) {
     return false
   }

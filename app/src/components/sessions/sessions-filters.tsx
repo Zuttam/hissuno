@@ -6,7 +6,6 @@ import { Input, Select, CollapsibleSection, Button, Combobox, FilterChip, Filter
 import type { SessionFilters, SessionSource } from '@/types/session'
 import { SESSION_SOURCE_INFO, SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
 import type { ProjectRow } from '@/lib/db/queries/projects'
-import { useCustomTags } from '@/hooks/use-custom-tags'
 import { useProductScopes } from '@/hooks/use-product-scopes'
 import { getSourceIcon } from '@/lib/constants/source-icons'
 
@@ -28,7 +27,6 @@ export function SessionsFilters({
   companies,
   contacts,
 }: SessionsFiltersProps) {
-  const { tags: customTags } = useCustomTags({ projectId: filters.projectId })
   const { scopes: productScopes } = useProductScopes({ projectId: filters.projectId })
 
   // Product scope handler
@@ -180,9 +178,6 @@ export function SessionsFilters({
     ? `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'} active`
     : undefined
 
-  // All custom tag slugs
-  const customTagSlugs = useMemo(() => customTags.map((t) => t.slug), [customTags])
-
   const companyItems = useMemo(
     () => (companies ?? []).map((c) => ({ value: c.id, label: c.name })),
     [companies]
@@ -257,20 +252,6 @@ export function SessionsFilters({
             onClick={() => handleTagToggle(tag)}
           />
         ))}
-        {customTags.length > 0 && (
-          <>
-            <span className="ml-2" />
-            <FilterLabel>Custom:</FilterLabel>
-            {customTags.map((tag) => (
-              <FilterChip
-                key={tag.slug}
-                label={tag.name}
-                active={filters.tags?.includes(tag.slug) ?? false}
-                onClick={() => handleTagToggle(tag.slug)}
-              />
-            ))}
-          </>
-        )}
       </div>
 
       {/* Row 2: Source + Archived */}
@@ -293,7 +274,7 @@ export function SessionsFilters({
         />
       </div>
 
-      {/* Row 3: Product Scope */}
+      {/* Row 3: Scope */}
       {productScopes.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
           <FilterLabel>Scope:</FilterLabel>

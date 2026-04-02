@@ -18,9 +18,9 @@ import { NextRequest, NextResponse } from 'next/server'
 // MOCKS
 // ============================================================================
 
-const mockAuth = vi.fn()
-vi.mock('@/lib/auth/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+const mockGetToken = vi.fn()
+vi.mock('next-auth/jwt', () => ({
+  getToken: (...args: unknown[]) => mockGetToken(...args),
 }))
 
 const mockResolveApiKey = vi.fn()
@@ -32,11 +32,11 @@ vi.mock('@/lib/auth/api-keys', () => ({
 const mockDbLimit = vi.fn()
 const mockDbWhere = vi.fn(() => ({ limit: mockDbLimit }))
 const mockDbFrom = vi.fn(() => ({ where: mockDbWhere }))
-const mockDbSelect = vi.fn(() => ({ from: mockDbFrom }))
+const mockDbSelect = vi.fn((..._args: any[]) => ({ from: mockDbFrom }))
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: (...args: unknown[]) => mockDbSelect(...args),
+    select: (...args: any[]) => mockDbSelect(...args),
   },
 }))
 
@@ -80,7 +80,7 @@ function createRequest(
   },
 ): NextRequest {
   const url = `${BASE_URL}${path}`
-  const init: RequestInit = {
+  const init = {
     method: options?.method ?? 'GET',
     headers: options?.headers ?? {},
   }
@@ -109,12 +109,10 @@ function setupAuthenticatedSession(user: {
   email?: string | null
   name?: string | null
 }) {
-  mockAuth.mockResolvedValue({
-    user: {
-      id: user.id,
-      email: user.email ?? null,
-      name: user.name ?? null,
-    },
+  mockGetToken.mockResolvedValue({
+    id: user.id,
+    email: user.email ?? null,
+    name: user.name ?? null,
   })
 }
 
@@ -131,7 +129,7 @@ function setupUserProfile(profile: {
 beforeEach(() => {
   vi.clearAllMocks()
   // Default: no session, no profile
-  mockAuth.mockResolvedValue(null)
+  mockGetToken.mockResolvedValue(null)
   mockDbLimit.mockResolvedValue([])
 })
 
@@ -158,7 +156,7 @@ describe('identity header stripping', () => {
       expect(forwarded?.get(header)).toBeFalsy()
     }
     // auth() should NOT be called for /api/auth paths
-    expect(mockAuth).not.toHaveBeenCalled()
+    expect(mockGetToken).not.toHaveBeenCalled()
   })
 
   it('strips all identity headers from public paths', async () => {
@@ -175,7 +173,7 @@ describe('identity header stripping', () => {
   })
 
   it('strips identity headers when no session exists on protected paths', async () => {
-    mockAuth.mockResolvedValue(null)
+    mockGetToken.mockResolvedValue(null)
 
     const request = createRequest('/api/projects', {
       headers: { 'x-user-id': 'spoofed-user' },
@@ -198,7 +196,7 @@ describe('/api/auth passthrough', () => {
     const response = await proxy(request)
 
     expect(response.status).toBe(200)
-    expect(mockAuth).not.toHaveBeenCalled()
+    expect(mockGetToken).not.toHaveBeenCalled()
   })
 
   it('passes through /api/auth/callback/google', async () => {
@@ -206,7 +204,7 @@ describe('/api/auth passthrough', () => {
     const response = await proxy(request)
 
     expect(response.status).toBe(200)
-    expect(mockAuth).not.toHaveBeenCalled()
+    expect(mockGetToken).not.toHaveBeenCalled()
   })
 })
 
@@ -375,7 +373,7 @@ describe('authenticated session flow', () => {
   })
 
   it('redirects unauthenticated page requests to /login with redirectTo', async () => {
-    mockAuth.mockResolvedValue(null)
+    mockGetToken.mockResolvedValue(null)
 
     const request = createRequest('/projects/abc/settings')
     const response = await proxy(request)
@@ -387,7 +385,7 @@ describe('authenticated session flow', () => {
   })
 
   it('returns 401 JSON for unauthenticated API requests (no API key)', async () => {
-    mockAuth.mockResolvedValue(null)
+    mockGetToken.mockResolvedValue(null)
 
     const request = createRequest('/api/projects')
     const response = await proxy(request)
@@ -405,7 +403,7 @@ describe('authenticated session flow', () => {
 describe('API key authentication', () => {
   beforeEach(() => {
     // No session (API key auth only applies when no session)
-    mockAuth.mockResolvedValue(null)
+    mockGetToken.mockResolvedValue(null)
   })
 
   it('authenticates with a valid hiss_ API key', async () => {
@@ -569,7 +567,7 @@ describe('marketing path (root /)', () => {
   })
 
   it('passes through for unauthenticated users on /', async () => {
-    mockAuth.mockResolvedValue(null)
+    mockGetToken.mockResolvedValue(null)
 
     const request = createRequest('/')
     const response = await proxy(request)
@@ -578,7 +576,7 @@ describe('marketing path (root /)', () => {
   })
 
   it('redirects OAuth errors from / to /login with error params', async () => {
-    mockAuth.mockResolvedValue(null)
+    mockGetToken.mockResolvedValue(null)
 
     const request = createRequest('/?error=access_denied&error_description=User+denied')
     const response = await proxy(request)
@@ -597,7 +595,7 @@ describe('marketing path (root /)', () => {
 
 describe('auth() failure', () => {
   it('returns 401 for API routes when auth() throws', async () => {
-    mockAuth.mockRejectedValue(new Error('auth session corrupted'))
+    mockGetToken.mockRejectedValue(new Error('auth session corrupted'))
 
     const request = createRequest('/api/projects')
     const response = await proxy(request)
@@ -606,7 +604,7 @@ describe('auth() failure', () => {
   })
 
   it('redirects page routes to /login with error when auth() throws', async () => {
-    mockAuth.mockRejectedValue(new Error('session expired'))
+    mockGetToken.mockRejectedValue(new Error('session expired'))
 
     const request = createRequest('/dashboard')
     const response = await proxy(request)
@@ -618,7 +616,7 @@ describe('auth() failure', () => {
   })
 
   it('strips identity headers when auth() throws', async () => {
-    mockAuth.mockRejectedValue(new Error('crash'))
+    mockGetToken.mockRejectedValue(new Error('crash'))
 
     const request = createRequest('/api/test', {
       headers: { 'x-user-id': 'should-be-stripped' },

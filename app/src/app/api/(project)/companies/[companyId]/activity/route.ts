@@ -75,16 +75,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
     ])
 
     const issueIds = [...new Set(issueLinks.map((r) => r.issue_id).filter((id): id is string => id !== null))]
-    let companyIssues: Array<{ id: string; title: string; type: string; status: string }> = []
+    let companyIssues: Array<{ id: string; name: string; type: string; status: string }> = []
     if (issueIds.length > 0) {
       const issueRows = await db
-        .select({ id: issues.id, title: issues.title, type: issues.type, status: issues.status })
+        .select({ id: issues.id, name: issues.name, type: issues.type, status: issues.status })
         .from(issues)
         .where(inArray(issues.id, issueIds))
 
       companyIssues = issueRows.map((i) => ({
         id: i.id,
-        title: i.title,
+        name: i.name,
         type: i.type ?? 'bug',
         status: i.status ?? 'open',
       }))

@@ -6,8 +6,8 @@ import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-cont
 import { listSessions, getProjectIntegrationStats } from '@/lib/db/queries/sessions'
 import { createSession } from '@/lib/sessions/sessions-service'
 import { isDatabaseConfigured } from '@/lib/db/config'
-import type { SessionFilters, CreateSessionInput, CreateMessageInput, SessionTag, SessionType } from '@/types/session'
-import { SESSION_TAGS } from '@/types/session'
+import type { SessionFilters, CreateSessionInput, CreateMessageInput, SessionTag, SessionType, SessionSource } from '@/types/session'
+import { SESSION_TAGS, SESSION_SOURCES } from '@/types/session'
 
 const VALID_SESSION_TYPES: SessionType[] = ['chat', 'meeting', 'behavioral']
 
@@ -107,19 +107,25 @@ export async function POST(request: NextRequest) {
     // Parse and validate messages
     let messages: CreateMessageInput[] | undefined
     if (body.messages && Array.isArray(body.messages)) {
-      messages = body.messages
-        .filter(
-          (msg: { role?: string; content?: string }) =>
-            msg.role &&
-            (msg.role === 'user' || msg.role === 'assistant') &&
-            msg.content &&
-            typeof msg.content === 'string' &&
-            msg.content.trim()
-        )
-        .map((msg: { role: 'user' | 'assistant'; content: string }) => ({
-          role: msg.role,
-          content: msg.content.trim(),
-        }))
+      const VALID_ROLES = new Set(['user', 'assistant'])
+      for (const msg of body.messages) {
+        if (!msg.role || !VALID_ROLES.has(msg.role)) {
+          return NextResponse.json(
+            { error: `Invalid message role "${msg.role}". Must be "user" or "assistant".` },
+            { status: 400 },
+          )
+        }
+        if (!msg.content || typeof msg.content !== 'string' || !msg.content.trim()) {
+          return NextResponse.json(
+            { error: 'Each message must have non-empty "content".' },
+            { status: 400 },
+          )
+        }
+      }
+      messages = body.messages.map((msg: { role: 'user' | 'assistant'; content: string }) => ({
+        role: msg.role,
+        content: msg.content.trim(),
+      }))
     }
 
     // Validate session_type if provided
@@ -134,17 +140,47 @@ export async function POST(request: NextRequest) {
       sessionType = body.session_type
     }
 
+    // Validate source if provided
+    let source: SessionSource | undefined
+    if (body.source) {
+      if (!SESSION_SOURCES.includes(body.source)) {
+        return NextResponse.json(
+          { error: `Invalid source. Must be one of: ${SESSION_SOURCES.join(', ')}` },
+          { status: 400 },
+        )
+      }
+      source = body.source
+    }
+
+    // Validate status if provided
+    let status: 'active' | 'closed' | undefined
+    if (body.status) {
+      if (body.status !== 'active' && body.status !== 'closed') {
+        return NextResponse.json(
+          { error: 'Invalid status. Must be "active" or "closed".' },
+          { status: 400 },
+        )
+      }
+      status = body.status
+    }
+
+    // Merge contact_email into user_metadata so contact resolution can find it
+    const contactEmail = body.contact_email || undefined
+    const userMetadata: Record<string, string> = {
+      ...(body.user_metadata || {}),
+      ...(body.user_id ? { userId: body.user_id } : {}),
+      ...(contactEmail ? { email: contactEmail } : {}),
+    }
+
     const input: CreateSessionInput = {
       project_id: projectId,
+      status,
       name: body.name || undefined,
       description: body.description || undefined,
       session_type: sessionType,
       contact_id: body.contact_id || undefined,
       linked_entities: body.linked_entities || undefined,
-      user_metadata: {
-        ...(body.user_metadata || {}),
-        ...(body.user_id ? { userId: body.user_id } : {}),
-      },
+      user_metadata: userMetadata,
       page_url: body.page_url || undefined,
       page_title: body.page_title || undefined,
       tags,
@@ -153,7 +189,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Note: Limits are enforced at analysis time (PM review), not at session creation
-    const session = await createSession(input)
+    const session = await createSession({ ...input, source })
 
     return NextResponse.json({ session }, { status: 201 })
   } catch (error) {

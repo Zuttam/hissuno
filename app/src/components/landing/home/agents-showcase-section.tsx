@@ -15,12 +15,12 @@ interface AgentRow {
 
 const AGENTS: AgentRow[] = [
   {
-    id: 'support-agent',
-    icon: MessageSquare,
-    headline: 'AI Support, Grounded in Your Product',
+    id: 'your-agent',
+    icon: Wrench,
+    headline: 'Your Agent, Our Data',
     description:
-      'Resolves questions using product knowledge, codebase context, and customer history.',
-    href: '/landing/support-agent',
+      'Connect any AI agent to the graph via MCP, CLI, or API. Build workflows on shared context.',
+    href: '/docs',
   },
   {
     id: 'pm-copilot',
@@ -31,12 +31,12 @@ const AGENTS: AgentRow[] = [
     href: '/landing/pm-copilot',
   },
   {
-    id: 'your-agent',
-    icon: Wrench,
-    headline: 'Your Agent, Our Data',
+    id: 'support-agent',
+    icon: MessageSquare,
+    headline: 'AI Support, Grounded in Your Product',
     description:
-      'Connect any AI agent to the graph via MCP, CLI, or API. Build workflows on shared context.',
-    href: '/docs',
+      'Resolves questions using product knowledge, codebase context, and customer history.',
+    href: '/landing/support-agent',
   },
 ]
 

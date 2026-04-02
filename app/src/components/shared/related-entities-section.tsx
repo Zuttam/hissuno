@@ -20,7 +20,7 @@ const TYPE_LABELS: Record<EntityType, string> = {
   issue: 'Issues',
   session: 'Feedback',
   knowledge_source: 'Knowledge',
-  product_scope: 'Product Scopes',
+  product_scope: 'Scopes',
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ function getGroupItems(
     case 'contact':
       return relationships.contacts.map((c) => ({ id: c.id, label: c.name, sublabel: c.email }))
     case 'issue':
-      return relationships.issues.map((i) => ({ id: i.id, label: i.title, sublabel: i.status ?? undefined }))
+      return relationships.issues.map((i) => ({ id: i.id, label: i.name, sublabel: i.status ?? undefined }))
     case 'session':
       return relationships.sessions.map((s) => ({ id: s.id, label: s.name || 'Unnamed', sublabel: s.source ?? undefined }))
     case 'knowledge_source':
@@ -259,50 +259,38 @@ function LinkSearch({ projectId, relatedType, existingIds, onSelect }: LinkSearc
   )
 }
 
+const ENTITY_TO_SEARCH_TYPE: Record<EntityType, string> = {
+  company: 'customers',
+  contact: 'customers',
+  issue: 'issues',
+  session: 'feedback',
+  knowledge_source: 'knowledge',
+  product_scope: 'scopes',
+}
+
+const ENTITY_TO_SUBTYPE: Partial<Record<EntityType, string>> = {
+  company: 'company',
+  contact: 'contact',
+}
+
 export async function searchEntities(
   projectId: string,
   type: EntityType,
   query: string,
 ): Promise<ComboboxItem[]> {
-  switch (type) {
-    case 'company': {
-      const data = await fetchApi<{ companies: Array<{ id: string; name: string }> }>(
-        buildUrl('/api/companies', { projectId, search: query, limit: 10 }),
-      )
-      return (data.companies ?? []).map((c) => ({ value: c.id, label: c.name }))
-    }
-    case 'contact': {
-      const data = await fetchApi<{ contacts: Array<{ id: string; name: string }> }>(
-        buildUrl('/api/contacts', { projectId, search: query, limit: 10 }),
-      )
-      return (data.contacts ?? []).map((c) => ({ value: c.id, label: c.name }))
-    }
-    case 'issue': {
-      const data = await fetchApi<{ issues: Array<{ id: string; title: string }> }>(
-        buildUrl('/api/issues', { projectId, search: query, limit: 10 }),
-      )
-      return (data.issues ?? []).map((i) => ({ value: i.id, label: i.title }))
-    }
-    case 'session': {
-      const data = await fetchApi<{ sessions: Array<{ id: string; name: string | null }> }>(
-        buildUrl('/api/sessions', { projectId, search: query, limit: 10 }),
-      )
-      return (data.sessions ?? []).map((s) => ({ value: s.id, label: s.name || 'Unnamed' }))
-    }
-    case 'knowledge_source': {
-      const data = await fetchApi<{ sources: Array<{ id: string; name: string | null }> }>(
-        buildUrl('/api/knowledge/sources', { projectId, search: query }),
-      )
-      return (data.sources ?? []).map((k) => ({ value: k.id, label: k.name || 'Unnamed' }))
-    }
-    case 'product_scope': {
-      const data = await fetchApi<{ productScopes: Array<{ id: string; name: string }> }>(
-        buildUrl('/api/product-scopes', { projectId }),
-      )
-      const lower = query.toLowerCase()
-      return (data.productScopes ?? [])
-        .filter((p) => p.name.toLowerCase().includes(lower))
-        .map((p) => ({ value: p.id, label: p.name }))
-    }
+  const searchType = ENTITY_TO_SEARCH_TYPE[type]
+  const subtypeFilter = ENTITY_TO_SUBTYPE[type]
+
+  const data = await fetchApi<{
+    results: Array<{ id: string; name: string; subtype?: string }>
+  }>(buildUrl('/api/search', { projectId, q: query, type: searchType, limit: '10' }))
+
+  let results = data.results ?? []
+
+  // For customers, filter by subtype (contact vs company)
+  if (subtypeFilter) {
+    results = results.filter((r) => r.subtype === subtypeFilter)
   }
+
+  return results.map((r) => ({ value: r.id, label: r.name || 'Unnamed' }))
 }

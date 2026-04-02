@@ -8,7 +8,30 @@ export interface PostgresResult {
   isDocker: boolean
 }
 
-export async function detectPostgres(): Promise<PostgresResult> {
+export async function detectPostgres(opts?: { databaseUrl?: string; postgresMethod?: string }): Promise<PostgresResult> {
+  // If a database URL is provided directly, skip all prompts
+  if (opts?.databaseUrl) {
+    return { databaseUrl: opts.databaseUrl, needsCreateDb: false, isDocker: false }
+  }
+
+  // If a postgres method is provided, skip the interactive selection
+  if (opts?.postgresMethod) {
+    switch (opts.postgresMethod) {
+      case 'docker':
+        return installViaDocker()
+      case 'brew':
+        return installViaBrew()
+      case 'apt':
+        return installViaApt()
+      case 'manual':
+        throw new Error('--postgres-method=manual requires --database-url to be provided')
+      case 'local':
+        return { databaseUrl: 'postgresql://localhost:5432/hissuno', needsCreateDb: true, isDocker: false }
+      default:
+        throw new Error(`Unknown postgres method "${opts.postgresMethod}". Valid methods: brew, apt, docker, manual, local`)
+    }
+  }
+
   const hasPsql = await commandExists('psql')
 
   if (hasPsql) {

@@ -8,6 +8,7 @@ import { eq, and, desc, ilike, or, count as drizzleCount, inArray, isNotNull } f
 import { db } from '@/lib/db'
 import { contacts, sessions, issues, entityRelationships } from '@/lib/db/schema/app'
 import { sanitizeSearchInput } from '@/lib/db/server'
+import { batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
 import type {
   ContactRecord,
   ContactWithCompany,
@@ -237,10 +238,10 @@ export interface ContactLinkedSession {
 
 export interface ContactLinkedIssue {
   id: string
-  title: string
+  name: string
   type: IssueType
   status: IssueStatus
-  upvote_count: number
+  session_count: number
   created_at: string
 }
 
@@ -338,25 +339,28 @@ export async function getContactLinkedIssues(contactId: string, limit = 20): Pro
 
     if (issueIds.length === 0) return []
 
-    // Step 3: Fetch issue details
-    const issueRows = await db
-      .select({
-        id: issues.id,
-        title: issues.title,
-        type: issues.type,
-        status: issues.status,
-        upvote_count: issues.upvote_count,
-        created_at: issues.created_at,
-      })
-      .from(issues)
-      .where(inArray(issues.id, issueIds.slice(0, limit)))
+    // Step 3: Fetch issue details + session counts in parallel
+    const slicedIds = issueIds.slice(0, limit)
+    const [issueRows, sessionCounts] = await Promise.all([
+      db
+        .select({
+          id: issues.id,
+          name: issues.name,
+          type: issues.type,
+          status: issues.status,
+          created_at: issues.created_at,
+        })
+        .from(issues)
+        .where(inArray(issues.id, slicedIds)),
+      batchGetIssueSessionCounts(slicedIds),
+    ])
 
     return issueRows.map((issue) => ({
       id: issue.id,
-      title: issue.title,
+      name: issue.name,
       type: issue.type as IssueType,
       status: issue.status as IssueStatus,
-      upvote_count: issue.upvote_count ?? 0,
+      session_count: sessionCounts.get(issue.id) ?? 0,
       created_at: issue.created_at?.toISOString() ?? new Date().toISOString(),
     }))
   } catch (error) {

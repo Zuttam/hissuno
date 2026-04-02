@@ -3,11 +3,16 @@ import { confirm } from '@inquirer/prompts'
 import { execCapture } from '../../lib/exec.js'
 import { log } from '../../lib/log.js'
 
-export async function seedDatabase(appDir: string, envFile = '.env.local'): Promise<{ seeded: boolean; apiKey?: string }> {
-  const shouldSeed = await confirm({
-    message: 'Seed with demo data? (admin user + project with sample sessions, issues, companies, and contacts)',
-    default: true,
-  })
+export async function seedDatabase(appDir: string, envFile = '.env.local', seed?: boolean): Promise<{ seeded: boolean; apiKey?: string }> {
+  let shouldSeed: boolean
+  if (seed !== undefined) {
+    shouldSeed = seed
+  } else {
+    shouldSeed = await confirm({
+      message: 'Seed with demo data? (admin user + project with sample sessions, issues, companies, and contacts)',
+      default: true,
+    })
+  }
 
   if (!shouldSeed) {
     log.info('Skipping seed')

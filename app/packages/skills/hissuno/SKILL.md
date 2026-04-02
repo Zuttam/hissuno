@@ -140,6 +140,24 @@ hissuno profile use staging                      # Switch to staging profile
 hissuno skills install                           # Install skills for Claude Code
 ```
 
+## Product Workflows
+
+Hissuno includes workflow skills that guide agents through structured product processes using the graph layer. Each is a standalone skill with its own trigger:
+
+| Skill | Use When |
+|-------|----------|
+| `hissuno-market-analysis` | Analyzing a product area or initiative - demand, competitors, market context, feasibility |
+| `hissuno-customer-health` | Assessing a customer account - feedback history, open issues, sentiment, health |
+
+These are templates. To create your own workflow skill:
+
+1. Create a new directory: `hissuno-<your-workflow-name>/`
+2. Add a `SKILL.md` with frontmatter (`name`, `description` with trigger keywords) and your phased procedure
+3. Use `hissuno` CLI commands in each step to query and enrich the graph
+4. Run `hissuno skills install` to deploy
+
+See any existing workflow skill's `SKILL.md` for the pattern.
+
 ## MCP Access (Alternative)
 
 Everything above can also be accessed via MCP tools if you prefer structured tool calls over CLI. See `references/MCP-TOOLS.md` for setup and usage.

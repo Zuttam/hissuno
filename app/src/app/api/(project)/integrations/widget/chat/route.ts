@@ -75,8 +75,16 @@ export async function GET(request: NextRequest) {
 
     // Check origin for widget requests
     if (!isOriginAllowed(origin, project.allowed_origins)) {
+      const hasOrigins = project.allowed_origins && project.allowed_origins.length > 0
       return addWidgetCorsHeaders(
-        NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
+        NextResponse.json({
+          error: 'Origin not allowed',
+          blocked: true,
+          reason: hasOrigins
+            ? `Origin "${origin}" is not in the allowed origins list.`
+            : 'No allowed origins configured for this project.',
+          help: 'Add your domain to the allowed origins list in Integrations > Widget, or via CLI: hissuno integrations widget --origins <domain>',
+        }, { status: 403 }),
         origin, CORS_METHODS
       )
     }
@@ -140,8 +148,16 @@ export async function POST(request: NextRequest) {
 
     // Always check origin
     if (!isOriginAllowed(origin, project.allowed_origins)) {
+      const hasOrigins = project.allowed_origins && project.allowed_origins.length > 0
       return addWidgetCorsHeaders(
-        NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }),
+        NextResponse.json({
+          error: 'Origin not allowed',
+          blocked: true,
+          reason: hasOrigins
+            ? `Origin "${origin}" is not in the allowed origins list.`
+            : 'No allowed origins configured for this project.',
+          help: 'Add your domain to the allowed origins list in Integrations > Widget, or via CLI: hissuno integrations widget --origins <domain>',
+        }, { status: 403 }),
         origin, CORS_METHODS
       )
     }

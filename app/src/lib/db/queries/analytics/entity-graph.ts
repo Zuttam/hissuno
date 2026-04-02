@@ -148,7 +148,7 @@ async function fetchRecentEntities(
         .orderBy(desc(contacts.created_at))
         .limit(5),
       db
-        .select({ id: issues.id, title: issues.title, type: issues.type })
+        .select({ id: issues.id, name: issues.name, type: issues.type })
         .from(issues)
         .where(eq(issues.project_id, projectId))
         .orderBy(desc(issues.created_at))
@@ -195,7 +195,7 @@ async function fetchRecentEntities(
 
   return {
     customer: customerEntities.map(({ _sortDate: _, ...rest }) => rest),
-    issue: issueRows.map(r => ({ id: r.id, category: 'issue' as const, label: r.title, sublabel: r.type })),
+    issue: issueRows.map(r => ({ id: r.id, category: 'issue' as const, label: r.name, sublabel: r.type })),
     session: sessionRows.map(r => ({
       id: r.id,
       category: 'session' as const,
@@ -256,9 +256,9 @@ async function batchFetchEntityLabels(
       break
     }
     case 'issue': {
-      const rows = await db.select({ id: issues.id, title: issues.title, type: issues.type })
+      const rows = await db.select({ id: issues.id, name: issues.name, type: issues.type })
         .from(issues).where(inArray(issues.id, idArray))
-      for (const r of rows) map.set(r.id, { label: r.title, sublabel: r.type })
+      for (const r of rows) map.set(r.id, { label: r.name, sublabel: r.type })
       break
     }
     case 'session': {
@@ -491,9 +491,9 @@ export async function getCategoryEntities(
     case 'issue': {
       const conditions = [eq(issues.project_id, projectId)]
       if (groupBy === 'status' && groupValue) conditions.push(eq(issues.status, groupValue))
-      const rows = await db.select({ id: issues.id, title: issues.title, type: issues.type })
+      const rows = await db.select({ id: issues.id, name: issues.name, type: issues.type })
         .from(issues).where(and(...conditions)).orderBy(desc(issues.created_at)).limit(limit)
-      return rows.map(r => ({ id: r.id, label: r.title, sublabel: r.type, entityType: 'issue' as const }))
+      return rows.map(r => ({ id: r.id, label: r.name, sublabel: r.type, entityType: 'issue' as const }))
     }
     case 'session': {
       const conditions = [eq(sessions.project_id, projectId)]

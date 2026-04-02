@@ -3,8 +3,9 @@
 import { useState, useCallback, type ChangeEvent } from 'react'
 import { Button, Input, Select, IconButton, FormField } from '@/components/ui'
 import { useCustomFields } from '@/hooks/use-custom-fields'
-import type { CustomerEntityType, CustomFieldType, CustomFieldDefinition } from '@/types/customer'
-import { CUSTOM_FIELD_TYPES } from '@/types/customer'
+import type { CustomFieldType, CustomFieldDefinition } from '@/types/ontology'
+import { CUSTOM_FIELD_TYPES } from '@/types/ontology'
+import type { EntityType } from '@/lib/db/queries/types'
 import {
   Type, Hash, Calendar, Check, ChevronDown, Link, List, Tag, AlertCircle,
   type LucideIcon,
@@ -19,6 +20,7 @@ const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   date: 'Date',
   boolean: 'Yes/No',
   select: 'Select',
+  multi_select: 'Multi-Select',
 }
 
 const FIELD_TYPE_ICONS: Record<string, LucideIcon> = {
@@ -28,6 +30,7 @@ const FIELD_TYPE_ICONS: Record<string, LucideIcon> = {
   'yes/no': Check,
   boolean: Check,
   select: ChevronDown,
+  multi_select: List,
   relation: Link,
   'multi-select': List,
   tag: Tag,
@@ -55,11 +58,12 @@ const EMPTY_FORM: FieldFormState = {
 export interface BuiltInField {
   label: string
   type: string
+  options?: string[]
 }
 
 interface FieldsEditorProps {
   projectId: string
-  entityType: CustomerEntityType
+  entityType: EntityType
   builtInFields?: BuiltInField[]
   title?: string
 }
@@ -70,6 +74,7 @@ export function FieldsEditor({ projectId, entityType, builtInFields = [], title 
     entityType,
   })
 
+  const [expandedBuiltIn, setExpandedBuiltIn] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formState, setFormState] = useState<FieldFormState>(EMPTY_FORM)
   const [formError, setFormError] = useState<string | null>(null)
@@ -83,7 +88,7 @@ export function FieldsEditor({ projectId, entityType, builtInFields = [], title 
     setFormState({
       label: field.field_label,
       type: field.field_type,
-      options: field.field_type === 'select' && field.select_options ? field.select_options.join(', ') : '',
+      options: (field.field_type === 'select' || field.field_type === 'multi_select') && field.select_options ? field.select_options.join(', ') : '',
       required: field.is_required,
     })
     setFormError(null)
@@ -149,10 +154,10 @@ export function FieldsEditor({ projectId, entityType, builtInFields = [], title 
       setFormError('A field with this key already exists.')
       return
     }
-    if (formState.type === 'select') {
+    if (formState.type === 'select' || formState.type === 'multi_select') {
       const options = formState.options.split(',').map((o) => o.trim()).filter(Boolean)
       if (options.length < 2) {
-        setFormError('Select type requires at least 2 options.')
+        setFormError(`${formState.type === 'multi_select' ? 'Multi-Select' : 'Select'} type requires at least 2 options.`)
         return
       }
     }
@@ -161,7 +166,7 @@ export function FieldsEditor({ projectId, entityType, builtInFields = [], title 
     setFormError(null)
 
     const selectOptions =
-      formState.type === 'select'
+      (formState.type === 'select' || formState.type === 'multi_select')
         ? formState.options.split(',').map((o) => o.trim()).filter(Boolean)
         : undefined
 
@@ -209,18 +214,49 @@ export function FieldsEditor({ projectId, entityType, builtInFields = [], title 
       )}
 
       {/* Built-in fields (readonly) */}
-      {builtInFields.map((field) => (
-        <div
-          key={field.label}
-          className="flex items-center gap-2 px-2 py-1.5"
-        >
-          <span className="text-sm text-[color:var(--text-secondary)]">{field.label}</span>
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 text-[color:var(--text-tertiary)]">
-            <FieldTypeIcon type={field.type} />
-            <span className="text-xs">{field.type}</span>
+      {builtInFields.map((field) => {
+        const hasOptions = field.options && field.options.length > 0
+        const isExpanded = expandedBuiltIn === field.label
+        return (
+          <div key={field.label}>
+            <div
+              className={`flex items-center gap-2 px-2 py-1.5 ${hasOptions ? 'cursor-pointer rounded-md hover:bg-[color:var(--background-secondary)]' : ''}`}
+              onClick={hasOptions ? () => setExpandedBuiltIn(isExpanded ? null : field.label) : undefined}
+            >
+              <span className="text-sm text-[color:var(--text-secondary)]">{field.label}</span>
+              <div className="ml-auto flex shrink-0 items-center gap-1.5 text-[color:var(--text-tertiary)]">
+                <FieldTypeIcon type={field.type} />
+                <span className="text-xs">{field.type}</span>
+                {hasOptions && (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            {hasOptions && isExpanded && (
+              <div className="ml-4 flex flex-col gap-0.5 pb-1">
+                {field.options!.map((option) => (
+                  <span key={option} className="px-2 py-0.5 text-xs text-[color:var(--text-tertiary)]">
+                    {option}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        )
+      })}
 
       {/* Custom fields (editable) */}
       {fields.map((field) => (
@@ -255,7 +291,7 @@ export function FieldsEditor({ projectId, entityType, builtInFields = [], title 
                   </Select>
                 </FormField>
               </div>
-              {formState.type === 'select' && (
+              {(formState.type === 'select' || formState.type === 'multi_select') && (
                 <FormField label="Options" description="Comma-separated">
                   <Input
                     value={formState.options}

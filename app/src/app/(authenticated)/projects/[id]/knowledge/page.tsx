@@ -11,6 +11,7 @@ import { KnowledgeSourceSidebar } from '@/components/projects/knowledge/knowledg
 import { fetchGithubStatus } from '@/lib/api/integrations'
 import { PageHeader, Spinner, FilterChip, FilterLabel, Input } from '@/components/ui'
 import { type KnowledgeSourceType, getSourceTypeLabel } from '@/lib/knowledge/types'
+import { useCustomFields } from '@/hooks/use-custom-fields'
 
 export default function KnowledgePage() {
   const { projectId, isLoading: isLoadingProject } = useProject()
@@ -18,12 +19,18 @@ export default function KnowledgePage() {
 
   const [filterAreaIds, setFilterAreaIds] = useState<string[]>([])
   const [filterTypes, setFilterTypes] = useState<KnowledgeSourceType[]>([])
+  const [filterCustomFields, setFilterCustomFields] = useState<Record<string, string[]>>({})
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null)
   const [addingType, setAddingType] = useState<KnowledgeSourceType | null>(null)
   const [addDropdownOpen, setAddDropdownOpen] = useState(false)
   const addDropdownRef = useRef<HTMLDivElement | null>(null)
   const [githubConnected, setGithubConnected] = useState(false)
+
+  const { fields: customFieldDefs } = useCustomFields({
+    projectId: projectId ?? undefined,
+    entityType: 'knowledge_source',
+  })
 
   const { sources, isLoading, updateSource, deleteSource, addSource, refresh } = useKnowledgeSources({
     projectId: projectId ?? '',
@@ -116,6 +123,20 @@ export default function KnowledgePage() {
     )
   }, [])
 
+  const handleCustomFieldToggle = useCallback((fieldKey: string, value: string) => {
+    setFilterCustomFields(prev => {
+      const current = prev[fieldKey] ?? []
+      const next = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value]
+      if (next.length === 0) {
+        const { [fieldKey]: _, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [fieldKey]: next }
+    })
+  }, [])
+
   // Filter sources by type, product area, and search query
   const filteredSources = useMemo(() => {
     let result = sources
@@ -134,8 +155,21 @@ export default function KnowledgePage() {
         s.name?.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q)
       )
     }
+    // Custom field filters (AND between fields, OR within field values)
+    for (const [fieldKey, selectedValues] of Object.entries(filterCustomFields)) {
+      if (selectedValues.length > 0) {
+        result = result.filter(s => {
+          const cf = (s.custom_fields as Record<string, unknown>) ?? {}
+          const fieldValue = cf[fieldKey]
+          if (Array.isArray(fieldValue)) {
+            return fieldValue.some(v => selectedValues.includes(String(v)))
+          }
+          return fieldValue != null && selectedValues.includes(String(fieldValue))
+        })
+      }
+    }
     return result
-  }, [sources, filterTypes, filterAreaIds, defaultAreaId, searchQuery])
+  }, [sources, filterTypes, filterAreaIds, defaultAreaId, searchQuery, filterCustomFields])
 
   // Get selected source object (returns null if source was deleted)
   const selectedSource = useMemo(
@@ -240,6 +274,21 @@ export default function KnowledgePage() {
               ))}
             </div>
           )}
+          {customFieldDefs
+            .filter(f => (f.field_type === 'select' || f.field_type === 'multi_select') && f.select_options?.length)
+            .map(f => (
+              <div key={f.id} className="flex flex-wrap items-center gap-1.5">
+                <FilterLabel>{f.field_label}:</FilterLabel>
+                {(f.select_options ?? []).map((opt) => (
+                  <FilterChip
+                    key={opt}
+                    label={opt}
+                    active={(filterCustomFields[f.field_key] ?? []).includes(opt)}
+                    onClick={() => handleCustomFieldToggle(f.field_key, opt)}
+                  />
+                ))}
+              </div>
+            ))}
         </div>
 
         {/* Source list */}
