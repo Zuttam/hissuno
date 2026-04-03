@@ -50,7 +50,7 @@ export function ConnectDropdown({ onSelect }: ConnectDropdownProps) {
                 className="flex w-full items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-xs text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-hover)]"
               >
                 <IntegrationIcon type={integration.id} size={16} />
-                <span>{integration.name}</span>
+                <span>{integration.setupLabel ? `${integration.setupLabel} ${integration.name}` : integration.name}</span>
               </button>
             ))}
           </div>

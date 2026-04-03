@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { SessionTagList } from './session-tag-badge'
-import { SESSION_TAGS, SESSION_TAG_INFO, type CustomTagRecord } from '@/types/session'
+import { SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
 import { updateSessionTags } from '@/lib/api/sessions'
+import { type TagOption, getVariantColor } from './utils'
 
 function PlusIcon({ className }: { className?: string }) {
   return (
@@ -40,36 +41,25 @@ function LoaderIcon({ className }: { className?: string }) {
   )
 }
 
-interface TagOption {
-  slug: string
-  label: string
-  variant: 'info' | 'success' | 'danger' | 'warning' | 'default'
-  isCustom: boolean
-}
-
 interface SessionTagEditorProps {
   projectId: string
   sessionId: string
-  /** Array of current tag slugs (native or custom) */
+  /** Array of current tag slugs */
   currentTags: string[]
   /** Callback when tags are updated */
   onTagsUpdated: (tags: string[]) => void
-  /** Custom tags for the project (optional) */
-  customTags?: CustomTagRecord[]
   disabled?: boolean
 }
 
 /**
  * Editor component for managing session tags.
  * Shows current tags with remove buttons and a dropdown to add new tags.
- * Supports both native tags and custom tags.
  */
 export function SessionTagEditor({
   projectId,
   sessionId,
   currentTags,
   onTagsUpdated,
-  customTags = [],
   disabled = false,
 }: SessionTagEditorProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -77,46 +67,18 @@ export function SessionTagEditor({
 
   // Build list of all available tag options
   const allTagOptions = useMemo((): TagOption[] => {
-    const nativeTags: TagOption[] = SESSION_TAGS.map((tag) => ({
+    return SESSION_TAGS.map((tag) => ({
       slug: tag,
       label: SESSION_TAG_INFO[tag].label,
       variant: SESSION_TAG_INFO[tag].variant,
-      isCustom: false,
     }))
-
-    const customTagOptions: TagOption[] = customTags.map((tag) => ({
-      slug: tag.slug,
-      label: tag.name,
-      variant: (tag.color as TagOption['variant']) || 'default',
-      isCustom: true,
-    }))
-
-    return [...nativeTags, ...customTagOptions]
-  }, [customTags])
+  }, [])
 
   // Get available tags (not already applied)
   const availableTags = useMemo(
     () => allTagOptions.filter((tag) => !currentTags.includes(tag.slug)),
     [allTagOptions, currentTags]
   )
-
-  const nativeAvailable = availableTags.filter((t) => !t.isCustom)
-  const customAvailable = availableTags.filter((t) => t.isCustom)
-
-  const getVariantColor = (variant: TagOption['variant']) => {
-    switch (variant) {
-      case 'success':
-        return 'bg-[color:var(--accent-success)]'
-      case 'danger':
-        return 'bg-[color:var(--accent-danger)]'
-      case 'warning':
-        return 'bg-[color:var(--accent-warning)]'
-      case 'default':
-        return 'bg-[color:var(--text-tertiary)]'
-      default:
-        return 'bg-[color:var(--accent-primary)]'
-    }
-  }
 
   const handleAddTag = useCallback(
     async (slug: string) => {
@@ -171,7 +133,6 @@ export function SessionTagEditor({
       <div className="flex flex-wrap items-center gap-1">
         <SessionTagList
           tags={currentTags}
-          customTags={customTags}
           removable={!disabled}
           onRemove={handleRemoveTag}
           size="md"
@@ -200,8 +161,7 @@ export function SessionTagEditor({
                 />
                 {/* Dropdown */}
                 <div className="absolute left-0 top-full z-20 mt-1 min-w-[160px] max-h-[250px] overflow-y-auto rounded-[4px] border-2 border-[color:var(--border)] bg-[color:var(--surface)] py-1 shadow-lg">
-                  {/* Native tags */}
-                  {nativeAvailable.map((tag) => (
+                  {availableTags.map((tag) => (
                     <button
                       key={tag.slug}
                       type="button"
@@ -212,29 +172,6 @@ export function SessionTagEditor({
                       {tag.label}
                     </button>
                   ))}
-
-                  {/* Custom tags */}
-                  {customAvailable.length > 0 && (
-                    <>
-                      {nativeAvailable.length > 0 && (
-                        <div className="border-t border-[color:var(--border-subtle)] my-1" />
-                      )}
-                      <div className="px-3 py-1 text-[10px] font-medium text-[color:var(--text-tertiary)] uppercase">
-                        Custom Tags
-                      </div>
-                      {customAvailable.map((tag) => (
-                        <button
-                          key={tag.slug}
-                          type="button"
-                          onClick={() => handleAddTag(tag.slug)}
-                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-[color:var(--surface-hover)]"
-                        >
-                          <span className={`h-2 w-2 rounded-full ${getVariantColor(tag.variant)}`} />
-                          {tag.label}
-                        </button>
-                      ))}
-                    </>
-                  )}
                 </div>
               </>
             )}

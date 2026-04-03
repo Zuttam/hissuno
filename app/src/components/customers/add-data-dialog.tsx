@@ -13,8 +13,8 @@ import {
   TabsPanel,
   FileDropZone,
 } from '@/components/ui'
+import type { EntityType } from '@/lib/db/queries/types'
 import type {
-  CustomerEntityType,
   CSVImportMapping,
   CSVImportResult,
   CreateCompanyInput,
@@ -57,7 +57,7 @@ export function AddDataDialog({
   onCreateContact,
 }: AddDataDialogProps) {
   // Shared state
-  const [entityType, setEntityType] = useState<CustomerEntityType>(defaultEntityType)
+  const [entityType, setEntityType] = useState<EntityType>(defaultEntityType)
   const [methodTab, setMethodTab] = useState<MethodTab>('csv')
   const [error, setError] = useState<string | null>(null)
 
@@ -156,7 +156,7 @@ export function AddDataDialog({
 
   // Reset when entity type changes
   const handleEntityTypeChange = useCallback(
-    (newType: CustomerEntityType) => {
+    (newType: EntityType) => {
       setEntityType(newType)
       resetAll()
     },
@@ -363,7 +363,7 @@ export function AddDataDialog({
           <label className="text-xs font-medium text-[color:var(--text-secondary)]">Entity type</label>
           <Select
             value={entityType}
-            onChange={(e) => handleEntityTypeChange(e.target.value as CustomerEntityType)}
+            onChange={(e) => handleEntityTypeChange(e.target.value as EntityType)}
           >
             <option value="company">Companies</option>
             <option value="contact">Contacts</option>

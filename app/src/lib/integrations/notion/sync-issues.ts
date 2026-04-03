@@ -216,7 +216,7 @@ export async function syncNotionIssues(
         const { issue } = await createIssueAdmin({
           projectId,
           type: issueType,
-          title,
+          name: title,
           description,
           priority,
           status,
@@ -239,7 +239,7 @@ export async function syncNotionIssues(
       ) {
         // Existing but changed - update via service layer (handles embeddings + graph eval)
         await updateIssueAdmin(existingRow.issue_id, projectId, {
-          title,
+          name: title,
           description,
           type: issueType,
           priority,

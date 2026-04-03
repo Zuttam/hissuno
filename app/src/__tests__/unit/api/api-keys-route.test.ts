@@ -70,7 +70,7 @@ vi.mock('@/lib/auth/api-keys', () => ({
 // ---------------------------------------------------------------------------
 
 const { GET, POST, DELETE } = await import(
-  '@/app/api/(project)/access/api-keys/route'
+  '@/app/api/(project)/settings/api-keys/route'
 )
 const { UnauthorizedError } = await import('@/lib/auth/server')
 const { ForbiddenError } = await import('@/lib/auth/authorization')
@@ -105,18 +105,18 @@ beforeEach(() => {
 
 // ---- GET -----------------------------------------------------------------
 
-describe('GET /api/access/api-keys', () => {
+describe('GET /api/settings/api-keys', () => {
   it('returns 500 when database is not configured', async () => {
     mockIsDatabaseConfigured.mockReturnValue(false)
 
-    const req = createRequest(`http://localhost/api/access/api-keys?projectId=${PROJECT_ID}`)
+    const req = createRequest(`http://localhost/api/settings/api-keys?projectId=${PROJECT_ID}`)
     const res = await GET(req)
 
     expect(res.status).toBe(500)
   })
 
   it('returns 400 when projectId is missing', async () => {
-    const req = createRequest('http://localhost/api/access/api-keys')
+    const req = createRequest('http://localhost/api/settings/api-keys')
     const res = await GET(req)
 
     expect(res.status).toBe(400)
@@ -125,7 +125,7 @@ describe('GET /api/access/api-keys', () => {
   it('returns 401 when not authenticated', async () => {
     mockRequireRequestIdentity.mockRejectedValue(new UnauthorizedError())
 
-    const req = createRequest(`http://localhost/api/access/api-keys?projectId=${PROJECT_ID}`)
+    const req = createRequest(`http://localhost/api/settings/api-keys?projectId=${PROJECT_ID}`)
     const res = await GET(req)
 
     expect(res.status).toBe(401)
@@ -134,7 +134,7 @@ describe('GET /api/access/api-keys', () => {
   it('returns 403 when user has no project access', async () => {
     mockAssertProjectAccess.mockRejectedValue(new ForbiddenError())
 
-    const req = createRequest(`http://localhost/api/access/api-keys?projectId=${PROJECT_ID}`)
+    const req = createRequest(`http://localhost/api/settings/api-keys?projectId=${PROJECT_ID}`)
     const res = await GET(req)
 
     expect(res.status).toBe(403)
@@ -146,7 +146,7 @@ describe('GET /api/access/api-keys', () => {
     ]
     mockListApiKeys.mockResolvedValue(apiKeys)
 
-    const req = createRequest(`http://localhost/api/access/api-keys?projectId=${PROJECT_ID}`)
+    const req = createRequest(`http://localhost/api/settings/api-keys?projectId=${PROJECT_ID}`)
     const res = await GET(req)
 
     expect(res.status).toBe(200)
@@ -158,7 +158,7 @@ describe('GET /api/access/api-keys', () => {
   it('returns 500 on unexpected error', async () => {
     mockListApiKeys.mockRejectedValue(new Error('DB error'))
 
-    const req = createRequest(`http://localhost/api/access/api-keys?projectId=${PROJECT_ID}`)
+    const req = createRequest(`http://localhost/api/settings/api-keys?projectId=${PROJECT_ID}`)
     const res = await GET(req)
 
     expect(res.status).toBe(500)
@@ -169,12 +169,12 @@ describe('GET /api/access/api-keys', () => {
 
 // ---- POST ----------------------------------------------------------------
 
-describe('POST /api/access/api-keys', () => {
+describe('POST /api/settings/api-keys', () => {
   const validBody = { name: 'My API Key' }
 
   function createPostRequest(body: Record<string, unknown>, projectId = PROJECT_ID) {
     return createRequest(
-      `http://localhost/api/access/api-keys?projectId=${projectId}`,
+      `http://localhost/api/settings/api-keys?projectId=${projectId}`,
       {
         method: 'POST',
         body: JSON.stringify(body),
@@ -193,7 +193,7 @@ describe('POST /api/access/api-keys', () => {
   })
 
   it('returns 400 when projectId is missing', async () => {
-    const req = createRequest('http://localhost/api/access/api-keys', {
+    const req = createRequest('http://localhost/api/settings/api-keys', {
       method: 'POST',
       body: JSON.stringify(validBody),
       headers: { 'Content-Type': 'application/json' },
@@ -311,10 +311,10 @@ describe('POST /api/access/api-keys', () => {
 
 // ---- DELETE --------------------------------------------------------------
 
-describe('DELETE /api/access/api-keys', () => {
+describe('DELETE /api/settings/api-keys', () => {
   function createDeleteRequest(projectId = PROJECT_ID) {
     return createRequest(
-      `http://localhost/api/access/api-keys?projectId=${projectId}`,
+      `http://localhost/api/settings/api-keys?projectId=${projectId}`,
       { method: 'DELETE' },
     )
   }
@@ -329,7 +329,7 @@ describe('DELETE /api/access/api-keys', () => {
   })
 
   it('returns 400 when projectId is missing', async () => {
-    const req = createRequest('http://localhost/api/access/api-keys', {
+    const req = createRequest('http://localhost/api/settings/api-keys', {
       method: 'DELETE',
     })
     const res = await DELETE(req)

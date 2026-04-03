@@ -8,7 +8,7 @@
 
 import { createStep } from '@mastra/core/workflows'
 import { z } from 'zod'
-import { graphEvalContextSchema, analyzeOutputSchema } from '../schemas'
+import { preparedContextSchema, analyzeOutputSchema } from '../schemas'
 
 const agentResponseSchema = z.object({
   impactAnalysis: z.object({
@@ -25,7 +25,7 @@ const agentResponseSchema = z.object({
   confidenceReasoning: z.string().optional(),
 })
 
-function buildNullResult(inputData: z.infer<typeof graphEvalContextSchema>) {
+function buildNullResult(inputData: z.infer<typeof preparedContextSchema>) {
   return {
     ...inputData,
     technicalImpactScore: null,
@@ -41,7 +41,7 @@ function buildNullResult(inputData: z.infer<typeof graphEvalContextSchema>) {
 export const analyzeImpactEffort = createStep({
   id: 'analyze-impact-effort',
   description: 'Analyze impact and effort using Technical Analyst agent',
-  inputSchema: graphEvalContextSchema,
+  inputSchema: preparedContextSchema,
   outputSchema: analyzeOutputSchema,
   execute: async ({ inputData, mastra, writer }) => {
     const logger = mastra?.getLogger()
@@ -63,10 +63,10 @@ export const analyzeImpactEffort = createStep({
     const prompt = `Analyze this issue and provide impact/effort assessment.
 
 ## Issue
-Title: ${issue.title}
+Name: ${issue.name}
 Type: ${issue.type}
 Description: ${issue.description}
-Upvotes: ${issue.upvoteCount}
+Linked sessions: ${issue.sessionCount}
 
 ## Codebase Context
 ${localCodePath ? `Local path: ${localCodePath}` : 'No codebase available - use your general knowledge to estimate.'}

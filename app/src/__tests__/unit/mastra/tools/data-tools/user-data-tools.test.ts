@@ -47,9 +47,11 @@ vi.mock('@/lib/db', () => ({
 
 const mockGetSessionContactInfo = vi.fn()
 const mockBatchGetSessionContacts = vi.fn()
+const mockBatchGetIssueSessionCounts = vi.fn().mockResolvedValue(new Map())
 vi.mock('@/lib/db/queries/entity-relationships', () => ({
   getSessionContactInfo: (...args: unknown[]) => mockGetSessionContactInfo(...args),
   batchGetSessionContacts: (...args: unknown[]) => mockBatchGetSessionContacts(...args),
+  batchGetIssueSessionCounts: (...args: unknown[]) => mockBatchGetIssueSessionCounts(...args),
 }))
 
 // ============================================================================
@@ -105,7 +107,7 @@ describe('user-mode data tools', () => {
 
     it('queries issues table filtered by projectId', async () => {
       mockLimit.mockResolvedValue([
-        { id: 'i-1', title: 'Bug 1', type: 'bug', priority: 'high', status: 'open', upvote_count: 3, updated_at: new Date('2026-01-01') },
+        { id: 'i-1', title: 'Bug 1', type: 'bug', priority: 'high', status: 'open', session_count: 3, updated_at: new Date('2026-01-01') },
       ])
 
       const result = await listIssuesTool.execute!({
@@ -146,7 +148,7 @@ describe('user-mode data tools', () => {
           type: 'bug',
           priority: 'high',
           status: 'open',
-          upvote_count: 3,
+          session_count: 3,
           created_at: new Date('2026-01-01'),
           updated_at: new Date('2026-01-02'),
         },

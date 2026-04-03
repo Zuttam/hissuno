@@ -60,7 +60,7 @@ export async function archiveCompany(projectId: string, companyId: string, isArc
 
 export interface CompanyActivity {
   sessions: Array<{ id: string; name: string | null; source: string; created_at: string }>
-  issues: Array<{ id: string; title: string; type: string; status: string }>
+  issues: Array<{ id: string; name: string; type: string; status: string }>
 }
 
 export async function getCompanyActivity(projectId: string, companyId: string) {

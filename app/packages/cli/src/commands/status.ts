@@ -8,14 +8,7 @@
 import { Command } from 'commander'
 import { loadConfig } from '../lib/config.js'
 import { apiCall } from '../lib/api.js'
-
-const BOLD = '\x1b[1m'
-const DIM = '\x1b[2m'
-const RESET = '\x1b[0m'
-const GREEN = '\x1b[32m'
-const RED = '\x1b[31m'
-const CYAN = '\x1b[36m'
-const YELLOW = '\x1b[33m'
+import { BOLD, DIM, RESET, GREEN, RED, CYAN, YELLOW } from '../lib/output.js'
 
 export const statusCommand = new Command('status')
   .description('Check connection health')
@@ -24,13 +17,21 @@ export const statusCommand = new Command('status')
 
     if (!config) {
       console.log(`\n  ${RED}Not configured${RESET}`)
-      console.log(`  ${DIM}Run \`hissuno config\` to set up your API key and URL.${RESET}\n`)
+      console.log(`  ${DIM}Run \`hissuno login\` or \`hissuno config\` to set up.${RESET}\n`)
       process.exit(1)
     }
 
     console.log(`\n  ${BOLD}${CYAN}Hissuno Status${RESET}\n`)
     console.log(`  ${DIM}URL:${RESET}     ${config.base_url}`)
-    console.log(`  ${DIM}API Key:${RESET} ${config.api_key.slice(0, 8)}${'*'.repeat(12)}`)
+
+    if (config.auth_token) {
+      console.log(`  ${DIM}Auth:${RESET}    Login session`)
+      if (config.username) {
+        console.log(`  ${DIM}User:${RESET}    ${config.username}`)
+      }
+    } else if (config.api_key) {
+      console.log(`  ${DIM}Auth:${RESET}    API key (${config.api_key.slice(0, 8)}${'*'.repeat(8)})`)
+    }
 
     if (config.project_id) {
       console.log(`  ${DIM}Project:${RESET} ${config.project_id}`)
@@ -46,7 +47,7 @@ export const statusCommand = new Command('status')
         console.log(`  ${RED}HTTP ${result.status}${RESET}`)
 
         if (result.status === 401) {
-          console.log(`  ${DIM}Your API key may be invalid or expired. Run \`hissuno config\` to reconfigure.${RESET}`)
+          console.log(`  ${DIM}Your credentials may be invalid or expired. Run \`hissuno login\` or \`hissuno config\`.${RESET}`)
         }
 
         console.log()

@@ -42,7 +42,7 @@ describe('Manual Creation and Archive Feature', () => {
         project_id: 'project-123',
         session_ids: ['session-456'],
         type: 'bug',
-        title: 'Test Bug',
+        name: 'Test Bug',
         description: 'This is a test bug description.',
         priority: 'high',
       }
@@ -50,7 +50,7 @@ describe('Manual Creation and Archive Feature', () => {
       expect(input.project_id).toBe('project-123')
       expect(input.session_ids).toEqual(['session-456'])
       expect(input.type).toBe('bug')
-      expect(input.title).toBe('Test Bug')
+      expect(input.name).toBe('Test Bug')
       expect(input.description).toBe('This is a test bug description.')
       expect(input.priority).toBe('high')
     })
@@ -59,7 +59,7 @@ describe('Manual Creation and Archive Feature', () => {
       const input: CreateIssueInput = {
         project_id: 'project-123',
         type: 'feature_request',
-        title: 'New Feature',
+        name: 'New Feature',
         description: 'Feature description',
         priority: 'medium',
       }
@@ -76,7 +76,7 @@ describe('Manual Creation and Archive Feature', () => {
         const input: CreateIssueInput = {
           project_id: 'project-123',
           type,
-          title: 'Test',
+          name: 'Test',
           description: 'Test',
           priority: 'low',
         }
@@ -91,7 +91,7 @@ describe('Manual Creation and Archive Feature', () => {
         const input: CreateIssueInput = {
           project_id: 'project-123',
           type: 'bug',
-          title: 'Test',
+          name: 'Test',
           description: 'Test',
           priority,
         }
@@ -251,11 +251,11 @@ describe('Manual Creation and Archive Feature', () => {
         id: 'issue-123',
         project_id: 'project-123',
         type: 'bug' as IssueType,
-        title: 'Test Bug',
+        name: 'Test Bug',
         description: 'Description',
         priority: 'high' as IssuePriority,
         priority_manual_override: false,
-        upvote_count: 1,
+        session_count: 1,
         status: 'open' as const,
         is_archived: false,
         brief: null,
@@ -272,11 +272,11 @@ describe('Manual Creation and Archive Feature', () => {
         id: 'issue-123',
         project_id: 'project-123',
         type: 'feature_request' as IssueType,
-        title: 'Archived Feature',
+        name: 'Archived Feature',
         description: 'Description',
         priority: 'low' as IssuePriority,
         priority_manual_override: false,
-        upvote_count: 0,
+        session_count: 0,
         status: 'closed' as const,
         is_archived: true,
         brief: null,

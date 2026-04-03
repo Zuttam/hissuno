@@ -5,13 +5,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ---------------------------------------------------------------------------
 
 const mockReturning = vi.fn()
-const mockWhere = vi.fn(() => ({ returning: mockReturning }))
+const mockWhere = vi.fn((_condition?: unknown) => ({ returning: mockReturning }))
 const mockSet = vi.fn(() => ({ where: mockWhere }))
-const mockUpdate = vi.fn(() => ({ set: mockSet }))
+const mockUpdate = vi.fn((..._args: any[]) => ({ set: mockSet }))
 
 vi.mock('@/lib/db', () => ({
   db: {
-    update: (...args: unknown[]) => mockUpdate(...args),
+    update: (...args: any[]) => mockUpdate(...args),
   },
 }))
 
@@ -105,13 +105,13 @@ describe('activatePendingMemberships', () => {
     await activatePendingMemberships('user-1', 'Test@Example.COM')
 
     // The where clause should use the lowercased email
-    const whereArg = mockWhere.mock.calls[0][0]
+    const whereArg = mockWhere.mock.calls[0][0] as { args: { op: string; col?: string; val?: unknown; args?: { op: string; col?: string; val?: unknown }[] }[] }
     // Find the or() clause that contains the email eq()
-    const orClause = whereArg.args.find((a: { op: string }) => a.op === 'or')
-    const emailEq = orClause.args.find(
-      (a: { op: string; col: string }) => a.op === 'eq' && a.col === 'invited_email'
+    const orClause = whereArg.args.find((a) => a.op === 'or')!
+    const emailEq = orClause.args!.find(
+      (a) => a.op === 'eq' && a.col === 'invited_email'
     )
-    expect(emailEq.val).toBe('test@example.com')
+    expect(emailEq!.val).toBe('test@example.com')
   })
 
   it('propagates errors (not swallowed)', async () => {

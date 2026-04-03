@@ -8,8 +8,8 @@ import { useProductScopes } from '@/hooks/use-product-scopes'
 import { ProductScopeList } from '@/components/projects/products/product-scope-list'
 import { ProductScopeSidebar } from '@/components/projects/products/product-scope-sidebar'
 import { PageHeader, Spinner, Input } from '@/components/ui'
-import { saveProductScopes } from '@/lib/api/settings'
-import type { ProductScopeRecord, ProductScopeType } from '@/types/product-scope'
+import { createProductScope, updateProductScope, saveProductScopes } from '@/lib/api/settings'
+import type { ProductScopeType, ProductScopeGoal } from '@/types/product-scope'
 import type { TagColorVariant } from '@/types/session'
 
 export default function ProductsPage() {
@@ -18,7 +18,7 @@ export default function ProductsPage() {
   const { scopes, isLoading, refresh } = useProductScopes({ projectId: projectId ?? undefined })
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [isAddingScope, setIsAddingScope] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   const [selectedScopeId, setSelectedScopeId] = useState<string | null>(
     searchParams.get('area')
   )
@@ -28,30 +28,45 @@ export default function ProductsPage() {
     [scopes, selectedScopeId]
   )
 
-  const handleAdd = useCallback(async (newScope: { name: string; slug: string; description: string; color: TagColorVariant; type: ProductScopeType }) => {
+  const handleSelect = useCallback((scopeId: string) => {
+    setIsCreating(false)
+    setSelectedScopeId(scopeId)
+  }, [])
+
+  const handleCreate = useCallback(async (newScope: {
+    name: string
+    slug: string
+    description: string
+    color: TagColorVariant
+    type: ProductScopeType
+    goals: ProductScopeGoal[] | null
+    custom_fields?: Record<string, unknown>
+  }) => {
     if (!projectId) return
-    const tempScope = {
-      id: `temp_${Date.now()}`,
+    await createProductScope(projectId, {
       name: newScope.name,
       slug: newScope.slug,
       description: newScope.description,
       color: newScope.color,
-      position: scopes.length,
-      is_default: false,
       type: newScope.type,
-      goals: null,
-    }
-    const updated = [...scopes, tempScope]
-    await saveProductScopes(projectId, updated)
+      goals: newScope.goals,
+      custom_fields: newScope.custom_fields,
+    })
+    setIsCreating(false)
     await refresh()
-  }, [projectId, scopes, refresh])
+  }, [projectId, refresh])
 
-  const handleSave = useCallback(async (updatedScope: ProductScopeRecord) => {
-    if (!projectId) return
-    const updated = scopes.map((s) => (s.id === updatedScope.id ? updatedScope : s))
-    await saveProductScopes(projectId, updated)
-    await refresh()
-  }, [projectId, scopes, refresh])
+  const handleUpdate = useCallback(async (updates: Record<string, unknown>): Promise<boolean> => {
+    if (!projectId || !selectedScopeId) return false
+    try {
+      await updateProductScope(projectId, selectedScopeId, updates)
+      await refresh()
+      return true
+    } catch (err) {
+      console.error('[products-page] update failed:', err)
+      return false
+    }
+  }, [projectId, selectedScopeId, refresh])
 
   const handleDelete = useCallback(async (scopeId: string) => {
     if (!projectId) return
@@ -66,7 +81,7 @@ export default function ProductsPage() {
   if (isLoadingProject || !projectId) {
     return (
       <>
-        <PageHeader title="Product Scopes (product areas and initiatives)" />
+        <PageHeader title="Scopes (product areas and initiatives)" />
         <div className="flex-1 flex items-center justify-center">
           <Spinner size="lg" />
         </div>
@@ -77,11 +92,11 @@ export default function ProductsPage() {
   return (
     <>
       <PageHeader
-        title="Product Scopes (product areas and initiatives)"
+        title="Scopes (product areas and initiatives)"
         actions={
           <button
             type="button"
-            onClick={() => setIsAddingScope(true)}
+            onClick={() => { setSelectedScopeId(null); setIsCreating(true) }}
             disabled={scopes.length >= 20}
             className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -115,11 +130,8 @@ export default function ProductsPage() {
           <ProductScopeList
             scopes={scopes}
             selectedScopeId={selectedScopeId}
-            onSelect={setSelectedScopeId}
-            onAdd={handleAdd}
+            onSelect={handleSelect}
             searchQuery={searchQuery}
-            isAdding={isAddingScope}
-            onAddingChange={setIsAddingScope}
           />
         )}
       </div>
@@ -130,8 +142,18 @@ export default function ProductsPage() {
           scope={selectedScope}
           projectId={projectId}
           onClose={() => setSelectedScopeId(null)}
-          onSave={(updated) => void handleSave(updated)}
+          onUpdate={handleUpdate}
           onDelete={(id) => void handleDelete(id)}
+        />
+      )}
+
+      {/* Create sidebar */}
+      {isCreating && (
+        <ProductScopeSidebar
+          projectId={projectId}
+          onClose={() => setIsCreating(false)}
+          onCreate={(newScope) => void handleCreate(newScope)}
+          existingSlugs={scopes.map((s) => s.slug)}
         />
       )}
     </>

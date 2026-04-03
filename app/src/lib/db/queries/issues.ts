@@ -10,8 +10,10 @@
 import {
   eq,
   and,
+  or,
   desc,
   sql,
+  ilike,
   count as countFn,
   inArray,
   gte,
@@ -31,7 +33,7 @@ import {
   contacts,
 } from '@/lib/db/schema/app'
 import { sanitizeSearchInput, dateToIso } from '@/lib/db/server'
-import { linkEntities, unlinkEntities, setEntityProductScope, getRelatedIds } from '@/lib/db/queries/entity-relationships'
+import { linkEntities, unlinkEntities, setEntityProductScope, getRelatedIds, batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -55,11 +57,10 @@ function rowToIssueRecord(row: typeof issues.$inferSelect): IssueRecord {
     id: row.id,
     project_id: row.project_id,
     type: row.type as IssueRecord['type'],
-    title: row.title,
+    name: row.name,
     description: row.description,
     priority: (row.priority ?? 'medium') as IssuePriority,
     priority_manual_override: row.priority_manual_override ?? false,
-    upvote_count: row.upvote_count ?? 0,
     status: (row.status ?? 'open') as IssueRecord['status'],
     brief: row.brief ?? null,
     brief_generated_at: dateToIso(row.brief_generated_at),
@@ -90,11 +91,10 @@ function rowToIssueRecord(row: typeof issues.$inferSelect): IssueRecord {
 export interface InsertIssueData {
   projectId: string
   type: 'bug' | 'feature_request' | 'change_request'
-  title: string
+  name: string
   description: string
   priority: IssuePriority
   priorityManualOverride?: boolean
-  upvoteCount?: number
   status?: 'open' | 'ready' | 'in_progress' | 'resolved' | 'closed'
   // Impact analysis fields
   impactScore?: number | null
@@ -117,11 +117,10 @@ export async function insertIssue(data: InsertIssueData): Promise<IssueRecord> {
     .values({
       project_id: data.projectId,
       type: data.type,
-      title: data.title,
+      name: data.name,
       description: data.description,
       priority: data.priority,
       priority_manual_override: data.priorityManualOverride ?? false,
-      upvote_count: data.upvoteCount ?? 1,
       status: data.status ?? 'open',
       is_archived: false,
       // Impact analysis
@@ -155,7 +154,7 @@ export async function updateIssueById(issueId: string, data: UpdateIssueInput): 
     updated_at: new Date(),
   }
 
-  if (data.title !== undefined) updates.title = data.title
+  if (data.name !== undefined) updates.name = data.name
   if (data.description !== undefined) updates.description = data.description
   if (data.type !== undefined) updates.type = data.type
   if (data.status !== undefined) updates.status = data.status
@@ -201,31 +200,6 @@ export async function deleteIssueById(issueId: string): Promise<boolean> {
 }
 
 /**
- * Update upvote count and priority for an issue
- */
-export async function updateIssueUpvote(
-  issueId: string,
-  newUpvoteCount: number,
-  newPriority: IssuePriority
-): Promise<IssueRecord> {
-  const [issue] = await db
-    .update(issues)
-    .set({
-      upvote_count: newUpvoteCount,
-      priority: newPriority,
-      updated_at: new Date(),
-    })
-    .where(eq(issues.id, issueId))
-    .returning()
-
-  if (!issue) {
-    throw new Error(`Failed to update issue upvote: ${issueId}`)
-  }
-
-  return rowToIssueRecord(issue)
-}
-
-/**
  * Link a session to an issue via entity_relationships
  */
 export async function linkSessionToIssue(issueId: string, sessionId: string): Promise<void> {
@@ -246,73 +220,15 @@ export async function unlinkSessionFromIssue(issueId: string, sessionId: string)
 }
 
 /**
- * Mark a session as PM reviewed
- */
-export async function markSessionPMReviewed(sessionId: string): Promise<void> {
-  try {
-    await db
-      .update(sessions)
-      .set({
-        pm_reviewed_at: new Date(),
-        analysis_status: 'analyzed',
-      })
-      .where(eq(sessions.id, sessionId))
-  } catch (error) {
-    console.error('[db.issues.markSessionPMReviewed] Failed', sessionId, error)
-  }
-}
-
-/**
- * Get an issue by ID with minimal fields (for upvote operations)
- */
-export async function getIssueForUpvote(
-  issueId: string
-): Promise<{
-  id: string
-  title: string
-  projectId: string
-  upvoteCount: number
-  priorityManualOverride: boolean
-  priority: IssuePriority
-  brief: string | null
-} | null> {
-  const [row] = await db
-    .select({
-      id: issues.id,
-      title: issues.title,
-      project_id: issues.project_id,
-      upvote_count: issues.upvote_count,
-      priority_manual_override: issues.priority_manual_override,
-      priority: issues.priority,
-      brief: issues.brief,
-    })
-    .from(issues)
-    .where(eq(issues.id, issueId))
-    .limit(1)
-
-  if (!row) return null
-
-  return {
-    id: row.id,
-    title: row.title,
-    projectId: row.project_id,
-    upvoteCount: row.upvote_count ?? 1,
-    priorityManualOverride: row.priority_manual_override ?? false,
-    priority: (row.priority ?? 'medium') as IssuePriority,
-    brief: row.brief ?? null,
-  }
-}
-
-/**
- * Get issue with current title/description for embedding comparison
+ * Get issue with current name/description for embedding comparison
  */
 export async function getIssueForEmbedding(
   issueId: string
-): Promise<{ projectId: string; title: string; description: string } | null> {
+): Promise<{ projectId: string; name: string; description: string } | null> {
   const [row] = await db
     .select({
       project_id: issues.project_id,
-      title: issues.title,
+      name: issues.name,
       description: issues.description,
     })
     .from(issues)
@@ -323,7 +239,7 @@ export async function getIssueForEmbedding(
 
   return {
     projectId: row.project_id,
-    title: row.title,
+    name: row.name,
     description: row.description,
   }
 }
@@ -440,66 +356,15 @@ export async function listIssues(
   filters: IssueFilters
 ): Promise<{ issues: IssueWithProject[]; total: number }> {
   try {
-    // Search across issue title/description and linked session messages via database RPC
-    if (filters.search && filters.search.trim().length >= 2) {
-      const searchTerm = filters.search.trim()
-      const sanitized = sanitizeSearchInput(searchTerm)
-      const limit = filters.limit ?? 50
-      const offset = filters.offset ?? 0
-
-      // Build metric range params
-      const reachRange = filters.reachLevel ? metricLevelToRange(filters.reachLevel) : undefined
-      const impactRange = filters.impactLevel ? metricLevelToRange(filters.impactLevel) : undefined
-      const confidenceRange = filters.confidenceLevel ? metricLevelToRange(filters.confidenceLevel) : undefined
-      const effortRange = filters.effortLevel ? metricLevelToRange(filters.effortLevel) : undefined
-
-      // Phase 1: RPC handles search + filters + pagination
-      const searchResults = await db.execute<{ issue_id: string; total_count: number }>(sql`
-        SELECT * FROM search_issues_multi(
-          p_project_id := ${projectId}::uuid,
-          p_query := ${searchTerm},
-          p_query_like := ${sanitized},
-          p_type := ${filters.type || null},
-          p_priority := ${filters.priority || null},
-          p_status := ${filters.status || null},
-          p_is_archived := ${filters.showArchived ?? false},
-          p_reach_min := ${reachRange?.[0] ?? null}::double precision,
-          p_reach_max := ${reachRange?.[1] ?? null}::double precision,
-          p_impact_min := ${impactRange?.[0] ?? null}::double precision,
-          p_impact_max := ${impactRange?.[1] ?? null}::double precision,
-          p_confidence_min := ${confidenceRange?.[0] ?? null}::double precision,
-          p_confidence_max := ${confidenceRange?.[1] ?? null}::double precision,
-          p_effort_min := ${effortRange?.[0] ?? null}::double precision,
-          p_effort_max := ${effortRange?.[1] ?? null}::double precision,
-          p_product_area_ids := ${filters.productScopeIds && filters.productScopeIds.length > 0 ? filters.productScopeIds : null}::uuid[],
-          p_limit := ${limit},
-          p_offset := ${offset}
-        )
-      `)
-
-      if (!searchResults.rows || searchResults.rows.length === 0) {
-        return { issues: [], total: 0 }
-      }
-
-      const matchedIds = searchResults.rows.map((r) => r.issue_id)
-      const totalCount = searchResults.rows[0].total_count
-
-      // Phase 2: Fetch full issue objects by returned IDs
-      const results = await db.query.issues.findMany({
-        where: inArray(issues.id, matchedIds),
-        with: {
-          project: { columns: { id: true, name: true } },
-        },
-        orderBy: [desc(issues.updated_at)],
-      })
-
-      const mapped = results.map((r) => toIssueWithProject(r))
-      const enriched = await enrichIssuesWithProductScope(mapped)
-      return { issues: enriched, total: Number(totalCount) }
-    }
-
-    // Build conditions for non-search queries
     const conditions = [eq(issues.project_id, projectId), ...buildIssueFilterConditions(filters)]
+
+    // Add text search via ilike on name/description
+    if (filters.search && filters.search.trim().length >= 2) {
+      const sanitized = sanitizeSearchInput(filters.search.trim())
+      const pattern = `%${sanitized}%`
+      const searchCondition = or(ilike(issues.name, pattern), ilike(issues.description, pattern))
+      if (searchCondition) conditions.push(searchCondition)
+    }
 
     const whereClause = and(...conditions)
     const limit = filters.limit ?? 50
@@ -521,7 +386,9 @@ export async function listIssues(
     const total = countResult[0].total
 
     const mapped = results.map((r) => toIssueWithProject(r))
-    const enriched = await enrichIssuesWithProductScope(mapped)
+    const enriched = await enrichIssuesWithSessionCounts(
+      await enrichIssuesWithProductScope(mapped)
+    )
     return { issues: enriched, total: Number(total) }
   } catch (error) {
     console.error('[db.issues] unexpected error listing issues', error)
@@ -627,6 +494,7 @@ export async function getIssueById(issueId: string): Promise<IssueWithSessions |
 
     return {
       ...issueRecord,
+      session_count: sessionIds.length,
       product_scope_id: productScopeId ?? null,
       project: result.project ? { id: result.project.id, name: result.project.name } : null,
       sessions: sessionsArr,
@@ -651,7 +519,11 @@ export async function getProjectIssues(projectId: string, limit = 20): Promise<I
       limit,
     })
 
-    return enrichIssuesWithProductScope(results.map((r) => toIssueWithProject(r)))
+    const mapped = results.map((r) => toIssueWithProject(r))
+    const [enrichedScopes] = await Promise.all([
+      enrichIssuesWithProductScope(mapped),
+    ])
+    return enrichIssuesWithSessionCounts(enrichedScopes)
   } catch (error) {
     console.error('[db.issues] unexpected error getting project issues', projectId, error)
     throw error
@@ -682,8 +554,6 @@ export async function getProjectSettings(projectId: string): Promise<ProjectSett
 
     return {
       project_id: projectId,
-      issue_tracking_enabled: settingsRow?.issue_tracking_enabled ?? true,
-      pm_dedup_include_closed: settingsRow?.pm_dedup_include_closed ?? false,
       widget_trigger_type: (widgetRow?.trigger_type ?? 'bubble') as ProjectSettingsRecord['widget_trigger_type'],
       widget_display_type: (widgetRow?.display_type ?? 'popup') as ProjectSettingsRecord['widget_display_type'],
       widget_shortcut: widgetRow?.shortcut ?? null,
@@ -792,10 +662,10 @@ export async function getIssueForAnalysisAdmin(
 ): Promise<{
   id: string
   projectId: string
-  title: string
+  name: string
   description: string
   type: string
-  upvoteCount: number
+  sessionCount: number
   impactScore: number | null
   effortEstimate: string | null
   priorityManualOverride: boolean
@@ -818,10 +688,9 @@ export async function getIssueForAnalysisAdmin(
     columns: {
       id: true,
       project_id: true,
-      title: true,
+      name: true,
       description: true,
       type: true,
-      upvote_count: true,
       impact_score: true,
       effort_estimate: true,
       priority_manual_override: true,
@@ -901,10 +770,10 @@ export async function getIssueForAnalysisAdmin(
   return {
     id: result.id,
     projectId: result.project_id,
-    title: result.title,
+    name: result.name,
     description: result.description ?? '',
     type: result.type,
-    upvoteCount: result.upvote_count ?? 1,
+    sessionCount: sessionsArr.length,
     impactScore: result.impact_score,
     effortEstimate: result.effort_estimate,
     priorityManualOverride: result.priority_manual_override ?? false,
@@ -994,7 +863,7 @@ export async function getIssueProjectId(issueId: string): Promise<string | null>
 
 /**
  * Gets top ranked issues for a project, sorted by combined score.
- * Score = (upvote_count * 2) + (impact_score ?? 0) + priorityWeight(priority)
+ * Score = (sessionCount * 2) + (impact_score ?? 0) + priorityWeight(priority)
  */
 export async function getTopRankedIssues(
   projectId: string,
@@ -1010,18 +879,22 @@ export async function getTopRankedIssues(
       with: {
         project: { columns: { id: true, name: true } },
       },
-      orderBy: [desc(issues.upvote_count)],
+      orderBy: [desc(issues.updated_at)],
       limit: 50,
     })
 
-    const priorityWeight: Record<string, number> = { high: 3, medium: 2, low: 1 }
-
     const mapped = results.map((r) => toIssueWithProject(r))
+
+    // Compute session counts from entity_relationships
+    const issueIds = mapped.map((i) => i.id)
+    const sessionCounts = await batchGetIssueSessionCounts(issueIds)
+
+    const priorityWeight: Record<string, number> = { high: 3, medium: 2, low: 1 }
 
     const scored = mapped.map((issue) => ({
       issue,
       score:
-        (issue.upvote_count ?? 0) * 2 +
+        (sessionCounts.get(issue.id) ?? 0) * 2 +
         (issue.impact_score ?? 0) +
         (priorityWeight[issue.priority] ?? 0),
     }))
@@ -1072,11 +945,30 @@ async function enrichIssuesWithProductScope(
 }
 
 // ---------------------------------------------------------------------------
+// Internal: enrich issues with session_count from entity_relationships
+// ---------------------------------------------------------------------------
+
+async function enrichIssuesWithSessionCounts(
+  issueList: IssueWithProject[]
+): Promise<IssueWithProject[]> {
+  if (issueList.length === 0) return issueList
+
+  const issueIds = issueList.map((i) => i.id)
+  const counts = await batchGetIssueSessionCounts(issueIds)
+
+  return issueList.map((i) => ({
+    ...i,
+    session_count: counts.get(i.id) ?? 0,
+  }))
+}
+
+// ---------------------------------------------------------------------------
 // Internal: transform relational query result to IssueWithProject
 // ---------------------------------------------------------------------------
 
 type IssueRelationalResult = Awaited<ReturnType<typeof db.query.issues.findMany>>[number]
 
+/** Maps a relational query result to IssueWithProject. Must be enriched with session counts before returning to callers. */
 function toIssueWithProject(r: IssueRelationalResult): IssueWithProject {
   const record = rowToIssueRecord(r)
 
@@ -1087,6 +979,7 @@ function toIssueWithProject(r: IssueRelationalResult): IssueWithProject {
 
   return {
     ...record,
+    session_count: 0, // Placeholder - enriched by enrichIssuesWithSessionCounts before returning
     project: projectData,
   }
 }

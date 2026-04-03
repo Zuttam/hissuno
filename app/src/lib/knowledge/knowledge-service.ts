@@ -18,7 +18,7 @@ import { db } from '@/lib/db'
 import { knowledgeSources } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { embedKnowledgeSource } from '@/lib/knowledge/embedding-service'
-import { searchWithFallback } from '@/lib/search/search-with-fallback'
+import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import { setEntityProductScope } from '@/lib/db/queries/entity-relationships'
 
 // ============================================================================
@@ -69,6 +69,7 @@ export interface CreateKnowledgeSourceAdminInput {
   analysisScope?: string | null
   origin?: string | null
   enabled?: boolean
+  customFields?: Record<string, unknown> | null
   productScopeId?: string | null
   /** When true, stores content as pending and skips inline embedding/graph-eval.
    *  Use when the source will go through the analysis workflow separately. */
@@ -116,6 +117,7 @@ export async function createKnowledgeSourceAdmin(
       source_code_id: input.sourceCodeId ?? null,
       analysis_scope: input.analysisScope ?? null,
       origin: input.origin ?? null,
+      custom_fields: input.customFields ?? null,
       status: skipProcessing ? 'pending' : (hasContent ? 'done' : 'pending'),
       analyzed_at: (!skipProcessing && hasContent) ? new Date() : null,
       enabled: input.enabled ?? true,
@@ -254,17 +256,19 @@ export interface SearchKnowledgeResult {
 export async function searchKnowledge(
   projectId: string,
   query: string,
-  limit: number = 10
+  limit: number = 10,
+  options?: { mode?: SearchMode; threshold?: number }
 ): Promise<SearchKnowledgeResult[]> {
-  return searchWithFallback<SearchKnowledgeResult>({
+  return searchByMode<SearchKnowledgeResult>({
     logPrefix: '[knowledge-service]',
+    mode: options?.mode,
     semanticSearch: async () => {
       const { searchKnowledgeBySourceIds } = await import(
         '@/lib/knowledge/embedding-service'
       )
       const results = await searchKnowledgeBySourceIds(projectId, query, {
         limit,
-        similarityThreshold: 0.5,
+        similarityThreshold: options?.threshold ?? 0.5,
       })
       return results.map((r) => ({
         id: r.id,
@@ -273,7 +277,7 @@ export async function searchKnowledge(
         score: r.similarity,
       }))
     },
-    textFallback: async () => {
+    keywordSearch: async () => {
       const s = `%${query}%`
       const data = await db
         .select({
@@ -289,6 +293,7 @@ export async function searchKnowledge(
             eq(knowledgeSources.enabled, true),
             or(
               ilike(knowledgeSources.name, s),
+              ilike(knowledgeSources.description, s),
               ilike(knowledgeSources.analyzed_content, s)
             )
           )

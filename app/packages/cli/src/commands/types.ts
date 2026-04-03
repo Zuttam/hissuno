@@ -35,9 +35,9 @@ const RESOURCE_TYPE_DEFINITIONS = {
   },
   scopes: {
     description: 'Product scopes (product areas and initiatives) with goals.',
-    filters: [],
-    search: null,
-    add: { required: ['name', 'type'], optional: ['description', 'goals'] },
+    filters: ['type'],
+    search: 'Semantic vector search with text fallback',
+    add: { required: ['name'], optional: ['slug', 'description', 'type', 'color', 'goals'] },
     update: { optional: ['name', 'type', 'description', 'goals'] },
   },
 }

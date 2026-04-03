@@ -8,7 +8,6 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { getSessionById, updateSessionTags } from '@/lib/db/queries/sessions'
-import { getProjectCustomTags } from '@/lib/db/queries/custom-tags'
 import { SESSION_TAGS } from '@/types/session'
 
 export const runtime = 'nodejs'
@@ -23,7 +22,6 @@ type RouteContext = {
  * PATCH /api/sessions/[sessionId]/tags?projectId=...
  * Update tags for a session manually.
  * Requires authenticated user who owns the project.
- * Supports both native tags and project-specific custom tags.
  */
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const { sessionId } = await context.params
@@ -51,20 +49,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Session not found.' }, { status: 404 })
     }
 
-    // Build valid tag set: native tags + project's custom tags
+    // Filter tags to only valid native tags
     const validTagSet = new Set<string>(SESSION_TAGS)
-    const customTags = await getProjectCustomTags(projectId)
-    for (const tag of customTags) {
-      validTagSet.add(tag.slug)
-    }
-
-    // Filter tags to only valid ones
     const tags: string[] = body.tags.filter(
       (t: unknown) => typeof t === 'string' && validTagSet.has(t)
     )
 
     // Update tags
-    const result = await updateSessionTags(sessionId, tags, false)
+    const result = await updateSessionTags(sessionId, tags)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Failed to update tags.' }, { status: 500 })
@@ -113,7 +105,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .select({
         id: sessions.id,
         tags: sessions.tags,
-        tags_auto_applied_at: sessions.tags_auto_applied_at,
         project_id: sessions.project_id,
       })
       .from(sessions)
@@ -131,7 +122,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     return NextResponse.json({
       tags: session.tags || [],
-      autoAppliedAt: session.tags_auto_applied_at?.toISOString() ?? null,
     })
   } catch (error) {
     if (error instanceof MissingProjectIdError) {

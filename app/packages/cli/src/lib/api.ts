@@ -65,8 +65,13 @@ export async function apiCall<T = unknown>(
   const baseUrl = getBaseUrl(config)
   const url = `${baseUrl}${path}`
 
+  const token = config.auth_token ?? config.api_key
+  if (!token) {
+    return { ok: false, status: 0, data: {} as T }
+  }
+
   const headers: Record<string, string> = {
-    Authorization: `Bearer ${config.api_key}`,
+    Authorization: `Bearer ${token}`,
   }
 
   if (body) {

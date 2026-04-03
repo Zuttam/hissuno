@@ -7,7 +7,7 @@ import {
   API_KEY_CREATED_BY_HEADER,
 } from '@/lib/auth/identity'
 import { resolveApiKey } from '@/lib/auth/api-keys'
-import { auth } from '@/lib/auth/auth'
+import { getToken } from 'next-auth/jwt'
 import { db } from '@/lib/db'
 import { userProfiles } from '@/lib/db/schema/app'
 import { eq } from 'drizzle-orm'
@@ -86,6 +86,7 @@ const PUBLIC_PATHS = [
   '/api/integrations/linear/callback',
   '/api/integrations/hubspot/callback',
   '/api/integrations/notion/callback',
+  '/api/integrations/widget/embed',
   '/api/integrations/widget/chat',
   '/api/webhooks/slack',
   '/api/webhooks/jira',
@@ -162,14 +163,38 @@ export async function proxy(request: NextRequest) {
   }
 
   // -------------------------------------------------------------------
-  // 3. Resolve AuthJS session (only for paths that need it)
+  // 3. Resolve user identity (cookie session OR Bearer JWT)
+  //    getToken() handles both: reads cookie first, falls back to
+  //    Authorization: Bearer header. This covers browser sessions
+  //    and CLI login tokens in a single call.
   // -------------------------------------------------------------------
-  let session: { user?: { id?: string; email?: string | null; name?: string | null } } | null = null
+  let userId: string | null = null
   try {
-    session = await auth()
+    const jwt = await getToken({ req: request, secret: process.env.AUTH_SECRET! })
+    if (jwt?.id) {
+      userId = jwt.id as string
+      stripAllIdentityHeaders(requestHeaders)
+      requestHeaders.set(USER_ID_HEADER, userId)
+
+      if (jwt.email) {
+        requestHeaders.set(USER_EMAIL_HEADER, jwt.email as string)
+      }
+
+      const [profile] = await db
+        .select({ full_name: userProfiles.full_name })
+        .from(userProfiles)
+        .where(eq(userProfiles.user_id, userId))
+        .limit(1)
+
+      const userName = profile?.full_name || (jwt.name as string) || null
+      if (userName) {
+        requestHeaders.set(USER_NAME_HEADER, userName)
+      }
+    } else {
+      stripAllIdentityHeaders(requestHeaders)
+    }
   } catch (err) {
-    console.error('[proxy] auth() failed', err)
-    // Auth resolution failed — treat as unauthenticated
+    console.error('[proxy] getToken() failed', err)
     stripAllIdentityHeaders(requestHeaders)
     if (isApiRoute) return jsonResponse({ error: 'Unauthorized' }, 401)
     const loginUrl = new URL('/login', request.url)
@@ -177,45 +202,12 @@ export async function proxy(request: NextRequest) {
     loginUrl.searchParams.set('error', 'Your session has expired. Please sign in again.')
     return redirectResponse(loginUrl)
   }
-  const user = session?.user
-
-  // Fetch user profile for display name
-  let userProfile: { full_name: string | null } | null = null
-
-  if (user?.id) {
-    requestHeaders.set(USER_ID_HEADER, user.id)
-
-    if (user.email) {
-      requestHeaders.set(USER_EMAIL_HEADER, user.email)
-    } else {
-      requestHeaders.delete(USER_EMAIL_HEADER)
-    }
-
-    const [profile] = await db
-      .select({
-        full_name: userProfiles.full_name,
-      })
-      .from(userProfiles)
-      .where(eq(userProfiles.user_id, user.id))
-      .limit(1)
-    userProfile = profile ? { full_name: profile.full_name } : null
-
-    const userName = userProfile?.full_name || user.name || null
-    if (userName) {
-      requestHeaders.set(USER_NAME_HEADER, userName)
-    } else {
-      requestHeaders.delete(USER_NAME_HEADER)
-    }
-  } else {
-    // SECURITY: Strip all identity headers when no session exists.
-    stripAllIdentityHeaders(requestHeaders)
-  }
 
   // -------------------------------------------------------------------
   // 4. Marketing paths — redirect authenticated users
   // -------------------------------------------------------------------
   if (isMarketingPath(pathname)) {
-    if (user) {
+    if (userId) {
       return redirectResponse(new URL('/projects', request.url))
     }
 
@@ -238,7 +230,7 @@ export async function proxy(request: NextRequest) {
   // -------------------------------------------------------------------
   // 5. Protected paths — require authentication
   // -------------------------------------------------------------------
-  if (!user?.id) {
+  if (!userId) {
     if (isApiRoute) {
       // Check for API key authentication (Bearer hiss_*)
       const authHeader = request.headers.get('authorization')

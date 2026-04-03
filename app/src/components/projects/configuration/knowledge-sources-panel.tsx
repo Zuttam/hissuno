@@ -517,7 +517,7 @@ export function KnowledgeSourcesPanel({ projectId, onSourcesChange, productScope
 
         {/* Product scope selector */}
         {productScopes && productScopes.length > 0 && (
-          <FormField label="Product Scope">
+          <FormField label="Scope">
             <Select
               value={editProductScopeId}
               onChange={(e) => setEditProductScopeId(e.target.value)}

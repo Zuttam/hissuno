@@ -16,6 +16,10 @@ import { eq } from 'drizzle-orm'
 import { productScopes, companies } from '@/lib/db/schema/app'
 import { linkEntities, getRelatedIds } from '@/lib/db/queries/entity-relationships'
 import { classifyGoal } from './classify-goal'
+import { searchSessionsSemantic } from '@/lib/sessions/embedding-service'
+import { searchSimilarIssues } from '@/lib/issues/embedding-service'
+import { searchKnowledgeBySourceIds } from '@/lib/knowledge/embedding-service'
+import { searchContactsSemantic, searchCompaniesSemantic } from '@/lib/customers/customer-embedding-service'
 import type { GraphEntityType } from '../schemas'
 import type { ProductScopeGoal } from '@/types/product-scope'
 
@@ -31,69 +35,117 @@ interface DiscoverInput {
 }
 
 /**
+ * Match an entity against product scopes using topic text matching + goal classification.
+ * Returns the first matching scope or null.
+ */
+export async function matchProductScope(
+  projectId: string,
+  topics: string[],
+  entityName: string,
+  contentSnippet: string,
+): Promise<{
+  scopeId: string
+  scopeName: string
+  reasoning: string | null
+  matchedGoalId: string | null
+  matchedGoalText: string | null
+} | null> {
+  const scopes = await db
+    .select({ id: productScopes.id, name: productScopes.name, description: productScopes.description, goals: productScopes.goals })
+    .from(productScopes)
+    .where(eq(productScopes.project_id, projectId))
+
+  const topicsLower = topics.map(t => t.toLowerCase())
+  for (const scope of scopes) {
+    const scopeGoals = (scope.goals as ProductScopeGoal[]) ?? []
+    const goalTexts = scopeGoals.map(g => g.text.toLowerCase()).join(' ')
+    const scopeText = `${scope.name} ${scope.description || ''} ${goalTexts}`.toLowerCase()
+    const matchedTopic = topicsLower.find(topic =>
+      scopeText.includes(topic) || topic.includes(scope.name.toLowerCase())
+    )
+    if (matchedTopic) {
+      try {
+        const classification = await classifyGoal({
+          entityName,
+          contentSnippet,
+          scopeName: scope.name,
+          scopeDescription: scope.description ?? '',
+          goals: scopeGoals,
+          matchedTopic,
+        })
+        return {
+          scopeId: scope.id,
+          scopeName: scope.name,
+          reasoning: classification.reasoning,
+          matchedGoalId: classification.matchedGoalId,
+          matchedGoalText: classification.matchedGoalText,
+        }
+      } catch {
+        // classifyGoal failed (e.g. LLM timeout) - return scope without goal classification
+        return {
+          scopeId: scope.id,
+          scopeName: scope.name,
+          reasoning: null,
+          matchedGoalId: null,
+          matchedGoalText: null,
+        }
+      }
+    }
+  }
+  return null
+}
+
+/**
  * Core logic for discovering relationships. Exported for inline use.
  */
+export interface IssueMatch {
+  issueId: string
+  name: string
+  description: string
+  similarity: number
+  status: string
+  sessionCount: number
+}
+
 export async function discoverRelationships(input: DiscoverInput): Promise<{
   relationshipsCreated: number
   productScopeId: string | null
   errors: string[]
+  issueMatches: IssueMatch[]
 }> {
   const { projectId, entityType, entityId, topics, combinedQuery, contentForTextMatch, entityName, contentForSearch } = input
   let relationshipsCreated = 0
   let productScopeId: string | null = null
   const errors: string[] = []
+  let issueMatches: IssueMatch[] = []
 
   if (topics.length === 0 && !combinedQuery) {
-    return { relationshipsCreated: 0, productScopeId: null, errors: [] }
+    return { relationshipsCreated: 0, productScopeId: null, errors: [], issueMatches: [] }
   }
 
   // 1. Product scope text match (skip for contacts and companies)
   if (entityType !== 'contact' && entityType !== 'company') {
     try {
-      // Check if entity already has a product scope - preserve existing
       const existingScopes = await getRelatedIds(projectId, entityType, entityId, 'product_scope')
       if (existingScopes.length === 0) {
-        const scopes = await db
-          .select({ id: productScopes.id, name: productScopes.name, description: productScopes.description, goals: productScopes.goals })
-          .from(productScopes)
-          .where(eq(productScopes.project_id, projectId))
-
-        const topicsLower = topics.map(t => t.toLowerCase())
-        for (const scope of scopes) {
-          const scopeGoals = (scope.goals as ProductScopeGoal[]) ?? []
-          const goalTexts = scopeGoals.map(g => g.text.toLowerCase()).join(' ')
-          const scopeText = `${scope.name} ${scope.description || ''} ${goalTexts}`.toLowerCase()
-          const matchedTopic = topicsLower.find(topic =>
-            scopeText.includes(topic) || topic.includes(scope.name.toLowerCase())
-          )
-          if (matchedTopic) {
-            try {
-              // Classify which goal this entity serves
-              const classification = await classifyGoal({
-                entityName: entityName ?? '',
-                contentSnippet: contentForSearch?.slice(0, 1500) ?? contentForTextMatch.slice(0, 1500),
-                scopeName: scope.name,
-                scopeDescription: scope.description ?? '',
-                goals: scopeGoals,
-                matchedTopic,
-              })
-
-              await linkEntities(projectId, entityType, entityId, 'product_scope', scope.id, {
-                matchedGoalId: classification.matchedGoalId,
-                matchedGoalText: classification.matchedGoalText,
-                reasoning: classification.reasoning,
-              })
-              relationshipsCreated++
-              if (!productScopeId) {
-                productScopeId = scope.id
-              }
-            } catch {
-              // Duplicate or invalid - skip
-            }
-          }
+        const match = await matchProductScope(
+          projectId,
+          topics,
+          entityName ?? '',
+          contentForSearch?.slice(0, 1500) ?? contentForTextMatch.slice(0, 1500),
+        )
+        if (match) {
+          try {
+            await linkEntities(projectId, entityType, entityId, 'product_scope', match.scopeId, {
+              matchedGoalId: match.matchedGoalId,
+              matchedGoalText: match.matchedGoalText,
+              reasoning: match.reasoning,
+            })
+            relationshipsCreated++
+          } catch { /* Duplicate or constraint violation - skip */ }
+          productScopeId = match.scopeId
         }
       } else {
-        // Already has a scope - use the first one as productScopeId
         productScopeId = existingScopes[0]
       }
     } catch (err) {
@@ -101,106 +153,110 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     }
   }
 
-  // 2. Semantic session search (skip if entityType=session)
-  if (entityType !== 'session' && combinedQuery) {
-    try {
-      const { searchSessionsSemantic } = await import('@/lib/sessions/embedding-service')
-      const results = await searchSessionsSemantic(projectId, combinedQuery, {
-        limit: 10,
-        threshold: 0.6,
-      })
-      const linkResults = await Promise.allSettled(
-        results.slice(0, 5).map((session) =>
-          linkEntities(projectId, entityType, entityId, 'session', session.sessionId)
-        )
-      )
-      relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
-    } catch (err) {
-      errors.push(`Session search failed: ${err instanceof Error ? err.message : 'Unknown'}`)
-    }
-  }
+  // Steps 2-6: Run semantic searches in parallel (each is independent)
+  if (combinedQuery) {
+    const searchTasks: Array<{ label: string; run: () => Promise<void> }> = []
 
-  // 3. Semantic issue search (skip if entityType=issue)
-  if (entityType !== 'issue' && combinedQuery) {
-    try {
-      const { searchSimilarIssues } = await import('@/lib/issues/embedding-service')
-      const results = await searchSimilarIssues(projectId, combinedQuery, '', {
-        limit: 10,
-        threshold: 0.6,
+    // 2. Semantic session search (skip if entityType=session)
+    if (entityType !== 'session') {
+      searchTasks.push({
+        label: 'Session search',
+        run: async () => {
+          const results = await searchSessionsSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
+          const linkResults = await Promise.allSettled(
+            results.slice(0, 5).map((session) =>
+              linkEntities(projectId, entityType, entityId, 'session', session.sessionId)
+            )
+          )
+          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+        },
       })
-      const linkResults = await Promise.allSettled(
-        results.slice(0, 5).map((issue) =>
-          linkEntities(projectId, entityType, entityId, 'issue', issue.issueId)
-        )
-      )
-      relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
-    } catch (err) {
-      errors.push(`Issue search failed: ${err instanceof Error ? err.message : 'Unknown'}`)
     }
-  }
 
-  // 4. Semantic knowledge search (skip if entityType=knowledge_source)
-  if (entityType !== 'knowledge_source' && combinedQuery) {
-    try {
-      const { searchKnowledgeBySourceIds } = await import('@/lib/knowledge/embedding-service')
-      const results = await searchKnowledgeBySourceIds(projectId, combinedQuery, {
-        limit: 10,
-        similarityThreshold: 0.6,
+    // 3. Semantic issue search (skip if entityType=issue)
+    if (entityType !== 'issue') {
+      searchTasks.push({
+        label: 'Issue search',
+        run: async () => {
+          const results = await searchSimilarIssues(projectId, combinedQuery, '', { limit: 10, threshold: 0.6 })
+          issueMatches = results.slice(0, 5).map((issue) => ({
+            issueId: issue.issueId,
+            name: issue.name,
+            description: issue.description,
+            similarity: issue.similarity,
+            status: issue.status,
+            sessionCount: issue.sessionCount,
+          }))
+          const linkResults = await Promise.allSettled(
+            issueMatches.map((issue) =>
+              linkEntities(projectId, entityType, entityId, 'issue', issue.issueId)
+            )
+          )
+          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+        },
       })
-      // Deduplicate by sourceId
-      const seenSourceIds = new Set<string>()
-      const uniqueSourceIds: string[] = []
-      for (const chunk of results) {
-        if (!chunk.sourceId || seenSourceIds.has(chunk.sourceId) || uniqueSourceIds.length >= 5) continue
-        seenSourceIds.add(chunk.sourceId)
-        uniqueSourceIds.push(chunk.sourceId)
+    }
+
+    // 4. Semantic knowledge search (skip if entityType=knowledge_source)
+    if (entityType !== 'knowledge_source') {
+      searchTasks.push({
+        label: 'Knowledge search',
+        run: async () => {
+          const results = await searchKnowledgeBySourceIds(projectId, combinedQuery, { limit: 10, similarityThreshold: 0.6 })
+          const seenSourceIds = new Set<string>()
+          const uniqueSourceIds: string[] = []
+          for (const chunk of results) {
+            if (!chunk.sourceId || seenSourceIds.has(chunk.sourceId) || uniqueSourceIds.length >= 5) continue
+            seenSourceIds.add(chunk.sourceId)
+            uniqueSourceIds.push(chunk.sourceId)
+          }
+          const linkResults = await Promise.allSettled(
+            uniqueSourceIds.map((sourceId) =>
+              linkEntities(projectId, entityType, entityId, 'knowledge_source', sourceId)
+            )
+          )
+          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+        },
+      })
+    }
+
+    // 5. Semantic contact search (skip if entityType=contact)
+    if (entityType !== 'contact') {
+      searchTasks.push({
+        label: 'Contact search',
+        run: async () => {
+          const results = await searchContactsSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
+          const linkResults = await Promise.allSettled(
+            results.slice(0, 5).map((contact) =>
+              linkEntities(projectId, entityType, entityId, 'contact', contact.contactId)
+            )
+          )
+          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+        },
+      })
+    }
+
+    // 6. Semantic company search (skip for contacts and company=self)
+    if (entityType !== 'contact' && entityType !== 'company') {
+      searchTasks.push({
+        label: 'Company semantic search',
+        run: async () => {
+          const results = await searchCompaniesSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
+          const linkResults = await Promise.allSettled(
+            results.slice(0, 5).map((company) =>
+              linkEntities(projectId, entityType, entityId, 'company', company.companyId)
+            )
+          )
+          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+        },
+      })
+    }
+
+    const searchResults = await Promise.allSettled(searchTasks.map((t) => t.run()))
+    for (let i = 0; i < searchResults.length; i++) {
+      if (searchResults[i].status === 'rejected') {
+        errors.push(`${searchTasks[i].label} failed: ${(searchResults[i] as PromiseRejectedResult).reason instanceof Error ? ((searchResults[i] as PromiseRejectedResult).reason as Error).message : 'Unknown'}`)
       }
-      const linkResults = await Promise.allSettled(
-        uniqueSourceIds.map((sourceId) =>
-          linkEntities(projectId, entityType, entityId, 'knowledge_source', sourceId)
-        )
-      )
-      relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
-    } catch (err) {
-      errors.push(`Knowledge search failed: ${err instanceof Error ? err.message : 'Unknown'}`)
-    }
-  }
-
-  // 5. Semantic contact search (skip if entityType=contact)
-  if (entityType !== 'contact' && combinedQuery) {
-    try {
-      const { searchContactsSemantic } = await import('@/lib/customers/customer-embedding-service')
-      const results = await searchContactsSemantic(projectId, combinedQuery, {
-        limit: 10,
-        threshold: 0.6,
-      })
-      const linkResults = await Promise.allSettled(
-        results.slice(0, 5).map((contact) =>
-          linkEntities(projectId, entityType, entityId, 'contact', contact.contactId)
-        )
-      )
-      relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
-    } catch (err) {
-      errors.push(`Contact search failed: ${err instanceof Error ? err.message : 'Unknown'}`)
-    }
-  }
-
-  // 6. Semantic company search (skip for contacts and company=self)
-  if (entityType !== 'contact' && entityType !== 'company' && combinedQuery) {
-    try {
-      const { searchCompaniesSemantic } = await import('@/lib/customers/customer-embedding-service')
-      const results = await searchCompaniesSemantic(projectId, combinedQuery, {
-        limit: 10,
-        threshold: 0.6,
-      })
-      const linkResults = await Promise.allSettled(
-        results.slice(0, 5).map((company) =>
-          linkEntities(projectId, entityType, entityId, 'company', company.companyId)
-        )
-      )
-      relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
-    } catch (err) {
-      errors.push(`Company semantic search failed: ${err instanceof Error ? err.message : 'Unknown'}`)
     }
   }
 
@@ -232,6 +288,6 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     }
   }
 
-  return { relationshipsCreated, productScopeId, errors }
+  return { relationshipsCreated, productScopeId, errors, issueMatches }
 }
 

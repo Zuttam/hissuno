@@ -54,11 +54,10 @@ export const generateBrief = createStep({
       const [issue] = await db
         .select({
           id: issues.id,
-          title: issues.title,
+          name: issues.name,
           description: issues.description,
           type: issues.type,
           priority: issues.priority,
-          upvote_count: issues.upvote_count,
           status: issues.status,
         })
         .from(issues)
@@ -135,11 +134,11 @@ export const generateBrief = createStep({
 
 ## Issue Details
 - **Type**: ${issue.type}
-- **Title**: ${issue.title}
+- **Name**: ${issue.name}
 - **Description**: ${issue.description}
 - **Priority**: ${issue.priority}
 - **Status**: ${issue.status}
-- **Upvotes**: ${issue.upvote_count}
+- **Linked sessions**: ${sessionIds.length}
 ${productScopeName ? `- **Product Scope**: ${productScopeName}${productScopeType ? ` (${productScopeType})` : ''}` : ''}
 ${productScopeGoals.length > 0 ? `- **Goals**: ${productScopeGoals.map((g) => g.text).join('; ')}` : ''}
 

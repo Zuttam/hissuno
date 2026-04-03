@@ -2,8 +2,8 @@ import { fetchApi, buildUrl } from './fetch'
 import type { ApiKeyRecord } from '@/types/project-members'
 
 const paths = {
-  apiKeys: '/api/access/api-keys',
-  apiKey: (keyId: string) => `/api/access/api-keys/${keyId}`,
+  apiKeys: '/api/settings/api-keys',
+  apiKey: (keyId: string) => `/api/settings/api-keys/${keyId}`,
 }
 
 export async function listApiKeys(projectId: string): Promise<ApiKeyRecord[]> {

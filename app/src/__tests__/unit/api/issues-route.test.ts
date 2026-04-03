@@ -138,7 +138,7 @@ describe('GET /api/issues', () => {
   })
 
   it('returns issues list', async () => {
-    const issues = [{ id: 'i1', title: 'Bug report' }]
+    const issues = [{ id: 'i1', name: 'Bug report' }]
     mockListIssues.mockResolvedValue({ issues, total: 1 })
 
     const req = createRequest(
@@ -239,7 +239,7 @@ describe('GET /api/issues', () => {
 describe('POST /api/issues', () => {
   const validBody = {
     type: 'bug',
-    title: 'Login page crashes',
+    name: 'Login page crashes',
     description: 'The login page crashes when clicking submit.',
   }
 
@@ -293,7 +293,7 @@ describe('POST /api/issues', () => {
   })
 
   it('returns 400 when type is missing', async () => {
-    const req = createPostRequest({ title: 'Bug', description: 'Desc' })
+    const req = createPostRequest({ name: 'Bug', description: 'Desc' })
     const res = await POST(req)
 
     expect(res.status).toBe(400)
@@ -301,17 +301,17 @@ describe('POST /api/issues', () => {
     expect(body.error).toBe('type is required.')
   })
 
-  it('returns 400 when title is missing', async () => {
+  it('returns 400 when name is missing', async () => {
     const req = createPostRequest({ type: 'bug', description: 'Desc' })
     const res = await POST(req)
 
     expect(res.status).toBe(400)
     const body = await res.json()
-    expect(body.error).toBe('title is required.')
+    expect(body.error).toBe('name is required.')
   })
 
   it('returns 400 when description is missing', async () => {
-    const req = createPostRequest({ type: 'bug', title: 'Bug' })
+    const req = createPostRequest({ type: 'bug', name: 'Bug' })
     const res = await POST(req)
 
     expect(res.status).toBe(400)

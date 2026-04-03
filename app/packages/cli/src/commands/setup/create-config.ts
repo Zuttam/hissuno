@@ -6,11 +6,16 @@ import { log } from '../../lib/log.js'
  * Auto-configure the CLI with the API key from the seed step.
  * Saves config to ~/.hissuno/config.json so `hissuno` commands work immediately.
  */
-export async function createConfig(apiKey: string, baseUrl = 'http://localhost:3000'): Promise<void> {
-  const shouldConfigure = await confirm({
-    message: 'Auto-configure the CLI with the generated API key?',
-    default: true,
-  })
+export async function createConfig(apiKey: string, baseUrl = 'http://localhost:3000', autoConfig?: boolean): Promise<void> {
+  let shouldConfigure: boolean
+  if (autoConfig !== undefined) {
+    shouldConfigure = autoConfig
+  } else {
+    shouldConfigure = await confirm({
+      message: 'Auto-configure the CLI with the generated API key?',
+      default: true,
+    })
+  }
 
   if (!shouldConfigure) {
     log.info('Skipping auto-config. Run `hissuno config` later to connect manually.')

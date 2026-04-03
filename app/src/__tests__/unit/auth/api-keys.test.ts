@@ -17,16 +17,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // MOCKS
 // ============================================================================
 
-// Chain-style mock: db.select().from().where().limit()
+// Chain-style mock: db.select().from().where().limit() / .orderBy()
 const mockLimit = vi.fn()
-const mockWhere = vi.fn(() => ({ limit: mockLimit }))
+const mockOrderByFromWhere = vi.fn()
+const mockWhere = vi.fn(() => ({ limit: mockLimit, orderBy: mockOrderByFromWhere }))
 const mockFrom = vi.fn(() => ({ where: mockWhere }))
-const mockDbSelect = vi.fn(() => ({ from: mockFrom }))
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDbSelect = vi.fn<(...args: any[]) => any>(() => ({ from: mockFrom }))
 
 // Insert chain: db.insert().values().returning()
 const mockReturning = vi.fn()
 const mockValues = vi.fn(() => ({ returning: mockReturning }))
-const mockInsert = vi.fn(() => ({ values: mockValues }))
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockInsert = vi.fn<(...args: any[]) => any>(() => ({ values: mockValues }))
 
 // Update chain: db.update().set().where().returning() / .then()
 const mockUpdateReturning = vi.fn()
@@ -38,7 +41,8 @@ const mockUpdateWhere = vi.fn(() => ({
   }),
 }))
 const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }))
-const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }))
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockUpdate = vi.fn<(...args: any[]) => any>(() => ({ set: mockUpdateSet }))
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -385,7 +389,7 @@ describe('revokeApiKey', () => {
 
 describe('revokeAllApiKeys', () => {
   it('calls update with project filter', async () => {
-    mockUpdateWhere.mockResolvedValue(undefined)
+    mockUpdateWhere.mockResolvedValue(undefined as never)
 
     await expect(revokeAllApiKeys(PROJECT_ID)).resolves.toBeUndefined()
     expect(mockUpdate).toHaveBeenCalled()
@@ -400,7 +404,7 @@ describe('revokeAllApiKeys', () => {
 describe('listApiKeys', () => {
   it('returns empty array when no keys exist', async () => {
     const mockOrderBy = vi.fn().mockResolvedValue([])
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy })
+    mockWhere.mockReturnValueOnce({ limit: mockLimit, orderBy: mockOrderBy })
 
     const result = await listApiKeys(PROJECT_ID)
 
@@ -422,7 +426,7 @@ describe('listApiKeys', () => {
         created_at: now,
       },
     ])
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy })
+    mockWhere.mockReturnValueOnce({ limit: mockLimit, orderBy: mockOrderBy })
 
     const result = await listApiKeys(PROJECT_ID)
 
@@ -460,7 +464,7 @@ describe('listApiKeys', () => {
         created_at: date1,
       },
     ])
-    mockWhere.mockReturnValueOnce({ orderBy: mockOrderBy })
+    mockWhere.mockReturnValueOnce({ limit: mockLimit, orderBy: mockOrderBy })
 
     const result = await listApiKeys(PROJECT_ID)
 

@@ -15,12 +15,16 @@
  * - PM Agent Tools -> product-scopes-service.ts (Admin) -> db
  */
 
-import { eq, count } from 'drizzle-orm'
+import { eq, and, or, asc, count, ilike, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { productScopes } from '@/lib/db/schema/app'
 import { isUniqueViolation } from '@/lib/db/errors'
 import { fireEmbedding } from '@/lib/utils/embeddings'
-import { buildProductScopeEmbeddingText } from '@/lib/product-scopes/embedding-service'
+import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
+import {
+  buildProductScopeEmbeddingText,
+  searchProductScopesSemantic,
+} from '@/lib/product-scopes/embedding-service'
 import type { ProductScopeRecord, ProductScopeType, ProductScopeGoal } from '@/types/product-scope'
 import {
   getProductScopeById,
@@ -50,6 +54,7 @@ export interface CreateProductScopeAdminInput {
   position?: number
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
+  custom_fields?: Record<string, unknown>
 }
 
 /**
@@ -63,6 +68,7 @@ export interface UpdateProductScopeAdminInput {
   position?: number
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
+  custom_fields?: Record<string, unknown>
 }
 
 // ============================================================================
@@ -100,6 +106,7 @@ export async function createProductScopeAdmin(
         is_default: false,
         type: input.type ?? 'product_area',
         goals: (input.goals ?? null) as unknown as Record<string, unknown>,
+        custom_fields: input.custom_fields ?? null,
       })
       .returning()
 
@@ -145,6 +152,7 @@ export async function updateProductScopeAdmin(
   if (input.position !== undefined) updates.position = input.position
   if (input.type !== undefined) updates.type = input.type
   if (input.goals !== undefined) updates.goals = input.goals as unknown as Record<string, unknown>
+  if (input.custom_fields !== undefined) updates.custom_fields = input.custom_fields
 
   if (Object.keys(updates).length === 0) {
     return existing
@@ -370,6 +378,68 @@ export async function syncProductScopesAdmin(
   }
 
   return result
+}
+
+// ============================================================================
+// Search
+// ============================================================================
+
+export interface SearchScopeResult {
+  id: string
+  name: string
+  snippet: string
+  score?: number
+}
+
+export async function searchScopes(
+  projectId: string,
+  query: string,
+  limit: number = 10,
+  options?: { mode?: SearchMode; threshold?: number }
+): Promise<SearchScopeResult[]> {
+  return searchByMode<SearchScopeResult>({
+    logPrefix: '[product-scopes-service]',
+    mode: options?.mode,
+    semanticSearch: async () => {
+      const results = await searchProductScopesSemantic(projectId, query, {
+        limit,
+        threshold: options?.threshold ?? 0.4,
+      })
+      return results.map((r) => ({
+        id: r.scopeId,
+        name: r.name,
+        snippet: r.description.slice(0, 200),
+        score: r.similarity,
+      }))
+    },
+    keywordSearch: async () => {
+      const s = `%${query}%`
+      const data = await db
+        .select({
+          id: productScopes.id,
+          name: productScopes.name,
+          description: productScopes.description,
+        })
+        .from(productScopes)
+        .where(
+          and(
+            eq(productScopes.project_id, projectId),
+            or(
+              ilike(productScopes.name, s),
+              ilike(productScopes.description, s),
+              sql`${productScopes.goals}::text ILIKE ${s}`
+            )
+          )
+        )
+        .orderBy(asc(productScopes.position))
+        .limit(limit)
+      return data.map((r) => ({
+        id: r.id,
+        name: r.name,
+        snippet: (r.description ?? '').slice(0, 200),
+      }))
+    },
+  })
 }
 
 // ============================================================================

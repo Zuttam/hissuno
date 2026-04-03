@@ -129,6 +129,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (payload.description !== undefined) {
       updates.description = payload.description || null
     }
+    if (payload.custom_fields !== undefined) {
+      updates.custom_fields = payload.custom_fields
+    }
 
     // Track if we're updating source_codes (for codebase)
     let updatedSourceCode = false

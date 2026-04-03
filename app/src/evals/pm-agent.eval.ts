@@ -156,7 +156,7 @@ async function evaluateTestCase(
   projectId: string,
   verbose: boolean
 ): Promise<PMEvalResult> {
-  const pmAgent = mastra.getAgent('feedbackDecisionAgent')
+  const pmAgent = mastra.getAgent('productManagerAgent')
 
   if (!pmAgent) {
     return {

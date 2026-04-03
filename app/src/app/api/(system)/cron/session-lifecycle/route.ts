@@ -1,25 +1,19 @@
 import { NextResponse } from 'next/server'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
-import { isUniqueViolation } from '@/lib/db/errors'
 import {
   sessions,
   sessionMessages,
-  sessionReviews,
   projectSettings,
 } from '@/lib/db/schema/app'
-import { eq, and, inArray, lte, isNull, sql } from 'drizzle-orm'
-import { ensureSessionName } from '@/lib/sessions/name-generator'
-import { mastra } from '@/mastra'
-import type { WorkflowOutput } from '@/mastra/workflows/session-review/schemas'
+import { eq, and, inArray, lte, isNull } from 'drizzle-orm'
+import { updateSession } from '@/lib/db/queries/sessions'
+import { fireSessionProcessing } from '@/lib/utils/session-processing'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const LOG_PREFIX = '[cron.session-lifecycle]'
-
-const REVIEW_BATCH_LIMIT = 10
-const STALE_REVIEW_MINUTES = 15
 
 // =========================================
 // Types
@@ -28,11 +22,7 @@ const STALE_REVIEW_MINUTES = 15
 interface PhaseResult {
   count: number
   errors: string[]
-}
-
-interface SessionToReview {
-  id: string
-  project_id: string
+  closedIds?: Set<string>
 }
 
 // =========================================
@@ -62,18 +52,24 @@ export async function closeScheduledSessions(now: Date): Promise<PhaseResult> {
 
   console.log(`${LOG_PREFIX} Found ${sessionsToClose.length} sessions to close`)
 
-  try {
-    const ids = sessionsToClose.map((s) => s.id)
-    await db
-      .update(sessions)
-      .set({ status: 'closed', updated_at: now })
-      .where(inArray(sessions.id, ids))
-    result.count = ids.length
-  } catch (err) {
-    console.error(`${LOG_PREFIX} Error batch-closing sessions:`, err)
-    result.errors.push(`Failed to batch-close ${sessionsToClose.length} sessions`)
+  const closeResults = await Promise.allSettled(
+    sessionsToClose.map((s) => updateSession(s.id, { status: 'closed' }))
+  )
+
+  const closedIds = new Set<string>()
+  for (let i = 0; i < closeResults.length; i++) {
+    const res = closeResults[i]
+    if (res.status === 'fulfilled' && res.value) {
+      result.count++
+      closedIds.add(sessionsToClose[i].id)
+    } else {
+      const session = sessionsToClose[i]
+      console.error(`${LOG_PREFIX} Error closing session ${session.id}:`, res.status === 'rejected' ? res.reason : 'Not found')
+      result.errors.push(`Failed to close session ${session.id}`)
+    }
   }
 
+  result.closedIds = closedIds
   return result
 }
 
@@ -168,184 +164,38 @@ export async function sendIdlePrompts(now: Date): Promise<PhaseResult> {
 }
 
 /**
- * Execute a single session review: ensure name, insert record, run workflow.
+ * Phase 3: Safety net - find closed sessions that haven't been base-processed.
+ * Primary processing fires from the service layer when sessions close.
+ * This catches any that were missed.
+ *
+ * `excludeIds` should contain session IDs already closed (and thus processed)
+ * in Phase 1, to avoid double-firing the processing workflow.
  */
-export async function executeSessionReview(
-  session: SessionToReview
-): Promise<{ triggered: boolean; error?: string }> {
-  // Ensure session has a name before PM review
-  await ensureSessionName({
-    sessionId: session.id,
-    projectId: session.project_id,
-  })
-
-  // Insert review record
-  const runId = `pm-review-${session.id}-${Date.now()}`
-
-  let reviewRecord: { id: string } | undefined
-  try {
-    const [record] = await db
-      .insert(sessionReviews)
-      .values({
-        session_id: session.id,
-        project_id: session.project_id,
-        run_id: runId,
-        status: 'running',
-        metadata: {
-          triggeredBy: 'session-lifecycle-cron',
-          sessionId: session.id,
-          projectId: session.project_id,
-        },
-      })
-      .returning({ id: sessionReviews.id })
-    reviewRecord = record
-  } catch (pmError: unknown) {
-    if (isUniqueViolation(pmError)) {
-      // Unique constraint violation - review already exists
-      return { triggered: false }
-    }
-    console.error(`${LOG_PREFIX} Failed to create review record for session ${session.id}:`, pmError)
-    return { triggered: false, error: pmError instanceof Error ? pmError.message : String(pmError) }
-  }
-
-  if (!reviewRecord) {
-    return { triggered: false, error: 'No review record returned' }
-  }
-
-  // Execute workflow
-  const workflow = mastra.getWorkflow('sessionReviewWorkflow')
-  if (!workflow) {
-    console.warn(`${LOG_PREFIX} Session review workflow not configured, skipping review for session ${session.id}`)
-    await db
-      .update(sessionReviews)
-      .set({
-        status: 'skipped',
-        completed_at: new Date(),
-        result: { action: 'skipped', skipReason: 'Workflow not configured' },
-      })
-      .where(eq(sessionReviews.id, reviewRecord.id))
-    return { triggered: true }
-  }
-
-  try {
-    console.log(`${LOG_PREFIX} Executing session review workflow for session ${session.id}`)
-    const run = await workflow.createRunAsync({ runId })
-    const workflowResult = await run.start({
-      inputData: {
-        sessionId: session.id,
-        projectId: session.project_id,
-      },
-    })
-
-    if (workflowResult.status === 'failed') {
-      throw new Error(workflowResult.error?.message ?? 'Workflow failed')
-    }
-
-    const steps = workflowResult.steps as Record<string, { output?: unknown } | undefined> | undefined
-    const pmReviewOutput = steps?.['execute-decision']?.output as Partial<WorkflowOutput> | undefined
-    const classifyOutput = steps?.['classify-session']?.output as { tags?: string[]; tagsApplied?: boolean } | undefined
-
-    const resultData: WorkflowOutput = {
-      tags: (classifyOutput?.tags ?? []) as WorkflowOutput['tags'],
-      tagsApplied: classifyOutput?.tagsApplied ?? false,
-      productScopeId: (classifyOutput as { productScopeId?: string | null } | undefined)?.productScopeId ?? null,
-      action: pmReviewOutput?.action ?? 'skipped',
-      issueId: pmReviewOutput?.issueId,
-      issueTitle: pmReviewOutput?.issueTitle,
-      skipReason: pmReviewOutput?.skipReason ?? (pmReviewOutput?.action ? undefined : 'No result from workflow'),
-    }
-
-    await db
-      .update(sessionReviews)
-      .set({
-        status: 'completed',
-        completed_at: new Date(),
-        result: resultData,
-      })
-      .where(eq(sessionReviews.id, reviewRecord.id))
-
-    console.log(`${LOG_PREFIX} Session review completed for session ${session.id}:`, resultData.action)
-    return { triggered: true }
-  } catch (workflowError) {
-    console.error(`${LOG_PREFIX} Workflow execution failed for session ${session.id}:`, workflowError)
-    await db
-      .update(sessionReviews)
-      .set({
-        status: 'failed',
-        completed_at: new Date(),
-        error_message: workflowError instanceof Error ? workflowError.message : 'Unknown error',
-      })
-      .where(eq(sessionReviews.id, reviewRecord.id))
-    return { triggered: false, error: workflowError instanceof Error ? workflowError.message : 'Unknown error' }
-  }
-}
-
-/**
- * Find all closed sessions that need review and trigger reviews for them.
- * Cleans up stale running records first, then processes up to REVIEW_BATCH_LIMIT sessions.
- */
-export async function triggerPendingReviews(): Promise<PhaseResult> {
+export async function triggerPendingProcessing(excludeIds?: Set<string>): Promise<PhaseResult> {
   const result: PhaseResult = { count: 0, errors: [] }
 
-  // Clean up stale running records (older than 15 min) -> mark as failed
-  const staleThreshold = new Date(Date.now() - STALE_REVIEW_MINUTES * 60 * 1000)
-  const staleRecords = await db
-    .update(sessionReviews)
-    .set({
-      status: 'failed',
-      completed_at: new Date(),
-      error_message: 'Stale review record - timed out after 15 minutes',
-    })
+  const unprocessedSessions = await db
+    .select({ id: sessions.id, project_id: sessions.project_id })
+    .from(sessions)
     .where(
       and(
-        eq(sessionReviews.status, 'running'),
-        lte(sessionReviews.created_at, staleThreshold)
+        eq(sessions.status, 'closed'),
+        isNull(sessions.base_processed_at),
       )
     )
-    .returning({ id: sessionReviews.id })
+    .orderBy(sessions.updated_at)
+    .limit(10)
 
-  if (staleRecords.length > 0) {
-    console.log(`${LOG_PREFIX} Cleaned up ${staleRecords.length} stale review records`)
-  }
-
-  // Find closed sessions with no terminal review record using a raw SQL approach
-  // equivalent to the Supabase LEFT JOIN anti-pattern
-  const unreviewedSessions = await db.execute(sql`
-    SELECT s.id, s.project_id
-    FROM sessions s
-    LEFT JOIN session_reviews sr
-      ON sr.session_id = s.id
-      AND sr.status IN ('completed', 'running', 'skipped')
-    WHERE s.status = 'closed'
-      AND sr.id IS NULL
-    ORDER BY s.updated_at ASC
-    LIMIT ${REVIEW_BATCH_LIMIT}
-  `) as unknown as { rows: Array<{ id: string; project_id: string }> }
-
-  if (!unreviewedSessions.rows || unreviewedSessions.rows.length === 0) {
+  if (unprocessedSessions.length === 0) {
     return result
   }
 
-  console.log(`${LOG_PREFIX} Found ${unreviewedSessions.rows.length} unreviewed closed sessions`)
+  console.log(`${LOG_PREFIX} Found ${unprocessedSessions.length} unprocessed closed sessions (safety net)`)
 
-  // Run session reviews in parallel
-  const reviewResults = await Promise.allSettled(
-    unreviewedSessions.rows.map((session) => executeSessionReview(session))
-  )
-
-  for (let i = 0; i < reviewResults.length; i++) {
-    const res = reviewResults[i]
-    const session = unreviewedSessions.rows[i]
-    if (res.status === 'fulfilled') {
-      if (res.value.triggered) {
-        result.count++
-      } else if (res.value.error) {
-        result.errors.push(`Review failed for session ${session.id}: ${res.value.error}`)
-      }
-    } else {
-      console.error(`${LOG_PREFIX} Error reviewing session ${session.id}:`, res.reason)
-      result.errors.push(`Failed to review session ${session.id}`)
-    }
+  for (const session of unprocessedSessions) {
+    if (excludeIds?.has(session.id)) continue
+    fireSessionProcessing(session.id, session.project_id)
+    result.count++
   }
 
   return result
@@ -360,7 +210,7 @@ export async function triggerPendingReviews(): Promise<PhaseResult> {
  * Cron job to handle session lifecycle:
  * 1. Auto-close sessions that are scheduled for close
  * 2. Send idle prompts to sessions that have been inactive
- * 3. Trigger PM review for all closed sessions without a review
+ * 3. Trigger base processing for closed sessions that were missed
  *
  * Should be run every minute via Vercel cron.
  */
@@ -387,14 +237,14 @@ export async function GET(request: Request) {
       sendIdlePrompts(now),
     ])
 
-    // Phase 3 runs after close (needs newly-closed sessions)
-    const reviewResult = await triggerPendingReviews()
+    // Phase 3: Base processing for unprocessed sessions (excludes Phase 1 IDs to avoid double-fire)
+    const processResult = await triggerPendingProcessing(closeResult.closedIds)
 
     const results = {
       sessionsClosed: closeResult.count,
       idlePromptsSent: idleResult.count,
-      pmReviewsTriggered: reviewResult.count,
-      errors: [...closeResult.errors, ...idleResult.errors, ...reviewResult.errors],
+      sessionsProcessed: processResult.count,
+      errors: [...closeResult.errors, ...idleResult.errors, ...processResult.errors],
     }
 
     console.log(`${LOG_PREFIX} Completed:`, results)

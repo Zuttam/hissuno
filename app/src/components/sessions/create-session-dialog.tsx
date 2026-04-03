@@ -72,10 +72,10 @@ function EntityLinkField({
             break
           }
           case 'issue': {
-            const data = await fetchApi<{ issues: Array<{ id: string; title: string }> }>(
+            const data = await fetchApi<{ issues: Array<{ id: string; name: string }> }>(
               buildUrl('/api/issues', { projectId, search: query, limit: 10 }),
             )
-            results = (data.issues ?? []).map((i) => ({ value: i.id, label: i.title }))
+            results = (data.issues ?? []).map((i) => ({ value: i.id, label: i.name }))
             break
           }
           case 'knowledge_source': {
@@ -795,7 +795,7 @@ export function CreateSessionDialog({
               onRemove={(val) => setLinkedKnowledge((prev) => prev.filter((i) => i.value !== val))}
             />
             <EntityLinkField
-              label="Product Scopes"
+              label="Scopes"
               projectId={projectId}
               entityType="product_scope"
               items={linkedScopes}

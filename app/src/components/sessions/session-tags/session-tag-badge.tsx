@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
-import { getTagInfo, type CustomTagRecord } from '@/types/session'
+import { getTagInfo } from '@/types/session'
 
 function XIcon({ className }: { className?: string }) {
   return (
@@ -22,10 +22,8 @@ function XIcon({ className }: { className?: string }) {
 }
 
 interface SessionTagBadgeProps {
-  /** Tag slug (native or custom) */
+  /** Tag slug */
   tag: string
-  /** Custom tags for the project (optional, needed for custom tag display) */
-  customTags?: CustomTagRecord[]
   onRemove?: () => void
   removable?: boolean
   size?: 'sm' | 'md'
@@ -33,16 +31,14 @@ interface SessionTagBadgeProps {
 
 /**
  * Badge component for displaying a session tag with appropriate styling.
- * Supports both native tags and custom tags.
  */
 export function SessionTagBadge({
   tag,
-  customTags = [],
   onRemove,
   removable = false,
   size = 'sm',
 }: SessionTagBadgeProps) {
-  const tagInfo = getTagInfo(tag, customTags)
+  const tagInfo = getTagInfo(tag)
 
   return (
     <Badge
@@ -68,10 +64,8 @@ export function SessionTagBadge({
 }
 
 interface SessionTagListProps {
-  /** Array of tag slugs (native or custom) */
+  /** Array of tag slugs */
   tags: string[]
-  /** Custom tags for the project (optional, needed for custom tag display) */
-  customTags?: CustomTagRecord[]
   onRemove?: (tag: string) => void
   removable?: boolean
   size?: 'sm' | 'md'
@@ -80,11 +74,9 @@ interface SessionTagListProps {
 
 /**
  * Display multiple tags in a row.
- * Supports both native tags and custom tags.
  */
 export function SessionTagList({
   tags,
-  customTags = [],
   onRemove,
   removable = false,
   size = 'sm',
@@ -102,7 +94,6 @@ export function SessionTagList({
         <SessionTagBadge
           key={tag}
           tag={tag}
-          customTags={customTags}
           removable={removable}
           onRemove={onRemove ? () => onRemove(tag) : undefined}
           size={size}

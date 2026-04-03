@@ -15,7 +15,7 @@ import { Command } from 'commander'
 import { input, password, confirm, select } from '@inquirer/prompts'
 import { loadConfig, saveConfig, getActiveProfileName, type HissunoConfig } from '../lib/config.js'
 import { apiCall } from '../lib/api.js'
-import { renderJson, success, error } from '../lib/output.js'
+import { renderJson, success, error, BOLD, DIM, RESET, CYAN } from '../lib/output.js'
 import {
   PLATFORMS,
   PLATFORM_LABELS,
@@ -30,40 +30,63 @@ import {
   type Platform,
 } from './integrations.js'
 
-const BOLD = '\x1b[1m'
-const DIM = '\x1b[2m'
-const RESET = '\x1b[0m'
-const CYAN = '\x1b[36m'
-
 /**
  * Run the interactive config wizard. Returns the validated config.
  * Used by both `hissuno config` and `hissuno profile create`.
+ *
+ * When `opts.apiKey` and `opts.url` are both provided, runs non-interactively.
  */
-export async function runConfigWizard(): Promise<HissunoConfig> {
-  console.log(`\n${BOLD}Step 1: Authentication${RESET}`)
+export async function runConfigWizard(opts?: { apiKey?: string; url?: string }): Promise<HissunoConfig> {
+  let apiKey: string
+  let baseUrl: string
 
-  const apiKey = await password({
-    message: 'API key (hiss_...):',
-    mask: '*',
-    validate: (val) => {
-      if (!val.startsWith('hiss_')) return 'API key must start with hiss_'
-      if (val.length < 10) return 'API key is too short'
-      return true
-    },
-  })
+  if (opts?.apiKey) {
+    // Non-interactive: use provided API key
+    apiKey = opts.apiKey
+  } else {
+    console.log(`\n${BOLD}Step 1: Authentication${RESET}`)
 
-  const baseUrl = await input({
-    message: 'Hissuno URL:',
-    default: 'http://localhost:3000',
-    validate: (val) => {
-      try {
-        new URL(val)
+    const authMethod = await select({
+      message: 'How would you like to authenticate?',
+      choices: [
+        { value: 'browser', name: 'Browser login (recommended)' },
+        { value: 'api_key', name: 'API key (hiss_...)' },
+      ],
+    })
+
+    if (authMethod === 'browser') {
+      console.log(`\n${DIM}Run \`hissuno login\` to authenticate via browser.${RESET}`)
+      process.exit(0)
+    }
+
+    apiKey = await password({
+      message: 'API key (hiss_...):',
+      mask: '*',
+      validate: (val) => {
+        if (!val.startsWith('hiss_')) return 'API key must start with hiss_'
+        if (val.length < 10) return 'API key is too short'
         return true
-      } catch {
-        return 'Must be a valid URL'
-      }
-    },
-  })
+      },
+    })
+  }
+
+  if (opts?.url) {
+    // Non-interactive: use provided URL
+    baseUrl = opts.url
+  } else {
+    baseUrl = await input({
+      message: 'Hissuno URL:',
+      default: 'http://localhost:3000',
+      validate: (val) => {
+        try {
+          new URL(val)
+          return true
+        } catch {
+          return 'Must be a valid URL'
+        }
+      },
+    })
+  }
 
   const normalizedUrl = baseUrl.replace(/\/+$/, '')
   const config: HissunoConfig = { api_key: apiKey, base_url: normalizedUrl }
@@ -99,66 +122,81 @@ export async function runConfigWizard(): Promise<HissunoConfig> {
 
 export const configCommand = new Command('config')
   .description('Configure CLI connection (API key, URL, project)')
-  .action(async () => {
+  .option('--api-key <key>', 'API key (hiss_...)')
+  .option('--url <url>', 'Hissuno instance URL')
+  .option('--yes', 'Skip confirmation prompts')
+  .action(async (opts) => {
     console.log(`\n${BOLD}${CYAN}Hissuno Config${RESET}`)
     console.log(`${DIM}Connect the CLI to your Hissuno instance.${RESET}\n`)
+
+    const nonInteractive = !!(opts.apiKey && opts.url)
 
     // Check for existing config
     const existing = loadConfig()
     if (existing) {
-      const reconfigure = await confirm({
-        message: 'Existing configuration found. Reconfigure?',
-        default: false,
-      })
-      if (!reconfigure) {
-        console.log('Keeping existing configuration.')
-        return
+      if (opts.yes) {
+        // Skip confirmation when --yes is provided
+      } else {
+        const reconfigure = await confirm({
+          message: 'Existing configuration found. Reconfigure?',
+          default: false,
+        })
+        if (!reconfigure) {
+          console.log('Keeping existing configuration.')
+          return
+        }
       }
     }
 
-    const fullConfig = await runConfigWizard()
+    const wizardOpts: { apiKey?: string; url?: string } = {}
+    if (opts.apiKey) wizardOpts.apiKey = opts.apiKey
+    if (opts.url) wizardOpts.url = opts.url
+
+    const fullConfig = await runConfigWizard(Object.keys(wizardOpts).length > 0 ? wizardOpts : undefined)
     saveConfig(fullConfig)
     success('Configuration saved to ~/.hissuno/config.json')
 
     // -----------------------------------------------------------------------
-    // Step 3: Connect Data Sources (optional)
+    // Step 3: Connect Data Sources (optional) - skip in non-interactive mode
     // -----------------------------------------------------------------------
-    console.log(`\n${BOLD}Step 3: Connect Data Sources (optional)${RESET}`)
+    if (!nonInteractive) {
+      console.log(`\n${BOLD}Step 3: Connect Data Sources (optional)${RESET}`)
 
-    let connectMore = await confirm({
-      message: 'Would you like to connect a data source?',
-      default: true,
-    })
-
-    while (connectMore) {
-      const platform = await select<Platform>({
-        message: 'Select a platform:',
-        choices: PLATFORMS.map((p) => ({
-          value: p,
-          name: PLATFORM_LABELS[p],
-        })),
+      let connectMore = await confirm({
+        message: 'Would you like to connect a data source?',
+        default: true,
       })
 
-      if (OAUTH_PLATFORMS.includes(platform)) {
-        await connectOAuth(fullConfig, platform, fullConfig.project_id!)
-      } else if (platform === 'gong') {
-        await connectGong(fullConfig, fullConfig.project_id!, {})
-      } else if (platform === 'zendesk') {
-        await connectZendesk(fullConfig, fullConfig.project_id!, {})
-      } else if (platform === 'intercom') {
-        await connectIntercom(fullConfig, fullConfig.project_id!, {})
-      } else if (platform === 'fathom') {
-        await connectFathom(fullConfig, fullConfig.project_id!, {})
-      } else if (platform === 'hubspot') {
-        await connectHubspot(fullConfig, fullConfig.project_id!, {})
-      } else if (platform === 'notion') {
-        await connectNotion(fullConfig, fullConfig.project_id!, {})
+      while (connectMore) {
+        const platform = await select<Platform>({
+          message: 'Select a platform:',
+          choices: PLATFORMS.map((p) => ({
+            value: p,
+            name: PLATFORM_LABELS[p],
+          })),
+        })
+
+        if (OAUTH_PLATFORMS.includes(platform)) {
+          await connectOAuth(fullConfig, platform, fullConfig.project_id!)
+        } else if (platform === 'gong') {
+          await connectGong(fullConfig, fullConfig.project_id!, {})
+        } else if (platform === 'zendesk') {
+          await connectZendesk(fullConfig, fullConfig.project_id!, {})
+        } else if (platform === 'intercom') {
+          await connectIntercom(fullConfig, fullConfig.project_id!, {})
+        } else if (platform === 'fathom') {
+          await connectFathom(fullConfig, fullConfig.project_id!, {})
+        } else if (platform === 'hubspot') {
+          await connectHubspot(fullConfig, fullConfig.project_id!, {})
+        } else if (platform === 'notion') {
+          await connectNotion(fullConfig, fullConfig.project_id!, {})
+        }
+
+        connectMore = await confirm({
+          message: 'Connect another?',
+          default: false,
+        })
       }
-
-      connectMore = await confirm({
-        message: 'Connect another?',
-        default: false,
-      })
     }
 
     // -----------------------------------------------------------------------
@@ -205,16 +243,26 @@ configCommand
     if (json) {
       console.log(renderJson({
         profile: profileName,
-        api_key: maskApiKey(config.api_key),
+        auth_method: config.auth_token ? 'login' : 'api_key',
+        ...(config.api_key ? { api_key: maskApiKey(config.api_key) } : {}),
+        ...(config.auth_token ? { auth_token: '(session token)' } : {}),
         base_url: config.base_url,
         project_id: config.project_id ?? null,
+        username: config.username ?? null,
       }))
       return
     }
 
     console.log(`\n  ${BOLD}${CYAN}Hissuno Configuration${RESET}\n`)
     console.log(`  ${DIM}Profile:${RESET}  ${profileName}`)
-    console.log(`  ${DIM}API Key:${RESET}  ${maskApiKey(config.api_key)}`)
+    if (config.auth_token) {
+      console.log(`  ${DIM}Auth:${RESET}     Login session`)
+      if (config.username) {
+        console.log(`  ${DIM}User:${RESET}     ${config.username}`)
+      }
+    } else if (config.api_key) {
+      console.log(`  ${DIM}API Key:${RESET}  ${maskApiKey(config.api_key)}`)
+    }
     console.log(`  ${DIM}URL:${RESET}      ${config.base_url}`)
     if (config.project_id) {
       console.log(`  ${DIM}Project:${RESET}  ${config.project_id}`)

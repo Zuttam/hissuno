@@ -8,10 +8,14 @@ import { searchSessions } from '@/lib/sessions/sessions-service'
 import { searchIssues } from '@/lib/issues/issues-service'
 import { searchCustomers } from '@/lib/customers/customers-service'
 import { searchKnowledge } from '@/lib/knowledge/knowledge-service'
+import { searchScopes } from '@/lib/product-scopes/product-scopes-service'
+import type { SearchMode } from '@/lib/search/search-by-mode'
 
 export const runtime = 'nodejs'
 
-const RESOURCE_TYPES = ['knowledge', 'feedback', 'issues', 'customers'] as const
+const VALID_MODES = new Set<string>(['semantic', 'keyword', 'both'])
+
+const RESOURCE_TYPES = ['knowledge', 'feedback', 'issues', 'customers', 'scopes'] as const
 type ResourceType = (typeof RESOURCE_TYPES)[number]
 
 const VALID_TYPES = new Set<string>(RESOURCE_TYPES)
@@ -22,43 +26,51 @@ interface SearchResult {
   name: string
   snippet: string
   score?: number
+  subtype?: string
 }
 
 async function searchByType(
   type: ResourceType,
   projectId: string,
   query: string,
-  limit: number
+  limit: number,
+  options?: { mode?: SearchMode; threshold?: number }
 ): Promise<SearchResult[]> {
   switch (type) {
     case 'feedback': {
-      const results = await searchSessions(projectId, query, limit)
+      const results = await searchSessions(projectId, query, limit, options)
       return results.map((r) => ({ ...r, type: 'feedback' as const }))
     }
     case 'issues': {
-      const results = await searchIssues(projectId, query, limit)
+      const results = await searchIssues(projectId, query, limit, options)
       return results.map((r) => ({ ...r, type: 'issues' as const }))
     }
     case 'customers': {
-      const results = await searchCustomers(projectId, query, limit)
-      return results.map((r) => ({ ...r, type: 'customers' as const }))
+      const results = await searchCustomers(projectId, query, limit, options)
+      return results.map((r) => ({ ...r, type: 'customers' as const, subtype: r.subtype }))
     }
     case 'knowledge': {
-      const results = await searchKnowledge(projectId, query, limit)
+      const results = await searchKnowledge(projectId, query, limit, options)
       return results.map((r) => ({ ...r, type: 'knowledge' as const }))
+    }
+    case 'scopes': {
+      const results = await searchScopes(projectId, query, limit, options)
+      return results.map((r) => ({ ...r, type: 'scopes' as const }))
     }
   }
 }
 
 /**
- * GET /api/search?projectId=...&q=...&type=...&limit=...
+ * GET /api/search?projectId=...&q=...&type=...&limit=...&mode=...&threshold=...
  *
  * Searches across project resources using the service layer.
  *
  * Query params:
  * - q (required) - search query
- * - type (optional) - knowledge|feedback|issues|customers
+ * - type (optional) - knowledge|feedback|issues|customers|scopes
  * - limit (optional, default 10, max 20)
+ * - mode (optional, default 'semantic') - semantic|keyword|both
+ * - threshold (optional) - similarity threshold for semantic search (0-1)
  */
 export async function GET(request: NextRequest) {
   if (!isDatabaseConfigured()) {
@@ -86,6 +98,30 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const modeParam = searchParams.get('mode')
+    if (modeParam && !VALID_MODES.has(modeParam)) {
+      return NextResponse.json(
+        { error: 'Invalid mode. Must be one of: semantic, keyword, both' },
+        { status: 400 }
+      )
+    }
+    const mode = (modeParam as SearchMode) || undefined
+
+    const thresholdParam = searchParams.get('threshold')
+    let threshold: number | undefined
+    if (thresholdParam) {
+      const parsed = parseFloat(thresholdParam)
+      if (isNaN(parsed) || parsed < 0 || parsed > 1) {
+        return NextResponse.json(
+          { error: 'Invalid threshold. Must be a number between 0 and 1.' },
+          { status: 400 }
+        )
+      }
+      threshold = parsed
+    }
+
+    const searchOptions = { mode, threshold }
+
     const limitParam = searchParams.get('limit')
     let limit = 10
     if (limitParam) {
@@ -100,11 +136,11 @@ export async function GET(request: NextRequest) {
     let allResults: SearchResult[]
 
     if (typeParam) {
-      allResults = await searchByType(typeParam as ResourceType, projectId, query.trim(), limit)
+      allResults = await searchByType(typeParam as ResourceType, projectId, query.trim(), limit, searchOptions)
     } else {
       // Search all types in parallel
       const results = await Promise.allSettled(
-        RESOURCE_TYPES.map((type) => searchByType(type, projectId, query.trim(), limit))
+        RESOURCE_TYPES.map((type) => searchByType(type, projectId, query.trim(), limit, searchOptions))
       )
 
       allResults = []
@@ -126,7 +162,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log(`[search.get] query="${query}" type=${typeParam ?? 'all'} results=${allResults.length}`)
+    console.log(`[search.get] query="${query}" type=${typeParam ?? 'all'} mode=${mode ?? 'semantic'} results=${allResults.length}`)
 
     return NextResponse.json({ results: allResults, total: allResults.length })
   } catch (error) {

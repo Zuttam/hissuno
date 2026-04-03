@@ -8,7 +8,7 @@
  * Steps:
  * 1. Prepare Codebase - Acquires codebase lease and syncs if needed
  * 2. Prepare Context - Gathers issue details, linked sessions with customer
- *    data, and session timestamps
+ *    data, session timestamps, and product scope from entity relationships
  * 3. Analyze Impact & Effort - Uses Technical Analyst agent to assess
  *    technical impact and implementation effort
  * 4. Compute Scores - Deterministic step that computes reach from
@@ -27,10 +27,10 @@ import { workflowInputSchema, workflowOutputSchema } from './schemas'
 import { prepareCodebase } from './steps/prepare-codebase'
 import { cleanupCodebase } from './steps/cleanup-codebase'
 import { prepareContext } from './steps/prepare-context'
-import { graphEvalIssue } from './steps/graph-eval'
 import { analyzeImpactEffort } from './steps/analyze-impact-effort'
 import { computeScores } from './steps/compute-scores'
 import { generateBrief } from './steps/generate-brief'
+import { completeAnalysisRun } from './steps/complete-analysis-run'
 
 export const issueAnalysisWorkflow = createWorkflow({
   id: 'issue-analysis-workflow',
@@ -39,18 +39,18 @@ export const issueAnalysisWorkflow = createWorkflow({
 })
   // Step 1: Prepare codebase access
   .then(prepareCodebase)
-  // Step 2: Gather all context for analysis
+  // Step 2: Gather all context for analysis (includes product scope lookup)
   .then(prepareContext)
-  // Step 3: Discover product scope + related entities
-  .then(graphEvalIssue)
-  // Step 4: Analyze technical impact and effort using AI agent
+  // Step 3: Analyze technical impact and effort using AI agent
   .then(analyzeImpactEffort)
-  // Step 5: Compute deterministic scores and persist to DB
+  // Step 4: Compute deterministic scores and persist to DB
   .then(computeScores)
-  // Step 6: Generate product brief
+  // Step 5: Generate product brief
   .then(generateBrief)
-  // Step 7: Cleanup codebase lease
+  // Step 6: Cleanup codebase lease
   .then(cleanupCodebase)
+  // Step 7: Mark analysis run as completed
+  .then(completeAnalysisRun)
 
 issueAnalysisWorkflow.commit()
 

@@ -93,7 +93,7 @@ export function CreateIssueDialog({
           project_id: projectId,
           session_ids: selectedSessionIds.length > 0 ? selectedSessionIds : undefined,
           type,
-          title: title.trim(),
+          name: title.trim(),
           description: description.trim(),
           priority,
           product_scope_id: productScopeId,
@@ -223,7 +223,7 @@ export function CreateIssueDialog({
           {productScopes.length > 0 && (
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-[color:var(--text-secondary)]">
-                Product Scope
+                Scope
               </label>
               <Select
                 value={productScopeId ?? ''}

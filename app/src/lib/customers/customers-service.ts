@@ -18,7 +18,7 @@ import { eq, and, ilike, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { companies, contacts } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
-import { searchWithFallback } from '@/lib/search/search-with-fallback'
+import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import {
   insertCompany,
   updateCompanyById,
@@ -340,6 +340,14 @@ export async function createCompanyAdmin(input: InsertCompanyData): Promise<Comp
  */
 export async function createContactAdmin(input: InsertContactData): Promise<ContactRecord> {
   const record = await insertContact(input)
+  fireContactEmbedding(record.id, input.projectId, {
+    name: input.name,
+    email: input.email,
+    role: input.role ?? null,
+    title: input.title ?? null,
+    companyId: input.companyId ?? null,
+    notes: input.notes ?? null,
+  })
   fireGraphEval(input.projectId, 'contact', record.id)
   return record
 }
@@ -360,6 +368,7 @@ export interface SearchResult {
   name: string
   snippet: string
   score?: number
+  subtype?: 'contact' | 'company'
 }
 
 
@@ -369,17 +378,19 @@ export interface SearchResult {
 export async function searchContacts(
   projectId: string,
   query: string,
-  limit: number = 10
+  limit: number = 10,
+  options?: { mode?: SearchMode; threshold?: number }
 ): Promise<SearchResult[]> {
-  return searchWithFallback<SearchResult>({
+  return searchByMode<SearchResult>({
     logPrefix: '[customers-service:contacts]',
+    mode: options?.mode,
     semanticSearch: async () => {
       const { searchContactsSemantic } = await import(
         '@/lib/customers/customer-embedding-service'
       )
       const semanticResults = await searchContactsSemantic(projectId, query, {
         limit,
-        threshold: 0.5,
+        threshold: options?.threshold ?? 0.5,
         isArchived: false,
       })
       return semanticResults.map((r) => ({
@@ -387,9 +398,10 @@ export async function searchContacts(
         name: r.name,
         snippet: [r.email, r.role].filter(Boolean).join(' | '),
         score: r.similarity,
+        subtype: 'contact' as const,
       }))
     },
-    textFallback: async () => {
+    keywordSearch: async () => {
       const s = `%${query}%`
       const data = await db
         .select({
@@ -415,6 +427,7 @@ export async function searchContacts(
         id: c.id,
         name: c.name,
         snippet: [c.email, c.role].filter(Boolean).join(' | '),
+        subtype: 'contact' as const,
       }))
     },
   })
@@ -426,17 +439,19 @@ export async function searchContacts(
 export async function searchCompanies(
   projectId: string,
   query: string,
-  limit: number = 10
+  limit: number = 10,
+  options?: { mode?: SearchMode; threshold?: number }
 ): Promise<SearchResult[]> {
-  return searchWithFallback<SearchResult>({
+  return searchByMode<SearchResult>({
     logPrefix: '[customers-service:companies]',
+    mode: options?.mode,
     semanticSearch: async () => {
       const { searchCompaniesSemantic } = await import(
         '@/lib/customers/customer-embedding-service'
       )
       const results = await searchCompaniesSemantic(projectId, query, {
         limit,
-        threshold: 0.5,
+        threshold: options?.threshold ?? 0.5,
         isArchived: false,
       })
       return results.map((r) => ({
@@ -444,9 +459,10 @@ export async function searchCompanies(
         name: r.name,
         snippet: r.domain,
         score: r.similarity,
+        subtype: 'company' as const,
       }))
     },
-    textFallback: async () => {
+    keywordSearch: async () => {
       const s = `%${query}%`
       const data = await db
         .select({
@@ -471,6 +487,7 @@ export async function searchCompanies(
         id: c.id,
         name: c.name,
         snippet: c.domain,
+        subtype: 'company' as const,
       }))
     },
   })
@@ -482,11 +499,12 @@ export async function searchCompanies(
 export async function searchCustomers(
   projectId: string,
   query: string,
-  limit: number = 10
+  limit: number = 10,
+  options?: { mode?: SearchMode; threshold?: number }
 ): Promise<SearchResult[]> {
   const [contactResults, companyResults] = await Promise.allSettled([
-    searchContacts(projectId, query, limit),
-    searchCompanies(projectId, query, limit),
+    searchContacts(projectId, query, limit, options),
+    searchCompanies(projectId, query, limit, options),
   ])
 
   const results: SearchResult[] = []

@@ -7,7 +7,7 @@ import { useCompanyDetail } from '@/hooks/use-companies'
 import type { CompanyStage, UpdateCompanyInput } from '@/types/customer'
 import { getCompanyActivity } from '@/lib/api/companies'
 import { RelatedEntitiesSection } from '@/components/shared/related-entities-section'
-import { formatRelativeTime } from '@/lib/utils/format-time'
+import { formatRelativeTime, formatDateTime } from '@/lib/utils/format-time'
 
 const STAGE_OPTIONS: { value: CompanyStage; label: string }[] = [
   { value: 'prospect', label: 'Prospect' },
@@ -194,7 +194,7 @@ export function CompanySidebar({
               projectId={projectId}
               entityType="company"
               entityId={companyId}
-              allowedTypes={['issue', 'knowledge_source', 'product_scope']}
+              allowedTypes={['session', 'contact', 'issue', 'knowledge_source', 'product_scope']}
             />
 
             {/* Contacts */}
@@ -391,13 +391,6 @@ function EditableDetailField({
   )
 }
 
-function formatDateTime(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '-'
-  const d = dateString instanceof Date ? dateString : new Date(dateString)
-  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-
 const SOURCE_BADGE_VARIANTS: Record<string, 'info' | 'success' | 'warning' | 'default'> = {
   widget: 'info', slack: 'warning', intercom: 'success', gong: 'default', api: 'default', manual: 'default',
 }
@@ -416,7 +409,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 interface CompanyActivity {
   sessions: Array<{ id: string; name: string | null; source: string; created_at: string }>
-  issues: Array<{ id: string; title: string; type: string; status: string }>
+  issues: Array<{ id: string; name: string; type: string; status: string }>
 }
 
 function CompanyActivitySection({ companyId, projectId }: { companyId: string; projectId: string }) {
@@ -493,7 +486,7 @@ function CompanyActivitySection({ companyId, projectId }: { companyId: string; p
                       {TYPE_LABELS[issue.type] ?? issue.type}
                     </Badge>
                     <span className="min-w-0 flex-1 truncate text-[color:var(--foreground)]">
-                      {issue.title}
+                      {issue.name}
                     </span>
                     <span className="shrink-0 text-xs text-[color:var(--text-tertiary)]">
                       {issue.status}

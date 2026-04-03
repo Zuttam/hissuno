@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { eq, and, desc, ilike, or, asc, inArray, isNotNull, sql } from 'drizzle-orm'
 import { sessions, sessionMessages, issues, contacts, companies, entityRelationships } from '@/lib/db/schema/app'
+import { batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
 import { batchGetSessionContacts, getSessionContactInfo } from '@/lib/db/queries/entity-relationships'
 import { getDataContext } from './helpers'
 
@@ -24,23 +25,23 @@ export const listIssuesTool = createTool({
   description: `List issues for the current project with optional filters.
 Use this to find bugs, feature requests, or change requests.
 Supports filtering by goalId to find issues that contribute to a specific product scope goal.
-Returns a summary of each issue including title, type, priority, status, and upvote count.`,
+Returns a summary of each issue including name, type, priority, status, and linked session count.`,
   inputSchema: z.object({
     type: z.enum(['bug', 'feature_request', 'change_request']).optional().describe('Filter by issue type'),
     priority: z.enum(['low', 'medium', 'high']).optional().describe('Filter by priority'),
     status: z.enum(['open', 'ready', 'in_progress', 'resolved', 'closed']).optional().describe('Filter by status'),
-    search: z.string().optional().describe('Search in title and description'),
+    search: z.string().optional().describe('Search in name and description'),
     goalId: z.string().optional().describe('Filter by product scope goal ID - returns only issues classified under this goal'),
     limit: z.number().min(1).max(50).default(20).optional().describe('Max results (default: 20)'),
   }),
   outputSchema: z.object({
     issues: z.array(z.object({
       id: z.string(),
-      title: z.string(),
+      name: z.string(),
       type: z.string(),
       priority: z.string(),
       status: z.string(),
-      upvoteCount: z.number(),
+      sessionCount: z.number(),
       updatedAt: z.string(),
     })),
     total: z.number(),
@@ -65,7 +66,7 @@ Returns a summary of each issue including title, type, priority, status, and upv
         const s = `%${context.search}%`
         conditions.push(
           or(
-            ilike(issues.title, s),
+            ilike(issues.name, s),
             ilike(issues.description, s)
           )!
         )
@@ -91,11 +92,10 @@ Returns a summary of each issue including title, type, priority, status, and upv
       const data = await db
         .select({
           id: issues.id,
-          title: issues.title,
+          name: issues.name,
           type: issues.type,
           priority: issues.priority,
           status: issues.status,
-          upvote_count: issues.upvote_count,
           updated_at: issues.updated_at,
         })
         .from(issues)
@@ -103,14 +103,17 @@ Returns a summary of each issue including title, type, priority, status, and upv
         .orderBy(desc(issues.updated_at))
         .limit(context.limit ?? 20)
 
+      const issueIds = data.map((i) => i.id)
+      const sessionCounts = issueIds.length > 0 ? await batchGetIssueSessionCounts(issueIds) : new Map<string, number>()
+
       return {
         issues: data.map((i) => ({
           id: i.id,
-          title: i.title,
+          name: i.name,
           type: i.type,
           priority: i.priority,
           status: i.status ?? 'open',
-          upvoteCount: i.upvote_count ?? 0,
+          sessionCount: sessionCounts.get(i.id) ?? 0,
           updatedAt: i.updated_at?.toISOString() ?? '',
         })),
         total: data.length,
@@ -135,12 +138,12 @@ Use this after list-issues to drill into a specific issue.`,
   outputSchema: z.object({
     issue: z.object({
       id: z.string(),
-      title: z.string(),
+      name: z.string(),
       description: z.string(),
       type: z.string(),
       priority: z.string(),
       status: z.string(),
-      upvoteCount: z.number(),
+      sessionCount: z.number(),
       createdAt: z.string(),
       updatedAt: z.string(),
       sessions: z.array(z.object({
@@ -165,12 +168,11 @@ Use this after list-issues to drill into a specific issue.`,
       const [issue] = await db
         .select({
           id: issues.id,
-          title: issues.title,
+          name: issues.name,
           description: issues.description,
           type: issues.type,
           priority: issues.priority,
           status: issues.status,
-          upvote_count: issues.upvote_count,
           created_at: issues.created_at,
           updated_at: issues.updated_at,
         })
@@ -220,12 +222,12 @@ Use this after list-issues to drill into a specific issue.`,
       return {
         issue: {
           id: issue.id,
-          title: issue.title,
+          name: issue.name,
           description: issue.description ?? '',
           type: issue.type,
           priority: issue.priority,
           status: issue.status ?? 'open',
-          upvoteCount: issue.upvote_count ?? 0,
+          sessionCount: linkedSessions.length,
           createdAt: issue.created_at?.toISOString() ?? '',
           updatedAt: issue.updated_at?.toISOString() ?? '',
           sessions: linkedSessions,
@@ -584,7 +586,7 @@ Use this after list-contacts to drill into a specific contact.`,
       })),
       issues: z.array(z.object({
         id: z.string(),
-        title: z.string(),
+        name: z.string(),
         type: z.string(),
         status: z.string(),
       })),
@@ -662,7 +664,7 @@ Use this after list-contacts to drill into a specific contact.`,
         : []
 
       // Get linked issues (sessions -> entity_relationships -> issues)
-      const issueMap = new Map<string, { id: string; title: string; type: string; status: string }>()
+      const issueMap = new Map<string, { id: string; name: string; type: string; status: string }>()
 
       if (contactSessionIds.length > 0) {
         const issueLinks = await db
@@ -679,7 +681,7 @@ Use this after list-contacts to drill into a specific contact.`,
           const issueRows = await db
             .select({
               id: issues.id,
-              title: issues.title,
+              name: issues.name,
               type: issues.type,
               status: issues.status,
             })
@@ -689,7 +691,7 @@ Use this after list-contacts to drill into a specific contact.`,
           for (const issue of issueRows) {
             issueMap.set(issue.id, {
               id: issue.id,
-              title: issue.title,
+              name: issue.name,
               type: issue.type,
               status: issue.status ?? 'open',
             })

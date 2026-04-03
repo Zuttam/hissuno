@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       project_id: projectId,
       session_ids: sessionIds,
       type: body.type,
-      title: body.title,
+      name: body.name,
       description: body.description,
       priority: body.priority || undefined,
       product_scope_id: body.product_scope_id || undefined,
@@ -105,8 +105,8 @@ export async function POST(request: NextRequest) {
     if (!input.type) {
       return NextResponse.json({ error: 'type is required.' }, { status: 400 })
     }
-    if (!input.title) {
-      return NextResponse.json({ error: 'title is required.' }, { status: 400 })
+    if (!input.name) {
+      return NextResponse.json({ error: 'name is required.' }, { status: 400 })
     }
     if (!input.description) {
       return NextResponse.json({ error: 'description is required.' }, { status: 400 })

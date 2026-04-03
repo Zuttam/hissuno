@@ -66,9 +66,11 @@ export function Marketplace({ connectedTypes, onSelect }: MarketplaceProps) {
                     <span className="text-sm font-medium text-[color:var(--foreground)]">
                       {integration.name}
                     </span>
-                    {isConnected && (
+                    {isConnected ? (
                       <span className="inline-block h-2 w-2 rounded-full bg-[color:var(--accent-success)]" title="Connected" />
-                    )}
+                    ) : integration.setupLabel ? (
+                      <Badge variant="default">{integration.setupLabel}</Badge>
+                    ) : null}
                   </div>
                   <p className="mt-0.5 text-xs text-[color:var(--text-tertiary)]">
                     {integration.description}

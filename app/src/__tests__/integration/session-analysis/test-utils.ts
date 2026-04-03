@@ -20,7 +20,7 @@
  */
 
 import type { IssueType, IssuePriority, IssueRecord } from '@/types/issue'
-import type { SessionRecord, ChatMessage, SessionTag, CustomTagRecord } from '@/types/session'
+import type { SessionRecord, ChatMessage, SessionTag } from '@/types/session'
 import type { PMEvalTestCase, PMEvalSeedIssue } from '@/evals/datasets/types'
 
 // ============================================================================
@@ -86,17 +86,14 @@ export function createMockSession(
     page_title: testCase.session.title,
     name: null,
     description: null,
-    analysis_status: 'pending',
     source: 'widget',
     session_type: 'chat',
     message_count: testCase.session.messages.length,
     status: 'closed',
     first_message_at: new Date().toISOString(),
     last_activity_at: new Date().toISOString(),
-    pm_reviewed_at: null,
     tags: [],
     custom_fields: {},
-    tags_auto_applied_at: null,
     goodbye_detected_at: null,
     idle_prompt_sent_at: null,
     scheduled_close_at: null,
@@ -106,6 +103,7 @@ export function createMockSession(
     human_takeover_user_id: null,
     human_takeover_slack_channel_id: null,
     human_takeover_slack_thread_ts: null,
+    base_processed_at: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }
@@ -134,11 +132,11 @@ export function createMockIssue(
     id: generateTestId('issue'),
     project_id: projectId,
     type: seedIssue.type,
-    title: seedIssue.title,
+    name: seedIssue.name,
     description: seedIssue.description,
     priority: seedIssue.priority,
     priority_manual_override: false,
-    upvote_count: seedIssue.upvoteCount || 0,
+    session_count: seedIssue.upvoteCount || 0,
     status: 'open',
     brief: null,
     brief_generated_at: null,
@@ -203,28 +201,23 @@ export interface ParsedSessionReviewResult {
 // ============================================================================
 
 /**
- * Get valid tags including custom tags
+ * Get valid native tags
  */
-export function getValidTags(customTags: CustomTagRecord[] = []): string[] {
-  return [...SESSION_TAGS, ...customTags.map(t => t.slug)]
+export function getValidTags(): string[] {
+  return [...SESSION_TAGS]
 }
 
 /**
  * Parse session tagging (classification) response
  * @param responseText - The raw response text from the tagging agent
- * @param customTags - Optional array of project-specific custom tags
  */
 export function parseSessionTaggingResponse(
   responseText: string,
-  customTags: CustomTagRecord[] = []
 ): ParsedSessionTaggingResult {
   const textLower = responseText.toLowerCase()
   const tags: string[] = []
 
-  // Build valid tags set including custom tags
-  const validNativeTags = new Set(SESSION_TAGS as readonly string[])
-  const customSlugs = new Set(customTags.map(t => t.slug))
-  const allValidTags = new Set([...SESSION_TAGS, ...customSlugs])
+  const allValidTags = new Set<string>(SESSION_TAGS as readonly string[])
 
   // Try to extract JSON
   const jsonMatch = responseText.match(/\{[\s\S]*\}/)
@@ -264,12 +257,6 @@ export function parseSessionTaggingResponse(
       tags.push('change_request')
     }
 
-    // Also check for custom tag slugs in text
-    for (const customSlug of customSlugs) {
-      if (textLower.includes(customSlug.toLowerCase())) {
-        tags.push(customSlug)
-      }
-    }
   }
 
   // Extract reasoning
@@ -292,7 +279,7 @@ export function parseSessionTaggingResponse(
     reasoning,
     hasActionableTags: tags.some((t) => ACTIONABLE_SESSION_TAGS.includes(t as SessionTagType)),
     hasSentimentTags: tags.some((t) => SENTIMENT_SESSION_TAGS.includes(t as SessionTagType)),
-    hasCustomTags: tags.some((t) => customSlugs.has(t)),
+    hasCustomTags: false,
   }
 }
 
@@ -655,9 +642,9 @@ export class MockDataStore {
       .filter((issue) => issue.project_id === projectId)
       .filter(
         (issue) =>
-          issue.title.toLowerCase().includes(queryLower) ||
+          issue.name.toLowerCase().includes(queryLower) ||
           issue.description.toLowerCase().includes(queryLower) ||
-          queryLower.includes(issue.title.toLowerCase().split(' ')[0])
+          queryLower.includes(issue.name.toLowerCase().split(' ')[0])
       )
   }
 

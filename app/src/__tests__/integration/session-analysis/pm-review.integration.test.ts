@@ -130,7 +130,7 @@ async function createTestSession(
 async function createSeedIssue(
   projectId: string,
   type: 'bug' | 'feature_request' | 'change_request',
-  title: string,
+  name: string,
   description: string,
   upvoteCount: number = 1
 ): Promise<IssueRecord> {
@@ -139,10 +139,9 @@ async function createSeedIssue(
     .values({
       project_id: projectId,
       type,
-      title,
+      name,
       description,
       priority: upvoteCount >= 5 ? 'high' : upvoteCount >= 3 ? 'medium' : 'low',
-      upvote_count: upvoteCount,
       status: 'open',
     })
     .returning()
@@ -222,7 +221,7 @@ async function runPMReview(
   response: string
   parsed: ParsedPMReviewResult
 }> {
-  const pmAgent = mastra.getAgent('feedbackDecisionAgent')
+  const pmAgent = mastra.getAgent('productManagerAgent')
 
   if (!pmAgent) {
     throw new Error('Feedback Decision agent not found')
@@ -310,7 +309,7 @@ USER: This is really blocking me from using your service.`
       const createdIssue = issues.find(
         (i) =>
           i.type === 'bug' &&
-          (i.title.toLowerCase().includes('payment') ||
+          (i.name.toLowerCase().includes('payment') ||
             i.description.toLowerCase().includes('payment'))
       )
 
@@ -354,7 +353,7 @@ USER: Please add it! This would really help our workflow.`
       const featureIssue = issues.find(
         (i) =>
           i.type === 'feature_request' &&
-          (i.title.toLowerCase().includes('excel') ||
+          (i.name.toLowerCase().includes('excel') ||
             i.description.toLowerCase().includes('excel'))
       )
 
@@ -397,8 +396,8 @@ USER: Absolutely! Please make this more visible.`
       const changeIssue = issues.find(
         (i) =>
           i.type === 'change_request' &&
-          (i.title.toLowerCase().includes('settings') ||
-            i.title.toLowerCase().includes('navigation'))
+          (i.name.toLowerCase().includes('settings') ||
+            i.name.toLowerCase().includes('navigation'))
       )
 
       if (changeIssue) {
@@ -458,8 +457,8 @@ USER: Yes, I just updated. Please fix this!`
       const loginIssues = allIssues.filter(
         (i) =>
           i.type === 'bug' &&
-          (i.title.toLowerCase().includes('login') ||
-            i.title.toLowerCase().includes('safari'))
+          (i.name.toLowerCase().includes('login') ||
+            i.name.toLowerCase().includes('safari'))
       )
 
       expect(loginIssues.length).toBeGreaterThanOrEqual(1)
@@ -614,8 +613,8 @@ USER: Please! My entire team is blocked. We're losing money every hour.`
       const issues = await getProjectIssues(testProjectId)
       const blockingIssue = issues.find(
         (i) =>
-          i.title.toLowerCase().includes('block') ||
-          i.title.toLowerCase().includes('access') ||
+          i.name.toLowerCase().includes('block') ||
+          i.name.toLowerCase().includes('access') ||
           i.description.toLowerCase().includes('blocking')
       )
 
@@ -655,7 +654,7 @@ ASSISTANT: Got it, I'll note that down.`
         const issues = await getProjectIssues(testProjectId)
         const recentIssue = issues.find(
           (i) =>
-            i.title.toLowerCase().includes('icon') ||
+            i.name.toLowerCase().includes('icon') ||
             i.description.toLowerCase().includes('icon')
         )
 
@@ -703,8 +702,8 @@ ASSISTANT: I'll report the bug. Glad you like the design overall!`
       const issues = await getProjectIssues(testProjectId)
       const newIssue = issues.find(
         (i) =>
-          i.title.toLowerCase().includes('save') ||
-          i.title.toLowerCase().includes('button') ||
+          i.name.toLowerCase().includes('save') ||
+          i.name.toLowerCase().includes('button') ||
           i.description.toLowerCase().includes('save')
       )
 

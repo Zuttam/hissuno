@@ -6,7 +6,8 @@ import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-cont
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { parseCSVContent, validateAndImportRows } from '@/lib/customers/csv-import'
 import { downloadCSVImport, deleteCSVImport } from '@/lib/customers/csv-storage'
-import type { CustomerEntityType, CSVImportMapping } from '@/types/customer'
+import type { CSVImportMapping } from '@/types/customer'
+import type { EntityType } from '@/lib/db/queries/types'
 
 export const runtime = 'nodejs'
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const storagePath = body.storagePath as string | undefined
-    const entityType = body.entityType as CustomerEntityType | undefined
+    const entityType = body.entityType as EntityType | undefined
     const mappings = body.mappings as CSVImportMapping[] | undefined
     const createMissingCompanies = body.createMissingCompanies === true
 

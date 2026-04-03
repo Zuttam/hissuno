@@ -186,9 +186,9 @@ function formatIssueRow(item: ResourceItem, name: string): string {
   const type = item.type ? badge(String(item.type), MAGENTA) : ''
   const priority = item.priority ? formatPriority(String(item.priority)) : ''
   const status = item.status ? label(String(item.status)) : ''
-  const upvotes = item.upvote_count != null ? `${item.upvote_count} upvotes` : ''
+  const sessions = item.session_count != null ? `${item.session_count} sessions` : ''
 
-  const parts = [type, priority, status, upvotes].filter(Boolean)
+  const parts = [type, priority, status, sessions].filter(Boolean)
   return `  ${itemName(truncate(name, 50))}  ${id}\n    ${parts.join('  ')}`
 }
 
@@ -304,7 +304,7 @@ function formatIssueDetail(lines: string[], item: ResourceItem): void {
   if (item.type) lines.push(`${label('Type:')} ${item.type}`)
   if (item.priority) lines.push(`${label('Priority:')} ${formatPriority(String(item.priority))}`)
   if (item.status) lines.push(`${label('Status:')} ${item.status}`)
-  if (item.upvote_count != null) lines.push(`${label('Upvotes:')} ${item.upvote_count}`)
+  if (item.session_count != null) lines.push(`${label('Sessions:')} ${item.session_count}`)
   if (item.created_at) lines.push(`${label('Created:')} ${formatDate(item.created_at)}`)
 
   if (item.description) {
@@ -412,7 +412,7 @@ export function formatRelatedEntities(relationships: Record<string, unknown[]>):
     issues: 'Issues',
     sessions: 'Feedback',
     knowledgeSources: 'Knowledge',
-    productScopes: 'Product Scopes',
+    productScopes: 'Scopes',
   }
 
   for (const [key, items] of Object.entries(relationships)) {

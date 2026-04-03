@@ -15,7 +15,7 @@ const seedIssues: PMEvalSeedIssue[] = [
   {
     id: 'seed-bug-checkout',
     type: 'bug',
-    title: 'Checkout button unresponsive on mobile Safari',
+    name: 'Checkout button unresponsive on mobile Safari',
     description:
       'Users report that the checkout button does not respond to taps on mobile Safari. The button appears clickable but nothing happens when pressed. This affects iOS 16+ users.',
     priority: 'high',
@@ -24,7 +24,7 @@ const seedIssues: PMEvalSeedIssue[] = [
   {
     id: 'seed-feature-dark-mode',
     type: 'feature_request',
-    title: 'Add dark mode support',
+    name: 'Add dark mode support',
     description:
       'Multiple users have requested dark mode support for the application. This would reduce eye strain and battery consumption on OLED displays.',
     priority: 'medium',
@@ -33,7 +33,7 @@ const seedIssues: PMEvalSeedIssue[] = [
   {
     id: 'seed-bug-login-timeout',
     type: 'bug',
-    title: 'Session expires too quickly during checkout',
+    name: 'Session expires too quickly during checkout',
     description:
       'Users are getting logged out after just 5 minutes of inactivity, even while in the middle of checkout. This is causing frustration and abandoned carts.',
     priority: 'high',
@@ -42,7 +42,7 @@ const seedIssues: PMEvalSeedIssue[] = [
   {
     id: 'seed-change-nav',
     type: 'change_request',
-    title: 'Navigation menu items should be reorganized',
+    name: 'Navigation menu items should be reorganized',
     description:
       'The current navigation structure is confusing. Users suggest moving Settings under Profile and making Search more prominent.',
     priority: 'low',

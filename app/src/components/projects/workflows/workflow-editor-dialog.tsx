@@ -23,6 +23,12 @@ interface WorkflowEditorDialogProps {
   initialValues: Record<string, string | boolean>
   onSaved: () => void
   saveFn: (projectId: string, values: Record<string, unknown>) => Promise<unknown>
+  /** Key in values for a master on/off toggle shown above the step list */
+  masterToggleKey?: string
+  /** Label for the master toggle */
+  masterToggleLabel?: string
+  /** Number of steps that are "base" processing (always on). Steps after this index are gated by the master toggle. */
+  baseStepCount?: number
 }
 
 export function WorkflowEditorDialog({
@@ -35,6 +41,9 @@ export function WorkflowEditorDialog({
   initialValues,
   onSaved,
   saveFn,
+  masterToggleKey,
+  masterToggleLabel,
+  baseStepCount,
 }: WorkflowEditorDialogProps) {
   const [values, setValues] = useState<Record<string, string | boolean>>(initialValues)
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null)
@@ -76,6 +85,40 @@ export function WorkflowEditorDialog({
 
         {error && <Alert variant="warning">{error}</Alert>}
 
+        {/* Master toggle */}
+        {masterToggleKey && masterToggleLabel && (
+          <div className="flex items-center justify-between rounded-lg border border-[color:var(--border-subtle)] px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-[color:var(--foreground)]">{masterToggleLabel}</span>
+              <p className="text-xs text-[color:var(--text-tertiary)] mt-0.5">
+                {values[masterToggleKey] !== false
+                  ? 'Automation runs after base processing completes'
+                  : 'Only base processing (classify, summarize, graph eval) will run'}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={values[masterToggleKey] !== false}
+              onClick={() =>
+                setValues((prev) => ({
+                  ...prev,
+                  [masterToggleKey]: !prev[masterToggleKey],
+                }))
+              }
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-primary)] focus:ring-offset-2 ${
+                values[masterToggleKey] !== false ? 'bg-[color:var(--accent-primary)]' : 'bg-[color:var(--surface-hover)]'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  values[masterToggleKey] !== false ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        )}
+
         {/* Pipeline steps */}
         <div className="flex flex-col">
           {steps.map((step, index) => {
@@ -83,6 +126,10 @@ export function WorkflowEditorDialog({
             const isExpanded = expandedStepId === step.id
             const isLast = index === steps.length - 1
             const hasToggle = !!step.toggleKey
+            // Steps after baseStepCount are gated by the master toggle
+            const isGatedByMaster = masterToggleKey && baseStepCount !== undefined && index >= baseStepCount
+            const isMasterEnabled = masterToggleKey ? values[masterToggleKey] !== false : true
+            const isStepActive = isGatedByMaster ? isMasterEnabled : true
             const isToggleEnabled = hasToggle ? values[step.toggleKey!] !== false : true
 
             return (
@@ -91,8 +138,8 @@ export function WorkflowEditorDialog({
                 <div className="flex flex-col items-center">
                   <div
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
-                      !isToggleEnabled
-                        ? 'border-[color:var(--border-subtle)] text-[color:var(--text-tertiary)]'
+                      !isStepActive || !isToggleEnabled
+                        ? 'border-[color:var(--border-subtle)] text-[color:var(--text-tertiary)] opacity-50'
                         : isConfigurable
                           ? 'border-[color:var(--accent-selected)] text-[color:var(--accent-selected)]'
                           : 'border-[color:var(--border-subtle)] text-[color:var(--text-tertiary)]'
@@ -108,7 +155,7 @@ export function WorkflowEditorDialog({
                 {/* Right: step content */}
                 <div className={`flex-1 ${isLast ? '' : 'pb-3'}`}>
                   {/* Step header */}
-                  {isConfigurable && isToggleEnabled ? (
+                  {isConfigurable && isToggleEnabled && isStepActive ? (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -166,11 +213,11 @@ export function WorkflowEditorDialog({
                   ) : (
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
-                        <span className={`text-sm ${isToggleEnabled ? 'text-[color:var(--text-tertiary)]' : 'text-[color:var(--text-tertiary)] opacity-60'}`}>
+                        <span className={`text-sm ${isStepActive && isToggleEnabled ? 'text-[color:var(--text-tertiary)]' : 'text-[color:var(--text-tertiary)] opacity-50'}`}>
                           {step.name}
                         </span>
-                        <p className={`text-xs mt-0.5 ${isToggleEnabled ? 'text-[color:var(--text-tertiary)]' : 'text-[color:var(--text-tertiary)] opacity-60'}`}>
-                          {isToggleEnabled ? step.description : 'Disabled'}
+                        <p className={`text-xs mt-0.5 ${isStepActive && isToggleEnabled ? 'text-[color:var(--text-tertiary)]' : 'text-[color:var(--text-tertiary)] opacity-50'}`}>
+                          {!isStepActive ? 'Disabled (automation off)' : isToggleEnabled ? step.description : 'Disabled'}
                         </p>
                       </div>
                       {hasToggle && (
@@ -199,7 +246,7 @@ export function WorkflowEditorDialog({
                   )}
 
                   {/* Expanded textarea */}
-                  {isConfigurable && isExpanded && isToggleEnabled && step.guidelineKey && (
+                  {isConfigurable && isExpanded && isToggleEnabled && isStepActive && step.guidelineKey && (
                     <div className="mt-3 rounded-[4px]">
                       <textarea
                         value={(values[step.guidelineKey] as string) ?? ''}

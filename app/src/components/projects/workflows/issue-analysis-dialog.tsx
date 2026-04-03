@@ -34,6 +34,7 @@ interface IssueAnalysisDialogProps {
   projectId: string
   analysisGuidelines: string
   briefGuidelines: string
+  issueAnalysisEnabled: boolean
   onSaved: () => void
 }
 
@@ -43,11 +44,16 @@ export function IssueAnalysisDialog({
   projectId,
   analysisGuidelines,
   briefGuidelines,
+  issueAnalysisEnabled,
   onSaved,
 }: IssueAnalysisDialogProps) {
   const initialValues = useMemo(
-    () => ({ analysis_guidelines: analysisGuidelines, brief_guidelines: briefGuidelines }),
-    [analysisGuidelines, briefGuidelines]
+    () => ({
+      analysis_guidelines: analysisGuidelines,
+      brief_guidelines: briefGuidelines,
+      issue_analysis_enabled: issueAnalysisEnabled,
+    }),
+    [analysisGuidelines, briefGuidelines, issueAnalysisEnabled]
   )
 
   return (
@@ -61,6 +67,8 @@ export function IssueAnalysisDialog({
       initialValues={initialValues}
       onSaved={onSaved}
       saveFn={updateIssueAnalysisSettings}
+      masterToggleKey="issue_analysis_enabled"
+      masterToggleLabel="Enable Issue Analysis"
     />
   )
 }

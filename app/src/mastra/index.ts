@@ -4,12 +4,11 @@ import { PinoLogger } from '@mastra/loggers';
 import { PostgresStore } from '@mastra/pg';
 import { packageCompilationWorkflow } from './workflows/package-compilation';
 import { sourceAnalysisWorkflow } from './workflows/source-analysis';
-import { sessionReviewWorkflow } from './workflows/session-review';
+import { sessionProcessingWorkflow } from './workflows/session-processing';
 import { issueAnalysisWorkflow } from './workflows/issue-analysis';
 import { supportAgent } from './agents/support-agent';
 import { codebaseAnalyzerAgent } from './agents/codebase-analyzer-agent';
 import { webScraperAgent } from './agents/web-scraper-agent';
-import { feedbackDecisionAgent } from './agents/feedback-decision-agent';
 import { productManagerAgent } from './agents/product-manager-agent';
 import { briefWriterAgent } from './agents/brief-writer-agent';
 import { securityScannerAgent } from './agents/security-scanner-agent';
@@ -36,12 +35,11 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const mastra = new Mastra({
-  workflows: { packageCompilationWorkflow, sourceAnalysisWorkflow, sessionReviewWorkflow, issueAnalysisWorkflow },
+  workflows: { packageCompilationWorkflow, sourceAnalysisWorkflow, sessionProcessingWorkflow, issueAnalysisWorkflow },
   agents: {
     supportAgent,
     codebaseAnalyzerAgent,
     webScraperAgent,
-    feedbackDecisionAgent,
     productManagerAgent,
     briefWriterAgent,
     securityScannerAgent,

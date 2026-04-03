@@ -61,7 +61,7 @@ interface CreateSessionResponse {
 export async function createSession(projectId: string, input: CreateSessionInput): Promise<CreateSessionResponse> {
   return fetchApi<CreateSessionResponse>(buildUrl(paths.list, { projectId }), {
     method: 'POST',
-    body: input,
+    body: { ...input, source: 'manual' },
     errorMessage: 'Failed to create session.',
   })
 }

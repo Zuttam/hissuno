@@ -1,10 +1,4 @@
-const BOLD = '\x1b[1m'
-const DIM = '\x1b[2m'
-const RESET = '\x1b[0m'
-const CYAN = '\x1b[36m'
-const RED = '\x1b[31m'
-const YELLOW = '\x1b[33m'
-const GREEN = '\x1b[32m'
+import { BOLD, DIM, RESET, CYAN, RED, YELLOW, GREEN } from './output.js'
 
 export const log = {
   banner() {
@@ -41,7 +35,7 @@ export const log = {
     console.log()
   },
 
-  ready(seeded: boolean) {
+  ready(seeded: boolean, apiKey?: string) {
     console.log()
     console.log(`  ${BOLD}${GREEN}Setup complete! Starting Hissuno...${RESET}`)
     console.log()
@@ -53,10 +47,13 @@ export const log = {
     }
     console.log(`  ${DIM}Open http://localhost:3000${RESET}`)
     console.log()
+    if (apiKey) {
+      this._mcpHint(apiKey)
+    }
     this._integrationHint()
   },
 
-  nextSteps(seeded: boolean) {
+  nextSteps(seeded: boolean, apiKey?: string) {
     console.log()
     console.log(`  ${BOLD}${GREEN}Setup complete!${RESET}`)
     console.log()
@@ -73,7 +70,31 @@ export const log = {
     }
     console.log(`  ${DIM}Then open http://localhost:3000${RESET}`)
     console.log()
+    if (apiKey) {
+      this._mcpHint(apiKey)
+    }
     this._integrationHint()
+  },
+
+  _mcpHint(apiKey: string) {
+    console.log(`  ${BOLD}Connect to Claude Code / Cursor / Claude Desktop:${RESET}`)
+    console.log()
+    console.log(`  ${DIM}Add to your MCP config (.mcp.json, claude_desktop_config.json, etc.):${RESET}`)
+    console.log()
+    console.log(`    ${CYAN}{${RESET}`)
+    console.log(`    ${CYAN}  "mcpServers": {${RESET}`)
+    console.log(`    ${CYAN}    "hissuno": {${RESET}`)
+    console.log(`    ${CYAN}      "type": "streamable-http",${RESET}`)
+    console.log(`    ${CYAN}      "url": "http://localhost:3000/mcp",${RESET}`)
+    console.log(`    ${CYAN}      "headers": {${RESET}`)
+    console.log(`    ${CYAN}        "Authorization": "Bearer ${apiKey}"${RESET}`)
+    console.log(`    ${CYAN}      }${RESET}`)
+    console.log(`    ${CYAN}    }${RESET}`)
+    console.log(`    ${CYAN}  }${RESET}`)
+    console.log(`    ${CYAN}}${RESET}`)
+    console.log()
+    console.log(`  ${DIM}Then ask your agent: "What are the top customer issues?"${RESET}`)
+    console.log()
   },
 
   _integrationHint() {

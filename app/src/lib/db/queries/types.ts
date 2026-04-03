@@ -11,10 +11,9 @@ import type {
   compilationRuns,
   userProfiles,
   productScopes,
-  customTags,
   companies,
   contacts,
-  customerCustomFieldDefinitions,
+  customFieldDefinitions,
   sessions,
   sessionMessages,
   sessionReviews,
@@ -67,13 +66,10 @@ export type UserProfileRow = typeof userProfiles.$inferSelect
 export type UserProfileInsert = typeof userProfiles.$inferInsert
 
 // ---------------------------------------------------------------------------
-// Product Scopes & Tags
+// Product Scopes
 // ---------------------------------------------------------------------------
 export type ProductScopeRow = typeof productScopes.$inferSelect
 export type ProductScopeInsert = typeof productScopes.$inferInsert
-
-export type CustomTagRow = typeof customTags.$inferSelect
-export type CustomTagInsert = typeof customTags.$inferInsert
 
 // ---------------------------------------------------------------------------
 // Customers
@@ -84,8 +80,12 @@ export type CompanyInsert = typeof companies.$inferInsert
 export type ContactRow = typeof contacts.$inferSelect
 export type ContactInsert = typeof contacts.$inferInsert
 
-export type CustomerCustomFieldRow = typeof customerCustomFieldDefinitions.$inferSelect
-export type CustomerCustomFieldInsert = typeof customerCustomFieldDefinitions.$inferInsert
+export type CustomFieldDefinitionRow = typeof customFieldDefinitions.$inferSelect
+export type CustomFieldDefinitionInsert = typeof customFieldDefinitions.$inferInsert
+/** @deprecated Use CustomFieldDefinitionRow */
+export type CustomerCustomFieldRow = CustomFieldDefinitionRow
+/** @deprecated Use CustomFieldDefinitionInsert */
+export type CustomerCustomFieldInsert = CustomFieldDefinitionInsert
 
 // ---------------------------------------------------------------------------
 // Sessions & Messages

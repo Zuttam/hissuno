@@ -82,13 +82,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     const body = await request.json()
-    const { name, slug, description, color, type, goals } = body as {
+    const { name, slug, description, color, type, goals, custom_fields } = body as {
       name?: string
       slug?: string
       description?: string
       color?: string
       type?: string
       goals?: ProductScopeGoal[]
+      custom_fields?: Record<string, unknown>
     }
 
     // Validate name
@@ -148,6 +149,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (color !== undefined) input.color = color
     if (type !== undefined) input.type = type as UpdateProductScopeInput['type']
     if (goals !== undefined) input.goals = goals ?? null
+    if (custom_fields !== undefined) input.custom_fields = custom_fields
 
     const scope = await updateProductScope(scopeId, input)
     return NextResponse.json({ scope })

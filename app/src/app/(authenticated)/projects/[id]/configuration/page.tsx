@@ -14,11 +14,10 @@ import { AgentCard, buildSupportChannels } from '@/components/projects/agents/ag
 import { SupportAgentDialog } from '@/components/projects/agents/support-agent-dialog'
 import { ProductCopilotDialog } from '@/components/projects/agents/product-copilot-dialog'
 import { WorkflowCard } from '@/components/projects/workflows/workflow-card'
-import { FeedbackReviewDialog } from '@/components/projects/workflows/feedback-review-dialog'
 import { IssueAnalysisDialog } from '@/components/projects/workflows/issue-analysis-dialog'
+import { GraphEvaluationDialog } from '@/components/projects/workflows/graph-evaluation-dialog'
 import { ProjectInfoSection } from '@/components/projects/configuration/project-info-section'
 import { DangerZoneSection } from '@/components/projects/configuration/danger-zone-section'
-import { CustomTagsSection, type LocalCustomTag } from '@/components/projects/configuration/custom-tags-section'
 import { FieldsEditor, type BuiltInField } from '@/components/customers/custom-fields-settings-dialog'
 import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
 import { Button, Heading, Spinner, PageHeader } from '@/components/ui'
@@ -27,18 +26,19 @@ import { updateProject } from '@/lib/api/projects'
 import { listPackages } from '@/lib/api/knowledge'
 import {
   getSupportAgentSettings,
-  getFeedbackReviewSettings,
   getIssueAnalysisSettings,
-  getFeedbackIssuesSettings,
-  updateFeedbackIssuesSettings,
+  getGraphEvaluationSettingsClient,
 } from '@/lib/api/settings'
 import type { KnowledgePackageWithSources } from '@/lib/knowledge/types'
+
+const ONTOLOGY_SECTIONS = ['customers', 'issues', 'feedback', 'knowledge', 'products'] as const
+const ONTOLOGY_SECTION_LABELS: Record<(typeof ONTOLOGY_SECTIONS)[number], string> = {
+  customers: 'Customers', issues: 'Issues', feedback: 'Feedback', knowledge: 'Knowledge', products: 'Scopes',
+}
 
 const VALID_TABS = ['general', 'access', 'ontology', 'agents-workflows'] as const
 const LEGACY_TAB_REDIRECTS: Record<string, string> = { customers: 'ontology', feedback: 'ontology' }
 type SettingsTab = (typeof VALID_TABS)[number]
-
-const MAX_TAGS = 10
 
 const COMPANY_BUILT_IN_FIELDS: BuiltInField[] = [
   { label: 'Name', type: 'Text' },
@@ -64,19 +64,35 @@ const CONTACT_BUILT_IN_FIELDS: BuiltInField[] = [
 ]
 
 const ISSUE_BUILT_IN_FIELDS: BuiltInField[] = [
-  { label: 'Title', type: 'Text' },
+  { label: 'Name', type: 'Text' },
   { label: 'Description', type: 'Text' },
-  { label: 'Type', type: 'Select' },
-  { label: 'Priority', type: 'Select' },
-  { label: 'Status', type: 'Select' },
+  { label: 'Type', type: 'Select', options: ['Bug', 'Feature Request', 'Change Request'] },
+  { label: 'Priority', type: 'Select', options: ['Low', 'Medium', 'High'] },
+  { label: 'Status', type: 'Select', options: ['Open', 'Ready', 'In Progress', 'Resolved', 'Closed'] },
 ]
 
 const FEEDBACK_BUILT_IN_FIELDS: BuiltInField[] = [
   { label: 'Name', type: 'Text' },
-  { label: 'Source', type: 'Select' },
-  { label: 'Type', type: 'Select' },
-  { label: 'Tags', type: 'Multi-select' },
-  { label: 'Status', type: 'Select' },
+  { label: 'Source', type: 'Select', options: ['Widget', 'Slack', 'Intercom', 'Zendesk', 'Gong', 'Fathom', 'PostHog', 'API', 'Manual'] },
+  { label: 'Type', type: 'Select', options: ['Chat', 'Meeting', 'Behavioral'] },
+  { label: 'Tags', type: 'Multi-select', options: ['General Feedback', 'Win', 'Loss', 'Bug', 'Feature Request', 'Change Request'] },
+  { label: 'Status', type: 'Select', options: ['Active', 'Closing Soon', 'Awaiting Idle Response', 'Closed'] },
+]
+
+const KNOWLEDGE_SOURCE_BUILT_IN_FIELDS: BuiltInField[] = [
+  { label: 'Name', type: 'Text' },
+  { label: 'Description', type: 'Text' },
+  { label: 'Type', type: 'Select', options: ['Codebase', 'Website', 'Docs Portal', 'Uploaded Document', 'Raw Text', 'Notion'] },
+  { label: 'Status', type: 'Select', options: ['Pending', 'Analyzing', 'Done', 'Failed'] },
+  { label: 'URL', type: 'Text' },
+]
+
+const PRODUCT_SCOPE_BUILT_IN_FIELDS: BuiltInField[] = [
+  { label: 'Name', type: 'Text' },
+  { label: 'Description', type: 'Text' },
+  { label: 'Type', type: 'Select', options: ['Product Area', 'Initiative'] },
+  { label: 'Color', type: 'Select', options: ['Blue', 'Green', 'Yellow', 'Red', 'Gray'] },
+  { label: 'Goals', type: 'Multi-select' },
 ]
 
 interface AgentSettings {
@@ -88,14 +104,13 @@ interface AgentSettings {
     sessionGoodbyeDelaySeconds: number
     sessionIdleResponseTimeoutSeconds: number
   }
-  feedbackReview: {
-    classificationGuidelines: string
-    analysisGuidelines: string
-    issueTrackingEnabled: boolean
-  }
   issueAnalysis: {
     analysisGuidelines: string
     briefGuidelines: string
+    issueAnalysisEnabled: boolean
+  }
+  graphEvaluation: {
+    creationPolicyEnabled: boolean
   }
 }
 
@@ -108,14 +123,13 @@ const DEFAULT_SETTINGS: AgentSettings = {
     sessionGoodbyeDelaySeconds: 90,
     sessionIdleResponseTimeoutSeconds: 60,
   },
-  feedbackReview: {
-    classificationGuidelines: '',
-    analysisGuidelines: '',
-    issueTrackingEnabled: true,
-  },
   issueAnalysis: {
     analysisGuidelines: '',
     briefGuidelines: '',
+    issueAnalysisEnabled: true,
+  },
+  graphEvaluation: {
+    creationPolicyEnabled: true,
   },
 }
 
@@ -147,8 +161,8 @@ export default function AgentsSettingsPage() {
   const [showSupportDialog, setShowSupportDialog] = useState(false)
   const [showProductCopilotDialog, setShowProductCopilotDialog] = useState(false)
   const [showTestAgent, setShowTestAgent] = useState(false)
-  const [showFeedbackReviewDialog, setShowFeedbackReviewDialog] = useState(false)
   const [showIssueAnalysisDialog, setShowIssueAnalysisDialog] = useState(false)
+  const [showGraphEvalDialog, setShowGraphEvalDialog] = useState(false)
 
 
   // --- Agent data ---
@@ -164,15 +178,8 @@ export default function AgentsSettingsPage() {
   const [generalSaved, setGeneralSaved] = useState(false)
 
   // --- Ontology sub-navigation ---
-  const [ontologySection, setOntologySection] = useState<'customers' | 'issues' | 'feedback'>('customers')
+  const [ontologySection, setOntologySection] = useState<'customers' | 'issues' | 'feedback' | 'knowledge' | 'products'>('customers')
 
-  // --- Feedback tab state ---
-  const [customTags, setCustomTags] = useState<LocalCustomTag[]>([])
-  const [isLoadingFeedback, setIsLoadingFeedback] = useState(true)
-
-  // --- Feedback auto-save state ---
-  const [feedbackError, setFeedbackError] = useState<string | null>(null)
-  const [tagsSaved, setTagsSaved] = useState(false)
 
   // Initialize general tab fields from project
   useEffect(() => {
@@ -186,17 +193,17 @@ export default function AgentsSettingsPage() {
   const fetchSettings = useCallback(async () => {
     if (!projectId) return
     try {
-      const [supportAgentData, feedbackReviewData, issueAnalysisData] = await Promise.all([
+      const [supportAgentData, issueAnalysisData, graphEvalData] = await Promise.all([
         getSupportAgentSettings(projectId).catch(() => null),
-        getFeedbackReviewSettings(projectId).catch(() => null),
         getIssueAnalysisSettings(projectId).catch(() => null),
+        getGraphEvaluationSettingsClient(projectId).catch(() => null),
       ])
 
-      if (supportAgentData?.settings) {
-        const s = supportAgentData.settings
-        setSettings((prev) => ({
-          ...prev,
-          supportAgent: {
+      setSettings((prev) => {
+        const next = { ...prev }
+        if (supportAgentData?.settings) {
+          const s = supportAgentData.settings
+          next.supportAgent = {
             ...prev.supportAgent,
             packageId: (s.support_agent_package_id as string) ?? null,
             toneOfVoice: (s.support_agent_tone as string) ?? 'professional',
@@ -204,32 +211,24 @@ export default function AgentsSettingsPage() {
             sessionIdleTimeoutMinutes: (s.session_idle_timeout_minutes as number) ?? 5,
             sessionGoodbyeDelaySeconds: (s.session_goodbye_delay_seconds as number) ?? 90,
             sessionIdleResponseTimeoutSeconds: (s.session_idle_response_timeout_seconds as number) ?? 60,
-          },
-        }))
-      }
-
-      if (feedbackReviewData?.settings) {
-        const s = feedbackReviewData.settings
-        setSettings((prev) => ({
-          ...prev,
-          feedbackReview: {
-            classificationGuidelines: (s.classification_guidelines as string) ?? '',
-            analysisGuidelines: (s.analysis_guidelines as string) ?? '',
-            issueTrackingEnabled: (s.issue_tracking_enabled as boolean) ?? true,
-          },
-        }))
-      }
-
-      if (issueAnalysisData?.settings) {
-        const s = issueAnalysisData.settings
-        setSettings((prev) => ({
-          ...prev,
-          issueAnalysis: {
+          }
+        }
+        if (issueAnalysisData?.settings) {
+          const s = issueAnalysisData.settings
+          next.issueAnalysis = {
             analysisGuidelines: (s.analysis_guidelines as string) ?? '',
             briefGuidelines: (s.brief_guidelines as string) ?? '',
-          },
-        }))
-      }
+            issueAnalysisEnabled: (s.issue_analysis_enabled as boolean) ?? true,
+          }
+        }
+        if (graphEvalData?.settings) {
+          const s = graphEvalData.settings
+          next.graphEvaluation = {
+            creationPolicyEnabled: (s.creation_policy_enabled as boolean) ?? true,
+          }
+        }
+        return next
+      })
 
     } catch (err) {
       console.error('[agents] Failed to fetch settings:', err)
@@ -248,33 +247,12 @@ export default function AgentsSettingsPage() {
     }
   }, [projectId])
 
-  // --- Unified feedback settings fetcher ---
-  const fetchFeedbackSettings = useCallback(async () => {
-    if (!projectId) return
-    setIsLoadingFeedback(true)
-    try {
-      const data = await getFeedbackIssuesSettings(projectId)
-      setCustomTags((data.customTags ?? []).map((tag) => ({
-        id: tag.id,
-        name: tag.name,
-        slug: tag.slug,
-        description: tag.description,
-        color: tag.color as LocalCustomTag['color'],
-        position: tag.position,
-      })))
-    } catch (err) {
-      setFeedbackError(err instanceof Error ? err.message : 'Failed to load feedback settings')
-    } finally {
-      setIsLoadingFeedback(false)
-    }
-  }, [projectId])
 
   // Fetch all data on mount
   useEffect(() => {
     void fetchSettings()
     void fetchPackages()
-    void fetchFeedbackSettings()
-  }, [fetchSettings, fetchPackages, fetchFeedbackSettings])
+  }, [fetchSettings, fetchPackages])
 
   // --- Agent event handlers ---
   const activePackage = packages.find((p) => p.id === settings.supportAgent.packageId)
@@ -322,17 +300,6 @@ export default function AgentsSettingsPage() {
     }
   }
 
-  // --- Auto-save custom tags ---
-  const handleSaveTags = useCallback(async (tags: LocalCustomTag[]) => {
-    setFeedbackError(null)
-    try {
-      await updateFeedbackIssuesSettings(projectId!, { custom_tags: tags })
-      setTagsSaved(true)
-      setTimeout(() => setTagsSaved(false), 3000)
-    } catch (err) {
-      setFeedbackError(err instanceof Error ? err.message : 'Failed to save custom tags')
-    }
-  }, [projectId])
 
   // Loading state
   if (isLoadingProject || !project || !projectId || isLoading) {
@@ -355,7 +322,7 @@ export default function AgentsSettingsPage() {
           <Tab value="general">General</Tab>
           <Tab value="access">Access</Tab>
           <Tab value="ontology">Ontology</Tab>
-          <Tab value="agents-workflows">Agents & Workflows</Tab>
+          <Tab value="agents-workflows">Agents & Automations</Tab>
         </TabsList>
 
         {/* General Tab */}
@@ -414,7 +381,7 @@ export default function AgentsSettingsPage() {
         <TabsPanel value="ontology">
           {/* Sub-navigation pills */}
           <div className="mb-6 flex gap-1">
-            {(['customers', 'issues', 'feedback'] as const).map((section) => (
+            {ONTOLOGY_SECTIONS.map((section) => (
               <button
                 key={section}
                 type="button"
@@ -425,7 +392,7 @@ export default function AgentsSettingsPage() {
                     : 'text-[color:var(--text-secondary)] hover:text-[color:var(--foreground)]'
                 }`}
               >
-                {section === 'customers' ? 'Customers' : section === 'issues' ? 'Issues' : 'Feedback'}
+                {ONTOLOGY_SECTION_LABELS[section]}
               </button>
             ))}
           </div>
@@ -449,70 +416,20 @@ export default function AgentsSettingsPage() {
 
             {/* Feedback section */}
             {ontologySection === 'feedback' && (
-              <>
-                <FieldsEditor projectId={projectId} entityType="session" builtInFields={FEEDBACK_BUILT_IN_FIELDS} title="Feedback Fields" />
+              <FieldsEditor projectId={projectId} entityType="session" builtInFields={FEEDBACK_BUILT_IN_FIELDS} title="Feedback Fields" />
+            )}
 
-                <div className="border-t border-[color:var(--border-subtle)]" />
+            {ontologySection === 'knowledge' && (
+              <FieldsEditor projectId={projectId} entityType="knowledge_source" builtInFields={KNOWLEDGE_SOURCE_BUILT_IN_FIELDS} title="Knowledge Source Fields" />
+            )}
 
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2">
-                    <Heading as="h3" size="subsection">Tags</Heading>
-                    {tagsSaved && (
-                      <span className="text-sm text-[color:var(--accent-success)]">Saved</span>
-                    )}
-                  </div>
-
-                  <p className="text-sm text-[color:var(--text-secondary)]">
-                    Tags are used by the AI to classify feedback sessions.
-                  </p>
-
-                  {/* Built-in tags (readonly) */}
-                  <div className="space-y-0.5">
-                    {[
-                      { label: 'General Feedback', color: 'bg-blue-500', description: 'General product feedback and opinions' },
-                      { label: 'Win', color: 'bg-green-500', description: 'Positive outcomes and customer successes' },
-                      { label: 'Loss', color: 'bg-red-500', description: 'Customer churn, lost deals, or negative outcomes' },
-                      { label: 'Bug', color: 'bg-red-500', description: 'Software defects and broken functionality' },
-                      { label: 'Feature Request', color: 'bg-yellow-500', description: 'Requests for new features or capabilities' },
-                      { label: 'Change Request', color: 'bg-yellow-500', description: 'Requests to modify existing functionality' },
-                    ].map((tag) => (
-                      <div key={tag.label} className="flex items-start gap-2.5 px-2 py-1.5">
-                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${tag.color}`} />
-                        <div className="min-w-0">
-                          <span className="text-sm text-[color:var(--text-secondary)]">{tag.label}</span>
-                          <p className="text-xs text-[color:var(--text-tertiary)]">{tag.description}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Custom tags */}
-                  {isLoadingFeedback ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Spinner size="md" />
-                    </div>
-                  ) : (
-                    <CustomTagsSection
-                      tags={customTags}
-                      onTagsChange={setCustomTags}
-                      onCommit={handleSaveTags}
-                      canAddMore={customTags.length < MAX_TAGS}
-                      error={null}
-                    />
-                  )}
-                </div>
-
-                {feedbackError && (
-                  <div className="rounded-[4px] border border-[color:var(--accent-danger)] p-3 text-sm text-[color:var(--accent-danger)]">
-                    {feedbackError}
-                  </div>
-                )}
-              </>
+            {ontologySection === 'products' && (
+              <FieldsEditor projectId={projectId} entityType="product_scope" builtInFields={PRODUCT_SCOPE_BUILT_IN_FIELDS} title="Scope Fields" />
             )}
           </div>
         </TabsPanel>
 
-        {/* Agents & Workflows Tab */}
+        {/* Agents & Automations Tab */}
         <TabsPanel value="agents-workflows">
           <h3 className="mb-4 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
             Agents
@@ -548,17 +465,19 @@ export default function AgentsSettingsPage() {
             </h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <WorkflowCard
-                icon="📋"
-                title="Feedback Review"
-                description="Classifies feedback and creates issues"
-                steps={['Classify Feedback', 'Summarize', 'Create or Upvote Issue']}
-                onClick={() => setShowFeedbackReviewDialog(true)}
+                icon="🕸️"
+                title="Graph Evaluation"
+                description="Discovers relationships and creates entities from feedback"
+                steps={['Load Entity Content', 'Extract Topics', 'Discover Relationships', 'Create New Resources']}
+                enabled={settings.graphEvaluation.creationPolicyEnabled}
+                onClick={() => setShowGraphEvalDialog(true)}
               />
               <WorkflowCard
                 icon="📊"
                 title="Issue Analysis"
                 description="Scores reach, impact, confidence, effort and generates a brief"
                 steps={['Analyze Impact & Effort', 'Compute Scores', 'Generate Brief']}
+                enabled={settings.issueAnalysis.issueAnalysisEnabled}
                 onClick={() => setShowIssueAnalysisDialog(true)}
               />
             </div>
@@ -586,21 +505,20 @@ export default function AgentsSettingsPage() {
         integrationStatuses={integrationStatuses}
       />
 
-      <FeedbackReviewDialog
-        open={showFeedbackReviewDialog}
-        onClose={() => setShowFeedbackReviewDialog(false)}
-        projectId={projectId}
-        classificationGuidelines={settings.feedbackReview.classificationGuidelines}
-        analysisGuidelines={settings.feedbackReview.analysisGuidelines}
-        issueTrackingEnabled={settings.feedbackReview.issueTrackingEnabled}
-        onSaved={handleSettingsSaved}
-      />
       <IssueAnalysisDialog
         open={showIssueAnalysisDialog}
         onClose={() => setShowIssueAnalysisDialog(false)}
         projectId={projectId}
         analysisGuidelines={settings.issueAnalysis.analysisGuidelines}
         briefGuidelines={settings.issueAnalysis.briefGuidelines}
+        issueAnalysisEnabled={settings.issueAnalysis.issueAnalysisEnabled}
+        onSaved={handleSettingsSaved}
+      />
+      <GraphEvaluationDialog
+        open={showGraphEvalDialog}
+        onClose={() => setShowGraphEvalDialog(false)}
+        projectId={projectId}
+        creationPolicyEnabled={settings.graphEvaluation.creationPolicyEnabled}
         onSaved={handleSettingsSaved}
       />
       {showTestAgent && (

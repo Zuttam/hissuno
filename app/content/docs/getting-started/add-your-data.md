@@ -19,7 +19,7 @@ Navigate to **Agents** in the sidebar and open the knowledge sources dialog to a
 - **Documents** -- Upload product specs, FAQs, runbooks, or any reference material.
 - **URLs** -- Point to public documentation pages that should be indexed.
 
-See [Knowledge Sources](/docs/knowledge/sources) for details on how sources are analyzed and packaged.
+See [Knowledge Sources](/docs/architecture/knowledge-graph#knowledge-sources) for details on source types and how they feed the Support Agent.
 
 ### Customer Import
 

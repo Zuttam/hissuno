@@ -8,29 +8,36 @@ export async function configureEnv(
   appDir: string,
   databaseUrl: string,
   envFile = '.env.local',
+  opts?: { appUrl?: string; openaiKey?: string },
 ): Promise<{ appUrl: string }> {
-  const appUrl = await input({
+  const appUrl = opts?.appUrl ?? await input({
     message: 'App URL:',
     default: 'http://localhost:3000',
   })
 
-  const wantsOpenai = await confirm({
-    message: 'Add an OpenAI API key? (enables AI analysis & semantic search)',
-    default: true,
-  })
-
   let openaiKey: string | undefined
-  if (wantsOpenai) {
-    openaiKey = await password({
-      message: 'Enter your OpenAI API key:',
-      mask: '*',
-      validate: (val) => {
-        if (!val.startsWith('sk-')) {
-          return 'API key should start with sk-'
-        }
-        return true
-      },
+  if (opts) {
+    // Non-interactive mode: only add OpenAI if explicitly provided
+    openaiKey = opts.openaiKey
+  } else {
+    // Interactive mode: ask the user
+    const wantsOpenai = await confirm({
+      message: 'Add an OpenAI API key? (enables AI analysis & semantic search)',
+      default: true,
     })
+
+    if (wantsOpenai) {
+      openaiKey = await password({
+        message: 'Enter your OpenAI API key:',
+        mask: '*',
+        validate: (val) => {
+          if (!val.startsWith('sk-')) {
+            return 'API key should start with sk-'
+          }
+          return true
+        },
+      })
+    }
   }
 
   const authSecret = crypto.randomBytes(32).toString('base64')

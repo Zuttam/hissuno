@@ -66,3 +66,5 @@ app/data/storage/
 skills-lock.json
 
 .claude/
+
+docs/superpowers/

@@ -95,6 +95,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Validate input
     const input: UpdateSessionInput = {}
     if (body.name !== undefined) input.name = body.name
+    if (body.description !== undefined) input.description = body.description
     if (body.status !== undefined) input.status = body.status
     if (body.user_metadata !== undefined) input.user_metadata = body.user_metadata
     if (body.contact_id !== undefined) input.contact_id = body.contact_id

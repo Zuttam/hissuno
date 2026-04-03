@@ -15,31 +15,12 @@ import {
   createKnowledgeSource,
   createKnowledgeSourceBulkAdmin,
 } from '@/lib/knowledge/knowledge-service'
+import { getRateLimiter } from '@/lib/utils/rate-limiter'
 
 export const runtime = 'nodejs'
 
-/**
- * Simple in-memory per-user upload rate limiter.
- * Max 20 uploads per 60-second window.
- */
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX_UPLOADS = 20
-const uploadTimestamps = new Map<string, number[]>()
-
-function checkUploadRateLimit(userId: string): boolean {
-  const now = Date.now()
-  const timestamps = uploadTimestamps.get(userId) ?? []
-  const recent = timestamps.filter((t) => now - t < RATE_LIMIT_WINDOW_MS)
-
-  if (recent.length >= RATE_LIMIT_MAX_UPLOADS) {
-    uploadTimestamps.set(userId, recent)
-    return false
-  }
-
-  recent.push(now)
-  uploadTimestamps.set(userId, recent)
-  return true
-}
 
 /** Source types that users can manually add (codebase uses dedicated handler) */
 const USER_ADDABLE_TYPES: KnowledgeSourceType[] = [
@@ -253,11 +234,16 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'File is required for uploaded_doc type.' }, { status: 400 })
         }
 
-        // Rate limit: max 20 uploads per minute per user
-        if (!checkUploadRateLimit(actingUserId)) {
+        // Rate limit: max 20 uploads per minute per user (configurable via RATE_LIMITER env var)
+        const allowed = await getRateLimiter().check(
+          `knowledge-upload:${actingUserId}`,
+          RATE_LIMIT_WINDOW_MS,
+          RATE_LIMIT_MAX_UPLOADS,
+        )
+        if (!allowed) {
           return NextResponse.json(
             { error: 'Upload rate limit exceeded. Please wait before uploading more files.' },
-            { status: 429 }
+            { status: 429 },
           )
         }
 
@@ -283,7 +269,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid payload.' }, { status: 400 })
       }
 
-      const { type, url, content, repositoryUrl, repositoryBranch, analysis_scope, productScopeId: rawProductScopeId, name, description, notionPageId, pages } = payload
+      const { type, url, content, repositoryUrl, repositoryBranch, analysis_scope, productScopeId: rawProductScopeId, name, description, notionPageId, pages, custom_fields } = payload
       productScopeId = rawProductScopeId || null
 
       // Special handling for codebase type
@@ -352,6 +338,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         notion_page_id: (type === 'notion' || (type === 'uploaded_doc' && origin === 'notion')) ? (notionPageId || null) : null,
         origin: type === 'uploaded_doc' ? (origin || 'upload') : null,
+        custom_fields: custom_fields || null,
       }
     }
 
@@ -365,6 +352,7 @@ export async function POST(request: NextRequest) {
       storagePath: sourceData.storage_path ?? null,
       notionPageId: sourceData.notion_page_id ?? null,
       origin: sourceData.origin ?? null,
+      customFields: sourceData.custom_fields as Record<string, unknown> | null ?? null,
       productScopeId,
     })
 

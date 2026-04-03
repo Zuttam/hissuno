@@ -2,7 +2,7 @@
  * Issue Analysis Unit Tests
  *
  * Tests the core business logic for issue analysis:
- * - Priority calculation (upvote-based and multi-factor)
+ * - RICE score calculation and priority mapping
  * - Keyword extraction and similarity matching
  * - Session tagging response parsing
  * - PM review response parsing
@@ -14,36 +14,13 @@
 import { describe, it, expect } from 'vitest'
 
 // ============================================================================
-// Priority Calculation
+// RICE Score Calculation
 // ============================================================================
 
 import {
-  calculatePriority,
   calculateRICEScore,
   riceScoreToPriority,
 } from '@/lib/issues/issues-service'
-
-describe('calculatePriority', () => {
-  it('returns low for 1-2 upvotes', () => {
-    expect(calculatePriority(1)).toBe('low')
-    expect(calculatePriority(2)).toBe('low')
-  })
-
-  it('returns medium for 3-4 upvotes', () => {
-    expect(calculatePriority(3)).toBe('medium')
-    expect(calculatePriority(4)).toBe('medium')
-  })
-
-  it('returns high for 5+ upvotes', () => {
-    expect(calculatePriority(5)).toBe('high')
-    expect(calculatePriority(10)).toBe('high')
-    expect(calculatePriority(100)).toBe('high')
-  })
-
-  it('returns low for 0 upvotes', () => {
-    expect(calculatePriority(0)).toBe('low')
-  })
-})
 
 describe('calculateRICEScore', () => {
   it('returns null when reach, impact, or effort is null', () => {
@@ -126,13 +103,13 @@ describe('keyword extraction and similarity', () => {
     const projectId = 'test-project'
 
     store.addIssue(createMockIssue(
-      { id: 'seed-1', title: 'Checkout button broken', description: 'Button does not respond', type: 'bug', priority: 'high', upvoteCount: 3 },
+      { id: 'seed-1', name: 'Checkout button broken', description: 'Button does not respond', type: 'bug', priority: 'high', upvoteCount: 3 },
       projectId
     ))
 
     const results = store.findSimilarIssues('checkout', projectId)
     expect(results.length).toBeGreaterThan(0)
-    expect(results[0].title).toContain('Checkout')
+    expect(results[0].name).toContain('Checkout')
   })
 
   it('returns empty for unrelated queries', () => {
@@ -140,7 +117,7 @@ describe('keyword extraction and similarity', () => {
     const projectId = 'test-project'
 
     store.addIssue(createMockIssue(
-      { id: 'seed-1', title: 'Checkout button broken', description: 'Button does not respond', type: 'bug', priority: 'high', upvoteCount: 3 },
+      { id: 'seed-1', name: 'Checkout button broken', description: 'Button does not respond', type: 'bug', priority: 'high', upvoteCount: 3 },
       projectId
     ))
 
@@ -152,7 +129,7 @@ describe('keyword extraction and similarity', () => {
     const store = new MockDataStore()
 
     store.addIssue(createMockIssue(
-      { id: 'seed-1', title: 'Checkout button broken', description: 'Button does not respond', type: 'bug', priority: 'high', upvoteCount: 3 },
+      { id: 'seed-1', name: 'Checkout button broken', description: 'Button does not respond', type: 'bug', priority: 'high', upvoteCount: 3 },
       'project-a'
     ))
 
@@ -234,16 +211,6 @@ describe('parseSessionTaggingResponse', () => {
     expect(result.tags).toContain('general_feedback')
   })
 
-  it('supports custom tags when provided', () => {
-    const customTags = [
-      { id: '1', project_id: 'p1', name: 'Onboarding', slug: 'onboarding', description: '', color: 'info', position: 0, created_at: '', updated_at: '' },
-    ]
-    const response = '{"tags": ["bug", "onboarding"], "reasoning": "Onboarding bug"}'
-    const result = parseSessionTaggingResponse(response, customTags)
-    expect(result.tags).toContain('bug')
-    expect(result.tags).toContain('onboarding')
-    expect(result.hasCustomTags).toBe(true)
-  })
 })
 
 describe('parsePMReviewResponse', () => {
@@ -523,7 +490,7 @@ describe('MockDataStore', () => {
   it('stores and retrieves issues', () => {
     const store = new MockDataStore()
     const issue = createMockIssue(
-      { id: 'seed-1', title: 'Test Issue', description: 'Test', type: 'bug', priority: 'low', upvoteCount: 1 },
+      { id: 'seed-1', name: 'Test Issue', description: 'Test', type: 'bug', priority: 'low', upvoteCount: 1 },
       'project-1'
     )
     store.addIssue(issue)
@@ -541,7 +508,7 @@ describe('MockDataStore', () => {
   it('clears all data', () => {
     const store = new MockDataStore()
     const issue = createMockIssue(
-      { id: 'seed-1', title: 'Test', description: 'Test', type: 'bug', priority: 'low', upvoteCount: 1 },
+      { id: 'seed-1', name: 'Test', description: 'Test', type: 'bug', priority: 'low', upvoteCount: 1 },
       'project-1'
     )
     store.addIssue(issue)
@@ -553,8 +520,8 @@ describe('MockDataStore', () => {
 describe('createTestContext', () => {
   it('creates context with seeded issues', () => {
     const seedIssues = [
-      { id: 'seed-1', title: 'Bug in checkout', description: 'Cannot check out', type: 'bug' as const, priority: 'high' as const, upvoteCount: 5 },
-      { id: 'seed-2', title: 'Add PDF export', description: 'Export to PDF', type: 'feature_request' as const, priority: 'medium' as const, upvoteCount: 2 },
+      { id: 'seed-1', name: 'Bug in checkout', description: 'Cannot check out', type: 'bug' as const, priority: 'high' as const, upvoteCount: 5 },
+      { id: 'seed-2', name: 'Add PDF export', description: 'Export to PDF', type: 'feature_request' as const, priority: 'medium' as const, upvoteCount: 2 },
     ]
     const { projectId, dataStore, issueIdMap } = createTestContext(seedIssues)
 
@@ -651,13 +618,13 @@ describe('PM decision tag hints', () => {
       action: 'create' as const,
       newIssue: {
         type: 'bug' as const,
-        title: 'Checkout fails on mobile',
+        name: 'Checkout fails on mobile',
         description: 'User reported checkout button not working on mobile Safari',
         priority: 'high' as const,
       },
     }
     expect(createDecision.newIssue.type).toBe('bug')
-    expect(createDecision.newIssue.title).toBeTruthy()
+    expect(createDecision.newIssue.name).toBeTruthy()
     expect(createDecision.newIssue.description).toBeTruthy()
     expect(createDecision.newIssue.priority).toBe('high')
   })
@@ -718,162 +685,3 @@ describe('execute decision output shapes', () => {
   })
 })
 
-// ============================================================================
-// Workflow Schema Validation
-// ============================================================================
-
-import {
-  pmDecisionSchema,
-  similarIssueSchema,
-  workflowInputSchema,
-  workflowOutputSchema,
-} from '@/mastra/workflows/session-review/schemas'
-
-describe('workflow schemas', () => {
-  describe('pmDecisionSchema', () => {
-    it('validates skip decision', () => {
-      const result = pmDecisionSchema.safeParse({
-        action: 'skip',
-        skipReason: 'No actionable feedback',
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('validates create decision', () => {
-      const result = pmDecisionSchema.safeParse({
-        action: 'create',
-        newIssue: {
-          type: 'bug',
-          title: 'Test issue',
-          description: 'Test description',
-          priority: 'medium',
-        },
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('validates upvote decision', () => {
-      const result = pmDecisionSchema.safeParse({
-        action: 'upvote',
-        existingIssueId: 'some-uuid',
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('rejects invalid action', () => {
-      const result = pmDecisionSchema.safeParse({
-        action: 'invalid',
-      })
-      expect(result.success).toBe(false)
-    })
-
-    it('rejects invalid issue type in create', () => {
-      const result = pmDecisionSchema.safeParse({
-        action: 'create',
-        newIssue: {
-          type: 'invalid_type',
-          title: 'Test',
-          description: 'Test',
-          priority: 'low',
-        },
-      })
-      expect(result.success).toBe(false)
-    })
-
-    it('rejects invalid priority in create', () => {
-      const result = pmDecisionSchema.safeParse({
-        action: 'create',
-        newIssue: {
-          type: 'bug',
-          title: 'Test',
-          description: 'Test',
-          priority: 'critical',
-        },
-      })
-      expect(result.success).toBe(false)
-    })
-  })
-
-  describe('similarIssueSchema', () => {
-    it('validates a valid similar issue', () => {
-      const result = similarIssueSchema.safeParse({
-        issueId: 'uuid-123',
-        title: 'Existing issue',
-        description: 'Description',
-        upvoteCount: 3,
-        status: 'open',
-        similarity: 0.85,
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('rejects missing required fields', () => {
-      const result = similarIssueSchema.safeParse({
-        issueId: 'uuid-123',
-        title: 'Existing issue',
-      })
-      expect(result.success).toBe(false)
-    })
-  })
-
-  describe('workflowInputSchema', () => {
-    it('validates minimal input', () => {
-      const result = workflowInputSchema.safeParse({
-        sessionId: 'session-1',
-        projectId: 'project-1',
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('validates input with classification guidelines', () => {
-      const result = workflowInputSchema.safeParse({
-        sessionId: 'session-1',
-        projectId: 'project-1',
-        classificationGuidelines: 'Custom guidelines here',
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('rejects missing sessionId', () => {
-      const result = workflowInputSchema.safeParse({
-        projectId: 'project-1',
-      })
-      expect(result.success).toBe(false)
-    })
-  })
-
-  describe('workflowOutputSchema', () => {
-    it('validates created output', () => {
-      const result = workflowOutputSchema.safeParse({
-        tags: ['bug'],
-        tagsApplied: true,
-        productScopeId: null,
-        action: 'created',
-        issueId: 'issue-1',
-        issueTitle: 'Test issue',
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('validates skipped output', () => {
-      const result = workflowOutputSchema.safeParse({
-        tags: ['wins'],
-        tagsApplied: true,
-        productScopeId: null,
-        action: 'skipped',
-        skipReason: 'No actionable feedback',
-      })
-      expect(result.success).toBe(true)
-    })
-
-    it('rejects invalid tag format', () => {
-      const result = workflowOutputSchema.safeParse({
-        tags: ['Invalid Tag With Spaces'],
-        tagsApplied: true,
-        productScopeId: null,
-        action: 'skipped',
-      })
-      expect(result.success).toBe(false)
-    })
-  })
-})

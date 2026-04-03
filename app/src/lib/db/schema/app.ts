@@ -8,6 +8,7 @@ import {
   integer,
   doublePrecision,
   unique,
+  index,
 } from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { vector } from './custom-types'
@@ -39,14 +40,22 @@ export const projectSettings = pgTable('project_settings', {
   classification_guidelines: text('classification_guidelines'),
   brief_guidelines: text('brief_guidelines'),
   analysis_guidelines: text('analysis_guidelines'),
-  issue_tracking_enabled: boolean('issue_tracking_enabled'),
-  pm_dedup_include_closed: boolean('pm_dedup_include_closed'),
+  issue_analysis_enabled: boolean('issue_analysis_enabled'),
   // Support agent
   support_agent_package_id: uuid('support_agent_package_id'),
   support_agent_tone: text('support_agent_tone'),
   brand_guidelines: text('brand_guidelines'),
   // Knowledge analysis settings
   knowledge_relationship_guidelines: text('knowledge_relationship_guidelines'),
+  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+})
+
+export const graphEvaluationSettings = pgTable('graph_evaluation_settings', {
+  project_id: uuid('project_id')
+    .primaryKey()
+    .references(() => projects.id),
+  creation_policy_enabled: boolean('creation_policy_enabled').notNull().default(true),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
@@ -157,20 +166,7 @@ export const productScopes = pgTable('product_scopes', {
   is_default: boolean('is_default').notNull().default(false),
   type: text('type').notNull().default('product_area'),
   goals: jsonb('goals'),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const customTags = pgTable('custom_tags', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  name: text('name').notNull(),
-  slug: text('slug').notNull(),
-  description: text('description').notNull().default(''),
-  color: text('color'),
-  position: integer('position').notNull().default(0),
+  custom_fields: jsonb('custom_fields'),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
@@ -223,7 +219,7 @@ export const contacts = pgTable('contacts', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
-export const customerCustomFieldDefinitions = pgTable('customer_custom_field_definitions', {
+export const customFieldDefinitions = pgTable('customer_custom_field_definitions', {
   id: uuid('id').primaryKey().defaultRandom(),
   project_id: uuid('project_id')
     .notNull()
@@ -266,9 +262,7 @@ export const sessions = pgTable('sessions', {
   scheduled_close_at: timestamp('scheduled_close_at', { mode: 'date' }),
   idle_prompt_sent_at: timestamp('idle_prompt_sent_at', { mode: 'date' }),
   // Analysis & review
-  analysis_status: text('analysis_status').notNull().default('pending'),
-  pm_reviewed_at: timestamp('pm_reviewed_at', { mode: 'date' }),
-  tags_auto_applied_at: timestamp('tags_auto_applied_at', { mode: 'date' }),
+  base_processed_at: timestamp('base_processed_at', { mode: 'date' }),
   // Human takeover
   is_human_takeover: boolean('is_human_takeover').notNull().default(false),
   human_takeover_at: timestamp('human_takeover_at', { mode: 'date' }),
@@ -336,14 +330,13 @@ export const issues = pgTable('issues', {
   project_id: uuid('project_id')
     .notNull()
     .references(() => projects.id),
-  title: text('title').notNull(),
+  name: text('name').notNull(),
   description: text('description').notNull(),
   type: text('type').notNull(),
   priority: text('priority').notNull().default('medium'),
   status: text('status'),
   is_archived: boolean('is_archived').notNull().default(false),
   custom_fields: jsonb('custom_fields'),
-  upvote_count: integer('upvote_count').default(0),
   priority_manual_override: boolean('priority_manual_override').default(false),
   // RICE scores
   reach_score: doublePrecision('reach_score'),
@@ -413,6 +406,7 @@ export const knowledgeSources = pgTable('knowledge_sources', {
   analysis_scope: text('analysis_scope'),
   notion_page_id: text('notion_page_id'),
   origin: text('origin'),
+  custom_fields: jsonb('custom_fields'),
   analyzed_at: timestamp('analyzed_at', { mode: 'date' }),
   enabled: boolean('enabled').default(true),
   error_message: text('error_message'),
@@ -1082,6 +1076,22 @@ export const fathomSyncRuns = pgTable('fathom_sync_runs', {
   started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
   completed_at: timestamp('completed_at', { mode: 'date' }),
 })
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Infrastructure: Rate Limiting
+// ---------------------------------------------------------------------------
+
+export const rateLimitEvents = pgTable('rate_limit_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  key: text('key').notNull(),
+  created_at: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+}, (table) => [
+  index('idx_rate_limit_key_created').on(table.key, table.created_at),
+])
 
 // ---------------------------------------------------------------------------
 // Notifications

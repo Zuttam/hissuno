@@ -6,7 +6,6 @@ import type { SessionWithProject } from '@/types/session'
 import type { SessionReviewResult as SessionReviewResultType, WorkflowStep } from '@/hooks/use-session-review'
 import { SessionTagList } from '../session-tags/session-tag-badge'
 import { SessionReviewResult } from './session-review-result'
-import { LinkedIssuesDisplay } from './linked-issues-display'
 
 /**
  * Display step-specific result data
@@ -16,26 +15,11 @@ function StepResultBadge({ step }: { step: WorkflowStep }) {
   if (!data) return null
 
   const tagCount = data.tagCount as number | undefined
-  const duplicateCount = data.duplicateCount as number | undefined
-  const impactScore = data.impactScore as number | undefined
-  const effort = data.effort as string | undefined
 
   switch (step.id) {
-    case 'classify-session':
+    case 'graph-eval':
       return tagCount ? (
-        <span className="text-xs text-[color:var(--text-secondary)]">{tagCount} tags</span>
-      ) : null
-    case 'find-duplicates':
-      return duplicateCount !== undefined ? (
-        <span className="text-xs text-[color:var(--text-secondary)]">{duplicateCount} similar</span>
-      ) : null
-    case 'analyze-impact':
-      return impactScore ? (
-        <span className="text-xs text-[color:var(--text-secondary)]">Impact: {impactScore}/5</span>
-      ) : null
-    case 'estimate-effort':
-      return effort ? (
-        <span className="text-xs text-[color:var(--text-secondary)]">Effort: {effort}</span>
+        <span className="text-xs text-[color:var(--text-secondary)]">{tagCount} relationships</span>
       ) : null
     default:
       return null
@@ -59,18 +43,8 @@ export function SessionReviewSection({
   reviewTags,
   steps,
 }: SessionReviewSectionProps) {
-  const wasReviewed = session.analysis_status === 'analyzed'
-  const linkedIssues = session.linked_issues ?? []
-  const hasLinkedIssues = linkedIssues.length > 0
-
-  // When the session has refreshed with linked_issues, prefer that over the fresh SSE result
-  // since the DB is the source of truth (avoids stale/wrong SSE result showing "irrelevant")
-  const showPersistedIssues = !isReviewing && hasLinkedIssues
-  // Show fresh result only when persisted linked issues aren't available yet
-  const showFreshResult = !showPersistedIssues && showResult && result && !isReviewing
-  // Show fallback when reviewed but no issues from either source
-  const resultIndicatesIssue = result && (result.action === 'created' || result.action === 'upvoted')
-  const showNoIssuesFallback = !showPersistedIssues && !showFreshResult && !isReviewing && wasReviewed && !resultIndicatesIssue
+  const isAutomationSkip = result?.action === 'skipped' && result.skipReason?.includes('disabled')
+  const showFreshResult = showResult && result && !isReviewing && !isAutomationSkip
 
   return (
     <div className="flex flex-col gap-4">
@@ -132,37 +106,13 @@ export function SessionReviewSection({
         </div>
       )}
 
-      {/* Linked Issues */}
-      {!isReviewing && (showPersistedIssues || showFreshResult || showNoIssuesFallback) && (
+      {/* Fresh result from current analysis */}
+      {!isReviewing && showFreshResult && (
         <div className="flex flex-col gap-2">
           <label className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Linked Issues
+            Analysis Result
           </label>
-
-          {/* Persisted linked issues from DB (source of truth) */}
-          {showPersistedIssues && (
-            <LinkedIssuesDisplay issues={linkedIssues} projectId={session.project_id} />
-          )}
-
-          {/* Fresh result from current analysis (before session refresh) */}
-          {showFreshResult && (
-            <SessionReviewResult result={result} projectId={session.project_id} />
-          )}
-
-          {/* No issues fallback */}
-          {showNoIssuesFallback && (
-            <div className="rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] p-3">
-              <div className="flex items-center gap-2">
-                <span className="text-lg text-[color:var(--text-tertiary)]">—</span>
-                <div>
-                  <p className="font-medium text-[color:var(--foreground)]">No issues found</p>
-                  <p className="text-xs text-[color:var(--text-secondary)]">
-                    No actionable feedback found
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          <SessionReviewResult result={result} projectId={session.project_id} />
         </div>
       )}
     </div>

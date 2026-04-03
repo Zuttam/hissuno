@@ -321,7 +321,7 @@ export function ProblemSection() {
       <div className="mx-auto max-w-6xl">
         <WaterReveal preset="text" parallax parallaxDepth={0.08}>
           <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Your Product Data Is Trapped
+            Your Product Data Is Fragmented
           </h2>
         </WaterReveal>
 

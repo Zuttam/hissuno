@@ -24,13 +24,17 @@ import { searchKnowledge } from '@/lib/knowledge/knowledge-service'
 import { createSessionAdmin } from '@/lib/sessions/sessions-service'
 import { createIssueAdmin } from '@/lib/issues/issues-service'
 import { createContactAdmin, createCompanyAdmin } from '@/lib/customers/customers-service'
+import { listProjectProductScopes, getProductScopeById } from '@/lib/db/queries/product-scopes'
+import { searchScopes, createProductScopeAdmin } from '@/lib/product-scopes/product-scopes-service'
+import { generateSlugFromName } from '@/lib/security/sanitize'
 import type { SessionTag, SessionSource } from '@/types/session'
 import type { IssueType, IssuePriority, IssueStatus } from '@/types/issue'
 import type { CompanyStage } from '@/types/customer'
+import type { ProductScopeType, ProductScopeGoal } from '@/types/product-scope'
 
 const LOG_PREFIX = '[mcp.resource-tools]'
 
-const RESOURCE_TYPES = ['knowledge', 'feedback', 'issues', 'customers'] as const
+const RESOURCE_TYPES = ['knowledge', 'feedback', 'issues', 'customers', 'scopes'] as const
 type ResourceType = (typeof RESOURCE_TYPES)[number]
 
 /**
@@ -70,7 +74,7 @@ export function registerResourceTools(server: McpServer) {
         'Product issues (bugs, feature requests, change requests).',
         '- **Filters:** `type` (bug|feature_request|change_request), `priority` (low|medium|high), `status` (open|ready|in_progress|resolved|closed), `search`',
         '- **Search:** Semantic vector search for similar issues',
-        '- **Add:** Required: `type`, `title`, `description`. Optional: `priority`',
+        '- **Add:** Required: `type`, `name`, `description`. Optional: `priority`',
         '',
         '## customers',
         'Customers - contacts (people) and companies (organizations).',
@@ -81,6 +85,12 @@ export function registerResourceTools(server: McpServer) {
         '- **Add:** Set `customer_type` in data to select sub-type.',
         '  - *contacts:* Required: `name`, `email`. Optional: `role`, `title`, `phone`, `company_id`, `is_champion`',
         '  - *companies:* Required: `name`, `domain`. Optional: `industry`, `arr`, `stage`, `employee_count`, `plan_tier`, `country`, `notes`',
+        '',
+        '## scopes',
+        'Product scopes (product areas and initiatives) that organize your product.',
+        '- **Filters:** `type` (product_area|initiative)',
+        '- **Search:** Semantic vector search with text fallback',
+        '- **Add:** Required: `name`. Optional: `slug`, `description`, `type` (product_area|initiative), `color`, `goals` (array of {id, text})',
       ].join('\n')
 
       return { content: [{ type: 'text' as const, text: markdown }] }
@@ -157,13 +167,13 @@ export function registerResourceTools(server: McpServer) {
             total = t
             items = data.map((i) => ({
               id: i.id,
-              name: i.title,
+              name: i.name,
               description: `${i.type} | ${i.priority} priority | ${i.status}`,
               metadata: {
                 type: i.type,
                 priority: i.priority,
                 status: i.status ?? 'open',
-                upvoteCount: String(i.upvote_count ?? 0),
+                sessionCount: String(i.session_count ?? 0),
                 updatedAt: i.updated_at ?? '',
               },
             }))
@@ -251,6 +261,33 @@ export function registerResourceTools(server: McpServer) {
               },
             }))
             total = items.length
+            break
+          }
+
+          case 'scopes': {
+            const allScopes = await listProjectProductScopes(ctx.projectId)
+            const typeFilter = typeof filters.type === 'string' ? filters.type : undefined
+            const filtered = typeFilter
+              ? allScopes.filter((s) => s.type === typeFilter)
+              : allScopes
+            const limited = filtered.slice(0, limit)
+            total = filtered.length
+            items = limited.map((s) => ({
+              id: s.id,
+              name: s.name,
+              description: s.description || `${s.type} scope`,
+              metadata: {
+                slug: s.slug,
+                type: s.type,
+                ...(s.color ? { color: s.color } : {}),
+                position: String(s.position),
+                isDefault: String(s.is_default),
+                ...(s.goals && (s.goals as Array<{ id: string; text: string }>).length > 0
+                  ? { goals: (s.goals as Array<{ id: string; text: string }>).map((g) => g.text).join(', ') }
+                  : {}),
+                ...(s.updated_at ? { updatedAt: String(s.updated_at) } : {}),
+              },
+            }))
             break
           }
         }
@@ -370,12 +407,11 @@ export function registerResourceTools(server: McpServer) {
             const [issue] = await db
               .select({
                 id: issues.id,
-                title: issues.title,
+                name: issues.name,
                 description: issues.description,
                 type: issues.type,
                 priority: issues.priority,
                 status: issues.status,
-                upvote_count: issues.upvote_count,
                 created_at: issues.created_at,
                 updated_at: issues.updated_at,
               })
@@ -390,12 +426,11 @@ export function registerResourceTools(server: McpServer) {
             if (!issue) break
 
             const lines: string[] = [
-              `# ${issue.title}`,
+              `# ${issue.name}`,
               '',
               `- **Type:** ${issue.type}`,
               `- **Priority:** ${issue.priority}`,
               `- **Status:** ${issue.status}`,
-              `- **Upvotes:** ${issue.upvote_count ?? 0}`,
               `- **Created:** ${issue.created_at?.toISOString() ?? ''}`,
               `- **Updated:** ${issue.updated_at?.toISOString() ?? ''}`,
               '',
@@ -509,7 +544,7 @@ export function registerResourceTools(server: McpServer) {
               const companyName = companyResult[0]?.name ?? null
 
               const sessionIds = contactSessions.map((s) => s.id)
-              const issueMap = new Map<string, { id: string; title: string; type: string; status: string }>()
+              const issueMap = new Map<string, { id: string; name: string; type: string; status: string }>()
 
               if (sessionIds.length > 0) {
                 const issueLinks = await db
@@ -532,7 +567,7 @@ export function registerResourceTools(server: McpServer) {
                   const issueRows = await db
                     .select({
                       id: issues.id,
-                      title: issues.title,
+                      name: issues.name,
                       type: issues.type,
                       status: issues.status,
                     })
@@ -542,7 +577,7 @@ export function registerResourceTools(server: McpServer) {
                   for (const issue of issueRows) {
                     issueMap.set(issue.id, {
                       id: issue.id,
-                      title: issue.title,
+                      name: issue.name,
                       type: issue.type,
                       status: issue.status ?? 'open',
                     })
@@ -574,7 +609,7 @@ export function registerResourceTools(server: McpServer) {
               if (issueList.length > 0) {
                 lines.push('', '## Linked Issues', '')
                 for (const i of issueList) {
-                  lines.push(`- **${i.title}** (${i.type}, ${i.status})`)
+                  lines.push(`- **${i.name}** (${i.type}, ${i.status})`)
                 }
               }
 
@@ -669,6 +704,39 @@ export function registerResourceTools(server: McpServer) {
             markdown = header + content
             break
           }
+
+          case 'scopes': {
+            const scope = await getProductScopeById(params.id)
+            if (!scope || scope.project_id !== ctx.projectId) break
+
+            const goals = scope.goals as Array<{ id: string; text: string }> | null
+
+            const lines: string[] = [
+              `# ${scope.name}`,
+              '',
+              `- **Slug:** ${scope.slug}`,
+              `- **Type:** ${scope.type}`,
+              scope.color ? `- **Color:** ${scope.color}` : null,
+              `- **Position:** ${scope.position}`,
+              `- **Default:** ${scope.is_default ? 'Yes' : 'No'}`,
+              scope.created_at ? `- **Created:** ${String(scope.created_at)}` : null,
+              scope.updated_at ? `- **Updated:** ${String(scope.updated_at)}` : null,
+            ].filter((line): line is string => line !== null)
+
+            if (scope.description) {
+              lines.push('', '## Description', '', scope.description)
+            }
+
+            if (goals && goals.length > 0) {
+              lines.push('', '## Goals', '')
+              for (const goal of goals) {
+                lines.push(`- ${goal.text}`)
+              }
+            }
+
+            markdown = lines.join('\n')
+            break
+          }
         }
 
         console.log(`${LOG_PREFIX} get_resource type=${params.type} id=${params.id} found=${!!markdown}`)
@@ -726,6 +794,8 @@ export function registerResourceTools(server: McpServer) {
               return (await searchCustomers(ctx.projectId, params.query, limit)).map((r) => ({ ...r, type: 'customers' as const }))
             case 'knowledge':
               return (await searchKnowledge(ctx.projectId, params.query, limit)).map((r) => ({ ...r, type: 'knowledge' as const }))
+            case 'scopes':
+              return (await searchScopes(ctx.projectId, params.query, limit)).map((r) => ({ ...r, type: 'scopes' as const }))
           }
         }
 
@@ -856,8 +926,8 @@ export function registerResourceTools(server: McpServer) {
               throw new Error(`Validation error: "type" must be one of: ${VALID_TYPES.join(', ')}`)
             }
 
-            if (typeof params.data.title !== 'string' || (params.data.title as string).trim().length === 0) {
-              throw new Error('Validation error: "title" is required.')
+            if (typeof params.data.name !== 'string' || (params.data.name as string).trim().length === 0) {
+              throw new Error('Validation error: "name" is required.')
             }
 
             if (typeof params.data.description !== 'string' || (params.data.description as string).trim().length === 0) {
@@ -867,13 +937,13 @@ export function registerResourceTools(server: McpServer) {
             const result = await createIssueAdmin({
               projectId: ctx.projectId,
               type: type as IssueType,
-              title: params.data.title as string,
+              name: params.data.name as string,
               description: params.data.description as string,
               priority: typeof params.data.priority === 'string' ? (params.data.priority as 'low' | 'medium' | 'high') : undefined,
             })
 
             resultId = result.issue.id
-            resultName = result.issue.title
+            resultName = result.issue.name
             break
           }
 
@@ -933,6 +1003,37 @@ export function registerResourceTools(server: McpServer) {
 
           case 'knowledge': {
             throw new Error('Knowledge sources cannot be created via MCP. Use the dashboard to add and analyze knowledge sources.')
+          }
+
+          case 'scopes': {
+            if (typeof params.data.name !== 'string' || (params.data.name as string).trim().length === 0) {
+              throw new Error('Validation error: "name" is required.')
+            }
+
+            const name = (params.data.name as string).trim()
+            const slug = typeof params.data.slug === 'string'
+              ? (params.data.slug as string).trim()
+              : generateSlugFromName(name)
+
+            const VALID_SCOPE_TYPES: ProductScopeType[] = ['product_area', 'initiative']
+            const scopeType = typeof params.data.type === 'string' ? params.data.type : undefined
+            if (scopeType && !VALID_SCOPE_TYPES.includes(scopeType as ProductScopeType)) {
+              throw new Error(`Validation error: "type" must be one of: ${VALID_SCOPE_TYPES.join(', ')}`)
+            }
+
+            const scope = await createProductScopeAdmin(ctx.projectId, {
+              name,
+              slug,
+              description: typeof params.data.description === 'string' ? params.data.description : undefined,
+              color: typeof params.data.color === 'string' ? params.data.color : undefined,
+              type: scopeType as ProductScopeType | undefined,
+              goals: Array.isArray(params.data.goals) ? params.data.goals as ProductScopeGoal[] : null,
+            })
+
+            resultId = scope.id
+            resultName = scope.name
+            resultType = 'scopes'
+            break
           }
         }
 

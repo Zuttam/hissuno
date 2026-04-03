@@ -9,8 +9,11 @@ import type { KnowledgeSourceType, KnowledgeSourceWithCodebase } from '@/lib/kno
 import { getSourceDisplayValue, getSourceTypeLabel } from '@/lib/knowledge/types'
 import type { ProductScopeRecord } from '@/types/product-scope'
 import type { AnalysisEvent } from '@/hooks/use-issue-analysis'
+import { formatDateTime } from '@/lib/utils/format-time'
 import { WorkflowProgress } from '@/components/issues/workflow-progress'
 import { RelatedEntitiesSection } from '@/components/shared/related-entities-section'
+import { CustomFieldsRenderer } from '@/components/shared/custom-fields-renderer'
+import { useCustomFields } from '@/hooks/use-custom-fields'
 import { MarkdownContent } from '@/components/ui/markdown-content'
 
 interface KnowledgeSourceSidebarEditProps {
@@ -53,12 +56,6 @@ const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
   pending: { color: 'var(--text-tertiary)', label: 'Pending' },
 }
 
-function formatDateTime(dateString: string | Date | null | undefined): string {
-  if (!dateString) return '-'
-  const d = dateString instanceof Date ? dateString : new Date(dateString)
-  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
-}
-
 export function KnowledgeSourceSidebar(props: KnowledgeSourceSidebarProps) {
   if (isCreateMode(props)) {
     return <CreateModeSidebar {...props} />
@@ -82,6 +79,11 @@ function EditModeSidebar({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isAnalyzingLocal, setIsAnalyzingLocal] = useState(false)
+
+  const { fields: customFields } = useCustomFields({
+    projectId: source.project_id,
+    entityType: 'knowledge_source',
+  })
 
   // Analysis is in progress if either the parent says so (SSE connected) or we're waiting for the POST
   const isAnalyzing = isAnalyzingProp || isAnalyzingLocal
@@ -110,9 +112,13 @@ function EditModeSidebar({
     return onUpdate(source.id, { [fieldKey]: newValue || null })
   }, [source.id, onUpdate])
 
+  const handleCustomFieldChange = useCallback((key: string, value: unknown) => {
+    const currentFields = (source.custom_fields as Record<string, unknown>) ?? {}
+    void onUpdate(source.id, { custom_fields: { ...currentFields, [key]: value } })
+  }, [source.id, source.custom_fields, onUpdate])
+
   const statusConfig = STATUS_CONFIG[source.status] ?? STATUS_CONFIG.pending
   const displayValue = getSourceDisplayValue(source)
-  const displayName = source.name || displayValue
 
   return (
     <>
@@ -138,10 +144,17 @@ function EditModeSidebar({
               </svg>
             </button>
           </div>
-          {/* Row 2: Title */}
-          <h3 className="mt-1 text-lg font-semibold text-[color:var(--foreground)] break-words">
-            {displayName}
-          </h3>
+          {/* Row 2: Title (inline editable) */}
+          <EditableHeaderName
+            name={source.name}
+            displayFallback={displayValue}
+            onSave={(newName) => handleFieldSave('name', newName)}
+          />
+          {/* Row 2b: Description (inline editable) */}
+          <EditableHeaderDescription
+            description={source.description}
+            onSave={(desc) => handleFieldSave('description', desc)}
+          />
           {/* Row 3: Action buttons */}
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             {/* Build / Re-analyze */}
@@ -208,41 +221,20 @@ function EditModeSidebar({
           <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
             <CollapsibleSection title="Details" variant="flat" defaultExpanded>
               <div className="grid grid-cols-2 gap-4 text-xs">
-                <div className="col-span-2">
-                  <EditableDetailField
-                    label="Name"
-                    value={source.name}
-                    fieldKey="name"
-                    onSave={handleFieldSave}
-                    placeholder={displayValue}
-                    required
-                  />
-                </div>
-                <div className="col-span-2">
-                  <EditableDetailField
-                    label="Description"
-                    value={source.description}
-                    fieldKey="description"
-                    onSave={handleFieldSave}
-                    type="textarea"
-                    placeholder="Describe what this source contains..."
-                    required
-                  />
-                </div>
+                {/* Custom fields */}
+                {customFields.length > 0 && (
+                  <div className="col-span-2">
+                    <CustomFieldsRenderer
+                      fields={customFields}
+                      values={(source.custom_fields as Record<string, unknown>) ?? {}}
+                      onChange={handleCustomFieldChange}
+                    />
+                  </div>
+                )}
 
                 {/* Type-specific field */}
                 <div className="col-span-2">
                   <TypeSpecificField source={source} />
-                </div>
-
-                {/* Related entities */}
-                <div className="col-span-2">
-                  <RelatedEntitiesSection
-                    projectId={source.project_id}
-                    entityType="knowledge_source"
-                    entityId={source.id}
-                    allowedTypes={['company', 'issue', 'session', 'product_scope']}
-                  />
                 </div>
 
                 {/* Analysis scope (codebase only) */}
@@ -284,6 +276,14 @@ function EditModeSidebar({
               </div>
             </CollapsibleSection>
           </div>
+
+          {/* Related entities */}
+          <RelatedEntitiesSection
+            projectId={source.project_id}
+            entityType="knowledge_source"
+            entityId={source.id}
+            allowedTypes={['company', 'contact', 'issue', 'session', 'product_scope']}
+          />
         </div>
 
       </aside>
@@ -323,6 +323,16 @@ function CreateModeSidebar({
   const [description, setDescription] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
+
+  const { fields: customFields } = useCustomFields({
+    projectId,
+    entityType: 'knowledge_source',
+  })
+
+  const handleCustomFieldChange = useCallback((key: string, value: unknown) => {
+    setCustomFieldValues((prev) => ({ ...prev, [key]: value }))
+  }, [])
 
   // URL input (website, docs_portal)
   const [url, setUrl] = useState('')
@@ -445,6 +455,8 @@ function CreateModeSidebar({
     try {
       let result: KnowledgeSourceWithCodebase | null = null
 
+      const cfPayload = Object.keys(customFieldValues).length > 0 ? customFieldValues : undefined
+
       if (createType === 'codebase') {
         result = await onAdd({
           type: 'codebase',
@@ -453,6 +465,7 @@ function CreateModeSidebar({
           analysis_scope: analysisScope || null,
           name: name || null,
           description: description || null,
+          custom_fields: cfPayload,
         })
       } else if (createType === 'uploaded_doc' && docOrigin === 'notion' && selectedNotionPage) {
         result = await onAdd({
@@ -461,6 +474,7 @@ function CreateModeSidebar({
           notionPageId: selectedNotionPage.pageId,
           name: name || selectedNotionPage.title || null,
           description: description || null,
+          custom_fields: cfPayload,
         })
       } else if (createType === 'uploaded_doc' && file) {
         const formData = new FormData()
@@ -476,6 +490,7 @@ function CreateModeSidebar({
           content: createType === 'raw_text' ? content : undefined,
           name: name || null,
           description: description || null,
+          custom_fields: cfPayload,
         })
       }
 
@@ -485,7 +500,7 @@ function CreateModeSidebar({
     } finally {
       setIsSaving(false)
     }
-  }, [createType, name, description, url, content, file, selectedRepo, selectedBranch, analysisScope, docOrigin, selectedNotionPage, onAdd, onClose])
+  }, [createType, name, description, url, content, file, selectedRepo, selectedBranch, analysisScope, docOrigin, selectedNotionPage, customFieldValues, onAdd, onClose])
 
   return (
     <>
@@ -760,6 +775,15 @@ function CreateModeSidebar({
                 className="mt-1"
               />
             </div>
+
+            {/* Custom fields */}
+            {customFields.length > 0 && (
+              <CustomFieldsRenderer
+                fields={customFields}
+                values={customFieldValues}
+                onChange={handleCustomFieldChange}
+              />
+            )}
           </div>
         </div>
 
@@ -787,6 +811,162 @@ function CreateModeSidebar({
 // ============================================================================
 // DetailField (read-only)
 // ============================================================================
+
+function EditableHeaderName({
+  name,
+  displayFallback,
+  onSave,
+}: {
+  name: string | null | undefined
+  displayFallback: string
+  onSave: (newName: string) => Promise<boolean>
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(name ?? '')
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleStartEdit = () => {
+    setEditValue(name ?? '')
+    setIsEditing(true)
+  }
+
+  const handleCancel = () => {
+    setEditValue(name ?? '')
+    setIsEditing(false)
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    const success = await onSave(editValue)
+    setIsSaving(false)
+    if (success) setIsEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') void handleSave()
+    if (e.key === 'Escape') handleCancel()
+  }
+
+  if (isEditing) {
+    return (
+      <div className="mt-1 flex items-center gap-1">
+        <input
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => void handleSave()}
+          autoFocus
+          disabled={isSaving}
+          className="w-full rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--surface)] px-2 py-1 text-lg font-semibold text-[color:var(--foreground)] focus:border-[color:var(--accent-primary)] focus:outline-none focus:ring-1 focus:ring-[color:var(--accent-primary)] disabled:opacity-50"
+          placeholder={displayFallback}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleStartEdit}
+      className="group mt-1 flex w-full items-center gap-2 text-left"
+    >
+      <h3 className="text-lg font-semibold text-[color:var(--foreground)] break-words">
+        {name || displayFallback}
+      </h3>
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-[color:var(--text-tertiary)] opacity-0 transition group-hover:opacity-100">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+      </svg>
+    </button>
+  )
+}
+
+function EditableHeaderDescription({
+  description,
+  onSave,
+}: {
+  description: string | null | undefined
+  onSave: (newValue: string) => Promise<boolean>
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(description ?? '')
+  const [isSaving, setIsSaving] = useState(false)
+
+  const handleStartEdit = () => {
+    setEditValue(description ?? '')
+    setIsEditing(true)
+  }
+
+  const handleCancel = () => {
+    setEditValue(description ?? '')
+    setIsEditing(false)
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    const success = await onSave(editValue)
+    setIsSaving(false)
+    if (success) setIsEditing(false)
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') handleCancel()
+  }
+
+  if (isEditing) {
+    return (
+      <div className="mt-1 flex items-start gap-1">
+        <textarea
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          rows={2}
+          className="flex-1 rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-2 py-1 text-sm text-[color:var(--foreground)] outline-none focus:border-[color:var(--accent-selected)]"
+          placeholder="Describe what this source contains..."
+        />
+        <button
+          type="button"
+          onClick={() => void handleSave()}
+          disabled={isSaving}
+          className="rounded-[4px] p-1 text-[color:var(--accent-success)] transition hover:bg-[color:var(--surface-hover)] disabled:opacity-50"
+          aria-label="Save"
+        >
+          {isSaving ? (
+            <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" /></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handleCancel}
+          className="rounded-[4px] p-1 text-[color:var(--accent-danger)] transition hover:bg-[color:var(--surface-hover)]"
+          aria-label="Cancel"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group mt-1 flex items-start gap-1">
+      <p className={`flex-1 text-sm ${description ? 'text-[color:var(--text-secondary)]' : 'text-[color:var(--text-tertiary)]'}`}>
+        {description || 'Add a description...'}
+      </p>
+      <button
+        type="button"
+        onClick={handleStartEdit}
+        className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+        aria-label="Edit description"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+      </button>
+    </div>
+  )
+}
 
 function DetailField({ label, children }: { label: string; children: React.ReactNode }) {
   return (

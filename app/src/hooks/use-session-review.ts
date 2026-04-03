@@ -11,30 +11,9 @@ import {
 export type SessionReviewSSEEventType =
   | 'connected'
   | 'review-start'
-  // Classification phase
-  | 'classify-start'
-  | 'classify-progress'
-  | 'classify-finish'
-  // PM Review multi-step phase
-  | 'prepare-context-start'
-  | 'prepare-context-progress'
-  | 'prepare-context-finish'
-  | 'find-duplicates-start'
-  | 'find-duplicates-progress'
-  | 'find-duplicates-finish'
-  | 'analyze-impact-start'
-  | 'analyze-impact-progress'
-  | 'analyze-impact-finish'
-  | 'estimate-effort-start'
-  | 'estimate-effort-progress'
-  | 'estimate-effort-finish'
-  | 'pm-decision-start'
-  | 'pm-decision-progress'
-  | 'pm-decision-finish'
-  | 'execute-decision-start'
-  | 'execute-decision-progress'
-  | 'execute-decision-finish'
-  // Completion
+  | 'graph-eval-start'
+  | 'graph-eval-progress'
+  | 'graph-eval-finish'
   | 'review-finish'
   | 'error'
 
@@ -45,10 +24,6 @@ export interface SessionReviewSSEEvent {
   message?: string
   tags?: SessionTag[]
   result?: SessionReviewResult
-  // Step-specific data
-  duplicateCount?: number
-  impactScore?: number
-  effortEstimate?: string
   timestamp: string
 }
 
@@ -61,13 +36,7 @@ export interface WorkflowStep {
 }
 
 const INITIAL_WORKFLOW_STEPS: WorkflowStep[] = [
-  { id: 'classify-session', name: 'Classification', status: 'pending' },
-  { id: 'prepare-pm-context', name: 'Preparing Context', status: 'pending' },
-  { id: 'find-duplicates', name: 'Finding Duplicates', status: 'pending' },
-  { id: 'analyze-impact', name: 'Impact Analysis', status: 'pending' },
-  { id: 'estimate-effort', name: 'Effort Estimation', status: 'pending' },
-  { id: 'pm-decision', name: 'PM Decision', status: 'pending' },
-  { id: 'execute-decision', name: 'Executing', status: 'pending' },
+  { id: 'graph-eval', name: 'Graph Evaluation', status: 'pending' },
 ]
 
 export interface SessionReviewResult {
@@ -75,9 +44,14 @@ export interface SessionReviewResult {
   tags: SessionTag[]
   tagsApplied: boolean
   // PM Review
-  action: 'created' | 'upvoted' | 'skipped'
+  action: 'created' | 'linked' | 'skipped'
   issueId?: string
-  issueTitle?: string
+  issueName?: string
+  issueResults?: Array<{
+    action: 'created' | 'linked' | 'skipped'
+    issueId?: string
+    issueName?: string
+  }>
   skipReason?: string
 }
 
@@ -99,7 +73,6 @@ interface UseSessionReviewOptions {
 
 interface UseSessionReviewState {
   isReviewing: boolean
-  events: SessionReviewSSEEvent[]
   result: SessionReviewResult | null
   error: string | null
   tags: SessionTag[]
@@ -111,7 +84,6 @@ interface UseSessionReviewState {
 
 export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptions): UseSessionReviewState {
   const [isReviewing, setIsReviewing] = useState(false)
-  const [events, setEvents] = useState<SessionReviewSSEEvent[]>([])
   const [result, setResult] = useState<SessionReviewResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [tags, setTags] = useState<SessionTag[]>([])
@@ -122,7 +94,7 @@ export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptio
 
   // Helper to reset steps to initial state
   const resetSteps = useCallback(() => {
-    setSteps(INITIAL_WORKFLOW_STEPS.map((s) => ({ ...s, status: 'pending' as const, message: undefined, data: undefined })))
+    setSteps(INITIAL_WORKFLOW_STEPS)
     setCurrentStepId(null)
   }, [])
 
@@ -136,7 +108,6 @@ export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptio
       eventSourceRef.current = null
     }
 
-    setEvents([])
     setError(null)
     resetSteps()
 
@@ -148,31 +119,13 @@ export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptio
 
       try {
         const data = JSON.parse(event.data) as SessionReviewSSEEvent
-        setEvents((prev) => [...prev, data])
+        // Process event (no accumulation needed - steps track progress)
 
         // Map event type to step ID for step tracking
         const eventTypeToStepId: Record<string, string> = {
-          'classify-start': 'classify-session',
-          'classify-progress': 'classify-session',
-          'classify-finish': 'classify-session',
-          'prepare-context-start': 'prepare-pm-context',
-          'prepare-context-progress': 'prepare-pm-context',
-          'prepare-context-finish': 'prepare-pm-context',
-          'find-duplicates-start': 'find-duplicates',
-          'find-duplicates-progress': 'find-duplicates',
-          'find-duplicates-finish': 'find-duplicates',
-          'analyze-impact-start': 'analyze-impact',
-          'analyze-impact-progress': 'analyze-impact',
-          'analyze-impact-finish': 'analyze-impact',
-          'estimate-effort-start': 'estimate-effort',
-          'estimate-effort-progress': 'estimate-effort',
-          'estimate-effort-finish': 'estimate-effort',
-          'pm-decision-start': 'pm-decision',
-          'pm-decision-progress': 'pm-decision',
-          'pm-decision-finish': 'pm-decision',
-          'execute-decision-start': 'execute-decision',
-          'execute-decision-progress': 'execute-decision',
-          'execute-decision-finish': 'execute-decision',
+          'graph-eval-start': 'graph-eval',
+          'graph-eval-progress': 'graph-eval',
+          'graph-eval-finish': 'graph-eval',
         }
 
         const stepId = eventTypeToStepId[data.type]
@@ -197,19 +150,11 @@ export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptio
                     message: data.message,
                     data: {
                       tagCount: data.tags?.length,
-                      duplicateCount: data.duplicateCount,
-                      impactScore: data.impactScore,
-                      effort: data.effortEstimate,
                     },
                   }
                 : s
             )
           )
-        }
-
-        // Update tags when classification finishes
-        if (data.type === 'classify-finish' && data.tags) {
-          setTags(data.tags)
         }
 
         // Handle completion
@@ -286,7 +231,6 @@ export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptio
 
     setError(null)
     setResult(null)
-    setEvents([])
     setTags([])
     resetSteps()
     setIsReviewing(true)
@@ -330,7 +274,6 @@ export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptio
   return useMemo(
     () => ({
       isReviewing,
-      events,
       result,
       error,
       tags,
@@ -339,6 +282,6 @@ export function useSessionReview({ projectId, sessionId }: UseSessionReviewOptio
       triggerReview: triggerReviewFn,
       refresh: fetchStatus,
     }),
-    [isReviewing, events, result, error, tags, steps, currentStepId, triggerReviewFn, fetchStatus]
+    [isReviewing, result, error, tags, steps, currentStepId, triggerReviewFn, fetchStatus]
   )
 }

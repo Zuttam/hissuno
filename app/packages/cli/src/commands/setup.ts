@@ -100,6 +100,16 @@ export const setupCommand = new Command('setup')
   .option('--only <steps>', 'Run only specific steps (comma-separated)')
   .option('--app-dir <dir>', 'Path to the app directory (default: ./hissuno/app)')
   .option('--env <environment>', 'Target environment (determines env file: .env.<environment>)')
+  .option('--database-url <url>', 'PostgreSQL connection URL')
+  .option('--postgres-method <method>', 'How to set up PostgreSQL: brew, apt, docker, manual')
+  .option('--app-url <url>', 'Application URL (default: http://localhost:3000)')
+  .option('--openai-key <key>', 'OpenAI API key (omit to skip)')
+  .option('--seed', 'Seed with demo data')
+  .option('--no-seed', 'Skip seeding with demo data')
+  .option('--auto-config', 'Auto-configure CLI with generated API key')
+  .option('--no-auto-config', 'Skip auto-configuring CLI')
+  .option('--start', 'Start server after setup')
+  .option('--no-start', 'Skip starting server after setup')
 
 // --- oauth subcommand ---
 setupCommand
@@ -175,12 +185,12 @@ setupCommand.action(async (opts) => {
 
     // 5. Detect/install PostgreSQL
     if (run('postgres')) {
-      const pgResult = await detectPostgres()
+      const pgResult = await detectPostgres({ databaseUrl: opts.databaseUrl, postgresMethod: opts.postgresMethod })
       databaseUrl = pgResult.databaseUrl
 
       // 6. Configure environment (depends on postgres result)
       if (run('env')) {
-        const envResult = await configureEnv(appDir, databaseUrl, envFile)
+        const envResult = await configureEnv(appDir, databaseUrl, envFile, { appUrl: opts.appUrl, openaiKey: opts.openaiKey })
         appUrl = envResult.appUrl
       }
 
@@ -192,7 +202,7 @@ setupCommand.action(async (opts) => {
       // Run env/database independently if postgres was skipped
       if (run('env')) {
         const url = process.env.DATABASE_URL || 'postgresql://localhost:5432/hissuno'
-        const envResult = await configureEnv(appDir, url, envFile)
+        const envResult = await configureEnv(appDir, url, envFile, { appUrl: opts.appUrl, openaiKey: opts.openaiKey })
         appUrl = envResult.appUrl
       }
       if (run('database')) {
@@ -210,19 +220,19 @@ setupCommand.action(async (opts) => {
 
     // 8. Seed (optional)
     if (run('seed')) {
-      const seedResult = await seedDatabase(appDir, envFile)
+      const seedResult = await seedDatabase(appDir, envFile, opts.seed)
       seeded = seedResult.seeded
       apiKey = seedResult.apiKey
     }
 
     // 9. Auto-configure CLI if we got an API key from seed
     if (run('config') && apiKey) {
-      await createConfig(apiKey, appUrl)
+      await createConfig(apiKey, appUrl, opts.autoConfig)
     }
 
     // 10. Start server or print next steps
     if (run('start')) {
-      await startServer(appDir, seeded)
+      await startServer(appDir, seeded, apiKey, opts.start)
     }
   } catch (err: any) {
     log.fatal(err.message)
