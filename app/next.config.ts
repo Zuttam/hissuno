@@ -1,6 +1,10 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname, '..'),
+  },
   // Mark pino and its dependencies as external to avoid Turbopack bundling issues
   serverExternalPackages: [
     'pino',
