@@ -16,31 +16,13 @@ import type { NotionPage } from './client'
 import { blocksToMarkdown } from './blocks-to-markdown'
 import { calculateNextSyncTime, type SyncFrequency } from '@/lib/integrations/shared/sync-utils'
 import type { SyncProgressEvent } from './sync-issues'
+import { extractPageTitle } from './sync-knowledge-helpers'
 
 import { triggerSourceAnalysisBatch } from '@/lib/knowledge/analysis-service'
 
 // Re-export so callers can import from either file
 export type { SyncProgressEvent }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Extract the page title from a Notion page's properties.
- */
-function extractPageTitle(page: NotionPage): string {
-  const properties = page.properties as Record<string, Record<string, unknown>>
-  for (const prop of Object.values(properties)) {
-    if (prop.type === 'title') {
-      const titleArray = prop.title as Array<{ plain_text: string }> | undefined
-      if (titleArray && titleArray.length > 0) {
-        return titleArray.map((t) => t.plain_text).join('')
-      }
-    }
-  }
-  return 'Untitled'
-}
+export { extractPageTitle }
 
 interface ProcessResult {
   outcome: 'created' | 'updated' | 'skipped'

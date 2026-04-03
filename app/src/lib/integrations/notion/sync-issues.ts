@@ -9,7 +9,7 @@ import { notionIssueSyncs, notionSyncConfigs } from '@/lib/db/schema/app'
 import { getNotionSyncConfig, getNotionCredentials } from '@/lib/integrations/notion'
 import { NotionClient } from './client'
 import type { NotionPage } from './client'
-import { extractPropertyValue } from './property-mapper'
+import { extractStringByPropertyName, mapPropertyValue } from './sync-issue-helpers'
 import { blocksToMarkdown } from './blocks-to-markdown'
 import { createIssueAdmin, updateIssueAdmin } from '@/lib/issues/issues-service'
 import { calculateNextSyncTime, type SyncFrequency } from '@/lib/integrations/shared/sync-utils'
@@ -51,60 +51,6 @@ interface NotionFieldMapping {
 const VALID_TYPES = new Set(['bug', 'feature_request', 'change_request'])
 const VALID_PRIORITIES = new Set(['low', 'medium', 'high'])
 const VALID_STATUSES = new Set(['open', 'ready', 'in_progress', 'resolved', 'closed'])
-
-/**
- * Find a property in a Notion page by its name.
- * Notion API returns properties keyed by their name.
- */
-function findPropertyByName(
-  properties: Record<string, unknown>,
-  propertyName: string
-): Record<string, unknown> | null {
-  const prop = properties[propertyName]
-  return prop ? (prop as Record<string, unknown>) : null
-}
-
-/**
- * Extract a string value from a Notion property by property name.
- */
-function extractStringByPropertyName(
-  properties: Record<string, unknown>,
-  propertyName: string
-): string {
-  const prop = findPropertyByName(properties, propertyName)
-  if (!prop) return ''
-  const val = extractPropertyValue(prop)
-  if (Array.isArray(val)) return val.join(', ')
-  return val != null ? String(val) : ''
-}
-
-/**
- * Map a Notion property value through a valueMap, falling back to a default.
- */
-function mapPropertyValue(
-  properties: Record<string, unknown>,
-  propertyName: string | undefined,
-  valueMap: Record<string, string> | undefined,
-  defaultValue: string,
-  validValues: Set<string>
-): string {
-  if (!propertyName) return defaultValue
-
-  const rawValue = extractStringByPropertyName(properties, propertyName)
-  if (!rawValue) return defaultValue
-
-  // Try to find a mapped value
-  if (valueMap) {
-    const mapped = valueMap[rawValue]
-    if (mapped && validValues.has(mapped)) return mapped
-  }
-
-  // Try the raw value directly (case-insensitive)
-  const normalized = rawValue.toLowerCase().replace(/\s+/g, '_')
-  if (validValues.has(normalized)) return normalized
-
-  return defaultValue
-}
 
 // ---------------------------------------------------------------------------
 // Main sync function

@@ -24,6 +24,7 @@ import {
   type ZendeskFilterConfig,
 } from './index'
 import { stripHtml } from '@/lib/integrations/shared/sync-utils'
+import { mapAuthorToSenderType, generateSessionId, buildUserMetadata } from './sync-helpers'
 
 /**
  * Progress event during sync
@@ -62,62 +63,6 @@ export interface SyncOptions {
   syncMode?: SyncMode
   onProgress?: (event: SyncProgressEvent) => void
   signal?: AbortSignal
-}
-
-/**
- * Map comment author to Hissuno sender type
- */
-function mapAuthorToSenderType(authorId: number, requesterId: number): 'user' | 'human_agent' {
-  return authorId === requesterId ? 'user' : 'human_agent'
-}
-
-/**
- * Generate a deterministic session ID from Zendesk ticket
- */
-function generateSessionId(ticketId: number, projectId: string): string {
-  return `zendesk-${ticketId}-${projectId}`
-}
-
-/**
- * Build enriched user metadata from Zendesk ticket/user/org
- */
-function buildUserMetadata(
-  ticket: ZendeskTicket,
-  user: ZendeskUser | null,
-  organization: ZendeskOrganization | null
-): Record<string, unknown> {
-  const metadata: Record<string, unknown> = {
-    zendesk_ticket_id: ticket.id,
-  }
-
-  if (ticket.tags?.length) {
-    metadata.zendesk_tags = ticket.tags.join(', ')
-  }
-  if (ticket.priority) {
-    metadata.zendesk_priority = ticket.priority
-  }
-  if (ticket.group_id) {
-    metadata.zendesk_group_id = String(ticket.group_id)
-  }
-
-  if (user) {
-    if (user.name) metadata.name = user.name
-    if (user.email) metadata.email = user.email
-    if (user.phone) metadata.phone = user.phone
-    if (user.time_zone) metadata.timezone = user.time_zone
-    if (user.tags?.length) {
-      metadata.zendesk_user_tags = user.tags.join(', ')
-    }
-  }
-
-  if (organization) {
-    metadata.company = organization.name
-    if (organization.domain_names?.length) {
-      metadata.company_domain = organization.domain_names[0]
-    }
-  }
-
-  return metadata
 }
 
 /**
