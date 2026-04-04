@@ -1,0 +1,5 @@
+{
+  "name": "hissuno-monorepo",
+  "private": true,
+  "workspaces": ["app", "website"]
+}
