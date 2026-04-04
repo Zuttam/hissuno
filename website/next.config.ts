@@ -1,29 +1,6 @@
-import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: path.resolve(__dirname, '..'),
-  },
-  // Mark pino and its dependencies as external to avoid Turbopack bundling issues
-  serverExternalPackages: [
-    'pino',
-    'pino-pretty',
-    'thread-stream',
-    '@react-email/render',
-    '@react-email/components',
-    'pg',
-    'bcryptjs',
-  ],
-  async redirects() {
-    return [
-      { source: '/', destination: '/projects', permanent: false },
-      { source: '/docs/:path*', destination: 'https://hissuno.com/docs/:path*', permanent: true },
-      { source: '/faq', destination: 'https://hissuno.com/faq', permanent: true },
-      { source: '/legal/:path*', destination: 'https://hissuno.com/legal/:path*', permanent: true },
-      { source: '/landing/:path*', destination: 'https://hissuno.com/landing/:path*', permanent: true },
-    ]
-  },
   async headers() {
     return [
       {
@@ -50,6 +27,13 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
+  },
+  async redirects() {
+    return [
+      { source: '/login', destination: 'https://app.hissuno.com/login', permanent: true },
+      { source: '/projects/:path*', destination: 'https://app.hissuno.com/projects/:path*', permanent: true },
+      { source: '/api/:path*', destination: 'https://app.hissuno.com/api/:path*', permanent: true },
+    ]
   },
 };
 
