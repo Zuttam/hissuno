@@ -1,5 +1,5 @@
 import { fetchApi, fetchApiRaw, buildUrl } from './fetch'
-import type { KnowledgeSourceWithCodebase, KnowledgePackageWithSources } from '@/lib/knowledge/types'
+import type { KnowledgeSourceWithCodebase, SupportPackageWithSources } from '@/lib/knowledge/types'
 
 const paths = {
   sources: '/api/knowledge/sources',
@@ -50,8 +50,14 @@ export async function updateKnowledgeSource(
   })
 }
 
-export async function deleteKnowledgeSource(projectId: string, sourceId: string) {
-  return fetchApi<void>(buildUrl(paths.source(sourceId), { projectId }), {
+export async function deleteKnowledgeSource(
+  projectId: string,
+  sourceId: string,
+  options?: { children?: 'reparent' | 'delete' },
+) {
+  const params: Record<string, string> = { projectId }
+  if (options?.children) params.children = options.children
+  return fetchApi<void>(buildUrl(paths.source(sourceId), params), {
     method: 'DELETE',
     errorMessage: 'Failed to delete source',
   })
@@ -102,7 +108,7 @@ const packagePaths = {
 }
 
 export async function listPackages(projectId: string) {
-  return fetchApi<{ packages: KnowledgePackageWithSources[] }>(buildUrl(packagePaths.list, { projectId }), {
+  return fetchApi<{ packages: SupportPackageWithSources[] }>(buildUrl(packagePaths.list, { projectId }), {
     errorMessage: 'Failed to load packages',
   })
 }

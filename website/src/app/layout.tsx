@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { ThemeProvider } from '@/components/providers/theme-provider'
-import { WaterWebGLProvider, WaterCanvas } from '@/components/water-webgl'
+
 import { MarketingNav } from '@/components/landing/marketing-nav'
 import { CookieConsentBanner } from '@/components/consent'
 import './globals.css'
@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Hissuno - Your Agents Don\'t Know Your Product. Hissuno Fixes That.',
   description:
-    'Organizational knowledge graph for AI agents. Connect customer signals, product goals, issues, docs, and codebase - any agent can query and traverse it via MCP, CLI, or API.',
+    'Organizational knowledge graph for AI agents. Connect customer signals, product goals, issues, docs, and codebase - any agent can query and traverse it via CLI or API.',
 }
 
 const jsonLd = {
@@ -29,7 +29,7 @@ const jsonLd = {
   name: 'Hissuno',
   applicationCategory: 'DeveloperApplication',
   description:
-    'Organizational knowledge graph for AI agents. Connects customer signals, product goals, issues, docs, and codebase into one traversable graph queryable via MCP, CLI, or API.',
+    'Organizational knowledge graph for AI agents. Connects customer signals, product goals, issues, docs, and codebase into one traversable graph queryable via CLI or API.',
   url: 'https://hissuno.com',
   operatingSystem: 'Any',
   offers: {
@@ -48,13 +48,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <WaterWebGLProvider enableClickRipples>
-            <div className="min-h-screen" suppressHydrationWarning>
+          <div className="min-h-screen" suppressHydrationWarning>
               <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
               />
-              <WaterCanvas />
 
               <MarketingNav />
 
@@ -100,7 +98,6 @@ export default function RootLayout({
             </div>
 
             <CookieConsentBanner />
-          </WaterWebGLProvider>
         </ThemeProvider>
       </body>
     </html>

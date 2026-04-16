@@ -46,8 +46,7 @@ const compilePackage = createStep({
 
     await writer?.write({ type: 'progress', message: `Analyzing ${sources.length} source(s)...` })
 
-    // Import the source analysis workflow
-    const { sourceAnalysisWorkflow } = await import('../source-analysis')
+    const { analyzeSource } = await import('@/lib/knowledge/knowledge-service')
 
     for (const source of sources) {
       try {
@@ -56,24 +55,18 @@ const compilePackage = createStep({
           message: `Analyzing source ${processedCount + 1}/${sources.length}: ${source.type}`,
         })
 
-        const runId = `batch-source-${source.id}-${Date.now()}`
-        const run = await sourceAnalysisWorkflow.createRunAsync({ runId })
-
-        const result = await run.start({
-          inputData: {
-            projectId,
-            sourceId: source.id,
-            sourceType: source.type,
-            url: source.url ?? null,
-            storagePath: source.storagePath ?? null,
-            content: source.content ?? null,
-            analysisScope: null,
-          },
+        const result = await analyzeSource({
+          projectId,
+          sourceId: source.id,
+          sourceType: source.type as 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'codebase' | 'notion',
+          url: source.url ?? null,
+          storagePath: source.storagePath ?? null,
+          content: source.content ?? null,
+          analysisScope: null,
         })
 
-        // Check result for errors
-        if (result?.status !== 'success') {
-          errors.push(`${source.type} (${source.id}): Workflow did not complete successfully`)
+        if (!result.saved || result.errors.length > 0) {
+          errors.push(`${source.type} (${source.id}): ${result.errors.join(', ') || 'Save failed'}`)
         }
 
         processedCount++

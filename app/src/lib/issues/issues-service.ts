@@ -33,6 +33,7 @@ import { eq, and, desc, ilike, or } from 'drizzle-orm'
 import { issues } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { linkEntities } from '@/lib/db/queries/entity-relationships'
+import { buildProgrammaticContext } from '@/lib/db/queries/relationship-metadata'
 import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings'
 import { triggerIssueAnalysis } from './analysis-service'
 import type {
@@ -310,7 +311,9 @@ export async function linkSessionToIssueAdmin(
   projectId: string,
 ): Promise<void> {
   await linkSessionToIssue(issueId, sessionId)
-  await linkEntities(projectId, 'issue', issueId, 'session', sessionId)
+  await linkEntities(projectId, 'issue', issueId, 'session', sessionId,
+    buildProgrammaticContext('admin-link') as unknown as Record<string, unknown>,
+  )
   maybeFireIssueAnalysis(issueId, projectId)
 }
 

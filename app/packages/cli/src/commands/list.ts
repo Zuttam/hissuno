@@ -5,7 +5,7 @@
 import { Command } from 'commander'
 import { requireConfig } from '../lib/config.js'
 import { apiCall, resolveProjectId, buildPath } from '../lib/api.js'
-import { formatResourceList, renderJson, error } from '../lib/output.js'
+import { formatResourceList, formatScopeTree, renderJson, error } from '../lib/output.js'
 import { resolveCustomerType } from '../lib/customer-type.js'
 
 const TYPE_ENDPOINTS: Record<string, { path: string; key: string }> = {
@@ -87,6 +87,8 @@ export const listCommand = new Command('list')
 
       if (jsonMode) {
         console.log(renderJson(result.data))
+      } else if (type === 'scopes') {
+        console.log(formatScopeTree(items, total))
       } else {
         console.log(formatResourceList(displayType, items, total))
       }

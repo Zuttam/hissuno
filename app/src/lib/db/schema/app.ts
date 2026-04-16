@@ -6,6 +6,7 @@ import {
   timestamp,
   jsonb,
   integer,
+  bigint,
   doublePrecision,
   unique,
   index,
@@ -47,6 +48,9 @@ export const projectSettings = pgTable('project_settings', {
   brand_guidelines: text('brand_guidelines'),
   // Knowledge analysis settings
   knowledge_relationship_guidelines: text('knowledge_relationship_guidelines'),
+  // AI model configuration (per-project override)
+  ai_model: text('ai_model'),
+  ai_model_small: text('ai_model_small'),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
@@ -158,14 +162,17 @@ export const productScopes = pgTable('product_scopes', {
   project_id: uuid('project_id')
     .notNull()
     .references(() => projects.id),
+  parent_id: uuid('parent_id'),
   name: text('name').notNull(),
   slug: text('slug').notNull(),
   description: text('description').notNull().default(''),
   color: text('color').notNull().default(''),
   position: integer('position').notNull().default(0),
+  depth: integer('depth').notNull().default(0),
   is_default: boolean('is_default').notNull().default(false),
   type: text('type').notNull().default('product_area'),
   goals: jsonb('goals'),
+  content: text('content'),
   custom_fields: jsonb('custom_fields'),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
@@ -395,6 +402,7 @@ export const knowledgeSources = pgTable('knowledge_sources', {
     .notNull()
     .references(() => projects.id),
   source_code_id: uuid('source_code_id').references(() => sourceCodes.id),
+  parent_id: uuid('parent_id'),
   name: text('name'),
   description: text('description'),
   type: text('type').notNull(),
@@ -410,6 +418,7 @@ export const knowledgeSources = pgTable('knowledge_sources', {
   analyzed_at: timestamp('analyzed_at', { mode: 'date' }),
   enabled: boolean('enabled').default(true),
   error_message: text('error_message'),
+  sort_order: integer('sort_order').default(0),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
@@ -432,7 +441,7 @@ export const knowledgeEmbeddings = pgTable('knowledge_embeddings', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
-export const knowledgePackages = pgTable('knowledge_packages', {
+export const supportPackages = pgTable('support_packages', {
   id: uuid('id').primaryKey().defaultRandom(),
   project_id: uuid('project_id')
     .notNull()
@@ -451,11 +460,11 @@ export const knowledgePackages = pgTable('knowledge_packages', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
-export const knowledgePackageSources = pgTable('knowledge_package_sources', {
+export const supportPackageSources = pgTable('support_package_sources', {
   id: uuid('id').primaryKey().defaultRandom(),
   package_id: uuid('package_id')
     .notNull()
-    .references(() => knowledgePackages.id),
+    .references(() => supportPackages.id),
   source_id: uuid('source_id')
     .notNull()
     .references(() => knowledgeSources.id),
@@ -574,6 +583,48 @@ export const githubAppInstallations = pgTable('github_app_installations', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
+export const githubSyncConfigs = pgTable('github_sync_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  installation_id: uuid('installation_id')
+    .notNull()
+    .references(() => githubAppInstallations.id, { onDelete: 'cascade' }),
+  project_id: uuid('project_id')
+    .notNull()
+    .references(() => projects.id),
+  sync_type: text('sync_type').notNull(), // 'feedback'
+  github_repo_ids: jsonb('github_repo_ids'), // array of {id, fullName}
+  github_label_filter: text('github_label_filter'),
+  github_label_tag_map: jsonb('github_label_tag_map'), // {githubLabel: sessionTag}
+  sync_enabled: boolean('sync_enabled').notNull().default(false),
+  sync_frequency: text('sync_frequency').notNull().default('manual'),
+  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
+  last_sync_status: text('last_sync_status'),
+  last_sync_error: text('last_sync_error'),
+  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
+  last_sync_count: integer('last_sync_count'),
+  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
+  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+}, (table) => [
+  unique().on(table.installation_id, table.sync_type),
+])
+
+export const githubSyncedIssues = pgTable('github_synced_issues', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  installation_id: uuid('installation_id')
+    .notNull()
+    .references(() => githubAppInstallations.id, { onDelete: 'cascade' }),
+  session_id: uuid('session_id')
+    .notNull()
+    .references(() => sessions.id),
+  github_issue_id: bigint('github_issue_id', { mode: 'number' }).notNull(),
+  github_issue_number: integer('github_issue_number').notNull(),
+  github_repo_full_name: text('github_repo_full_name').notNull(),
+  github_issue_url: text('github_issue_url'),
+  github_issue_updated_at: timestamp('github_issue_updated_at', { mode: 'date' }),
+  last_synced_at: timestamp('last_synced_at', { mode: 'date' }).defaultNow(),
+  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
+})
+
 // ---------------------------------------------------------------------------
 // Integrations: Jira
 // ---------------------------------------------------------------------------
@@ -603,28 +654,6 @@ export const jiraConnections = pgTable('jira_connections', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
-export const jiraIssueSyncs = pgTable('jira_issue_syncs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => jiraConnections.id),
-  issue_id: uuid('issue_id')
-    .notNull()
-    .unique()
-    .references(() => issues.id),
-  jira_issue_id: text('jira_issue_id'),
-  jira_issue_key: text('jira_issue_key'),
-  jira_issue_url: text('jira_issue_url'),
-  last_jira_status: text('last_jira_status'),
-  last_sync_status: text('last_sync_status').notNull().default('pending'),
-  last_sync_action: text('last_sync_action'),
-  last_sync_error: text('last_sync_error'),
-  last_synced_at: timestamp('last_synced_at', { mode: 'date' }),
-  last_webhook_received_at: timestamp('last_webhook_received_at', { mode: 'date' }),
-  retry_count: integer('retry_count').notNull().default(0),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-})
-
 // ---------------------------------------------------------------------------
 // Integrations: Linear
 // ---------------------------------------------------------------------------
@@ -652,28 +681,6 @@ export const linearConnections = pgTable('linear_connections', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
-export const linearIssueSyncs = pgTable('linear_issue_syncs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => linearConnections.id),
-  issue_id: uuid('issue_id')
-    .notNull()
-    .unique()
-    .references(() => issues.id),
-  linear_issue_id: text('linear_issue_id'),
-  linear_issue_identifier: text('linear_issue_identifier'),
-  linear_issue_url: text('linear_issue_url'),
-  last_linear_state: text('last_linear_state'),
-  last_linear_state_type: text('last_linear_state_type'),
-  last_sync_status: text('last_sync_status').notNull().default('pending'),
-  last_sync_action: text('last_sync_action'),
-  last_sync_error: text('last_sync_error'),
-  last_synced_at: timestamp('last_synced_at', { mode: 'date' }),
-  last_webhook_received_at: timestamp('last_webhook_received_at', { mode: 'date' }),
-  retry_count: integer('retry_count').notNull().default(0),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-})
 
 // ---------------------------------------------------------------------------
 // Integrations: Zendesk
@@ -1108,3 +1115,8 @@ export const userNotifications = pgTable('user_notifications', {
   sent_at: timestamp('sent_at', { mode: 'date' }).defaultNow(),
   dismissed_at: timestamp('dismissed_at', { mode: 'date' }),
 })
+
+// ---------------------------------------------------------------------------
+// Automations
+// ---------------------------------------------------------------------------
+

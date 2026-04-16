@@ -6,11 +6,11 @@ import { SettingsIcon, ChevronRightIcon, RefreshIcon, CheckIcon } from '@/compon
 import { AnalysisProgressBar, type AnalysisEvent } from './analysis-progress-bar'
 import { PackageContentTabs } from './package-content-tabs'
 import { formatRelativeTime } from '@/lib/utils/format-time'
-import type { KnowledgePackageWithSources } from '@/lib/knowledge/types'
+import type { SupportPackageWithSources } from '@/lib/knowledge/types'
 
 interface PackageListItemProps {
   projectId: string
-  pkg: KnowledgePackageWithSources
+  pkg: SupportPackageWithSources
   isExpanded: boolean
   isActive: boolean
   isAnalyzing: boolean

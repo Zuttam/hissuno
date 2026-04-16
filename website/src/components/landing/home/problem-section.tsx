@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { motion, useInView } from 'motion/react'
 import Image from 'next/image'
 import { GripVertical, User } from 'lucide-react'
-import { WaterReveal } from '@/components/landing/water-reveal'
 import { ThemeLogo } from '@/components/ui/theme-logo'
 
 // --- Logo definitions ---
@@ -319,71 +318,65 @@ export function ProblemSection() {
   return (
     <section className="px-6 py-12 md:px-12">
       <div className="mx-auto max-w-6xl">
-        <WaterReveal preset="text" parallax parallaxDepth={0.08}>
-          <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            Your Product Data Is Fragmented
-          </h2>
-        </WaterReveal>
+        <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
+          Your Product Data Is Fragmented
+        </h2>
 
-        <WaterReveal preset="text" delay={0.15}>
-          <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            Every product agent needs the same context - your codebase, docs, customer history, feedback. But each rebuilds its own fragmented view from 10+ scattered tools.
-          </p>
-        </WaterReveal>
+        <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
+          Every product agent needs the same context - your codebase, docs, customer history, feedback. But each rebuilds its own fragmented view from 10+ scattered tools.
+        </p>
 
-        <WaterReveal preset="card" delay={0.3}>
+        <div
+          ref={containerRef}
+          className="relative mx-auto mt-16 h-64 max-w-4xl cursor-ew-resize select-none overflow-hidden rounded-xl border border-[var(--border)] md:h-80"
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          {/* After panel (full width, behind) */}
+          <div className="absolute inset-0 bg-[var(--background)]">
+            <FlowPanel />
+          </div>
+
+          {/* Before panel (clipped to left side) */}
           <div
-            ref={containerRef}
-            className="relative mx-auto mt-16 h-64 max-w-4xl cursor-ew-resize select-none overflow-hidden rounded-xl border border-[var(--border)] md:h-80"
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
+            className="absolute inset-0 bg-[var(--background)]"
+            style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
           >
-            {/* After panel (full width, behind) */}
-            <div className="absolute inset-0 bg-[var(--background)]">
-              <FlowPanel />
-            </div>
+            <ChaosPanel />
+          </div>
 
-            {/* Before panel (clipped to left side) */}
+          {/* Divider handle */}
+          <div
+            className="absolute top-0 bottom-0 z-20"
+            style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
+          >
+            {/* Vertical line */}
+            <div className="h-full w-px bg-[var(--accent-teal)]" />
+
+            {/* Grip handle */}
             <div
-              className="absolute inset-0 bg-[var(--background)]"
-              style={{ clipPath: `inset(0 ${100 - position}% 0 0)` }}
+              role="slider"
+              tabIndex={0}
+              aria-label="Comparison slider"
+              aria-valuenow={Math.round(position)}
+              aria-valuemin={5}
+              aria-valuemax={95}
+              onPointerDown={handlePointerDown}
+              onKeyDown={handleKeyDown}
+              className="absolute top-1/2 left-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-[var(--accent-teal)] bg-[var(--background)] shadow-md transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-teal)]"
             >
-              <ChaosPanel />
-            </div>
-
-            {/* Divider handle */}
-            <div
-              className="absolute top-0 bottom-0 z-20"
-              style={{ left: `${position}%`, transform: 'translateX(-50%)' }}
-            >
-              {/* Vertical line */}
-              <div className="h-full w-px bg-[var(--accent-teal)]" />
-
-              {/* Grip handle */}
-              <div
-                role="slider"
-                tabIndex={0}
-                aria-label="Comparison slider"
-                aria-valuenow={Math.round(position)}
-                aria-valuemin={5}
-                aria-valuemax={95}
-                onPointerDown={handlePointerDown}
-                onKeyDown={handleKeyDown}
-                className="absolute top-1/2 left-1/2 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full border border-[var(--accent-teal)] bg-[var(--background)] shadow-md transition-shadow hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-teal)]"
-              >
-                <GripVertical className="h-4 w-4 text-[var(--accent-teal)]" />
-              </div>
-            </div>
-
-            {/* Before / After labels */}
-            <div className="pointer-events-none absolute top-3 left-4 z-10 rounded-md bg-[var(--background)]/80 px-2 py-0.5 font-mono text-xs text-[var(--text-tertiary)] backdrop-blur-sm">
-              Before
-            </div>
-            <div className="pointer-events-none absolute top-3 right-4 z-10 rounded-md bg-[var(--background)]/80 px-2 py-0.5 font-mono text-xs text-[var(--accent-teal)] backdrop-blur-sm">
-              After
+              <GripVertical className="h-4 w-4 text-[var(--accent-teal)]" />
             </div>
           </div>
-        </WaterReveal>
+
+          {/* Before / After labels */}
+          <div className="pointer-events-none absolute top-3 left-4 z-10 rounded-md bg-[var(--background)]/80 px-2 py-0.5 font-mono text-xs text-[var(--text-tertiary)] backdrop-blur-sm">
+            Before
+          </div>
+          <div className="pointer-events-none absolute top-3 right-4 z-10 rounded-md bg-[var(--background)]/80 px-2 py-0.5 font-mono text-xs text-[var(--accent-teal)] backdrop-blur-sm">
+            After
+          </div>
+        </div>
       </div>
     </section>
   )

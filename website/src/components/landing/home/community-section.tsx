@@ -15,7 +15,6 @@ export function CommunitySection() {
           <FloatingCard
             floating="moderate"
             variant="elevated"
-            respondToRipple
             className="flex cursor-pointer flex-col items-center gap-4 p-8 text-center transition-colors hover:border-[var(--accent-teal)] md:flex-row md:text-left"
           >
             <motion.div

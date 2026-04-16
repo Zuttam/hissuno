@@ -24,7 +24,7 @@ hissuno search "authentication flow" --type knowledge
 
 ## Creation
 
-Not supported via CLI or MCP. Add knowledge sources through the Hissuno dashboard.
+Not supported via CLI. Add knowledge sources through the Hissuno dashboard.
 
 ## Relationships
 

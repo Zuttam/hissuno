@@ -1,17 +1,26 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, FolderPlus } from 'lucide-react'
+import Image from 'next/image'
 import { useProject } from '@/components/providers/project-provider'
 import { useProductScopes } from '@/hooks/use-product-scopes'
 import { useKnowledgeSources } from '@/hooks/use-knowledge-sources'
 import { useSourceAnalysis } from '@/hooks/use-source-analysis'
-import { KnowledgeSourceGroupedList, SOURCE_TYPE_CONFIG, ALL_TYPES } from '@/components/projects/knowledge/knowledge-source-grouped-list'
+import { KnowledgeSourceTree } from '@/components/projects/knowledge/knowledge-source-tree'
 import { KnowledgeSourceSidebar } from '@/components/projects/knowledge/knowledge-source-sidebar'
 import { fetchGithubStatus } from '@/lib/api/integrations'
 import { PageHeader, Spinner, FilterChip, FilterLabel, Input } from '@/components/ui'
 import { type KnowledgeSourceType, getSourceTypeLabel } from '@/lib/knowledge/types'
 import { useCustomFields } from '@/hooks/use-custom-fields'
+
+const ADD_SOURCE_TYPES: { type: KnowledgeSourceType; icon: React.ReactNode; label: string }[] = [
+  { type: 'codebase', icon: <Image src="/logos/github.svg" alt="GitHub" width={16} height={16} />, label: 'Codebase' },
+  { type: 'website', icon: <span className="text-sm">🌐</span>, label: 'Website' },
+  { type: 'docs_portal', icon: <span className="text-sm">📚</span>, label: 'Documentation' },
+  { type: 'uploaded_doc', icon: <span className="text-sm">📄</span>, label: 'Documents' },
+  { type: 'raw_text', icon: <span className="text-sm">📝</span>, label: 'Custom Text' },
+]
 
 export default function KnowledgePage() {
   const { projectId, isLoading: isLoadingProject } = useProject()
@@ -182,6 +191,13 @@ export default function KnowledgePage() {
     setAddingType(type)
   }, [])
 
+  const handleCreateFolder = useCallback(async (parentId?: string | null) => {
+    const source = await addSource({ type: 'folder', name: 'Untitled folder', parent_id: parentId ?? null })
+    if (source) {
+      setSelectedSourceId(source.id)
+    }
+  }, [addSource])
+
   const handleAnalyze = useCallback(async (sourceId: string) => {
     await startAnalysis(sourceId)
   }, [startAnalysis])
@@ -202,20 +218,27 @@ export default function KnowledgePage() {
       <PageHeader
         title="Knowledge"
         actions={
-          <div className="relative" ref={addDropdownRef}>
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setAddDropdownOpen(prev => !prev)}
+              onClick={() => handleCreateFolder()}
               className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
             >
-              <Plus size={14} />
-              Add Knowledge
+              <FolderPlus size={14} />
+              New Folder
             </button>
-            {addDropdownOpen && (
-              <div className="absolute right-0 z-50 mt-1 min-w-[180px] rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] p-1 shadow-lg">
-                {ALL_TYPES.map(type => {
-                  const config = SOURCE_TYPE_CONFIG[type]
-                  return (
+            <div className="relative" ref={addDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setAddDropdownOpen(prev => !prev)}
+                className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)]"
+              >
+                <Plus size={14} />
+                Add Knowledge
+              </button>
+              {addDropdownOpen && (
+                <div className="absolute right-0 z-50 mt-1 min-w-[180px] rounded-[4px] border border-[color:var(--border-subtle)] bg-[color:var(--background)] p-1 shadow-lg">
+                  {ADD_SOURCE_TYPES.map(({ type, icon, label }) => (
                     <button
                       key={type}
                       type="button"
@@ -225,13 +248,13 @@ export default function KnowledgePage() {
                       }}
                       className="flex w-full items-center gap-2 rounded-[2px] px-2 py-1.5 text-left text-xs text-[color:var(--foreground)] transition hover:bg-[color:var(--surface-hover)]"
                     >
-                      <span className="flex items-center shrink-0">{config.icon}</span>
-                      {config.label}
+                      <span className="flex items-center shrink-0">{icon}</span>
+                      {label}
                     </button>
-                  )
-                })}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         }
       />
@@ -297,24 +320,19 @@ export default function KnowledgePage() {
             <Spinner size="md" />
           </div>
         ) : (
-          <>
-            <KnowledgeSourceGroupedList
-              sources={filteredSources}
-              selectedSourceId={selectedSourceId}
-              onSelect={(id) => {
-                setAddingType(null)
-                setSelectedSourceId(id)
-              }}
-              productScopes={productScopes}
-              githubConnected={githubConnected}
-            />
-
-            {sources.length === 0 && (
-              <p className="text-sm text-[color:var(--text-tertiary)] py-4 text-center">
-                No sources configured yet. Click &quot;Add Knowledge&quot; above to get started.
-              </p>
-            )}
-          </>
+          <KnowledgeSourceTree
+            sources={filteredSources}
+            selectedSourceId={selectedSourceId}
+            onSelect={(id) => {
+              setAddingType(null)
+              setSelectedSourceId(id)
+            }}
+            onUpdate={updateSource}
+            onDelete={deleteSource}
+            onCreateFolder={handleCreateFolder}
+            productScopes={productScopes}
+            githubConnected={githubConnected}
+          />
         )}
       </div>
 

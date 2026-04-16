@@ -43,14 +43,6 @@ Interactive prompts:
 3. Description
 4. Priority (optional: low / medium / high)
 
-**MCP add fields:**
-
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `type` | Yes | string | `bug`, `feature_request`, or `change_request` |
-| `title` | Yes | string | Issue title |
-| `description` | Yes | string | Detailed description |
-| `priority` | No | string | `low`, `medium`, or `high` |
 
 ## Relationships
 

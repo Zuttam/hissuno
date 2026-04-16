@@ -45,6 +45,7 @@ export interface SyncScopeInput {
   is_default: boolean
   type: ProductScopeType
   goals: ProductScopeGoal[] | null
+  parent_id?: string | null
 }
 
 /**
@@ -70,6 +71,8 @@ export interface UpdateProductScopeInput {
   color?: string
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
+  parent_id?: string | null
+  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -115,6 +118,8 @@ export async function updateProductScope(
   if (input.color !== undefined) updates.color = input.color
   if (input.type !== undefined) updates.type = input.type
   if (input.goals !== undefined) updates.goals = input.goals as unknown as Record<string, unknown>
+  if (input.parent_id !== undefined) updates.parent_id = input.parent_id
+  if (input.content !== undefined) updates.content = input.content
   if (input.custom_fields !== undefined) updates.custom_fields = input.custom_fields
 
   if (Object.keys(updates).length === 0) {
@@ -139,8 +144,13 @@ export async function updateProductScope(
 
 /**
  * Delete a single product scope. Cannot delete the default scope.
+ * By default, reparents children to the deleted scope's parent.
+ * Pass childrenMode='delete' to cascade-delete children instead.
  */
-export async function deleteProductScope(scopeId: string): Promise<void> {
+export async function deleteProductScope(
+  scopeId: string,
+  childrenMode: 'reparent' | 'delete' = 'reparent',
+): Promise<void> {
   const existing = await getProductScopeById(scopeId)
   if (!existing) {
     throw new Error('Product scope not found.')
@@ -150,7 +160,63 @@ export async function deleteProductScope(scopeId: string): Promise<void> {
     throw new Error('Cannot delete the default product scope.')
   }
 
-  await db
-    .delete(productScopes)
-    .where(eq(productScopes.id, scopeId))
+  await db.transaction(async (tx) => {
+    if (childrenMode === 'reparent') {
+      // Move children up to the deleted scope's parent
+      const newParentId = existing.parent_id
+      const newDepth = existing.depth > 0 ? existing.depth - 1 : 0
+      const children = await tx
+        .select()
+        .from(productScopes)
+        .where(eq(productScopes.parent_id, scopeId))
+
+      for (const child of children) {
+        await tx
+          .update(productScopes)
+          .set({ parent_id: newParentId, depth: newDepth })
+          .where(eq(productScopes.id, child.id))
+        // Recursively update descendants' depth
+        await updateDescendantDepths(tx, child.id, newDepth + 1)
+      }
+    } else {
+      // Cascade delete all descendants
+      await deleteDescendants(tx, scopeId)
+    }
+
+    await tx.delete(productScopes).where(eq(productScopes.id, scopeId))
+  })
+}
+
+async function updateDescendantDepths(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  parentId: string,
+  depth: number,
+): Promise<void> {
+  const children = await tx
+    .select()
+    .from(productScopes)
+    .where(eq(productScopes.parent_id, parentId))
+
+  for (const child of children) {
+    await tx
+      .update(productScopes)
+      .set({ depth })
+      .where(eq(productScopes.id, child.id))
+    await updateDescendantDepths(tx, child.id, depth + 1)
+  }
+}
+
+async function deleteDescendants(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  parentId: string,
+): Promise<void> {
+  const children = await tx
+    .select()
+    .from(productScopes)
+    .where(eq(productScopes.parent_id, parentId))
+
+  for (const child of children) {
+    await deleteDescendants(tx, child.id)
+    await tx.delete(productScopes).where(eq(productScopes.id, child.id))
+  }
 }

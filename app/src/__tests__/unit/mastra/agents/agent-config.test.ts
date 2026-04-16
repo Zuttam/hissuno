@@ -34,7 +34,7 @@ describe('Agent Router', () => {
     it('routes to support agent when contactId is present', async () => {
       const result = await resolveAgent({
         contactId: 'contact-1',
-        knowledgePackageId: null,
+        supportPackageId: null,
       })
 
       expect(mockGetAgent).toHaveBeenCalledWith('supportAgent')
@@ -44,7 +44,7 @@ describe('Agent Router', () => {
     it('routes to product manager agent when no contactId', async () => {
       const result = await resolveAgent({
         contactId: null,
-        knowledgePackageId: null,
+        supportPackageId: null,
       })
 
       expect(mockGetAgent).toHaveBeenCalledWith('productManagerAgent')
@@ -55,7 +55,7 @@ describe('Agent Router', () => {
       mockGetAgent.mockReturnValue(null)
 
       await expect(
-        resolveAgent({ contactId: 'contact-1', knowledgePackageId: null })
+        resolveAgent({ contactId: 'contact-1', supportPackageId: null })
       ).rejects.toThrow('not found in Mastra registry')
     })
 
@@ -64,7 +64,7 @@ describe('Agent Router', () => {
 
       const result = await resolveAgent({
         contactId: 'contact-1',
-        knowledgePackageId: 'pkg-1',
+        supportPackageId: 'pkg-1',
       })
 
       expect(result.systemMessages).toHaveLength(1)
@@ -81,7 +81,7 @@ describe('Agent Router', () => {
 
       const result = await resolveAgent({
         contactId: 'contact-1',
-        knowledgePackageId: 'pkg-1',
+        supportPackageId: 'pkg-1',
       })
 
       expect(result.systemMessages).toHaveLength(0)
@@ -92,16 +92,16 @@ describe('Agent Router', () => {
 
       const result = await resolveAgent({
         contactId: null,
-        knowledgePackageId: 'pkg-1',
+        supportPackageId: 'pkg-1',
       })
 
       expect(result.systemMessages).toHaveLength(0)
     })
 
-    it('does not inject knowledge when knowledgePackageId is null', async () => {
+    it('does not inject knowledge when supportPackageId is null', async () => {
       const result = await resolveAgent({
         contactId: 'contact-1',
-        knowledgePackageId: null,
+        supportPackageId: null,
       })
 
       expect(result.systemMessages).toHaveLength(0)

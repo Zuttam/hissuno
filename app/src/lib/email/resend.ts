@@ -18,5 +18,8 @@ export function isResendConfigured(): boolean {
 }
 
 export function getFromAddress(): string {
-  return process.env.EMAIL_FROM_ADDRESS ?? 'Hissuno <hello@hissuno.com>'
+  if (!process.env.EMAIL_FROM_ADDRESS) {
+    throw new Error('EMAIL_FROM_ADDRESS environment variable is not configured')
+  }
+  return process.env.EMAIL_FROM_ADDRESS 
 }

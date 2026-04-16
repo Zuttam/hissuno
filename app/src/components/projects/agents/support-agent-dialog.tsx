@@ -6,13 +6,13 @@ import { Dialog, Button, Select, Alert, IconButton, PlusIcon, Input, Textarea } 
 import { updateSupportAgentSettings } from '@/lib/api/settings'
 import { PackageList } from '@/components/projects/knowledge/package-list'
 import { PackageDialog } from '@/components/projects/knowledge/package-dialog'
-import type { KnowledgePackageWithSources } from '@/lib/knowledge/types'
+import type { SupportPackageWithSources } from '@/lib/knowledge/types'
 import type { IntegrationStatuses } from '@/hooks/use-integration-statuses'
 
 type PackageView =
   | null
   | { mode: 'create' }
-  | { mode: 'edit'; pkg: KnowledgePackageWithSources }
+  | { mode: 'edit'; pkg: SupportPackageWithSources }
 
 function ChannelStatus({ connected }: { connected: boolean }) {
   return (

@@ -1,6 +1,13 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
 import { Memory } from '@mastra/memory'
 import { contactDataTools } from '../tools/data-tools'
+
+export const SUPPORT_MODEL: ModelConfig = {
+  name: 'support',
+  tier: 'default',
+  fallback: 'openai/gpt-5',
+}
 
 /**
  * Support Agent — customer-facing conversational AI
@@ -135,7 +142,7 @@ This marker signals that the conversation has reached a natural conclusion. The 
 Example response when goodbye is detected:
 "You're welcome! I'm glad I could help. Feel free to come back anytime if you have more questions. Take care! [SESSION_GOODBYE]"
 `,
-  model: 'openai/gpt-5',
+  model: ({ runtimeContext }) => resolveModel(SUPPORT_MODEL, runtimeContext),
   tools: Object.fromEntries([...contactDataTools].map((tool) => [tool.id, tool])),
 
   // Memory uses storage from Mastra instance

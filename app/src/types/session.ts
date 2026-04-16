@@ -6,7 +6,7 @@ export type SessionStatus = 'active' | 'closing_soon' | 'awaiting_idle_response'
 /**
  * Session source channels
  */
-export const SESSION_SOURCES = ['widget', 'slack', 'intercom', 'zendesk', 'gong', 'posthog', 'fathom', 'api', 'manual'] as const
+export const SESSION_SOURCES = ['widget', 'slack', 'intercom', 'zendesk', 'github', 'gong', 'posthog', 'fathom', 'api', 'manual'] as const
 export type SessionSource = (typeof SESSION_SOURCES)[number]
 
 /**
@@ -52,6 +52,7 @@ export const SESSION_SOURCE_INFO: Record<
   slack: { label: 'Slack', variant: 'warning' },
   intercom: { label: 'Intercom', variant: 'success' },
   zendesk: { label: 'Zendesk', variant: 'success' },
+  github: { label: 'GitHub', variant: 'default' },
   gong: { label: 'Gong', variant: 'default' },
   fathom: { label: 'Fathom', variant: 'default' },
   posthog: { label: 'PostHog', variant: 'warning' },

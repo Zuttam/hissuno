@@ -1,4 +1,11 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
+
+export const WEB_SCRAPER_MODEL: ModelConfig = {
+  name: 'web-scraper',
+  tier: 'default',
+  fallback: 'openai/gpt-5',
+}
 
 /**
  * Web Scraper Agent
@@ -98,5 +105,5 @@ Bullet points of essential links and resources.
 - Be thorough but concise
 - If pages are inaccessible, note which ones
 `,
-  model: 'openai/gpt-5',
+  model: ({ runtimeContext }) => resolveModel(WEB_SCRAPER_MODEL, runtimeContext),
 })

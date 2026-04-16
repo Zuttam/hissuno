@@ -9,6 +9,7 @@ import {
   unlinkEntities,
   getRelatedEntitiesWithDetails,
 } from '@/lib/db/queries/entity-relationships'
+import { buildManualContext } from '@/lib/db/queries/relationship-metadata'
 import type { EntityType } from '@/lib/db/queries/types'
 
 export const runtime = 'nodejs'
@@ -54,7 +55,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'source_id and target_id are required.' }, { status: 400 })
     }
 
-    await linkEntities(projectId, source_type, source_id, target_type, target_id)
+    await linkEntities(projectId, source_type, source_id, target_type, target_id,
+      buildManualContext() as unknown as Record<string, unknown>,
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -53,10 +53,10 @@ hissuno get issues iss_abc123
 
 The CLI supports both interactive and non-interactive modes. See the [CLI documentation](/docs/connect/cli) for the full command reference.
 
-## Connect External Agents via MCP
+## Connect External Agents
 
-1. Add Hissuno as an MCP server in your AI tool (Claude Desktop, Cursor, or Claude Code)
-2. Configure the server with your Hissuno API key and project ID
-3. Agents get tools to search feedback, list issues, query knowledge, create resources, and ask Hissuno questions about your product
+1. Install the Hissuno CLI: `npm install -g hissuno`
+2. Configure it with your API key and project ID
+3. Agents get access to search feedback, list issues, query knowledge, and ask Hissuno questions about your product
 
-See the [MCP Server documentation](/docs/connect/mcp) for setup instructions and available tools.
+See the [CLI documentation](/docs/connect/cli) for setup instructions and available commands.

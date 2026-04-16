@@ -48,6 +48,30 @@ export async function linkEntities(
   idB: string,
   metadata?: Record<string, unknown> | null,
 ): Promise<void> {
+  // Check if edge already exists
+  const existing = await db
+    .select({ id: entityRelationships.id, metadata: entityRelationships.metadata })
+    .from(entityRelationships)
+    .where(
+      and(
+        eq(entityRelationships.project_id, projectId),
+        eq(ENTITY_COLUMNS[typeA], idA),
+        eq(ENTITY_COLUMNS[typeB], idB),
+      ),
+    )
+    .limit(1)
+
+  if (existing.length > 0) {
+    // Edge exists - update metadata if caller provides it
+    if (metadata) {
+      await db
+        .update(entityRelationships)
+        .set({ metadata })
+        .where(eq(entityRelationships.id, existing[0].id))
+    }
+    return
+  }
+
   const values: Record<string, unknown> = {
     project_id: projectId,
     [columnName(typeA)]: idA,
@@ -60,7 +84,6 @@ export async function linkEntities(
   try {
     await db.insert(entityRelationships).values(values as never)
   } catch (err) {
-    // Silently handle duplicate - link already exists
     if (isUniqueViolation(err)) return
     throw err
   }
@@ -119,13 +142,18 @@ export interface ViaAttribution {
   ids: string[]
 }
 
+export interface RelationshipInfo {
+  metadata?: Record<string, unknown> | null
+  linkedAt?: string | null
+}
+
 export interface RelatedEntitiesResult {
-  companies: Array<{ id: string; name: string; domain: string; via?: ViaAttribution }>
-  contacts: Array<{ id: string; name: string; email: string; via?: ViaAttribution }>
-  issues: Array<{ id: string; name: string; type: string; status: string | null; via?: ViaAttribution }>
-  sessions: Array<{ id: string; name: string | null; source: string | null; created_at: Date | null; via?: ViaAttribution }>
-  knowledgeSources: Array<{ id: string; name: string | null; type: string; status: string }>
-  productScopes: Array<{ id: string; name: string; color: string; metadata?: Record<string, unknown> | null }>
+  companies: Array<{ id: string; name: string; domain: string; via?: ViaAttribution } & RelationshipInfo>
+  contacts: Array<{ id: string; name: string; email: string; company_id: string | null; via?: ViaAttribution } & RelationshipInfo>
+  issues: Array<{ id: string; name: string; type: string; status: string | null; via?: ViaAttribution } & RelationshipInfo>
+  sessions: Array<{ id: string; name: string | null; source: string | null; created_at: Date | null; via?: ViaAttribution } & RelationshipInfo>
+  knowledgeSources: Array<{ id: string; name: string | null; type: string; status: string } & RelationshipInfo>
+  productScopes: Array<{ id: string; name: string; color: string } & RelationshipInfo>
 }
 
 const RELATED_TYPES: EntityType[] = ['company', 'contact', 'issue', 'session', 'knowledge_source', 'product_scope']
@@ -159,17 +187,23 @@ export async function getRelatedEntitiesWithDetails(
     product_scope: [],
   }
 
-  const metadataByProductScopeId = new Map<string, Record<string, unknown> | null>()
+  // Track metadata + created_at for every relationship, keyed by "type:id"
+  const relInfoMap = new Map<string, RelationshipInfo>()
 
   for (const row of rows) {
     for (const rt of RELATED_TYPES) {
       if (rt === entityType) continue
       const val = row[columnName(rt) as keyof typeof row] as string | null
       if (val) {
-        idsByType[rt].push(val)
-        // Track metadata for product scope relationships
-        if (rt === 'product_scope') {
-          metadataByProductScopeId.set(val, (row.metadata as Record<string, unknown>) ?? null)
+        const key = `${rt}:${val}`
+        const existing = relInfoMap.get(key)
+        // On duplicate edges, prefer the one with metadata (LLM-enriched context)
+        if (!existing || (row.metadata && !existing.metadata)) {
+          if (!existing) idsByType[rt].push(val)
+          relInfoMap.set(key, {
+            metadata: (row.metadata as Record<string, unknown>) ?? null,
+            linkedAt: row.created_at?.toISOString() ?? null,
+          })
         }
       }
     }
@@ -182,7 +216,7 @@ export async function getRelatedEntitiesWithDetails(
           .from(companies).where(inArray(companies.id, idsByType.company))
       : [],
     idsByType.contact.length > 0
-      ? db.select({ id: contacts.id, name: contacts.name, email: contacts.email })
+      ? db.select({ id: contacts.id, name: contacts.name, email: contacts.email, company_id: contacts.company_id })
           .from(contacts).where(inArray(contacts.id, idsByType.contact))
       : [],
     idsByType.issue.length > 0
@@ -221,50 +255,64 @@ export async function getRelatedEntitiesWithDetails(
   // Per-target: targetId -> { intermediateType -> Set<intermediateId> }
   const viaMapByTarget = new Map<EntityType, Map<string, Map<EntityType, Set<string>>>>()
 
+  // Build all 2-hop queries upfront, then execute in parallel
+  const hopQueries: { target: EntityType; intermediate: EntityType; promise: Promise<{ targetId: string | null; intermediateId: string | null }[]> }[] = []
+
   for (const target of TRAVERSABLE_TARGETS) {
     if (target === entityType) continue
-    const directIds = new Set(idsByType[target])
-    const targetVia = new Map<string, Map<EntityType, Set<string>>>()
-
     for (const intermediate of RELATED_TYPES) {
       if (intermediate === target || intermediate === entityType) continue
       if (idsByType[intermediate].length === 0) continue
-
-      const hopRows = await db
-        .select({
-          targetId: ENTITY_COLUMNS[target],
-          intermediateId: ENTITY_COLUMNS[intermediate],
-        })
-        .from(entityRelationships)
-        .where(
-          and(
-            eq(entityRelationships.project_id, projectId),
-            inArray(ENTITY_COLUMNS[intermediate], idsByType[intermediate]),
-            isNotNull(ENTITY_COLUMNS[target]),
+      hopQueries.push({
+        target,
+        intermediate,
+        promise: db
+          .select({
+            targetId: ENTITY_COLUMNS[target],
+            intermediateId: ENTITY_COLUMNS[intermediate],
+          })
+          .from(entityRelationships)
+          .where(
+            and(
+              eq(entityRelationships.project_id, projectId),
+              inArray(ENTITY_COLUMNS[intermediate], idsByType[intermediate]),
+              isNotNull(ENTITY_COLUMNS[target]),
+            ),
           ),
-        )
-
-      for (const row of hopRows) {
-        const tid = row.targetId as string | null
-        const iid = row.intermediateId as string | null
-        if (!tid || !iid || tid === entityId) continue
-
-        if (!directIds.has(tid)) {
-          secondDegreeByTarget[target].add(tid)
-        }
-
-        if (!targetVia.has(tid)) {
-          targetVia.set(tid, new Map())
-        }
-        const byType = targetVia.get(tid)!
-        if (!byType.has(intermediate)) {
-          byType.set(intermediate, new Set())
-        }
-        byType.get(intermediate)!.add(iid)
-      }
+      })
     }
+  }
 
-    viaMapByTarget.set(target, targetVia)
+  const hopResults = await Promise.all(hopQueries.map(q => q.promise))
+
+  for (let qi = 0; qi < hopQueries.length; qi++) {
+    const { target, intermediate } = hopQueries[qi]
+    const hopRows = hopResults[qi]
+    const directIds = new Set(idsByType[target])
+
+    if (!viaMapByTarget.has(target)) {
+      viaMapByTarget.set(target, new Map())
+    }
+    const targetVia = viaMapByTarget.get(target)!
+
+    for (const row of hopRows) {
+      const tid = row.targetId as string | null
+      const iid = row.intermediateId as string | null
+      if (!tid || !iid || tid === entityId) continue
+
+      if (!directIds.has(tid)) {
+        secondDegreeByTarget[target].add(tid)
+      }
+
+      if (!targetVia.has(tid)) {
+        targetVia.set(tid, new Map())
+      }
+      const byType = targetVia.get(tid)!
+      if (!byType.has(intermediate)) {
+        byType.set(intermediate, new Set())
+      }
+      byType.get(intermediate)!.add(iid)
+    }
   }
 
   // Batch-fetch 2nd-degree details
@@ -275,7 +323,7 @@ export async function getRelatedEntitiesWithDetails(
 
   const [newContacts, newCompanies, newIssues, newSessions] = await Promise.all([
     newContactIds.length > 0
-      ? db.select({ id: contacts.id, name: contacts.name, email: contacts.email })
+      ? db.select({ id: contacts.id, name: contacts.name, email: contacts.email, company_id: contacts.company_id })
           .from(contacts).where(inArray(contacts.id, newContactIds))
       : [],
     newCompanyIds.length > 0
@@ -311,28 +359,31 @@ export async function getRelatedEntitiesWithDetails(
     return { type: bestType, ids: [...bestIds] }
   }
 
+  // Helper to merge relationship info (metadata + linkedAt) into entity rows
+  const withRelInfo = <T extends { id: string }>(type: EntityType, row: T): T & RelationshipInfo => ({
+    ...row,
+    ...relInfoMap.get(`${type}:${row.id}`),
+  })
+
   return {
     companies: [
-      ...companyRows,
-      ...newCompanies.map(c => ({ ...c, via: buildVia('company', c.id) })),
+      ...companyRows.map(c => withRelInfo('company', c)),
+      ...newCompanies.map(c => ({ ...withRelInfo('company', c), via: buildVia('company', c.id) })),
     ],
     contacts: [
-      ...contactRows,
-      ...newContacts.map(c => ({ ...c, via: buildVia('contact', c.id) })),
+      ...contactRows.map(c => withRelInfo('contact', c)),
+      ...newContacts.map(c => ({ ...withRelInfo('contact', c), via: buildVia('contact', c.id) })),
     ],
     issues: [
-      ...issueRows,
-      ...newIssues.map(i => ({ ...i, via: buildVia('issue', i.id) })),
+      ...issueRows.map(i => withRelInfo('issue', i)),
+      ...newIssues.map(i => ({ ...withRelInfo('issue', i), via: buildVia('issue', i.id) })),
     ],
     sessions: [
-      ...sessionRows,
-      ...newSessions.map(s => ({ ...s, via: buildVia('session', s.id) })),
+      ...sessionRows.map(s => withRelInfo('session', s)),
+      ...newSessions.map(s => ({ ...withRelInfo('session', s), via: buildVia('session', s.id) })),
     ],
-    knowledgeSources: ksRows,
-    productScopes: paRows.map((ps) => ({
-      ...ps,
-      metadata: metadataByProductScopeId.get(ps.id) ?? null,
-    })),
+    knowledgeSources: ksRows.map(k => withRelInfo('knowledge_source', k)),
+    productScopes: paRows.map(ps => withRelInfo('product_scope', ps)),
   }
 }
 
@@ -460,7 +511,7 @@ export async function setSessionContact(
         ),
       )
 
-    // Link new contact
+    // Link new contact (metadata is added later by graph evaluation enrichment)
     if (contactId) {
       const values: Record<string, unknown> = {
         project_id: projectId,

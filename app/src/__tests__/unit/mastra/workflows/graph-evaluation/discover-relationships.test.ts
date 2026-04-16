@@ -66,6 +66,10 @@ vi.mock('@/lib/customers/customer-embedding-service', () => ({
   searchCompaniesSemantic: mockSearchCompaniesSemantic,
 }))
 
+vi.mock('@/mastra/workflows/graph-evaluation/steps/enrich-relationship-context', () => ({
+  enrichRelationshipContext: vi.fn().mockResolvedValue(new Map()),
+}))
+
 import { discoverRelationships } from '@/mastra/workflows/graph-evaluation/steps/discover-relationships'
 import type { GraphEntityType } from '@/mastra/workflows/graph-evaluation/schemas'
 
@@ -161,18 +165,8 @@ describe('discoverRelationships', () => {
       },
     ]
 
-    it('skips strategy when entityType is "contact"', async () => {
-      await discoverRelationships(makeInput({ entityType: 'contact' }))
-      expect(mockGetRelatedIds).not.toHaveBeenCalled()
-    })
-
-    it('skips strategy when entityType is "company"', async () => {
-      await discoverRelationships(makeInput({ entityType: 'company' }))
-      expect(mockGetRelatedIds).not.toHaveBeenCalled()
-    })
-
-    it('runs strategy for session, issue, knowledge_source', async () => {
-      for (const type of ['session', 'issue', 'knowledge_source'] as const) {
+    it('runs strategy for all entity types', async () => {
+      for (const type of ['session', 'issue', 'knowledge_source', 'contact', 'company'] as const) {
         vi.clearAllMocks()
         setupDefaultMocks()
 
@@ -261,6 +255,7 @@ describe('discoverRelationships', () => {
           contentForSearch: 'Billing content here',
         }))
         expect(mockClassifyGoal).toHaveBeenCalledWith({
+          projectId: PROJECT_ID,
           entityName: 'My Session',
           contentSnippet: 'Billing content here',
           scopeName: 'Billing',
@@ -310,11 +305,13 @@ describe('discoverRelationships', () => {
         await discoverRelationships(makeInput({ topics: ['billing'] }))
         expect(mockLinkEntities).toHaveBeenCalledWith(
           PROJECT_ID, 'session', ENTITY_ID, 'product_scope', 'scope-1',
-          {
+          expect.objectContaining({
+            strategy: 'product_scope',
             matchedGoalId: 'g1',
             matchedGoalText: 'Reduce payment failures',
             reasoning: 'Relates to billing',
-          },
+            topics: ['billing'],
+          }),
         )
       })
 
@@ -799,25 +796,25 @@ describe('discoverRelationships', () => {
   // ==========================================================================
 
   describe('entity type skip matrix', () => {
-    it('contact: only runs strategies 2, 3, 4 (skips 1, 5, 6, 7)', async () => {
+    it('contact: runs strategies 1, 2, 3, 4 (skips 5, 6, 7)', async () => {
       mockSearchSessionsSemantic.mockResolvedValue([{ sessionId: 's1' }])
       mockSearchSimilarIssues.mockResolvedValue([{ issueId: 'i1' }])
       mockSearchKnowledgeBySourceIds.mockResolvedValue([{ sourceId: 'ks1' }])
 
       await discoverRelationships(makeInput({ entityType: 'contact' }))
 
-      // Ran: session search, issue search, knowledge search
+      // Ran: scope matching, session search, issue search, knowledge search
+      expect(mockGetRelatedIds).toHaveBeenCalled()
       expect(mockSearchSessionsSemantic).toHaveBeenCalled()
       expect(mockSearchSimilarIssues).toHaveBeenCalled()
       expect(mockSearchKnowledgeBySourceIds).toHaveBeenCalled()
 
-      // Skipped: scope matching, contact search, company semantic, company text match
-      expect(mockGetRelatedIds).not.toHaveBeenCalled()
+      // Skipped: contact search (self), company semantic, company text match
       expect(mockSearchContactsSemantic).not.toHaveBeenCalled()
       expect(mockSearchCompaniesSemantic).not.toHaveBeenCalled()
     })
 
-    it('company: runs strategies 2, 3, 4, 5 (skips 1, 6, 7)', async () => {
+    it('company: runs strategies 1, 2, 3, 4, 5 (skips 6, 7)', async () => {
       mockSearchSessionsSemantic.mockResolvedValue([{ sessionId: 's1' }])
       mockSearchSimilarIssues.mockResolvedValue([{ issueId: 'i1' }])
       mockSearchKnowledgeBySourceIds.mockResolvedValue([{ sourceId: 'ks1' }])
@@ -826,13 +823,13 @@ describe('discoverRelationships', () => {
       await discoverRelationships(makeInput({ entityType: 'company' }))
 
       // Ran
+      expect(mockGetRelatedIds).toHaveBeenCalled()
       expect(mockSearchSessionsSemantic).toHaveBeenCalled()
       expect(mockSearchSimilarIssues).toHaveBeenCalled()
       expect(mockSearchKnowledgeBySourceIds).toHaveBeenCalled()
       expect(mockSearchContactsSemantic).toHaveBeenCalled()
 
-      // Skipped
-      expect(mockGetRelatedIds).not.toHaveBeenCalled()
+      // Skipped: company semantic (self), company text match (self)
       expect(mockSearchCompaniesSemantic).not.toHaveBeenCalled()
     })
 

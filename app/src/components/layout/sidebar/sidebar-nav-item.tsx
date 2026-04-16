@@ -46,7 +46,7 @@ export function SidebarNavItem({ item, isCollapsed, projectId, onNavigate }: Sid
   if (disabled) {
     return (
       <span
-        className={`flex items-center gap-2 px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide text-[color:var(--text-tertiary)] opacity-40 ${
+        className={`flex items-center gap-2 px-2 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-tertiary)] opacity-40 ${
           isCollapsed ? 'justify-center' : ''
         }`}
         title={isCollapsed ? item.label : undefined}
@@ -61,7 +61,7 @@ export function SidebarNavItem({ item, isCollapsed, projectId, onNavigate }: Sid
     <Link
       href={href}
       onClick={onNavigate}
-      className={`flex items-center gap-2 px-2 py-1.5 font-mono text-xs font-semibold uppercase tracking-wide transition ${
+      className={`flex items-center gap-2 px-2 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wide transition ${
         isCollapsed ? 'justify-center' : ''
       } ${
         active

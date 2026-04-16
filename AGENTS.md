@@ -4,7 +4,7 @@ AI coding agent guide for the Hissuno codebase. See `docs/` for detailed archite
 
 ## Project Overview
 
-Hissuno is an open-source unified context layer for product agents. It ingests codebases, docs, and customer signals into an interconnected knowledge graph - where sessions, contacts, issues, product areas, and knowledge sources are all linked. Any AI agent can traverse and query this graph natively via MCP, CLI, API, embedded widget, or Slack integration.
+Hissuno is an open-source unified context layer for product agents. It ingests codebases, docs, and customer signals into an interconnected knowledge graph - where sessions, contacts, issues, product areas, and knowledge sources are all linked. Any AI agent can traverse and query this graph natively via CLI, API, embedded widget, or Slack integration.
 
 ## Development Commands
 
@@ -14,7 +14,6 @@ All commands run from the `app/` directory:
 # Development
 npm run dev                    # Next.js dev server (port 3000)
 npm run dev:mastra             # Mastra agent playground
-npm run mcp:dev               # MCP server development
 
 # Build & Production
 npm run build                  # Build Next.js app
@@ -110,7 +109,6 @@ app/
 │   │   ├── agents/            # AI agents
 │   │   ├── tools/             # Agent tools
 │   │   └── workflows/         # Multi-step workflows
-│   ├── mcp/                   # MCP server (graph access for external agents)
 │   └── types/                 # TypeScript definitions
 └── packages/widget/           # @hissuno/widget npm package
 ```

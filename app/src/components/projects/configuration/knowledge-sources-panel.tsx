@@ -48,7 +48,7 @@ interface Repo {
   defaultBranch: string
 }
 
-type AddableSourceType = KnowledgeSourceType
+type AddableSourceType = Exclude<KnowledgeSourceType, 'folder'>
 
 const SOURCE_TYPE_CONFIG: Record<AddableSourceType, { icon: React.ReactNode; name: string; placeholder: string }> = {
   codebase: {
@@ -407,7 +407,7 @@ export function KnowledgeSourcesPanel({ projectId, onSourcesChange, productScope
   }
 
   const getSourceIcon = (source: KnowledgeSource) => {
-    const config = SOURCE_TYPE_CONFIG[source.type]
+    const config = SOURCE_TYPE_CONFIG[source.type as AddableSourceType]
     return config?.icon ?? <span>📦</span>
   }
 
@@ -436,7 +436,7 @@ export function KnowledgeSourcesPanel({ projectId, onSourcesChange, productScope
       >
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium flex items-center gap-1.5">
-            {getSourceIcon(source)} {SOURCE_TYPE_CONFIG[source.type]?.name ?? source.type}
+            {getSourceIcon(source)} {SOURCE_TYPE_CONFIG[source.type as AddableSourceType]?.name ?? source.type}
           </span>
           <Button variant="ghost" size="sm" onClick={cancelEditing}>
             Cancel
@@ -499,14 +499,14 @@ export function KnowledgeSourcesPanel({ projectId, onSourcesChange, productScope
             <Input
               value={editUrl}
               onChange={(e) => setEditUrl(e.target.value)}
-              placeholder={SOURCE_TYPE_CONFIG[source.type].placeholder}
+              placeholder={SOURCE_TYPE_CONFIG[source.type as AddableSourceType].placeholder}
             />
           </FormField>
         ) : source.type === 'raw_text' ? (
           <Textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
-            placeholder={SOURCE_TYPE_CONFIG[source.type].placeholder}
+            placeholder={SOURCE_TYPE_CONFIG[source.type as AddableSourceType].placeholder}
             rows={3}
           />
         ) : (

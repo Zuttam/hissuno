@@ -1,5 +1,12 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
 import { getSessionContextTool } from '../tools/issue-tools'
+
+export const TAGGING_MODEL: ModelConfig = {
+  name: 'tagging',
+  tier: 'small',
+  fallback: 'openai/gpt-5.4-mini',
+}
 
 /**
  * Tagging Agent
@@ -88,7 +95,7 @@ Return a JSON object:
 }
 \`\`\`
 `,
-  model: 'openai/gpt-5.4-mini',
+  model: ({ runtimeContext }) => resolveModel(TAGGING_MODEL, runtimeContext),
   tools: {
     'get-session-context': getSessionContextTool,
   },

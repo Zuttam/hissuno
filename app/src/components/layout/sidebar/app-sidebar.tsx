@@ -8,6 +8,7 @@ import { useSidebarState } from './use-sidebar-state'
 import { SidebarNavItem, type NavItemConfig } from './sidebar-nav-item'
 import { SidebarProjectSelector } from './sidebar-project-selector'
 import { SidebarAccountSection } from './sidebar-account-section'
+import { SidebarResourceTree } from './sidebar-resource-tree'
 
 // Icons for navigation items
 function DashboardIcon({ className }: { className?: string }) {
@@ -18,42 +19,13 @@ function DashboardIcon({ className }: { className?: string }) {
   )
 }
 
-function SessionsIcon({ className }: { className?: string }) {
+function GraphIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 0 1-.825-.242m9.345-8.334a2.126 2.126 0 0 0-.476-.095 48.64 48.64 0 0 0-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0 0 11.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
-    </svg>
-  )
-}
-
-function IssuesIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 0 1 0 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 0 1 0-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375Z" />
-    </svg>
-  )
-}
-
-function CustomersIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
-    </svg>
-  )
-}
-
-function KnowledgeIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
-    </svg>
-  )
-}
-
-function ProductsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="m21 7.5-9-5.25L3 7.5m18 0-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+      <circle cx="5" cy="6" r="2.5" />
+      <circle cx="19" cy="6" r="2.5" />
+      <circle cx="12" cy="19" r="2.5" />
+      <path strokeLinecap="round" d="M7.5 6h9M6.5 8.2l4.5 8.6M17.5 8.2l-4.5 8.6" />
     </svg>
   )
 }
@@ -69,7 +41,7 @@ function IntegrationsIcon({ className }: { className?: string }) {
 function ConfigurationIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
     </svg>
   )
 }
@@ -105,27 +77,29 @@ function CloseIcon({ className }: { className?: string }) {
   )
 }
 
-// Navigation items configuration - project-scoped routes
-const PROJECT_NAV_ITEMS: NavItemConfig[] = [
-  { href: '/projects/[id]/dashboard', label: 'Dashboard', icon: <DashboardIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/issues', label: 'Issues', icon: <IssuesIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/sessions', label: 'Feedback', icon: <SessionsIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/customers', label: 'Customers', icon: <CustomersIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/knowledge', label: 'Knowledge', icon: <KnowledgeIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/products', label: 'Scopes', icon: <ProductsIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/integrations', label: 'Integrations', icon: <IntegrationsIcon className="h-4 w-4" /> },
-  { href: '/projects/[id]/configuration', label: 'Configuration', icon: <ConfigurationIcon className="h-4 w-4" /> },
+// Top section: project-level configuration pages
+const CONFIG_NAV_ITEMS: NavItemConfig[] = [
+  { href: '/projects/[id]/dashboard', label: 'Dashboard', icon: <DashboardIcon className="h-3.5 w-3.5" /> },
+  { href: '/projects/[id]/graph', label: 'Graph', icon: <GraphIcon className="h-3.5 w-3.5" /> },
+  { href: '/projects/[id]/integrations', label: 'Integrations', icon: <IntegrationsIcon className="h-3.5 w-3.5" /> },
+  { href: '/projects/[id]/configuration', label: 'Configuration', icon: <ConfigurationIcon className="h-3.5 w-3.5" /> },
 ]
+
+function ResourcesIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+    </svg>
+  )
+}
 
 interface AppSidebarProps {
   user: SessionUser | null
 }
 
 export function AppSidebar({ user }: AppSidebarProps) {
-  const { isCollapsed, isMobileOpen, toggleCollapsed, setMobileOpen, closeMobile } = useSidebarState()
+  const { isCollapsed, isMobileOpen, sidebarWidth, isResizing, toggleCollapsed, setMobileOpen, closeMobile, onResizeStart } = useSidebarState()
   const { projectId: currentProjectId } = useProject()
-
-  const sidebarWidth = isCollapsed ? 'w-16' : 'w-60'
 
   const renderSidebarContent = (forMobile = false) => {
     const collapsed = forMobile ? false : isCollapsed
@@ -172,10 +146,10 @@ export function AppSidebar({ user }: AppSidebarProps) {
           <SidebarProjectSelector isCollapsed={collapsed} onNavigate={closeMobile} />
         </div>
 
-        {/* Main navigation */}
-        <nav className="flex-1 overflow-y-auto py-2">
-          <div className={`space-y-0.5 ${collapsed ? 'px-1.5' : 'px-2'}`}>
-            {PROJECT_NAV_ITEMS.map((item) => (
+        {/* Config navigation */}
+        <nav className={`py-2 ${collapsed ? '' : 'border-b border-[color:var(--border-subtle)]'}`}>
+          <div className={`flex flex-col gap-0.5 ${collapsed ? 'px-1.5' : 'px-2'}`}>
+            {CONFIG_NAV_ITEMS.map((item) => (
               <SidebarNavItem
                 key={item.href}
                 item={item}
@@ -186,6 +160,22 @@ export function AppSidebar({ user }: AppSidebarProps) {
             ))}
           </div>
         </nav>
+
+        {/* Resources tree */}
+        {collapsed ? (
+          <div className="flex flex-1 flex-col items-center pt-2">
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              className="flex h-8 w-8 items-center justify-center rounded-[4px] text-[color:var(--text-tertiary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] cursor-pointer"
+              title="Show resources"
+            >
+              <ResourcesIcon className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <SidebarResourceTree isCollapsed={collapsed} onNavigate={closeMobile} />
+        )}
 
         {/* Account section */}
         <div className={`border-t border-[color:var(--border-subtle)] ${collapsed ? 'py-2' : 'py-2.5'}`}>
@@ -210,9 +200,19 @@ export function AppSidebar({ user }: AppSidebarProps) {
 
       {/* Desktop sidebar */}
       <aside
-        className={`hidden md:flex flex-col ${sidebarWidth} flex-shrink-0 border-r border-[color:var(--border-subtle)] backdrop-blur-xl bg-[color:var(--background)]/80 transition-all duration-300 relative z-50`}
+        className={`hidden md:flex flex-col flex-shrink-0 border-r border-[color:var(--border-subtle)] backdrop-blur-xl bg-[color:var(--background)]/80 relative z-50 ${isResizing ? '' : 'transition-all duration-300'}`}
+        style={{ width: sidebarWidth }}
       >
         {renderSidebarContent(false)}
+        {/* Resize handle */}
+        {!isCollapsed && (
+          <div
+            onMouseDown={onResizeStart}
+            className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-[color:var(--border-active)] transition-colors z-10 group"
+          >
+            <div className="absolute top-0 -left-1 w-3 h-full" />
+          </div>
+        )}
       </aside>
 
       {/* Mobile sidebar overlay */}

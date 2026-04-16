@@ -4,8 +4,8 @@
  * Generates session names from conversation content using lightweight LLM calls.
  */
 
-import { generateText } from 'ai'
-import { openai } from '@ai-sdk/openai'
+import { Agent } from '@mastra/core/agent'
+import { resolveModel } from '@/mastra/models'
 import { db } from '@/lib/db'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { sessions } from '@/lib/db/schema/app'
@@ -63,11 +63,9 @@ export async function generateSessionNameFromMessages(
     conversationText.length > 2000 ? `${conversationText.slice(0, 2000)}...` : conversationText
 
   try {
-    const { text } = await generateText({
-      model: openai('gpt-5.4-mini'),
-      maxOutputTokens: 50,
-      temperature: 0.3,
-      system: `You generate concise, descriptive titles for support conversations.
+    const nameAgent = new Agent({
+      name: 'Session Name Generator',
+      instructions: `You generate concise, descriptive titles for support conversations.
 Rules:
 - Output ONLY the title, nothing else
 - Maximum 6 words
@@ -75,8 +73,12 @@ Rules:
 - Use action words when appropriate (e.g., "Can't export CSV", "Need help with billing")
 - No quotes, no punctuation at the end
 - If the conversation is unclear, output a generic title like "General inquiry"`,
-      prompt: `Generate a short title for this customer conversation:\n\n${truncatedText}`,
+      model: resolveModel({ name: 'session-name', tier: 'small', fallback: 'openai/gpt-5.4-mini' }),
     })
+    const response = await nameAgent.generate(
+      `Generate a short title for this customer conversation:\n\n${truncatedText}`,
+    )
+    const text = response.text ?? ''
 
     const cleanedTitle = text.trim().replace(/^["']|["']$/g, '').replace(/[.!?]$/, '')
 

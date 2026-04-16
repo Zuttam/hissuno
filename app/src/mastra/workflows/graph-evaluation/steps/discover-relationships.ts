@@ -9,6 +9,12 @@
  * 5. Semantic contact search (skip if entityType=contact)
  * 6. Semantic company search (skip for contacts, skip if entityType=company)
  * 7. Company text match fallback (skip for contacts, skip if entityType=company)
+ *
+ * Flow: search → batch LLM context enrichment → link
+ *
+ * Searches collect matches without linking. Then a single LLM call generates
+ * human-readable context for all matches. Finally, all matches are linked
+ * with enriched metadata. If the LLM call fails, template context is used.
  */
 
 import { db } from '@/lib/db'
@@ -20,6 +26,12 @@ import { searchSessionsSemantic } from '@/lib/sessions/embedding-service'
 import { searchSimilarIssues } from '@/lib/issues/embedding-service'
 import { searchKnowledgeBySourceIds } from '@/lib/knowledge/embedding-service'
 import { searchContactsSemantic, searchCompaniesSemantic } from '@/lib/customers/customer-embedding-service'
+import {
+  buildSemanticContext,
+  buildTextMatchContext,
+  buildProductScopeContext,
+} from '@/lib/db/queries/relationship-metadata'
+import { enrichRelationshipContext, type DiscoveredMatch } from './enrich-relationship-context'
 import type { GraphEntityType } from '../schemas'
 import type { ProductScopeGoal } from '@/types/product-scope'
 
@@ -66,6 +78,7 @@ export async function matchProductScope(
     if (matchedTopic) {
       try {
         const classification = await classifyGoal({
+          projectId,
           entityName,
           contentSnippet,
           scopeName: scope.name,
@@ -123,8 +136,12 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     return { relationshipsCreated: 0, productScopeId: null, errors: [], issueMatches: [] }
   }
 
-  // 1. Product scope text match (skip for contacts and companies)
-  if (entityType !== 'contact' && entityType !== 'company') {
+  // Collect all discovered matches for batch enrichment
+  const discoveredMatches: DiscoveredMatch[] = []
+
+  // 1. Product scope text match
+  // Product scope already has LLM reasoning via classifyGoal, so it links directly.
+  {
     try {
       const existingScopes = await getRelatedIds(projectId, entityType, entityId, 'product_scope')
       if (existingScopes.length === 0) {
@@ -136,11 +153,15 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
         )
         if (match) {
           try {
-            await linkEntities(projectId, entityType, entityId, 'product_scope', match.scopeId, {
-              matchedGoalId: match.matchedGoalId,
-              matchedGoalText: match.matchedGoalText,
-              reasoning: match.reasoning,
-            })
+            await linkEntities(projectId, entityType, entityId, 'product_scope', match.scopeId,
+              buildProductScopeContext({
+                scopeName: match.scopeName,
+                topics,
+                matchedGoalId: match.matchedGoalId,
+                matchedGoalText: match.matchedGoalText,
+                reasoning: match.reasoning,
+              }) as unknown as Record<string, unknown>,
+            )
             relationshipsCreated++
           } catch { /* Duplicate or constraint violation - skip */ }
           productScopeId = match.scopeId
@@ -153,7 +174,10 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     }
   }
 
-  // Steps 2-6: Run semantic searches in parallel (each is independent)
+  // -------------------------------------------------------------------------
+  // Steps 2-7: Search phase - collect matches without linking
+  // -------------------------------------------------------------------------
+
   if (combinedQuery) {
     const searchTasks: Array<{ label: string; run: () => Promise<void> }> = []
 
@@ -163,12 +187,16 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
         label: 'Session search',
         run: async () => {
           const results = await searchSessionsSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
-          const linkResults = await Promise.allSettled(
-            results.slice(0, 5).map((session) =>
-              linkEntities(projectId, entityType, entityId, 'session', session.sessionId)
-            )
-          )
-          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+          for (const session of results.slice(0, 5)) {
+            discoveredMatches.push({
+              targetType: 'session',
+              targetId: session.sessionId,
+              targetName: session.name,
+              targetDescription: session.description,
+              similarity: session.similarity,
+              strategy: 'semantic',
+            })
+          }
         },
       })
     }
@@ -187,12 +215,16 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
             status: issue.status,
             sessionCount: issue.sessionCount,
           }))
-          const linkResults = await Promise.allSettled(
-            issueMatches.map((issue) =>
-              linkEntities(projectId, entityType, entityId, 'issue', issue.issueId)
-            )
-          )
-          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+          for (const issue of issueMatches) {
+            discoveredMatches.push({
+              targetType: 'issue',
+              targetId: issue.issueId,
+              targetName: issue.name,
+              targetDescription: issue.description,
+              similarity: issue.similarity,
+              strategy: 'semantic',
+            })
+          }
         },
       })
     }
@@ -204,18 +236,26 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
         run: async () => {
           const results = await searchKnowledgeBySourceIds(projectId, combinedQuery, { limit: 10, similarityThreshold: 0.6 })
           const seenSourceIds = new Set<string>()
-          const uniqueSourceIds: string[] = []
+          const sourceBySimilarity = new Map<string, number>()
           for (const chunk of results) {
-            if (!chunk.sourceId || seenSourceIds.has(chunk.sourceId) || uniqueSourceIds.length >= 5) continue
-            seenSourceIds.add(chunk.sourceId)
-            uniqueSourceIds.push(chunk.sourceId)
+            if (!chunk.sourceId || sourceBySimilarity.size >= 5 && !sourceBySimilarity.has(chunk.sourceId)) continue
+            if (!seenSourceIds.has(chunk.sourceId)) {
+              seenSourceIds.add(chunk.sourceId)
+              sourceBySimilarity.set(chunk.sourceId, chunk.similarity)
+            } else {
+              const best = sourceBySimilarity.get(chunk.sourceId) ?? 0
+              if (chunk.similarity > best) sourceBySimilarity.set(chunk.sourceId, chunk.similarity)
+            }
           }
-          const linkResults = await Promise.allSettled(
-            uniqueSourceIds.map((sourceId) =>
-              linkEntities(projectId, entityType, entityId, 'knowledge_source', sourceId)
-            )
-          )
-          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+          for (const [sourceId, similarity] of sourceBySimilarity) {
+            discoveredMatches.push({
+              targetType: 'knowledge_source',
+              targetId: sourceId,
+              targetName: sourceId, // knowledge sources don't have names in search results
+              similarity,
+              strategy: 'semantic',
+            })
+          }
         },
       })
     }
@@ -226,12 +266,15 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
         label: 'Contact search',
         run: async () => {
           const results = await searchContactsSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
-          const linkResults = await Promise.allSettled(
-            results.slice(0, 5).map((contact) =>
-              linkEntities(projectId, entityType, entityId, 'contact', contact.contactId)
-            )
-          )
-          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+          for (const contact of results.slice(0, 5)) {
+            discoveredMatches.push({
+              targetType: 'contact',
+              targetId: contact.contactId,
+              targetName: contact.name,
+              similarity: contact.similarity,
+              strategy: 'semantic',
+            })
+          }
         },
       })
     }
@@ -242,12 +285,15 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
         label: 'Company semantic search',
         run: async () => {
           const results = await searchCompaniesSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
-          const linkResults = await Promise.allSettled(
-            results.slice(0, 5).map((company) =>
-              linkEntities(projectId, entityType, entityId, 'company', company.companyId)
-            )
-          )
-          relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+          for (const company of results.slice(0, 5)) {
+            discoveredMatches.push({
+              targetType: 'company',
+              targetId: company.companyId,
+              targetName: company.name,
+              similarity: company.similarity,
+              strategy: 'semantic',
+            })
+          }
         },
       })
     }
@@ -269,25 +315,83 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
         .where(eq(companies.project_id, projectId))
 
       const contentLower = contentForTextMatch.toLowerCase()
-      const matchedCompanyIds: string[] = []
       for (const company of allCompanies) {
         const nameMatch = company.name.length > 2 && contentLower.includes(company.name.toLowerCase())
         const domainMatch = company.domain && contentLower.includes(company.domain.toLowerCase())
-        if (nameMatch || domainMatch) {
-          matchedCompanyIds.push(company.id)
+        if (nameMatch) {
+          discoveredMatches.push({
+            targetType: 'company',
+            targetId: company.id,
+            targetName: company.name,
+            strategy: 'text_match',
+            matchType: 'name',
+            matchedValue: company.name,
+          })
+        } else if (domainMatch) {
+          discoveredMatches.push({
+            targetType: 'company',
+            targetId: company.id,
+            targetName: company.name,
+            strategy: 'text_match',
+            matchType: 'domain',
+            matchedValue: company.domain!,
+          })
         }
       }
-      const linkResults = await Promise.allSettled(
-        matchedCompanyIds.map((companyId) =>
-          linkEntities(projectId, entityType, entityId, 'company', companyId)
-        )
-      )
-      relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
     } catch (err) {
       errors.push(`Company text match failed: ${err instanceof Error ? err.message : 'Unknown'}`)
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Enrichment phase: batch LLM call for human-readable context
+  // -------------------------------------------------------------------------
+
+  let llmContextMap = new Map<string, string>()
+  if (discoveredMatches.length > 0) {
+    try {
+      llmContextMap = await enrichRelationshipContext(
+        entityType,
+        entityName ?? 'Unknown',
+        contentForSearch?.slice(0, 2000) ?? contentForTextMatch.slice(0, 2000),
+        discoveredMatches,
+        projectId,
+      )
+      if (llmContextMap.size > 0) {
+        console.log(`[discover-relationships] LLM enriched ${llmContextMap.size}/${discoveredMatches.length} matches`)
+      } else {
+        console.warn(`[discover-relationships] LLM enrichment returned 0 contexts for ${discoveredMatches.length} matches`)
+      }
+    } catch (err) {
+      // Non-fatal - template context will be used as fallback
+      console.warn('[discover-relationships] Enrichment call failed:', err instanceof Error ? err.message : err)
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Link phase: create all relationships with enriched metadata
+  // -------------------------------------------------------------------------
+
+  const linkPromises = discoveredMatches.map((match) => {
+    // Build base metadata from template builders
+    const baseMeta = match.strategy === 'text_match'
+      ? buildTextMatchContext({ matchType: match.matchType!, matchedValue: match.matchedValue! })
+      : buildSemanticContext({ similarity: match.similarity!, topics, targetName: match.targetName })
+
+    // Override context with LLM-generated version if available
+    const llmContext = llmContextMap.get(match.targetId)
+    const metadata = llmContext
+      ? { ...baseMeta, context: llmContext }
+      : baseMeta
+
+    return linkEntities(
+      projectId, entityType, entityId, match.targetType, match.targetId,
+      metadata as unknown as Record<string, unknown>,
+    )
+  })
+
+  const linkResults = await Promise.allSettled(linkPromises)
+  relationshipsCreated += linkResults.filter((r) => r.status === 'fulfilled').length
+
   return { relationshipsCreated, productScopeId, errors, issueMatches }
 }
-

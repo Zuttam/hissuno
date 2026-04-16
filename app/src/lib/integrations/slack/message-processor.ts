@@ -7,12 +7,12 @@ import type { ModelMessage } from 'ai'
 import { RuntimeContext } from '@mastra/core/runtime-context'
 import { db } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
-import { slackThreadSessions, projectSettings, projects } from '@/lib/db/schema/app'
+import { slackThreadSessions, projectSettings } from '@/lib/db/schema/app'
 import { sessions } from '@/lib/db/schema/app'
 import { upsertSession, updateSessionActivity } from '@/lib/db/queries/sessions'
 import { saveSessionMessage } from '@/lib/db/queries/session-messages'
 import { triggerChatRun, updateChatRunStatus, type ChatMessage } from '@/lib/agent/chat-run-service'
-import { generateWidgetJWT } from '@/lib/utils/widget-auth'
+
 import type { SupportAgentContext } from '@/types/agent'
 import { resolveAgent } from '@/mastra/agents/router'
 import { getSupportAgentSettingsAdmin } from '@/lib/db/queries/project-settings/support-agent'
@@ -445,10 +445,10 @@ async function executeAgentSync(params: {
 
   try {
     // Load knowledge package ID from project settings
-    let knowledgePackageId: string | null = null
+    let supportPackageId: string | null = null
     try {
       const agentSettings = await getSupportAgentSettingsAdmin(projectId)
-      knowledgePackageId = agentSettings.support_agent_package_id
+      supportPackageId = agentSettings.support_agent_package_id
     } catch (err) {
       console.warn(`${LOG_PREFIX} Failed to load agent settings for knowledge:`, err)
     }
@@ -456,7 +456,7 @@ async function executeAgentSync(params: {
     // Resolve agent via router (support or PM based on contactId)
     const { agent, systemMessages } = await resolveAgent({
       contactId,
-      knowledgePackageId,
+      supportPackageId,
       projectId,
     })
 
@@ -466,27 +466,8 @@ async function executeAgentSync(params: {
     runtimeContext.set('userId', userId)
     runtimeContext.set('userMetadata', userMetadata)
     runtimeContext.set('sessionId', sessionId)
-    runtimeContext.set('knowledgePackageId', knowledgePackageId)
+    runtimeContext.set('supportPackageId', supportPackageId)
 
-    // Generate contact JWT for MCP contact-mode auth (if we have an email)
-    let contactToken: string | null = null
-    const email = userMetadata?.email ?? userId
-    if (email && email.includes('@')) {
-      const projectRows = await db
-        .select({ secret_key: projects.secret_key })
-        .from(projects)
-        .where(eq(projects.id, projectId))
-
-      const project = projectRows[0]
-
-      if (project?.secret_key) {
-        contactToken = generateWidgetJWT(
-          { userId: email, userMetadata: userMetadata ?? undefined },
-          project.secret_key
-        )
-      }
-    }
-    runtimeContext.set('contactToken', contactToken)
     runtimeContext.set('contactId', contactId)
 
     // Convert messages to ModelMessage format, with knowledge prepended

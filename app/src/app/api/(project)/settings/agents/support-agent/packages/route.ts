@@ -6,8 +6,8 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
-import { knowledgePackages, knowledgePackageSources, knowledgeSources } from '@/lib/db/schema/app'
-import type { KnowledgePackageWithSources } from '@/lib/knowledge/types'
+import { supportPackages, supportPackageSources, knowledgeSources } from '@/lib/db/schema/app'
+import type { SupportPackageWithSources } from '@/lib/knowledge/types'
 
 export const runtime = 'nodejs'
 
@@ -29,9 +29,9 @@ export async function GET(request: NextRequest) {
     // Fetch all named packages for the project
     const packages = await db
       .select()
-      .from(knowledgePackages)
-      .where(eq(knowledgePackages.project_id, projectId))
-      .orderBy(asc(knowledgePackages.created_at))
+      .from(supportPackages)
+      .where(eq(supportPackages.project_id, projectId))
+      .orderBy(asc(supportPackages.created_at))
 
     if (packages.length === 0) {
       return NextResponse.json({ packages: [] })
@@ -42,9 +42,9 @@ export async function GET(request: NextRequest) {
       packages.map(async (pkg) => {
         // Get linked sources
         const sourcesData = await db
-          .select({ source_id: knowledgePackageSources.source_id })
-          .from(knowledgePackageSources)
-          .where(eq(knowledgePackageSources.package_id, pkg.id))
+          .select({ source_id: supportPackageSources.source_id })
+          .from(supportPackageSources)
+          .where(eq(supportPackageSources.package_id, pkg.id))
 
         const sourceIds = sourcesData.map((s) => s.source_id)
 
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
           created_at: pkg.created_at?.toISOString() ?? null,
           updated_at: pkg.updated_at?.toISOString() ?? null,
           compiled_at: pkg.compiled_at?.toISOString() ?? null,
-          sources: rawSources as unknown as KnowledgePackageWithSources['sources'],
+          sources: rawSources as unknown as SupportPackageWithSources['sources'],
           sourceCount: rawSources.length,
           lastAnalyzedAt,
         }
@@ -128,12 +128,12 @@ export async function POST(request: NextRequest) {
 
     // Check for duplicate name
     const [existing] = await db
-      .select({ id: knowledgePackages.id })
-      .from(knowledgePackages)
+      .select({ id: supportPackages.id })
+      .from(supportPackages)
       .where(
         and(
-          eq(knowledgePackages.project_id, projectId),
-          eq(knowledgePackages.name, trimmedName)
+          eq(supportPackages.project_id, projectId),
+          eq(supportPackages.name, trimmedName)
         )
       )
       .limit(1)
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     // Create the package
     const [pkg] = await db
-      .insert(knowledgePackages)
+      .insert(supportPackages)
       .values({
         project_id: projectId,
         name: trimmedName,
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
       if (validSourceIds.length > 0) {
         try {
           await db
-            .insert(knowledgePackageSources)
+            .insert(supportPackageSources)
             .values(validSourceIds.map((sourceId) => ({
               package_id: pkg.id,
               source_id: sourceId,
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
       ...pkg,
       created_at: pkg.created_at?.toISOString() ?? null,
       updated_at: pkg.updated_at?.toISOString() ?? null,
-      sources: sources as unknown as KnowledgePackageWithSources['sources'],
+      sources: sources as unknown as SupportPackageWithSources['sources'],
       sourceCount: sources.length,
       lastAnalyzedAt: null,
     }

@@ -5,7 +5,8 @@
 
 import { db } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
-import { githubAppInstallations, knowledgeSources, sourceCodes } from '@/lib/db/schema/app'
+import { githubAppInstallations, githubSyncConfigs, githubSyncedIssues, knowledgeSources, sourceCodes } from '@/lib/db/schema/app'
+import { calculateNextSyncTime, type SyncFrequency } from '@/lib/integrations/shared/sync-utils'
 import { generateInstallationToken, clearTokenCache } from './jwt'
 
 // =============================================================================
@@ -390,4 +391,152 @@ export function parseGitHubRepoUrl(url: string): { owner: string; repo: string }
   }
 
   return null
+}
+
+// =============================================================================
+// Sync Config CRUD
+// =============================================================================
+
+export type GitHubSyncType = 'feedback'
+
+type GitHubSyncConfigRow = typeof githubSyncConfigs.$inferSelect
+
+/**
+ * Get the GitHub installation UUID for a project (FK for sync tables)
+ */
+export async function getGitHubInstallationUuid(
+  projectId: string
+): Promise<string | null> {
+  const rows = await db
+    .select({ id: githubAppInstallations.id })
+    .from(githubAppInstallations)
+    .where(eq(githubAppInstallations.project_id, projectId))
+
+  return rows[0]?.id ?? null
+}
+
+/**
+ * Get sync config for a project + sync type
+ */
+export async function getGitHubSyncConfig(
+  projectId: string,
+  syncType: GitHubSyncType
+): Promise<GitHubSyncConfigRow | null> {
+  const rows = await db
+    .select()
+    .from(githubSyncConfigs)
+    .where(
+      and(
+        eq(githubSyncConfigs.project_id, projectId),
+        eq(githubSyncConfigs.sync_type, syncType)
+      )
+    )
+
+  return rows[0] ?? null
+}
+
+/**
+ * Upsert a sync config. Uses onConflictDoUpdate on (installation_id, sync_type).
+ */
+export async function upsertGitHubSyncConfig(params: {
+  projectId: string
+  installationId: string
+  syncType: GitHubSyncType
+  githubRepoIds?: Array<{ id: number; fullName: string }> | null
+  githubLabelFilter?: string | null
+  githubLabelTagMap?: Record<string, string> | null
+  syncEnabled?: boolean
+  syncFrequency?: SyncFrequency
+}): Promise<GitHubSyncConfigRow> {
+  const frequency = params.syncFrequency ?? 'manual'
+  const syncEnabled = params.syncEnabled ?? (frequency !== 'manual')
+  const nextSyncAt = calculateNextSyncTime(frequency)
+
+  const values = {
+    installation_id: params.installationId,
+    project_id: params.projectId,
+    sync_type: params.syncType,
+    github_repo_ids: params.githubRepoIds ?? null,
+    github_label_filter: params.githubLabelFilter ?? null,
+    github_label_tag_map: params.githubLabelTagMap ?? null,
+    sync_enabled: syncEnabled,
+    sync_frequency: frequency,
+    next_sync_at: nextSyncAt ? new Date(nextSyncAt) : null,
+    updated_at: new Date(),
+  }
+
+  const [row] = await db
+    .insert(githubSyncConfigs)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [githubSyncConfigs.installation_id, githubSyncConfigs.sync_type],
+      set: {
+        github_repo_ids: values.github_repo_ids,
+        github_label_filter: values.github_label_filter,
+        github_label_tag_map: values.github_label_tag_map,
+        sync_enabled: values.sync_enabled,
+        sync_frequency: values.sync_frequency,
+        next_sync_at: values.next_sync_at,
+        updated_at: values.updated_at,
+      },
+    })
+    .returning()
+
+  return row
+}
+
+/**
+ * Delete a sync config by project and type
+ */
+export async function deleteGitHubSyncConfig(
+  projectId: string,
+  syncType: GitHubSyncType
+): Promise<void> {
+  await db
+    .delete(githubSyncConfigs)
+    .where(
+      and(
+        eq(githubSyncConfigs.project_id, projectId),
+        eq(githubSyncConfigs.sync_type, syncType)
+      )
+    )
+}
+
+/**
+ * Get already-synced GitHub issue IDs for dedup
+ */
+export async function getSyncedIssueIds(
+  installationId: string
+): Promise<Set<number>> {
+  const rows = await db
+    .select({ github_issue_id: githubSyncedIssues.github_issue_id })
+    .from(githubSyncedIssues)
+    .where(eq(githubSyncedIssues.installation_id, installationId))
+
+  return new Set(rows.map((row) => row.github_issue_id))
+}
+
+/**
+ * Record a synced issue
+ */
+export async function recordSyncedIssue(
+  params: {
+    installationId: string
+    sessionId: string
+    githubIssueId: number
+    githubIssueNumber: number
+    githubRepoFullName: string
+    githubIssueUrl: string
+    githubIssueUpdatedAt?: string
+  }
+): Promise<void> {
+  await db.insert(githubSyncedIssues).values({
+    installation_id: params.installationId,
+    session_id: params.sessionId,
+    github_issue_id: params.githubIssueId,
+    github_issue_number: params.githubIssueNumber,
+    github_repo_full_name: params.githubRepoFullName,
+    github_issue_url: params.githubIssueUrl,
+    github_issue_updated_at: params.githubIssueUpdatedAt ? new Date(params.githubIssueUpdatedAt) : null,
+  })
 }

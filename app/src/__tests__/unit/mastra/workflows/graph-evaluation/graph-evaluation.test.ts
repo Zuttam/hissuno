@@ -57,13 +57,14 @@ describe('evaluateEntityRelationships', () => {
       expect(mockLoadEntityContent).toHaveBeenCalledWith(PROJECT_ID, 'session', ENTITY_ID)
     })
 
-    it('calls extractTopics with contentForSearch, entityName, entityType, guidelines', async () => {
+    it('calls extractTopics with contentForSearch, entityName, entityType, guidelines, projectId', async () => {
       await evaluateEntityRelationships(PROJECT_ID, 'issue', ENTITY_ID)
       expect(mockExtractTopics).toHaveBeenCalledWith(
         'search content',
         'Test Entity',
         'issue',
         'some guidelines',
+        PROJECT_ID,
       )
     })
 
@@ -76,6 +77,8 @@ describe('evaluateEntityRelationships', () => {
         topics: ['billing', 'payments'],
         combinedQuery: 'billing payments',
         contentForTextMatch: 'text match content',
+        entityName: 'Test Entity',
+        contentForSearch: 'search content',
       })
     })
 
@@ -265,7 +268,7 @@ describe('evaluateEntityRelationships', () => {
       mockDiscoverRelationships.mockResolvedValue({ relationshipsCreated: 0, productScopeId: null, errors: [] })
 
       await evaluateEntityRelationships(PROJECT_ID, 'session', ENTITY_ID)
-      expect(mockExtractTopics).toHaveBeenCalledWith('content', 'Name', 'session', 'focus on API topics')
+      expect(mockExtractTopics).toHaveBeenCalledWith('content', 'Name', 'session', 'focus on API topics', PROJECT_ID)
     })
   })
 })

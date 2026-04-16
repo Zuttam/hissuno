@@ -8,8 +8,9 @@
  * Runs as part of graph evaluation Phase 2 (creation policies).
  */
 
-import { generateText } from 'ai'
-import { openai } from '@ai-sdk/openai'
+import { Agent } from '@mastra/core/agent'
+import { resolveModel } from '@/mastra/models'
+import { getAIModelSettingsAdmin } from '@/lib/db/queries/project-settings'
 
 import type { IssueMatch } from './discover-relationships'
 
@@ -243,10 +244,16 @@ For SKIP:
 For CREATE (one or more issues):
 {"action": "create", "newIssues": [{"type": "bug|feature_request|change_request", "name": "Issue name", "description": "Detailed description with quotes", "priority": "low|medium|high"}]}`
 
-  const response = await generateText({
-    model: openai('gpt-5.2'),
-    prompt,
+  const aiSettings = await getAIModelSettingsAdmin(input.projectId)
+  const issuePolicyAgent = new Agent({
+    name: 'Issue Creation Policy',
+    instructions: 'You decide whether to create new issues, link to existing ones, or skip, based on customer feedback analysis.',
+    model: resolveModel(
+      { name: 'issue-policy', tier: 'default', fallback: 'openai/gpt-5' },
+      aiSettings,
+    ),
   })
+  const response = await issuePolicyAgent.generate(prompt)
 
   // Parse the response
   const text = response.text ?? ''

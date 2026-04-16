@@ -120,4 +120,4 @@ API-key integrations (Gong, Zendesk, Intercom) work without any server-side conf
 
 - [Create your first project](/docs/getting-started/first-project) and connect knowledge sources
 - [Configure integrations](/docs/integrations/self-hosting-setup) for Slack, GitHub, and more
-- [Connect your AI agents](/docs/connect/overview) via MCP, CLI, or API
+- [Connect your AI agents](/docs/connect/overview) via CLI or API

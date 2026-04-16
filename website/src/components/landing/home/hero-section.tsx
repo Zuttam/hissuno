@@ -3,8 +3,6 @@
 import { motion } from 'motion/react'
 import Image from 'next/image'
 import { InstallCommand } from '@/components/landing/install-command'
-import { useWaterWebGLOptional } from '@/components/water-webgl/WaterWebGLContext'
-import { WATER_EASINGS } from '@/components/landing/scroll-animation-config'
 
 
 interface Integration {
@@ -23,13 +21,6 @@ const INTEGRATIONS: Integration[] = [
 ]
 
 export function HeroSection() {
-  const water = useWaterWebGLOptional()
-
-  const handleCTAClick = (e: React.MouseEvent) => {
-    water?.triggerRipple(e.clientX, e.clientY, 1.5)
-  }
-
-  // Hero uses timed animations (not scroll-triggered) since it's above the fold
   const heroAnimation = {
     initial: { opacity: 0 },
     animate: { opacity: 1 },
@@ -37,27 +28,12 @@ export function HeroSection() {
 
   return (
     <section className="relative overflow-hidden px-6 pb-12 md:px-12">
-      {/* Atmospheric gradient for onsen atmosphere - light mode only */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-60 dark:opacity-0"
-        style={{
-          background: 'radial-gradient(ellipse 100% 80% at 50% 20%, rgba(200, 228, 225, 0.4) 0%, transparent 60%)',
-        }}
-        aria-hidden="true"
-      />
-
       <motion.div
         {...heroAnimation}
-        transition={{ duration: 1.2, ease: WATER_EASINGS.float, delay: 0.2 }}
+        transition={{ duration: 1.2, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.2 }}
         className="relative z-10 mx-auto max-w-4xl text-center">
 
-        <div className="mt-12 flex justify-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent-teal)]/30 bg-[var(--accent-teal)]/5 px-3 py-1 font-mono text-xs text-[var(--accent-teal)]">
-            Open Source
-          </span>
-        </div>
-
-        <h1 className="mt-4 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
+        <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
           Your Agents Don&apos;t Know Your Product.
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
             We Built the Missing Layer.
@@ -72,7 +48,7 @@ export function HeroSection() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: WATER_EASINGS.float, delay: 0.6 }}
+          transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.6 }}
           className="mt-8 flex flex-wrap items-center justify-center gap-4"
         >
           <span className="text-sm text-[var(--text-tertiary)]">Connects to your stack</span>
@@ -95,7 +71,7 @@ export function HeroSection() {
           </div>
         </motion.div>
 
-        <div className="mt-10 flex flex-col items-center justify-center gap-4" onClick={handleCTAClick}>
+        <div className="mt-10 flex flex-col items-center justify-center gap-4">
           <InstallCommand />
         </div>
       </motion.div>

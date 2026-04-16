@@ -24,7 +24,7 @@ export function ProductCopilotDialog({ open, onClose, projectId, integrationStat
     <Dialog open={open} onClose={onClose} title="Product Co-pilot" size="lg">
       <div className="flex flex-col gap-6">
         <p className="text-sm text-[color:var(--text-secondary)]">
-          When used as a team agent (via MCP server or dashboard), Hissuno has broader access to your project data.
+          When used as a team agent (via the dashboard), Hissuno has broader access to your project data.
         </p>
 
         <div className="flex flex-col gap-4">
@@ -44,7 +44,7 @@ export function ProductCopilotDialog({ open, onClose, projectId, integrationStat
             </li>
             <li className="flex items-start gap-2">
               <span className="mt-0.5 shrink-0 text-[color:var(--text-tertiary)]">&#8226;</span>
-              <span>Available via MCP, CLI, Skills, or the dashboard chat</span>
+              <span>Available via CLI, Skills, or the dashboard chat</span>
             </li>
           </ul>
         </div>
@@ -87,8 +87,7 @@ export function ProductCopilotDialog({ open, onClose, projectId, integrationStat
             Create an API key in the{' '}
             <strong className="text-[color:var(--foreground)]">Access</strong>{' '}
             tab, then connect via{' '}
-            <a href="/docs/connect/mcp" className="text-[color:var(--accent-selected)] hover:underline">MCP</a>,{' '}
-            <a href="/docs/connect/cli" className="text-[color:var(--accent-selected)] hover:underline">CLI</a>, or{' '}
+            <a href="/docs/connect/cli" className="text-[color:var(--accent-selected)] hover:underline">CLI</a> or{' '}
             <a href="/docs/connect/skills" className="text-[color:var(--accent-selected)] hover:underline">Skills</a>.
           </p>
         </div>

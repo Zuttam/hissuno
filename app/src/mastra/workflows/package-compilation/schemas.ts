@@ -20,7 +20,7 @@ export type SourceInput = z.infer<typeof sourceInputSchema>
 
 /**
  * Workflow input schema - projectId and sources.
- * Per-source analysis is delegated to the sourceAnalysisWorkflow.
+ * Per-source analysis is delegated to analyzeSource() in knowledge-service.
  * After all sources are analyzed, the package is compiled if packageId is provided.
  */
 export const workflowInputSchema = z.object({

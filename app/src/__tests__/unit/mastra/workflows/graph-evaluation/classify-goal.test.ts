@@ -7,16 +7,31 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { ProductScopeGoal } from '@/types/product-scope'
 
-const mockGenerateObject = vi.hoisted(() => vi.fn())
+const mockAgentGenerate = vi.hoisted(() => vi.fn())
 
-vi.mock('ai', () => ({
-  generateObject: mockGenerateObject,
+vi.mock('@mastra/core/agent', () => ({
+  Agent: class {
+    generate = mockAgentGenerate
+  },
 }))
-vi.mock('@ai-sdk/openai', () => ({
-  openai: vi.fn(() => 'mock-model'),
+vi.mock('@/mastra/models', () => ({
+  resolveModel: vi.fn(() => 'mock-model'),
+}))
+vi.mock('@/lib/db/queries/project-settings', () => ({
+  getAIModelSettingsAdmin: vi.fn(() => Promise.resolve({ ai_model: null, ai_model_small: null })),
 }))
 
 import { classifyGoal, type ClassifyGoalInput } from '@/mastra/workflows/graph-evaluation/steps/classify-goal'
+
+/** Helper: mock agent.generate to resolve with a structured object */
+function mockGenerateResult(obj: unknown) {
+  mockAgentGenerate.mockResolvedValue({ object: obj })
+}
+
+/** Helper: mock agent.generate to reject */
+function mockGenerateReject(error: Error) {
+  mockAgentGenerate.mockRejectedValue(error)
+}
 
 const GOALS: ProductScopeGoal[] = [
   { id: 'goal-1', text: 'Improve onboarding flow' },
@@ -26,6 +41,7 @@ const GOALS: ProductScopeGoal[] = [
 
 function makeInput(overrides: Partial<ClassifyGoalInput> = {}): ClassifyGoalInput {
   return {
+    projectId: 'test-project-id',
     entityName: 'Login Bug',
     contentSnippet: 'Users report that the login page freezes after entering credentials.',
     scopeName: 'Core Platform',
@@ -48,9 +64,9 @@ describe('classifyGoal', () => {
       expect(result.matchedGoalText).toBeNull()
     })
 
-    it('does NOT call generateObject when goals are empty', async () => {
+    it('does NOT call agent.generate when goals are empty', async () => {
       await classifyGoal(makeInput({ goals: [] }))
-      expect(mockGenerateObject).not.toHaveBeenCalled()
+      expect(mockAgentGenerate).not.toHaveBeenCalled()
     })
 
     it('returns "Matched via topic" reasoning when matchedTopic is provided', async () => {
@@ -66,30 +82,26 @@ describe('classifyGoal', () => {
     it('handles null goals (runtime edge case)', async () => {
       const result = await classifyGoal(makeInput({ goals: null as unknown as ProductScopeGoal[] }))
       expect(result.matchedGoalId).toBeNull()
-      expect(mockGenerateObject).not.toHaveBeenCalled()
+      expect(mockAgentGenerate).not.toHaveBeenCalled()
     })
   })
 
   describe('LLM goal classification', () => {
-    it('calls generateObject with goals formatted as numbered list', async () => {
-      mockGenerateObject.mockResolvedValue({
-        object: { goalId: 'goal-1', reasoning: 'Relates to onboarding' },
-      })
+    it('calls agent.generate with goals formatted as numbered list', async () => {
+      mockGenerateResult({ goalId: 'goal-1', reasoning: 'Relates to onboarding' })
 
       await classifyGoal(makeInput())
-      const prompt = mockGenerateObject.mock.calls[0][0].prompt
+      const prompt = mockAgentGenerate.mock.calls[0][0]
       expect(prompt).toContain('1. [goal-1] Improve onboarding flow')
       expect(prompt).toContain('2. [goal-2] Reduce churn rate')
       expect(prompt).toContain('3. [goal-3] Increase API adoption')
     })
 
     it('includes entity name and scope info in prompt', async () => {
-      mockGenerateObject.mockResolvedValue({
-        object: { goalId: 'goal-1', reasoning: 'test' },
-      })
+      mockGenerateResult({ goalId: 'goal-1', reasoning: 'test' })
 
       await classifyGoal(makeInput())
-      const prompt = mockGenerateObject.mock.calls[0][0].prompt
+      const prompt = mockAgentGenerate.mock.calls[0][0]
       expect(prompt).toContain('Login Bug')
       expect(prompt).toContain('Core Platform')
       expect(prompt).toContain('Core platform features and infrastructure')
@@ -97,21 +109,17 @@ describe('classifyGoal', () => {
 
     it('truncates contentSnippet to 1500 characters in the prompt', async () => {
       const longContent = 'Z'.repeat(3000)
-      mockGenerateObject.mockResolvedValue({
-        object: { goalId: null, reasoning: 'test' },
-      })
+      mockGenerateResult({ goalId: null, reasoning: 'test' })
 
       await classifyGoal(makeInput({ contentSnippet: longContent }))
-      const prompt = mockGenerateObject.mock.calls[0][0].prompt
+      const prompt = mockAgentGenerate.mock.calls[0][0]
       // The prompt should contain at most 1500 Z's (no Z's elsewhere in template)
       const zCount = (prompt.match(/Z/g) || []).length
       expect(zCount).toBe(1500)
     })
 
     it('returns matching goal ID and text when LLM picks a valid goal', async () => {
-      mockGenerateObject.mockResolvedValue({
-        object: { goalId: 'goal-2', reasoning: 'This relates to churn' },
-      })
+      mockGenerateResult({ goalId: 'goal-2', reasoning: 'This relates to churn' })
 
       const result = await classifyGoal(makeInput())
       expect(result.matchedGoalId).toBe('goal-2')
@@ -120,9 +128,7 @@ describe('classifyGoal', () => {
     })
 
     it('returns null goalId when LLM returns goalId as null', async () => {
-      mockGenerateObject.mockResolvedValue({
-        object: { goalId: null, reasoning: 'No goal is relevant' },
-      })
+      mockGenerateResult({ goalId: null, reasoning: 'No goal is relevant' })
 
       const result = await classifyGoal(makeInput())
       expect(result.matchedGoalId).toBeNull()
@@ -131,9 +137,7 @@ describe('classifyGoal', () => {
     })
 
     it('returns null goalId when LLM returns a goalId that does not exist in goals array', async () => {
-      mockGenerateObject.mockResolvedValue({
-        object: { goalId: 'goal-nonexistent', reasoning: 'Hallucinated goal' },
-      })
+      mockGenerateResult({ goalId: 'goal-nonexistent', reasoning: 'Hallucinated goal' })
 
       const result = await classifyGoal(makeInput())
       expect(result.matchedGoalId).toBeNull()
@@ -141,9 +145,7 @@ describe('classifyGoal', () => {
     })
 
     it('returns goal text from goals array, not from LLM response', async () => {
-      mockGenerateObject.mockResolvedValue({
-        object: { goalId: 'goal-1', reasoning: 'Matches onboarding' },
-      })
+      mockGenerateResult({ goalId: 'goal-1', reasoning: 'Matches onboarding' })
 
       const result = await classifyGoal(makeInput())
       // Text comes from the goals array definition, not LLM
@@ -152,8 +154,8 @@ describe('classifyGoal', () => {
   })
 
   describe('LLM failure fallback', () => {
-    it('returns null goalId when generateObject throws', async () => {
-      mockGenerateObject.mockRejectedValue(new Error('API error'))
+    it('returns null goalId when agent.generate throws', async () => {
+      mockGenerateReject(new Error('API error'))
 
       const result = await classifyGoal(makeInput())
       expect(result.matchedGoalId).toBeNull()
@@ -161,21 +163,21 @@ describe('classifyGoal', () => {
     })
 
     it('includes "(goal classification unavailable)" in fallback reasoning with matchedTopic', async () => {
-      mockGenerateObject.mockRejectedValue(new Error('fail'))
+      mockGenerateReject(new Error('fail'))
 
       const result = await classifyGoal(makeInput({ matchedTopic: 'billing' }))
       expect(result.reasoning).toBe('Matched via topic: billing (goal classification unavailable)')
     })
 
     it('includes scope name in fallback reasoning when matchedTopic is undefined', async () => {
-      mockGenerateObject.mockRejectedValue(new Error('fail'))
+      mockGenerateReject(new Error('fail'))
 
       const result = await classifyGoal(makeInput({ matchedTopic: undefined }))
       expect(result.reasoning).toBe('Matched to scope "Core Platform" (goal classification unavailable)')
     })
 
     it('does not throw - error is swallowed', async () => {
-      mockGenerateObject.mockRejectedValue(new Error('fail'))
+      mockGenerateReject(new Error('fail'))
 
       await expect(classifyGoal(makeInput())).resolves.toBeDefined()
     })
@@ -183,9 +185,7 @@ describe('classifyGoal', () => {
 
   describe('edge cases', () => {
     it('handles single goal in array', async () => {
-      mockGenerateObject.mockResolvedValue({
-        object: { goalId: 'only-goal', reasoning: 'Only option' },
-      })
+      mockGenerateResult({ goalId: 'only-goal', reasoning: 'Only option' })
 
       const result = await classifyGoal(makeInput({
         goals: [{ id: 'only-goal', text: 'The only goal' }],

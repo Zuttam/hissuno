@@ -31,5 +31,5 @@ The Automation layer is a set of workflows that run without manual intervention:
 Agents and interfaces consume the graph to deliver value:
 
 - **[Support Agent](/docs/architecture/support-agent)** - A customer-facing AI that answers questions using compiled knowledge packages, past conversations, and product context. Deployed via the embeddable widget or Slack.
-- **[PM Copilot](/docs/architecture/pm-copilot)** - A team-facing AI assistant for PMs, founders, and engineers. Available in-app, via Slack, or through MCP.
-- **[Interfaces](/docs/architecture/interfaces)** - MCP (Claude Desktop, Cursor), CLI, Skills, API, and the embeddable Widget.
+- **[PM Copilot](/docs/architecture/pm-copilot)** - A team-facing AI assistant for PMs, founders, and engineers. Available in-app or via Slack.
+- **[Interfaces](/docs/architecture/interfaces)** - CLI, Skills, API, and the embeddable Widget.

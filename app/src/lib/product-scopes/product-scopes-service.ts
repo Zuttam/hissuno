@@ -37,7 +37,8 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 // Re-export types used by callers
 export type { SyncScopeInput, SyncScopesResult } from '@/lib/db/queries/product-scopes'
 
-const MAX_SCOPES_PER_PROJECT = 20
+const MAX_SCOPES_PER_PROJECT = 50
+const MAX_DEPTH = 3
 
 // ============================================================================
 // Types
@@ -54,6 +55,8 @@ export interface CreateProductScopeAdminInput {
   position?: number
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
+  parent_id?: string | null
+  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -68,6 +71,8 @@ export interface UpdateProductScopeAdminInput {
   position?: number
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
+  parent_id?: string | null
+  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -77,7 +82,7 @@ export interface UpdateProductScopeAdminInput {
 
 /**
  * Creates a product scope with graph eval. No user auth required.
- * Enforces the max-scopes-per-project limit.
+ * Enforces the max-scopes-per-project limit and depth limit.
  */
 export async function createProductScopeAdmin(
   projectId: string,
@@ -93,19 +98,52 @@ export async function createProductScopeAdmin(
     throw new Error(`Maximum of ${MAX_SCOPES_PER_PROJECT} product scopes per project.`)
   }
 
+  // Validate parent and compute depth
+  let depth = 0
+  if (input.parent_id) {
+    const parent = await getProductScopeById(input.parent_id)
+    if (!parent || parent.project_id !== projectId) {
+      throw new Error('Parent scope not found in this project.')
+    }
+    depth = parent.depth + 1
+    if (depth > MAX_DEPTH) {
+      throw new Error(`Maximum nesting depth of ${MAX_DEPTH} exceeded.`)
+    }
+  }
+
+  // Default position: append after siblings
+  let position = input.position
+  if (position === undefined) {
+    const siblings = await db
+      .select({ value: count() })
+      .from(productScopes)
+      .where(
+        and(
+          eq(productScopes.project_id, projectId),
+          input.parent_id
+            ? eq(productScopes.parent_id, input.parent_id)
+            : sql`${productScopes.parent_id} IS NULL`
+        )
+      )
+    position = siblings[0].value
+  }
+
   try {
     const [created] = await db
       .insert(productScopes)
       .values({
         project_id: projectId,
+        parent_id: input.parent_id ?? null,
         name: input.name,
         slug: input.slug,
         description: input.description ?? '',
         color: input.color ?? '',
-        position: input.position ?? existing, // append to end if not specified
+        position,
+        depth,
         is_default: false,
         type: input.type ?? 'product_area',
         goals: (input.goals ?? null) as unknown as Record<string, unknown>,
+        content: input.content ?? null,
         custom_fields: input.custom_fields ?? null,
       })
       .returning()
@@ -136,11 +174,42 @@ export async function updateProductScopeAdmin(
 
   // Default scope protections
   if (existing.is_default) {
-    if (input.type === 'initiative') {
-      throw new Error('The default product scope cannot be changed to an initiative.')
+    if (input.type === 'initiative' || input.type === 'experiment') {
+      throw new Error('The default product scope cannot change type.')
     }
     if (input.name !== undefined || input.slug !== undefined) {
       throw new Error('Cannot change the name or slug of the default product scope.')
+    }
+    if (input.parent_id !== undefined && input.parent_id !== null) {
+      throw new Error('The default product scope must remain a root scope.')
+    }
+  }
+
+  // Handle parent_id change: validate no cycles, recompute depth
+  if (input.parent_id !== undefined && input.parent_id !== existing.parent_id) {
+    if (input.parent_id === scopeId) {
+      throw new Error('A scope cannot be its own parent.')
+    }
+    if (input.parent_id) {
+      const parent = await getProductScopeById(input.parent_id)
+      if (!parent || parent.project_id !== existing.project_id) {
+        throw new Error('Parent scope not found in this project.')
+      }
+      // Check for cycles: new parent cannot be a descendant
+      const allScopes = await db
+        .select()
+        .from(productScopes)
+        .where(eq(productScopes.project_id, existing.project_id))
+      const allRecords = allScopes as unknown as ProductScopeRecord[]
+      const { getScopeDescendantIds } = await import('@/lib/product-scopes/tree-utils')
+      const descendantIds = getScopeDescendantIds(allRecords, scopeId)
+      if (descendantIds.includes(input.parent_id)) {
+        throw new Error('Cannot move a scope under one of its own descendants.')
+      }
+      const newDepth = parent.depth + 1
+      if (newDepth > MAX_DEPTH) {
+        throw new Error(`Maximum nesting depth of ${MAX_DEPTH} exceeded.`)
+      }
     }
   }
 
@@ -152,10 +221,39 @@ export async function updateProductScopeAdmin(
   if (input.position !== undefined) updates.position = input.position
   if (input.type !== undefined) updates.type = input.type
   if (input.goals !== undefined) updates.goals = input.goals as unknown as Record<string, unknown>
+  if (input.parent_id !== undefined) updates.parent_id = input.parent_id
+  if (input.content !== undefined) updates.content = input.content
   if (input.custom_fields !== undefined) updates.custom_fields = input.custom_fields
 
   if (Object.keys(updates).length === 0) {
     return existing
+  }
+
+  // If parent changed, recompute depth for this scope and descendants
+  if (input.parent_id !== undefined && input.parent_id !== existing.parent_id) {
+    let newDepth = 0
+    if (input.parent_id) {
+      const parent = await getProductScopeById(input.parent_id)
+      newDepth = (parent?.depth ?? 0) + 1
+    }
+    updates.depth = newDepth
+
+    // Update in a transaction to also fix descendant depths
+    const [updated] = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(productScopes)
+        .set(updates)
+        .where(eq(productScopes.id, scopeId))
+        .returning()
+
+      // Recursively update descendant depths
+      await updateSubtreeDepths(tx, scopeId, newDepth + 1)
+      return [row]
+    })
+
+    const record = updated as unknown as ProductScopeRecord
+    fireEmbedding(record.id, 'product_scope', record.project_id, buildProductScopeEmbeddingText(record))
+    return record
   }
 
   try {
@@ -176,6 +274,28 @@ export async function updateProductScopeAdmin(
   }
 }
 
+/**
+ * Recursively update depths for all descendants of a scope.
+ */
+async function updateSubtreeDepths(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  parentId: string,
+  depth: number,
+): Promise<void> {
+  const children = await tx
+    .select()
+    .from(productScopes)
+    .where(eq(productScopes.parent_id, parentId))
+
+  for (const child of children) {
+    await tx
+      .update(productScopes)
+      .set({ depth })
+      .where(eq(productScopes.id, child.id))
+    await updateSubtreeDepths(tx, child.id, depth + 1)
+  }
+}
+
 // ============================================================================
 // Sync Helpers (operate within a transaction)
 // ============================================================================
@@ -186,6 +306,7 @@ function detectScopeChanges(
   isDefault: boolean
 ): boolean {
   const goalsChanged = JSON.stringify(existing.goals) !== JSON.stringify(incoming.goals)
+  const parentChanged = (existing.parent_id ?? null) !== (incoming.parent_id ?? null)
   if (isDefault) {
     return (
       existing.description !== incoming.description ||
@@ -201,7 +322,8 @@ function detectScopeChanges(
     existing.color !== incoming.color ||
     existing.position !== incoming.position ||
     existing.type !== incoming.type ||
-    goalsChanged
+    goalsChanged ||
+    parentChanged
   )
 }
 
@@ -234,11 +356,13 @@ async function createNewScopes(
         .insert(productScopes)
         .values({
           project_id: projectId,
+          parent_id: newScope.parent_id ?? null,
           name: newScope.name,
           slug: newScope.slug,
           description: newScope.description,
           color: newScope.color,
           position: newScope.position,
+          depth: 0, // Caller should set correct depth via parent resolution
           is_default: false,
           type: newScope.type ?? 'product_area',
           goals: newScope.goals as unknown as Record<string, unknown>,
@@ -298,6 +422,7 @@ async function updateExistingScopes(
       const [updated] = await tx
         .update(productScopes)
         .set({
+          parent_id: incomingScope.parent_id ?? null,
           name: incomingScope.name,
           slug: incomingScope.slug,
           description: incomingScope.description,
@@ -419,6 +544,7 @@ export async function searchScopes(
           id: productScopes.id,
           name: productScopes.name,
           description: productScopes.description,
+          content: productScopes.content,
         })
         .from(productScopes)
         .where(
@@ -427,7 +553,8 @@ export async function searchScopes(
             or(
               ilike(productScopes.name, s),
               ilike(productScopes.description, s),
-              sql`${productScopes.goals}::text ILIKE ${s}`
+              sql`${productScopes.goals}::text ILIKE ${s}`,
+              sql`to_tsvector('english', coalesce(${productScopes.content}, '')) @@ plainto_tsquery('english', ${query})`
             )
           )
         )
@@ -436,7 +563,7 @@ export async function searchScopes(
       return data.map((r) => ({
         id: r.id,
         name: r.name,
-        snippet: (r.description ?? '').slice(0, 200),
+        snippet: (r.description || r.content || '').slice(0, 200),
       }))
     },
   })

@@ -64,13 +64,6 @@ export async function triggerSourceAnalysis(
     .set({ status: 'analyzing', error_message: null })
     .where(eq(knowledgeSources.id, sourceId))
 
-  // Get the workflow
-  const workflow = mastra.getWorkflow('sourceAnalysisWorkflow')
-  if (!workflow) {
-    console.error('[compilation-service] sourceAnalysisWorkflow not found')
-    return { success: false, error: 'Source analysis workflow not configured.', statusCode: 500 }
-  }
-
   // Generate a unique run ID
   const runId = `source-${sourceId}-${Date.now()}`
 
@@ -116,13 +109,7 @@ export async function triggerSourceAnalysisBatch(
 ): Promise<void> {
   if (sourceIds.length === 0) return
 
-  const workflow = mastra.getWorkflow('sourceAnalysisWorkflow')
-  if (!workflow) {
-    console.error('[analysis-service] sourceAnalysisWorkflow not found for batch trigger')
-    return
-  }
-
-  // Fetch only the columns needed for workflow input
+  // Fetch only the columns needed for analysis input
   const sources = await db
     .select({
       id: knowledgeSources.id,
@@ -154,10 +141,8 @@ export async function triggerSourceAnalysisBatch(
         .set({ status: 'analyzing', error_message: null })
         .where(eq(knowledgeSources.id, source.id))
 
-      const runId = `batch-${source.id}-${Date.now()}`
-      const run = await workflow.createRunAsync({ runId })
-
-      const input = {
+      const { analyzeSource } = await import('@/lib/knowledge/knowledge-service')
+      await analyzeSource({
         projectId,
         sourceId: source.id,
         sourceType: source.type as 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'codebase' | 'notion',
@@ -168,18 +153,11 @@ export async function triggerSourceAnalysisBatch(
         notionPageId: source.notion_page_id ?? null,
         origin: source.origin ?? null,
         sourceName: source.name ?? null,
-      }
-
-      // Run the workflow and consume the stream to completion
-      const stream = run.stream({ inputData: input })
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      for await (const _event of stream.fullStream) {
-        // Consume events to drive workflow to completion
-      }
+      })
 
       console.log(`[analysis-service] Completed analysis for source ${source.id}`)
     } catch (error) {
-      console.error(`[analysis-service] Failed analysis for source ${source.id}:`, error)
+      console.error(`[analysis-service] Failed analysis for source ${source.id}:`, error instanceof Error ? error.stack ?? error.message : error)
       // Mark as failed and continue with next source
       try {
         await db
@@ -189,8 +167,9 @@ export async function triggerSourceAnalysisBatch(
             error_message: error instanceof Error ? error.message : 'Batch analysis failed',
           })
           .where(eq(knowledgeSources.id, source.id))
-      } catch {
-        // Best effort
+      } catch (statusErr) {
+        // Best effort: log so we know when status propagation is also broken.
+        console.warn(`[analysis-service] Failed to mark source ${source.id} as failed:`, statusErr instanceof Error ? statusErr.message : statusErr)
       }
     }
   }
@@ -237,7 +216,7 @@ export type TriggerAnalysisResult = {
 export async function triggerPackageCompilation(
   params: TriggerAnalysisParams
 ): Promise<TriggerAnalysisResult> {
-  const { projectId, userId, packageId, sourceIds } = params
+  const { projectId, packageId, sourceIds } = params
 
   // Fetch project
   const [project] = await db

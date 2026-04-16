@@ -56,7 +56,7 @@ export default function TermsOfServicePage() {
             <li>Automated issue creation, prioritization, and tracking</li>
             <li>Knowledge graph with semantic search</li>
             <li>Integration with third-party tools (Slack, GitHub, Jira, Linear, Intercom, etc.)</li>
-            <li>MCP server for agent-native access</li>
+            <li>CLI and API for agent-native access</li>
           </ul>
         </section>
 
@@ -192,7 +192,7 @@ export default function TermsOfServicePage() {
           <h2>15. Contact Us</h2>
           <p>If you have any questions about these Terms, please contact us at:</p>
           <p>
-            <strong>Email:</strong> legal@hissuno.com
+            <strong>Email:</strong> support@hissuno.com
           </p>
         </section>
       </div>

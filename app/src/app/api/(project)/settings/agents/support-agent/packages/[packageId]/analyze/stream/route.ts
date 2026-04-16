@@ -6,7 +6,7 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
-import { knowledgePackages, compilationRuns, knowledgeSources } from '@/lib/db/schema/app'
+import { supportPackages, compilationRuns, knowledgeSources } from '@/lib/db/schema/app'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/utils/sse'
 import { mastra } from '@/mastra'
 import type { WorkflowInput } from '@/mastra/workflows/package-compilation/schemas'
@@ -90,12 +90,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // Verify package exists
     const [pkg] = await db
-      .select({ id: knowledgePackages.id, name: knowledgePackages.name })
-      .from(knowledgePackages)
+      .select({ id: supportPackages.id, name: supportPackages.name })
+      .from(supportPackages)
       .where(
         and(
-          eq(knowledgePackages.id, packageId),
-          eq(knowledgePackages.project_id, projectId)
+          eq(supportPackages.id, packageId),
+          eq(supportPackages.project_id, projectId)
         )
       )
       .limit(1)

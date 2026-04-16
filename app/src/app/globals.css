@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "@hissuno/widget/styles.css";
-@import "@xyflow/react/dist/style.css";
 @plugin "@tailwindcss/typography";
 @custom-variant dark (&:where(.dark &));
 

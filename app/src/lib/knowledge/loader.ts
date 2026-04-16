@@ -7,28 +7,28 @@
  */
 
 import { db } from '@/lib/db'
-import { knowledgePackages, knowledgePackageSources, knowledgeSources } from '@/lib/db/schema/app'
+import { supportPackages, supportPackageSources, knowledgeSources } from '@/lib/db/schema/app'
 import { eq, and, inArray } from 'drizzle-orm'
 
 /**
  * Load all analyzed knowledge for a package.
  *
- * Reads compiled content directly from the knowledgePackages record
+ * Reads compiled content directly from the supportPackages record
  * (faq_content, howto_content, feature_docs_content, troubleshooting_content).
  * If no compiled content exists, falls back to concatenating each source's
- * analyzed_content via knowledgePackageSources.
+ * analyzed_content via supportPackageSources.
  *
  * @returns Combined knowledge content string, or empty string if no content available
  */
 export async function loadPackageKnowledge(packageId: string, projectId?: string): Promise<string> {
   // Fetch the package record with compiled content, scoped to project when provided
   const conditions = projectId
-    ? and(eq(knowledgePackages.id, packageId), eq(knowledgePackages.project_id, projectId))
-    : eq(knowledgePackages.id, packageId)
+    ? and(eq(supportPackages.id, packageId), eq(supportPackages.project_id, projectId))
+    : eq(supportPackages.id, packageId)
 
   const [pkg] = await db
     .select()
-    .from(knowledgePackages)
+    .from(supportPackages)
     .where(conditions)
     .limit(1)
 
@@ -61,9 +61,9 @@ export async function loadPackageKnowledge(packageId: string, projectId?: string
 
   // Fall back to concatenating source analyzed_content
   const packageSourceRows = await db
-    .select({ source_id: knowledgePackageSources.source_id })
-    .from(knowledgePackageSources)
-    .where(eq(knowledgePackageSources.package_id, packageId))
+    .select({ source_id: supportPackageSources.source_id })
+    .from(supportPackageSources)
+    .where(eq(supportPackageSources.package_id, packageId))
 
   if (packageSourceRows.length === 0) {
     console.log('[knowledge-loader] No sources linked to package', packageId)

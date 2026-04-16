@@ -25,7 +25,7 @@ const QUOTES: QuoteItem[] = [
   },
   {
     id: 'q3',
-    text: "Every agent we tried needed its own MCP server, its own data pipeline, its own context. We were building infrastructure instead of product.",
+    text: "Every agent we tried needed its own data pipeline, its own context, its own integrations. We were building infrastructure instead of product.",
     author: 'Engineering Lead',
     role: 'B2B Platform',
   },

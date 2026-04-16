@@ -7,7 +7,7 @@ import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-cont
 import { triggerPackageCompilation } from '@/lib/knowledge/analysis-service'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
-import { knowledgePackages, knowledgePackageSources, knowledgeSources, compilationRuns } from '@/lib/db/schema/app'
+import { supportPackages, supportPackageSources, knowledgeSources, compilationRuns } from '@/lib/db/schema/app'
 
 export const runtime = 'nodejs'
 
@@ -37,12 +37,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // Verify package exists and belongs to project
     const [pkg] = await db
-      .select({ id: knowledgePackages.id, name: knowledgePackages.name })
-      .from(knowledgePackages)
+      .select({ id: supportPackages.id, name: supportPackages.name })
+      .from(supportPackages)
       .where(
         and(
-          eq(knowledgePackages.id, packageId),
-          eq(knowledgePackages.project_id, projectId)
+          eq(supportPackages.id, packageId),
+          eq(supportPackages.project_id, projectId)
         )
       )
       .limit(1)
@@ -53,9 +53,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     // Get the linked sources for this package
     const linkedSources = await db
-      .select({ source_id: knowledgePackageSources.source_id })
-      .from(knowledgePackageSources)
-      .where(eq(knowledgePackageSources.package_id, packageId))
+      .select({ source_id: supportPackageSources.source_id })
+      .from(supportPackageSources)
+      .where(eq(supportPackageSources.package_id, packageId))
 
     const sourceIds = linkedSources.map((s) => s.source_id)
 
@@ -129,12 +129,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // Verify package exists
     const [pkg] = await db
-      .select({ id: knowledgePackages.id, name: knowledgePackages.name })
-      .from(knowledgePackages)
+      .select({ id: supportPackages.id, name: supportPackages.name })
+      .from(supportPackages)
       .where(
         and(
-          eq(knowledgePackages.id, packageId),
-          eq(knowledgePackages.project_id, projectId)
+          eq(supportPackages.id, packageId),
+          eq(supportPackages.project_id, projectId)
         )
       )
       .limit(1)
@@ -145,9 +145,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // Get linked sources to check analysis status
     const linkedSources = await db
-      .select({ source_id: knowledgePackageSources.source_id })
-      .from(knowledgePackageSources)
-      .where(eq(knowledgePackageSources.package_id, packageId))
+      .select({ source_id: supportPackageSources.source_id })
+      .from(supportPackageSources)
+      .where(eq(supportPackageSources.package_id, packageId))
 
     const sourceIds = linkedSources.map((s) => s.source_id)
 

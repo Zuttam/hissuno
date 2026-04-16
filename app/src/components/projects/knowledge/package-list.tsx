@@ -6,7 +6,7 @@ import { PackageDialog } from './package-dialog'
 import { PackageListItem } from './package-list-item'
 import { usePackageAnalysis } from '@/hooks/use-package-analysis'
 import { listPackages, getPackageAnalysisStatus } from '@/lib/api/knowledge'
-import type { KnowledgePackageWithSources } from '@/lib/knowledge/types'
+import type { SupportPackageWithSources } from '@/lib/knowledge/types'
 
 interface PackageListProps {
   projectId: string
@@ -18,14 +18,14 @@ interface PackageListProps {
   showCreateDialog?: boolean
   onCreateDialogClose?: () => void
   onCreatePackage?: () => void
-  onEditPackage?: (pkg: KnowledgePackageWithSources) => void
+  onEditPackage?: (pkg: SupportPackageWithSources) => void
 }
 
 export function PackageList({ projectId, activePackageId, onPackagesChange, hasResources = true, initialExpandedPackageId, onPackageSelect, showCreateDialog: showCreateDialogProp, onCreateDialogClose, onCreatePackage, onEditPackage }: PackageListProps) {
-  const [packages, setPackages] = useState<KnowledgePackageWithSources[]>([])
+  const [packages, setPackages] = useState<SupportPackageWithSources[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [settingsPackage, setSettingsPackage] = useState<KnowledgePackageWithSources | null>(null)
+  const [settingsPackage, setSettingsPackage] = useState<SupportPackageWithSources | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
   // Sync showCreateDialog with parent prop
@@ -74,7 +74,7 @@ export function PackageList({ projectId, activePackageId, onPackagesChange, hasR
       const data = await listPackages(projectId)
       const pkgs = data.packages ?? []
       setPackages(pkgs)
-      return pkgs as KnowledgePackageWithSources[]
+      return pkgs as SupportPackageWithSources[]
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError(message)
@@ -86,7 +86,7 @@ export function PackageList({ projectId, activePackageId, onPackagesChange, hasR
 
   // Check for running analysis across all packages
   const checkRunningAnalysis = useCallback(
-    async (pkgs: KnowledgePackageWithSources[]) => {
+    async (pkgs: SupportPackageWithSources[]) => {
       for (const pkg of pkgs) {
         try {
           const response = await getPackageAnalysisStatus(projectId, pkg.id)
@@ -123,7 +123,7 @@ export function PackageList({ projectId, activePackageId, onPackagesChange, hasR
   }, [fetchPackages, checkRunningAnalysis])
 
   // Handle package expansion toggle
-  const handleToggleExpand = (pkg: KnowledgePackageWithSources) => {
+  const handleToggleExpand = (pkg: SupportPackageWithSources) => {
     if (expandedPackageId === pkg.id) {
       setExpandedPackageId(null)
     } else {
@@ -131,7 +131,7 @@ export function PackageList({ projectId, activePackageId, onPackagesChange, hasR
     }
   }
 
-  const handleSettingsClick = (e: React.MouseEvent, pkg: KnowledgePackageWithSources) => {
+  const handleSettingsClick = (e: React.MouseEvent, pkg: SupportPackageWithSources) => {
     e.stopPropagation()
     if (onEditPackage) {
       onEditPackage(pkg)
@@ -140,7 +140,7 @@ export function PackageList({ projectId, activePackageId, onPackagesChange, hasR
     }
   }
 
-  const handleCompileClick = (e: React.MouseEvent, pkg: KnowledgePackageWithSources) => {
+  const handleCompileClick = (e: React.MouseEvent, pkg: SupportPackageWithSources) => {
     e.stopPropagation()
     if (pkg.sourceCount === 0) return
     setAnalyzingPackageId(pkg.id)

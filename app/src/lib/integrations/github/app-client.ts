@@ -97,3 +97,133 @@ export async function listUserRepos(token: string): Promise<GitHubRepo[]> {
 
   return repos
 }
+
+// ---------------------------------------------------------------------------
+// Issue & Comment types
+// ---------------------------------------------------------------------------
+
+export type GitHubIssue = {
+  id: number
+  number: number
+  title: string
+  body: string | null
+  state: 'open' | 'closed'
+  user: { login: string; id: number } | null
+  labels: Array<{ id: number; name: string }>
+  created_at: string
+  updated_at: string
+  closed_at: string | null
+  html_url: string
+  pull_request?: unknown // present if this is a PR
+  comments: number
+}
+
+export type GitHubComment = {
+  id: number
+  body: string
+  user: { login: string; id: number } | null
+  created_at: string
+  updated_at: string
+  html_url: string
+}
+
+// ---------------------------------------------------------------------------
+// Issue fetching
+// ---------------------------------------------------------------------------
+
+const MAX_ISSUE_PAGES = 10
+
+/**
+ * List issues for a repository (excludes pull requests).
+ * Supports label filtering and incremental sync via `since`.
+ */
+export async function listRepoIssues(
+  token: string,
+  owner: string,
+  repo: string,
+  opts?: { labels?: string; since?: string; state?: 'open' | 'closed' | 'all' }
+): Promise<GitHubIssue[]> {
+  const issues: GitHubIssue[] = []
+  let page = 1
+  const state = opts?.state ?? 'all'
+
+  while (page <= MAX_ISSUE_PAGES) {
+    const params = new URLSearchParams({
+      state,
+      per_page: '100',
+      page: String(page),
+      sort: 'updated',
+      direction: 'desc',
+    })
+    if (opts?.labels) params.set('labels', opts.labels)
+    if (opts?.since) params.set('since', opts.since)
+
+    const response = await fetch(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/issues?${params}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[github.listRepoIssues] Error:', response.status, errorText)
+      throw new Error(`Failed to list issues: ${response.status}`)
+    }
+
+    const data: GitHubIssue[] = await response.json()
+
+    // Filter out pull requests (GitHub issues API returns PRs too)
+    const realIssues = data.filter((item) => !item.pull_request)
+    issues.push(...realIssues)
+
+    if (data.length < 100) break
+    page++
+  }
+
+  return issues
+}
+
+/**
+ * Get all comments for an issue.
+ */
+export async function getIssueComments(
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number
+): Promise<GitHubComment[]> {
+  const comments: GitHubComment[] = []
+  let page = 1
+
+  while (page <= MAX_ISSUE_PAGES) {
+    const response = await fetch(
+      `${GITHUB_API_BASE}/repos/${owner}/${repo}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[github.getIssueComments] Error:', response.status, errorText)
+      throw new Error(`Failed to get comments: ${response.status}`)
+    }
+
+    const data: GitHubComment[] = await response.json()
+    comments.push(...data)
+
+    if (data.length < 100) break
+    page++
+  }
+
+  return comments
+}

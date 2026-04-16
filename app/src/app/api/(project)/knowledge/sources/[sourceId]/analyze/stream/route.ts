@@ -8,8 +8,6 @@ import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
 import { compilationRuns, knowledgeSources } from '@/lib/db/schema/app'
 import { createSSEStreamWithExecutor, createSSEEvent, type BaseSSEEvent } from '@/lib/utils/sse'
-import { mastra } from '@/mastra'
-import type { SourceAnalysisInput } from '@/mastra/workflows/source-analysis/schemas'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,16 +32,6 @@ type SourceSSEEventType =
 
 interface SourceSSEEvent extends BaseSSEEvent {
   type: SourceSSEEventType
-}
-
-function getStepDisplayName(stepId: string): string {
-  const stepNames: Record<string, string> = {
-    'fetch-content': 'Fetching and analyzing content',
-    'sanitize-content': 'Scanning for sensitive information',
-    'save-and-embed': 'Saving and generating embeddings',
-    'trigger-graph-eval': 'Discovering related entities',
-  }
-  return stepNames[stepId] ?? stepId
 }
 
 /**
@@ -100,11 +88,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'No running analysis found for this source.' }, { status: 404 })
     }
 
-    const workflow = mastra.getWorkflow('sourceAnalysisWorkflow')
-    if (!workflow) {
-      return NextResponse.json({ error: 'Workflow not configured.' }, { status: 500 })
-    }
-
     return createSSEStreamWithExecutor<SourceSSEEvent>({
       logPrefix: LOG_PREFIX,
       executor: async ({ emit, close, isClosed }) => {
@@ -118,84 +101,42 @@ export async function GET(request: NextRequest, context: RouteContext) {
         emitEvent('connected', { message: 'Connected to source analysis stream' })
 
         try {
-          const workflowInput: SourceAnalysisInput = {
-            projectId,
-            sourceId,
-            sourceType: source.type as SourceAnalysisInput['sourceType'],
-            url: source.url,
-            storagePath: source.storage_path,
-            content: source.content,
-            analysisScope: source.analysis_scope ?? null,
-            notionPageId: source.notion_page_id ?? null,
-            origin: (source as Record<string, unknown>).origin as string | null ?? null,
-            sourceName: source.name ?? null,
-          }
+          const { analyzeSource } = await import('@/lib/knowledge/knowledge-service')
 
-          const run = await workflow.createRunAsync({ runId: sourceAnalysis.run_id })
-          const workflowStream = run.stream({ inputData: workflowInput })
+          emitEvent('workflow-start', { message: 'Source analysis started' })
 
-          for await (const event of workflowStream.fullStream) {
-            if (isClosed()) break
-
-            const payload = 'payload' in event ? (event.payload as Record<string, unknown>) : undefined
-            const stepId = payload?.stepName as string | undefined
-
-            switch (event.type) {
-              case 'workflow-start':
-                emitEvent('workflow-start', { message: 'Source analysis started' })
-                break
-
-              case 'workflow-step-start':
-                emitEvent('step-start', {
-                  stepId,
-                  message: `Starting: ${getStepDisplayName(stepId ?? '')}`,
-                })
-                break
-
-              case 'workflow-step-output': {
-                const output = (payload?.output as { type?: string; message?: string })
-                  ?? (payload as { type?: string; message?: string })
-                if (output?.type === 'progress') {
-                  emitEvent('step-progress', {
-                    stepId,
-                    message: output?.message ?? 'Processing...',
-                  })
+          const result = await analyzeSource(
+            {
+              projectId,
+              sourceId,
+              sourceType: source.type as 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'codebase' | 'notion',
+              url: source.url,
+              storagePath: source.storage_path,
+              content: source.content,
+              analysisScope: source.analysis_scope ?? null,
+              notionPageId: source.notion_page_id ?? null,
+              origin: (source as Record<string, unknown>).origin as string | null ?? null,
+              sourceName: source.name ?? null,
+            },
+            {
+              onProgress: (step, message) => {
+                if (!isClosed()) {
+                  emitEvent('step-progress', { stepId: step, message })
                 }
-                break
-              }
-
-              case 'workflow-step-result':
-              case 'workflow-step-finish':
-                emitEvent('step-finish', {
-                  stepId,
-                  message: `Completed: ${getStepDisplayName(stepId ?? '')}`,
-                })
-                break
-
-              case 'workflow-finish':
-              case 'workflow-canceled': {
-                const workflowStatus = payload?.workflowStatus as string | undefined
-                const isError = workflowStatus === 'error' || workflowStatus === 'failed'
-
-                if (isError) {
-                  throw new Error((payload?.error as string) || 'Workflow failed')
-                } else {
-                  // Mark analysis as completed
-                  await db
-                    .update(compilationRuns)
-                    .set({
-                      status: 'completed',
-                      completed_at: new Date(),
-                    })
-                    .where(eq(compilationRuns.id, sourceAnalysis.id))
-
-                  emitEvent('workflow-finish', { message: 'Source analysis completed' })
-                }
-                break
-              }
+              },
             }
-          }
+          )
 
+          // Mark compilation run as completed
+          await db
+            .update(compilationRuns)
+            .set({ status: 'completed', completed_at: new Date() })
+            .where(eq(compilationRuns.id, sourceAnalysis.id))
+
+          if (result.errors.length > 0) {
+            emitEvent('step-progress', { message: `Completed with ${result.errors.length} warning(s)` })
+          }
+          emitEvent('workflow-finish', { message: 'Source analysis completed' })
           close()
         } catch (error) {
           console.error(`${LOG_PREFIX} stream error`, error)

@@ -3,8 +3,11 @@
 import { useState, useEffect } from 'react'
 import { Check, Unplug, Shield, KeyRound, Plug } from 'lucide-react'
 import { Dialog, Button, InlineAlert, Spinner, FormField, Input } from '@/components/ui'
+import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
 import { ToggleGroup } from '@/components/ui/toggle-group'
-import { fetchGithubStatus, disconnectGithub, githubConnectUrl, connectGithubPat } from '@/lib/api/integrations'
+import { fetchGithubStatus, disconnectGithub, githubConnectUrl, connectGithubPat, fetchGithubRepos, fetchGithubSyncConfig, saveGithubSyncConfig } from '@/lib/api/integrations'
+import { GitHubCodebaseSyncTab } from './github-codebase-sync-tab'
+import { GitHubFeedbackSyncTab } from './github-feedback-sync-tab'
 
 interface GitHubConfigDialogProps {
   open: boolean
@@ -47,11 +50,21 @@ export function GitHubConfigDialog({
   const [accessToken, setAccessToken] = useState('')
   const [isConnecting, setIsConnecting] = useState(false)
 
-  // Fetch current GitHub connection status
+  // Tabs state
+  const [activeTab, setActiveTab] = useState('feedback')
+
+  // Available repos
+  const [allRepos, setAllRepos] = useState<Array<{ id: number; fullName: string; defaultBranch: string }>>([])
+  const [selectedRepos, setSelectedRepos] = useState<Array<{ id: number; fullName: string }>>([])
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false)
+  const [reposDirty, setReposDirty] = useState(false)
+  const [isSavingRepos, setIsSavingRepos] = useState(false)
+
+  // Fetch current GitHub connection status + repos + saved config
   useEffect(() => {
     if (!open) return
 
-    const fetchStatus = async () => {
+    const fetchAll = async () => {
       setIsLoading(true)
       setError(null)
       try {
@@ -65,6 +78,26 @@ export function GitHubConfigDialog({
           accountLogin: data.accountLogin,
           authMethod: data.authMethod,
         })
+
+        if (data.connected) {
+          // Load repos and saved config in parallel
+          setIsLoadingRepos(true)
+          const [reposData, configRes] = await Promise.all([
+            fetchGithubRepos(projectId),
+            fetchGithubSyncConfig(projectId, 'feedback'),
+          ])
+          setAllRepos(reposData.repos ?? [])
+
+          // Restore saved repo selection from sync config
+          if (configRes.ok) {
+            const configData = await configRes.json()
+            if (configData.configured && configData.githubRepoIds?.length > 0) {
+              setSelectedRepos(configData.githubRepoIds)
+            }
+          }
+          setIsLoadingRepos(false)
+          setReposDirty(false)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load GitHub status')
       } finally {
@@ -72,8 +105,40 @@ export function GitHubConfigDialog({
       }
     }
 
-    void fetchStatus()
+    void fetchAll()
   }, [open, projectId])
+
+  const toggleRepo = (repo: { id: number; fullName: string }) => {
+    setSelectedRepos((prev) => {
+      const exists = prev.some((r) => r.id === repo.id)
+      if (exists) return prev.filter((r) => r.id !== repo.id)
+      return [...prev, { id: repo.id, fullName: repo.fullName }]
+    })
+    setReposDirty(true)
+  }
+
+  const handleSaveRepos = async () => {
+    setIsSavingRepos(true)
+    setError(null)
+    try {
+      const response = await saveGithubSyncConfig({
+        projectId,
+        syncType: 'feedback',
+        githubRepoIds: selectedRepos,
+        syncEnabled: true,
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to save repositories')
+      }
+      setReposDirty(false)
+      setSuccessMessage('Repositories saved.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save repositories')
+    } finally {
+      setIsSavingRepos(false)
+    }
+  }
 
   const handleConnect = () => {
     // Open GitHub OAuth flow in a new window
@@ -173,17 +238,61 @@ export function GitHubConfigDialog({
             <Spinner size="md" />
           </div>
         ) : status.connected ? (
-          <div className="space-y-4">
+          <div className="flex flex-col gap-4">
+            {/* Connection status header */}
             <p className="flex items-center gap-2 text-sm text-[color:var(--accent-success)]"><Check size={14} />Connected to GitHub: {status.accountLogin || 'Unknown'} <span className="text-xs opacity-75">via {authMethodLabel}</span></p>
-            <Button variant="ghost" size="sm" onClick={handleRefresh}>
-              Refresh Status
-            </Button>
+
+            {/* Available Repositories */}
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-[color:var(--foreground)]">Available Repositories</label>
+              {isLoadingRepos ? (
+                <div className="flex items-center gap-2 py-2">
+                  <Spinner size="sm" />
+                  <span className="text-sm text-[color:var(--text-secondary)]">Loading repositories...</span>
+                </div>
+              ) : allRepos.length === 0 ? (
+                <p className="text-sm text-[color:var(--text-tertiary)]">No repositories found.</p>
+              ) : (
+                <div className="max-h-40 flex flex-col gap-1 overflow-y-auto rounded-[4px] border border-[color:var(--border-subtle)] p-2">
+                  {allRepos.map((repo) => (
+                    <label key={repo.id} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-[color:var(--surface-hover)]">
+                      <input
+                        type="checkbox"
+                        checked={selectedRepos.some((r) => r.id === repo.id)}
+                        onChange={() => toggleRepo(repo)}
+                        className="rounded"
+                      />
+                      <span className="text-sm text-[color:var(--foreground)]">{repo.fullName}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {reposDirty && (
+                <Button variant="secondary" size="sm" onClick={handleSaveRepos} loading={isSavingRepos} disabled={selectedRepos.length === 0}>
+                  Save Repositories
+                </Button>
+              )}
+            </div>
+
+            {/* Tabs for Feedback Sync and Codebase */}
+            <Tabs value={activeTab} onChange={setActiveTab}>
+              <TabsList className="-mx-4 px-4">
+                <Tab value="feedback">Feedback Sync</Tab>
+                <Tab value="codebase">Codebase</Tab>
+              </TabsList>
+              <TabsPanel value="feedback" className="px-0 py-4" forceMount>
+                <GitHubFeedbackSyncTab projectId={projectId} selectedRepos={selectedRepos} />
+              </TabsPanel>
+              <TabsPanel value="codebase" className="px-0 py-4" forceMount>
+                <GitHubCodebaseSyncTab projectId={projectId} />
+              </TabsPanel>
+            </Tabs>
 
             {/* Danger Zone */}
             <div className="border-t border-[color:var(--accent-danger)] pt-4">
               <p className="font-mono text-xs font-medium uppercase tracking-wide text-[color:var(--text-secondary)]">Danger Zone</p>
               <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
-                This will remove the GitHub connection.
+                This will remove the GitHub connection and all sync configurations.
               </p>
               <Button
                 variant="danger"
@@ -231,7 +340,7 @@ export function GitHubConfigDialog({
                         Connect GitHub
                       </Button>
                       {connectClicked && (
-                        <Button variant="secondary" onClick={handleRefresh}>
+                        <Button variant="secondary" size="sm" onClick={handleRefresh}>
                           Refresh Status
                         </Button>
                       )}

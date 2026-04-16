@@ -5,7 +5,6 @@ import { motion, useInView } from 'motion/react'
 import Image from 'next/image'
 import { Database, Sparkles, Terminal, LucideIcon } from 'lucide-react'
 import { ThemeLogo } from '@/components/ui/theme-logo'
-import { WaterReveal } from '@/components/landing/water-reveal'
 
 interface FloatingIntegration {
   name: string
@@ -30,7 +29,7 @@ const STEPS: Step[] = [
     step: 1,
     title: 'Connect Sources',
     description:
-      'Slack, Intercom, Gong, GitHub, email — connect the tools where product signals already live.',
+      'Slack, Intercom, Gong, GitHub, email - connect the tools where product signals already live.',
     icon: Database,
     integrations: [
       { name: 'Slack', logo: '/logos/slack.svg', delay: 0 },
@@ -55,7 +54,7 @@ const STEPS: Step[] = [
     step: 3,
     title: 'Expose to Agents',
     description:
-      'MCP, CLI, API - your AI agents traverse the graph and query product intelligence natively.',
+      'CLI, API - your AI agents traverse the graph and query product intelligence natively.',
     icon: Terminal,
     integrations: [
       { name: 'Anthropic', logo: '/logos/anthropic.svg', delay: 0 },
@@ -235,17 +234,13 @@ export function FeaturesSection() {
   return (
     <section className="px-6 py-12 md:px-12">
       <div className="mx-auto max-w-6xl">
-        <WaterReveal preset="text" parallax parallaxDepth={0.08}>
-          <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
-            How It Works
-          </h2>
-        </WaterReveal>
+        <h2 className="text-center font-mono text-3xl font-bold text-[var(--foreground)]">
+          How It Works
+        </h2>
 
-        <WaterReveal preset="text" delay={0.15}>
-          <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
-            From scattered data to a traversable knowledge graph in three steps
-          </p>
-        </WaterReveal>
+        <p className="mx-auto mt-4 max-w-2xl text-center text-[var(--text-secondary)]">
+          From scattered data to a traversable knowledge graph in three steps
+        </p>
 
         <div className="mt-16">
           <HorizontalTimeline />

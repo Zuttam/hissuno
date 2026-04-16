@@ -6,9 +6,6 @@ import type {
   SessionsStripAnalytics,
   IssuesStripAnalytics,
   CustomerSegmentationAnalytics,
-  EntityGraphAnalytics,
-  EdgeEntitiesData,
-  DrilldownData,
 } from '@/lib/db/queries/analytics'
 import type { DashboardActionableData } from '@/types/dashboard'
 
@@ -53,75 +50,6 @@ export async function getCustomerSegmentationAnalytics(projectId: string, period
   const url = buildUrl(paths.analytics, { type: 'customer-segmentation', projectId, period })
   const { data } = await fetchApi<{ data: CustomerSegmentationAnalytics | null }>(url, {
     errorMessage: 'Failed to load customer segmentation analytics.',
-  })
-  return data ?? null
-}
-
-export async function getEntityGraphAnalytics(
-  projectId: string,
-): Promise<EntityGraphAnalytics | null> {
-  const url = buildUrl(paths.analytics, { type: 'entity-graph', projectId })
-  const { data } = await fetchApi<{ data: EntityGraphAnalytics | null }>(url, {
-    errorMessage: 'Failed to load entity graph analytics.',
-  })
-  return data ?? null
-}
-
-export async function getEdgeEntities(
-  projectId: string,
-  sourceCategory: string,
-  targetCategory: string,
-  limit: number = 10,
-): Promise<EdgeEntitiesData | null> {
-  const url = buildUrl(paths.analytics, {
-    type: 'entity-graph-edge-entities',
-    projectId,
-    sourceCategory,
-    targetCategory,
-    limit,
-  })
-  const { data } = await fetchApi<{ data: EdgeEntitiesData | null }>(url, {
-    errorMessage: 'Failed to load edge entities.',
-  })
-  return data ?? null
-}
-
-export async function getDrilldownData(
-  projectId: string,
-  category: string,
-  level: 'groups' | 'entities',
-  groupBy?: string,
-  groupValue?: string,
-  limit?: number,
-): Promise<DrilldownData | null> {
-  const url = buildUrl(paths.analytics, {
-    type: 'entity-graph-drilldown',
-    projectId,
-    category,
-    level,
-    groupBy,
-    groupValue,
-    limit,
-  })
-  const { data } = await fetchApi<{ data: DrilldownData | null }>(url, {
-    errorMessage: 'Failed to load drilldown data.',
-  })
-  return data ?? null
-}
-
-export async function getChildEntityEdges(
-  projectId: string,
-  category: string,
-  childIds: string[],
-): Promise<Record<string, string[]> | null> {
-  const url = buildUrl(paths.analytics, {
-    type: 'entity-graph-child-edges',
-    projectId,
-    category,
-    childIds: childIds.join(','),
-  })
-  const { data } = await fetchApi<{ data: Record<string, string[]> | null }>(url, {
-    errorMessage: 'Failed to load child entity edges.',
   })
   return data ?? null
 }

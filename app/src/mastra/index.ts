@@ -3,8 +3,6 @@ import { Mastra } from '@mastra/core/mastra';
 import { PinoLogger } from '@mastra/loggers';
 import { PostgresStore } from '@mastra/pg';
 import { packageCompilationWorkflow } from './workflows/package-compilation';
-import { sourceAnalysisWorkflow } from './workflows/source-analysis';
-import { sessionProcessingWorkflow } from './workflows/session-processing';
 import { issueAnalysisWorkflow } from './workflows/issue-analysis';
 import { supportAgent } from './agents/support-agent';
 import { codebaseAnalyzerAgent } from './agents/codebase-analyzer-agent';
@@ -35,7 +33,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const mastra = new Mastra({
-  workflows: { packageCompilationWorkflow, sourceAnalysisWorkflow, sessionProcessingWorkflow, issueAnalysisWorkflow },
+  workflows: { packageCompilationWorkflow, issueAnalysisWorkflow },
   agents: {
     supportAgent,
     codebaseAnalyzerAgent,

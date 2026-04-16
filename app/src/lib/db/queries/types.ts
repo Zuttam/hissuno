@@ -22,8 +22,8 @@ import type {
   issueAnalysisRuns,
   knowledgeSources,
   knowledgeEmbeddings,
-  knowledgePackages,
-  knowledgePackageSources,
+  supportPackages,
+  supportPackageSources,
   entityRelationships,
   sourceCodes,
   embeddings,
@@ -32,9 +32,7 @@ import type {
   slackThreadSessions,
   githubAppInstallations,
   jiraConnections,
-  jiraIssueSyncs,
   linearConnections,
-  linearIssueSyncs,
   zendeskConnections,
   intercomConnections,
   gongConnections,
@@ -123,11 +121,11 @@ export type KnowledgeSourceInsert = typeof knowledgeSources.$inferInsert
 export type KnowledgeEmbeddingRow = typeof knowledgeEmbeddings.$inferSelect
 export type KnowledgeEmbeddingInsert = typeof knowledgeEmbeddings.$inferInsert
 
-export type KnowledgePackageRow = typeof knowledgePackages.$inferSelect
-export type KnowledgePackageInsert = typeof knowledgePackages.$inferInsert
+export type SupportPackageRow = typeof supportPackages.$inferSelect
+export type SupportPackageInsert = typeof supportPackages.$inferInsert
 
-export type KnowledgePackageSourceRow = typeof knowledgePackageSources.$inferSelect
-export type KnowledgePackageSourceInsert = typeof knowledgePackageSources.$inferInsert
+export type SupportPackageSourceRow = typeof supportPackageSources.$inferSelect
+export type SupportPackageSourceInsert = typeof supportPackageSources.$inferInsert
 
 // ---------------------------------------------------------------------------
 // Entity Relationships
@@ -152,10 +150,8 @@ export type SlackThreadSessionRow = typeof slackThreadSessions.$inferSelect
 export type GithubAppInstallationRow = typeof githubAppInstallations.$inferSelect
 
 export type JiraConnectionRow = typeof jiraConnections.$inferSelect
-export type JiraIssueSyncRow = typeof jiraIssueSyncs.$inferSelect
 
 export type LinearConnectionRow = typeof linearConnections.$inferSelect
-export type LinearIssueSyncRow = typeof linearIssueSyncs.$inferSelect
 
 export type ZendeskConnectionRow = typeof zendeskConnections.$inferSelect
 export type IntercomConnectionRow = typeof intercomConnections.$inferSelect

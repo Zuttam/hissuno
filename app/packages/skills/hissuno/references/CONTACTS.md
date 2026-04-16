@@ -52,17 +52,6 @@ Interactive prompts:
 6. Company ID (optional)
 7. Is champion? (optional)
 
-**MCP add fields:**
-
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `name` | Yes | string | Full name |
-| `email` | Yes | string | Email address |
-| `role` | No | string | Role/position |
-| `title` | No | string | Job title |
-| `phone` | No | string | Phone number |
-| `company_id` | No | string | UUID of associated company |
-| `is_champion` | No | boolean | Whether this is a product champion |
 
 ## Relationships
 

@@ -14,11 +14,11 @@ import {
   Heading,
 } from '@/components/ui'
 import { listKnowledgeSources, createPackage, updatePackage, deletePackage } from '@/lib/api/knowledge'
-import type { KnowledgePackageWithSources, KnowledgeSourceRecord } from '@/lib/knowledge/types'
+import type { SupportPackageWithSources, KnowledgeSourceRecord } from '@/lib/knowledge/types'
 
 interface PackageDialogProps {
   projectId: string
-  package?: KnowledgePackageWithSources
+  package?: SupportPackageWithSources
   open: boolean
   onClose: () => void
   onSaved?: () => void

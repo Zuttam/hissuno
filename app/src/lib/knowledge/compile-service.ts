@@ -6,10 +6,10 @@
  */
 
 import { db } from '@/lib/db'
-import { knowledgePackages, knowledgePackageSources, knowledgeSources } from '@/lib/db/schema/app'
+import { supportPackages, supportPackageSources, knowledgeSources } from '@/lib/db/schema/app'
 import { eq, and, inArray } from 'drizzle-orm'
-import { generateObject } from 'ai'
-import { openai } from '@ai-sdk/openai'
+import { Agent } from '@mastra/core/agent'
+import { resolveModel } from '@/mastra/models'
 import { z } from 'zod'
 
 const compilationSchema = z.object({
@@ -26,7 +26,7 @@ const compilationSchema = z.object({
  * 1. Verify package belongs to project
  * 2. Fetch linked sources with status='done' and their analyzed_content
  * 3. Use AI to categorize content into 4 sections
- * 4. Update the knowledgePackages record with compiled content fields
+ * 4. Update the supportPackages record with compiled content fields
  */
 export async function compilePackageContent(
   projectId: string,
@@ -41,12 +41,12 @@ export async function compilePackageContent(
 }> {
   // Verify package belongs to project
   const [pkg] = await db
-    .select({ id: knowledgePackages.id, guidelines: knowledgePackages.guidelines })
-    .from(knowledgePackages)
+    .select({ id: supportPackages.id, guidelines: supportPackages.guidelines })
+    .from(supportPackages)
     .where(
       and(
-        eq(knowledgePackages.id, packageId),
-        eq(knowledgePackages.project_id, projectId),
+        eq(supportPackages.id, packageId),
+        eq(supportPackages.project_id, projectId),
       )
     )
     .limit(1)
@@ -57,9 +57,9 @@ export async function compilePackageContent(
 
   // Fetch linked source IDs
   const packageSourceRows = await db
-    .select({ source_id: knowledgePackageSources.source_id })
-    .from(knowledgePackageSources)
-    .where(eq(knowledgePackageSources.package_id, packageId))
+    .select({ source_id: supportPackageSources.source_id })
+    .from(supportPackageSources)
+    .where(eq(supportPackageSources.package_id, packageId))
 
   if (packageSourceRows.length === 0) {
     throw new Error('No sources linked to this package.')
@@ -102,10 +102,14 @@ export async function compilePackageContent(
     ? `\n\nThe package author provided these guidelines for how content should be organized:\n${pkg.guidelines}`
     : ''
 
-  const { object: categorized } = await generateObject({
-    model: openai('gpt-5.4'),
-    schema: compilationSchema,
-    prompt: `You are a technical writer organizing product knowledge into a structured support package.
+  const compilerAgent = new Agent({
+    name: 'Package Compiler',
+    instructions: 'You are a technical writer organizing product knowledge into structured support package sections (FAQ, how-to, feature docs, troubleshooting).',
+    model: resolveModel({ name: 'package-compiler', tier: 'default', fallback: 'openai/gpt-5' }),
+  })
+
+  const { object: categorized } = await compilerAgent.generate(
+    `You are a technical writer organizing product knowledge into a structured support package.
 
 Given the following analyzed source content from a product's codebase, documentation, and other sources, categorize the information into four sections:
 
@@ -120,7 +124,8 @@ Preserve technical accuracy. Do not invent information not present in the source
 --- SOURCE CONTENT ---
 
 ${combinedContent}`,
-  })
+    { output: compilationSchema },
+  )
 
   // Build source snapshot
   const sourceSnapshot = {
@@ -132,7 +137,7 @@ ${combinedContent}`,
 
   // Update the package record directly with compiled content
   const [updated] = await db
-    .update(knowledgePackages)
+    .update(supportPackages)
     .set({
       faq_content: categorized.faq_content,
       howto_content: categorized.howto_content,
@@ -142,7 +147,7 @@ ${combinedContent}`,
       source_snapshot: sourceSnapshot,
       updated_at: new Date(),
     })
-    .where(eq(knowledgePackages.id, packageId))
+    .where(eq(supportPackages.id, packageId))
     .returning()
 
   if (!updated) {

@@ -26,7 +26,7 @@ type ResolveAgentParams = {
   /** If present, routes to support agent (contact mode) */
   contactId: string | null
   /** Knowledge package ID for knowledge injection (support agent only) */
-  knowledgePackageId: string | null
+  supportPackageId: string | null
   /** Project ID for scoping knowledge package access */
   projectId?: string
 }
@@ -37,7 +37,7 @@ type ResolveAgentParams = {
  * @throws Error if the resolved agent is not registered in Mastra
  */
 export async function resolveAgent(params: ResolveAgentParams): Promise<ResolvedAgent> {
-  const { contactId, knowledgePackageId, projectId } = params
+  const { contactId, supportPackageId, projectId } = params
   const isContact = !!contactId
 
   const agentKey = isContact ? 'supportAgent' : 'productManagerAgent'
@@ -50,9 +50,9 @@ export async function resolveAgent(params: ResolveAgentParams): Promise<Resolved
   const systemMessages: ModelMessage[] = []
 
   // Inject knowledge for support agent
-  if (isContact && knowledgePackageId) {
+  if (isContact && supportPackageId) {
     try {
-      const knowledgeContent = await loadPackageKnowledge(knowledgePackageId, projectId)
+      const knowledgeContent = await loadPackageKnowledge(supportPackageId, projectId)
       if (knowledgeContent) {
         systemMessages.push({
           role: 'system' as const,

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { SessionProvider, useSession } from 'next-auth/react'
 
 interface AuthUser {
@@ -32,16 +32,6 @@ function AuthContextBridge({ children }: { children: ReactNode }) {
         : null,
     [session?.user?.id, session?.user?.email, session?.user?.name, session?.user?.image]
   )
-
-  useEffect(() => {
-    if (user) {
-      // Auto-set consent for authenticated users (registration = acceptance)
-      const consentKey = 'hissuno_cookie_consent'
-      if (!localStorage.getItem(consentKey)) {
-        localStorage.setItem(consentKey, 'accepted')
-      }
-    }
-  }, [user])
 
   return (
     <AuthContext.Provider value={{ user, isLoading }}>

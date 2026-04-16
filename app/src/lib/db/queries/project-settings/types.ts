@@ -107,3 +107,24 @@ export type KnowledgeAnalysisSettingsInput = Partial<KnowledgeAnalysisSettings>
 export const DEFAULT_KNOWLEDGE_ANALYSIS_SETTINGS: KnowledgeAnalysisSettings = {
   knowledge_relationship_guidelines: null,
 }
+
+/**
+ * AI model settings subset of ProjectSettingsRecord
+ */
+export interface AIModelSettings {
+  ai_model: string | null
+  ai_model_small: string | null
+}
+
+/**
+ * Input for updating AI model settings
+ */
+export type AIModelSettingsInput = Partial<AIModelSettings>
+
+/**
+ * Default AI model settings (null = use env var / hardcoded fallback)
+ */
+export const DEFAULT_AI_MODEL_SETTINGS: AIModelSettings = {
+  ai_model: null,
+  ai_model_small: null,
+}

@@ -269,8 +269,23 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid payload.' }, { status: 400 })
       }
 
-      const { type, url, content, repositoryUrl, repositoryBranch, analysis_scope, productScopeId: rawProductScopeId, name, description, notionPageId, pages, custom_fields } = payload
+      const { type, url, content, repositoryUrl, repositoryBranch, analysis_scope, productScopeId: rawProductScopeId, name, description, notionPageId, pages, custom_fields, parent_id } = payload
       productScopeId = rawProductScopeId || null
+
+      // Folder creation - container-only, no analysis
+      if (type === 'folder') {
+        const data = await createKnowledgeSource({
+          projectId,
+          type: 'folder',
+          name: name || 'Untitled folder',
+          parentId: parent_id || null,
+          skipInlineProcessing: true,
+        })
+        if (!data) {
+          return NextResponse.json({ error: 'Failed to create folder.' }, { status: 500 })
+        }
+        return NextResponse.json({ source: data }, { status: 201 })
+      }
 
       // Special handling for codebase type
       if (type === 'codebase') {
@@ -354,6 +369,7 @@ export async function POST(request: NextRequest) {
       origin: sourceData.origin ?? null,
       customFields: sourceData.custom_fields as Record<string, unknown> | null ?? null,
       productScopeId,
+      parentId: sourceData.parent_id ?? null,
     })
 
     if (!data) {

@@ -5,7 +5,7 @@ description: "Import Notion pages as knowledge sources for your Hissuno project.
 
 ## Overview
 
-The Notion integration connects your Notion workspace to Hissuno, letting you import pages as knowledge sources. Your documentation, wikis, and internal notes become part of the knowledge graph - searchable by agents and queryable through MCP, CLI, and API.
+The Notion integration connects your Notion workspace to Hissuno, letting you import pages as knowledge sources. Your documentation, wikis, and internal notes become part of the knowledge graph - searchable by agents and queryable through CLI and API.
 
 ## Prerequisites
 
@@ -82,7 +82,7 @@ When you import a Notion page:
 2. Content is converted to a format suitable for analysis
 3. The knowledge analysis workflow processes the page
 4. The page is embedded for semantic search
-5. It becomes available through MCP, CLI, and API queries
+5. It becomes available through CLI and API queries
 
 ## Keeping Pages Updated
 

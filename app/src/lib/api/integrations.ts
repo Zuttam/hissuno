@@ -36,6 +36,8 @@ const paths = {
   // GitHub
   github: '/api/integrations/github',
   githubConnect: '/api/integrations/github/connect',
+  githubSyncConfig: '/api/integrations/github/sync-config',
+  githubSyncFeedback: '/api/integrations/github/sync/feedback',
 
   // Intercom
   intercom: '/api/integrations/intercom',
@@ -205,6 +207,30 @@ export async function fetchGithubBranches(projectId: string, owner: string, repo
     buildUrl(`/api/integrations/github/repos/${owner}/${repo}/branches`, { projectId }),
     { errorMessage: 'Failed to load branches' },
   )
+}
+
+export function fetchGithubSyncConfig(projectId: string, syncType: string): Promise<Response> {
+  return fetchApiRaw(buildUrl(paths.githubSyncConfig, { projectId, syncType }))
+}
+
+export function saveGithubSyncConfig(body: {
+  projectId: string
+  syncType: string
+  githubRepoIds?: Array<{ id: number; fullName: string }>
+  githubLabelFilter?: string
+  githubLabelTagMap?: Record<string, string>
+  syncEnabled?: boolean
+  syncFrequency?: string
+}): Promise<Response> {
+  return fetchApiRaw(paths.githubSyncConfig, { method: 'PUT', body })
+}
+
+export function deleteGithubSyncConfig(projectId: string, syncType: string): Promise<Response> {
+  return fetchApiRaw(buildUrl(paths.githubSyncConfig, { projectId, syncType }), { method: 'DELETE' })
+}
+
+export function githubSyncFeedbackUrl(projectId: string): string {
+  return buildUrl(paths.githubSyncFeedback, { projectId })
 }
 
 // ---------------------------------------------------------------------------

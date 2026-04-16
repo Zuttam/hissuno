@@ -19,7 +19,7 @@ interface UseKnowledgeSourcesState {
   error: string | null
   refresh: () => Promise<void>
   updateSource: (sourceId: string, updates: Record<string, unknown>) => Promise<boolean>
-  deleteSource: (sourceId: string) => Promise<boolean>
+  deleteSource: (sourceId: string, options?: { children?: 'reparent' | 'delete' }) => Promise<boolean>
   addSource: (data: FormData | Record<string, unknown>) => Promise<KnowledgeSourceWithCodebase | null>
 }
 
@@ -56,16 +56,42 @@ export function useKnowledgeSources({ projectId }: UseKnowledgeSourcesOptions): 
     }
   }, [projectId])
 
-  const deleteSourceFn = useCallback(async (sourceId: string): Promise<boolean> => {
+  const deleteSourceFn = useCallback(async (
+    sourceId: string,
+    options?: { children?: 'reparent' | 'delete' },
+  ): Promise<boolean> => {
     try {
-      await deleteKnowledgeSource(projectId, sourceId)
-      setSources(prev => prev.filter(s => s.id !== sourceId))
+      await deleteKnowledgeSource(projectId, sourceId, options)
+      if (options?.children === 'delete') {
+        const toRemove = new Set<string>([sourceId])
+        const queue = [sourceId]
+        while (queue.length > 0) {
+          const parentId = queue.pop()!
+          for (const s of sources) {
+            if (s.parent_id === parentId && !toRemove.has(s.id)) {
+              toRemove.add(s.id)
+              queue.push(s.id)
+            }
+          }
+        }
+        setSources(prev => prev.filter(s => !toRemove.has(s.id)))
+      } else {
+        // Reparent: update children's parent_id to the deleted source's parent
+        const deleted = sources.find(s => s.id === sourceId)
+        setSources(prev => prev
+          .filter(s => s.id !== sourceId)
+          .map(s => s.parent_id === sourceId
+            ? { ...s, parent_id: deleted?.parent_id ?? null }
+            : s
+          )
+        )
+      }
       return true
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete source')
       return false
     }
-  }, [projectId])
+  }, [projectId, sources])
 
   const addSourceFn = useCallback(async (data: FormData | Record<string, unknown>): Promise<KnowledgeSourceWithCodebase | null> => {
     try {

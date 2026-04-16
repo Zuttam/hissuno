@@ -4,7 +4,7 @@
 
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { projectSettings, knowledgePackages } from '@/lib/db/schema/app'
+import { projectSettings, supportPackages } from '@/lib/db/schema/app'
 import type { SupportAgentSettings, SupportAgentSettingsInput } from './types'
 import { DEFAULT_SUPPORT_AGENT_SETTINGS } from './types'
 
@@ -67,8 +67,8 @@ export async function updateSupportAgentSettings(
   try {
     // If setting a package, verify it belongs to this project
     if (settings.support_agent_package_id) {
-      const pkg = await db.query.knowledgePackages.findFirst({
-        where: eq(knowledgePackages.id, settings.support_agent_package_id),
+      const pkg = await db.query.supportPackages.findFirst({
+        where: eq(supportPackages.id, settings.support_agent_package_id),
         columns: { id: true, project_id: true },
       })
 

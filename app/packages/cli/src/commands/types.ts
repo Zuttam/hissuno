@@ -34,11 +34,11 @@ const RESOURCE_TYPE_DEFINITIONS = {
     },
   },
   scopes: {
-    description: 'Product scopes (product areas and initiatives) with goals.',
+    description: 'Product scopes (product areas, initiatives, and experiments) with goals and hierarchical nesting.',
     filters: ['type'],
     search: 'Semantic vector search with text fallback',
-    add: { required: ['name'], optional: ['slug', 'description', 'type', 'color', 'goals'] },
-    update: { optional: ['name', 'type', 'description', 'goals'] },
+    add: { required: ['name'], optional: ['slug', 'description', 'type', 'color', 'goals', 'parent_id', 'content'] },
+    update: { optional: ['name', 'type', 'description', 'goals', 'parent_id', 'content'] },
   },
 }
 

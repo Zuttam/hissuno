@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { eq, and, isNotNull } from 'drizzle-orm'
+import { eq, and, isNotNull, inArray } from 'drizzle-orm'
 import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
@@ -133,6 +133,34 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       updates.custom_fields = payload.custom_fields
     }
 
+    // Handle parent_id updates (move in tree) with cycle detection
+    if (payload.parent_id !== undefined) {
+      const newParentId = payload.parent_id || null
+      if (newParentId) {
+        // Cycle detection: walk up the ancestor chain from the target parent
+        let currentId: string | null = newParentId
+        while (currentId) {
+          if (currentId === sourceId) {
+            return NextResponse.json(
+              { error: 'Cannot move a source into its own descendant.' },
+              { status: 400 }
+            )
+          }
+          const parent = await db.query.knowledgeSources.findFirst({
+            where: eq(knowledgeSources.id, currentId),
+            columns: { parent_id: true },
+          })
+          currentId = parent?.parent_id ?? null
+        }
+      }
+      updates.parent_id = newParentId
+    }
+
+    // Handle sort_order updates (reorder within siblings)
+    if (typeof payload.sort_order === 'number') {
+      updates.sort_order = payload.sort_order
+    }
+
     // Track if we're updating source_codes (for codebase)
     let updatedSourceCode = false
 
@@ -240,6 +268,8 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
 
+    const childrenMode = request.nextUrl.searchParams.get('children') ?? 'reparent'
+
     // First fetch the source to get storage_path for cleanup
     const source = await db.query.knowledgeSources.findFirst({
       where: and(
@@ -250,6 +280,48 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     if (!source) {
       return NextResponse.json({ error: 'Knowledge source not found.' }, { status: 404 })
+    }
+
+    // Handle children of this source
+    const children = await db.query.knowledgeSources.findMany({
+      where: and(
+        eq(knowledgeSources.parent_id, sourceId),
+        eq(knowledgeSources.project_id, projectId)
+      ),
+      columns: { id: true },
+    })
+
+    if (children.length > 0) {
+      if (childrenMode === 'delete') {
+        // Recursively collect all descendant IDs
+        const toDelete: string[] = []
+        const queue = children.map(c => c.id)
+        while (queue.length > 0) {
+          const id = queue.pop()!
+          toDelete.push(id)
+          const grandchildren = await db.query.knowledgeSources.findMany({
+            where: and(
+              eq(knowledgeSources.parent_id, id),
+              eq(knowledgeSources.project_id, projectId)
+            ),
+            columns: { id: true },
+          })
+          queue.push(...grandchildren.map(c => c.id))
+        }
+        // Delete all descendants
+        if (toDelete.length > 0) {
+          await db
+            .delete(knowledgeSources)
+            .where(inArray(knowledgeSources.id, toDelete))
+        }
+      } else {
+        // Reparent children to the deleted source's parent
+        const childIds = children.map(c => c.id)
+        await db
+          .update(knowledgeSources)
+          .set({ parent_id: source.parent_id ?? null })
+          .where(inArray(knowledgeSources.id, childIds))
+      }
     }
 
     // Clean up linked resources

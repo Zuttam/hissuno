@@ -53,6 +53,7 @@ export async function evaluateEntityRelationships(
       content.entityName,
       entityType,
       content.guidelines,
+      projectId,
     )
 
     // Step 3: Discover relationships
@@ -63,6 +64,8 @@ export async function evaluateEntityRelationships(
       topics: topicsResult.topics,
       combinedQuery: topicsResult.combinedQuery,
       contentForTextMatch: content.contentForTextMatch,
+      entityName: content.entityName,
+      contentForSearch: content.contentForSearch,
     })
 
     // Phase 2: Creation policies (only for sessions with creationContext)

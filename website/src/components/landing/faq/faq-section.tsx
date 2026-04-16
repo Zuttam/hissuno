@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
-import { WaterReveal } from '@/components/landing/water-reveal'
 
 interface FAQItem {
   question: string
@@ -21,7 +20,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'What is Hissuno?',
         answer:
-          'Hissuno is an open-source unified context layer that turns all your product-related data into an agent-ready knowledge graph. For example, your codebase, docs, customer conversations, support tickets, issues, and usage signals all get ingested, connected, and exposed via MCP, CLI, and API - so any AI agent can query your product intelligence natively.',
+          'Hissuno is an open-source unified context layer that turns all your product-related data into an agent-ready knowledge graph. For example, your codebase, docs, customer conversations, support tickets, issues, and usage signals all get ingested, connected, and exposed via CLI and API - so any AI agent can query your product intelligence natively.',
       },
       {
         question: 'Why not just connect AI agents to my tools directly?',
@@ -46,7 +45,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'How do agents connect to Hissuno?',
         answer:
-          'Via MCP (Model Context Protocol), REST API, or CLI. Any agent - support bot, coding assistant, PM copilot - connects once and gets the full picture.',
+          'Via REST API, CLI, or Skills. Any agent - support bot, coding assistant, PM copilot - connects once and gets the full picture.',
       },
       {
         question: 'How does Hissuno save tokens and context window?',
@@ -86,7 +85,7 @@ const FAQ_DATA: FAQCategory[] = [
       {
         question: 'Can I use Hissuno with Claude Desktop / Cursor / other AI tools?',
         answer:
-          'Yes. The Hissuno CLI ships with dedicated skills for Claude Code, Cursor, and other AI coding tools - giving agents deep product intelligence right in their workflow. Hissuno also exposes an MCP server that any MCP-compatible tool (Claude Desktop, Windsurf, etc.) can connect to natively.',
+          'Yes. The Hissuno CLI ships with dedicated skills for Claude Code, Cursor, and other AI coding tools - giving agents deep product intelligence right in their workflow.',
       },
     ],
   },
@@ -112,59 +111,52 @@ const FAQ_DATA: FAQCategory[] = [
   },
 ]
 
-function FAQAccordionItem({ item, index }: { item: FAQItem; index: number }) {
+function FAQAccordionItem({ item }: { item: FAQItem }) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <WaterReveal preset="text" staggerIndex={index} stagger="tight">
-      <div className="border-b border-[var(--border)]/50">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex w-full items-center justify-between gap-4 py-5 text-left transition-colors hover:text-[var(--accent-teal)]"
-        >
-          <span className="font-mono text-sm font-medium text-[var(--foreground)]">
-            {item.question}
-          </span>
-          <ChevronDown
-            className={`h-4 w-4 flex-shrink-0 text-[var(--text-tertiary)] transition-transform duration-200 ${
-              isOpen ? 'rotate-180' : ''
-            }`}
-          />
-        </button>
-        <div
-          className={`grid transition-[grid-template-rows] duration-200 ease-out ${
-            isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+    <div className="border-b border-[var(--border)]/50">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between gap-4 py-5 text-left transition-colors hover:text-[var(--accent-teal)]"
+      >
+        <span className="font-mono text-sm font-medium text-[var(--foreground)]">
+          {item.question}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 flex-shrink-0 text-[var(--text-tertiary)] transition-transform duration-200 ${
+            isOpen ? 'rotate-180' : ''
           }`}
-        >
-          <div className="overflow-hidden">
-            <p className="pb-5 text-sm leading-relaxed text-[var(--text-secondary)]">
-              {item.answer}
-            </p>
-          </div>
+        />
+      </button>
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+          isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <p className="pb-5 text-sm leading-relaxed text-[var(--text-secondary)]">
+            {item.answer}
+          </p>
         </div>
       </div>
-    </WaterReveal>
+    </div>
   )
 }
 
 export function FAQSection() {
-  let globalIndex = 0
-
   return (
     <section className="relative px-6 pb-24 md:px-12">
       <div className="mx-auto max-w-3xl">
         {FAQ_DATA.map((category) => (
           <div key={category.title} className="mb-12 last:mb-0">
-            <WaterReveal preset="text">
-              <h2 className="mb-6 font-mono text-xs font-semibold uppercase tracking-widest text-[var(--accent-teal)]">
-                {category.title}
-              </h2>
-            </WaterReveal>
+            <h2 className="mb-6 font-mono text-xs font-semibold uppercase tracking-widest text-[var(--accent-teal)]">
+              {category.title}
+            </h2>
             <div>
-              {category.items.map((item) => {
-                const idx = globalIndex++
-                return <FAQAccordionItem key={item.question} item={item} index={idx} />
-              })}
+              {category.items.map((item) => (
+                <FAQAccordionItem key={item.question} item={item} />
+              ))}
             </div>
           </div>
         ))}

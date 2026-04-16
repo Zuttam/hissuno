@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Hissuno (the platform, widget, CLI, or MCP server), please report it responsibly.
+If you discover a security vulnerability in Hissuno (the platform, widget, or CLI), please report it responsibly.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
@@ -27,7 +27,6 @@ This policy covers:
 - The Hissuno web application (`app/`)
 - The embeddable widget (`@hissuno/widget`)
 - The CLI (`hissuno`)
-- The MCP server
 - API endpoints and authentication
 
 ## Out of Scope

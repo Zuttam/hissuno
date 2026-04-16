@@ -1,13 +1,14 @@
 /**
  * Knowledge Source Description Generator
  *
- * Generates concise, agent-optimized descriptions for knowledge sources
- * using a lightweight LLM call. Descriptions help agents determine which
- * knowledge sources are relevant to a given task.
+ * Uses a Mastra agent to generate concise, agent-optimized descriptions for
+ * knowledge sources. Descriptions help agents determine which knowledge
+ * sources are relevant to a given task.
  */
 
-import { generateText } from 'ai'
-import { openai } from '@ai-sdk/openai'
+import { Agent } from '@mastra/core/agent'
+import { resolveModel } from '@/mastra/models'
+import { getAIModelSettingsAdmin } from '@/lib/db/queries/project-settings'
 
 const LOG_PREFIX = '[generate-description]'
 
@@ -17,7 +18,8 @@ const LOG_PREFIX = '[generate-description]'
  */
 export async function generateSourceDescription(
   content: string,
-  sourceName?: string | null
+  sourceName?: string | null,
+  projectId?: string,
 ): Promise<string | null> {
   if (!content || content.trim().length < 50) {
     return null
@@ -29,11 +31,10 @@ export async function generateSourceDescription(
   const nameContext = sourceName ? `\nDocument title: "${sourceName}"` : ''
 
   try {
-    const { text } = await generateText({
-      model: openai('gpt-5.4-nano'),
-      maxOutputTokens: 200,
-      temperature: 0.3,
-      system: `You generate concise descriptions of knowledge documents for an AI agent.
+    const aiSettings = projectId ? await getAIModelSettingsAdmin(projectId) : null
+    const descriptionAgent = new Agent({
+      name: 'Knowledge Source Description',
+      instructions: `You generate concise descriptions of knowledge documents for an AI agent.
 The description helps the agent decide if this document is relevant to a task.
 
 Rules:
@@ -43,8 +44,16 @@ Rules:
 - Focus on WHAT information the document contains, not how it's structured
 - Do not start with "This document" - jump straight to the content
 - No markdown formatting`,
-      prompt: `Generate a description for this knowledge source:${nameContext}\n\n${truncated}`,
+      model: resolveModel(
+        { name: 'source-description', tier: 'small', fallback: 'openai/gpt-5.4-mini' },
+        aiSettings,
+      ),
     })
+
+    const response = await descriptionAgent.generate(
+      `Generate a description for this knowledge source:${nameContext}\n\n${truncated}`,
+    )
+    const text = response.text ?? ''
 
     const cleaned = text.trim()
     if (!cleaned || cleaned.length < 10) {
@@ -53,7 +62,8 @@ Rules:
 
     return cleaned
   } catch (error) {
-    console.warn(`${LOG_PREFIX} Failed to generate description:`, error instanceof Error ? error.message : error)
+    // Non-fatal: source description is optional. Log clearly so the failure is visible.
+    console.error(`${LOG_PREFIX} Failed to generate description:`, error instanceof Error ? error.stack ?? error.message : error)
     return null
   }
 }

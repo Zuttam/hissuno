@@ -8,7 +8,6 @@ import type {
   SessionsStripAnalytics,
   IssuesStripAnalytics,
   CustomerSegmentationAnalytics,
-  EntityGraphAnalytics,
 } from '@/lib/db/queries/analytics'
 import {
   getOverallAnalytics,
@@ -16,7 +15,6 @@ import {
   getSessionsStripAnalytics,
   getIssuesStripAnalytics,
   getCustomerSegmentationAnalytics,
-  getEntityGraphAnalytics,
 } from '@/lib/api/analytics'
 import { useFetchData } from './use-fetch-data'
 
@@ -149,23 +147,3 @@ export function useCustomerSegmentationAnalytics({
   })
 }
 
-interface UseEntityGraphAnalyticsOptions {
-  projectId: string
-}
-
-interface UseEntityGraphAnalyticsState {
-  data: EntityGraphAnalytics | null
-  isLoading: boolean
-  error: string | null
-  refresh: () => Promise<void>
-}
-
-export function useEntityGraphAnalytics({
-  projectId,
-}: UseEntityGraphAnalyticsOptions): UseEntityGraphAnalyticsState {
-  return useFetchData<EntityGraphAnalytics>({
-    fetchFn: () => getEntityGraphAnalytics(projectId),
-    deps: [projectId],
-    errorPrefix: 'Unexpected error loading entity graph analytics',
-  })
-}

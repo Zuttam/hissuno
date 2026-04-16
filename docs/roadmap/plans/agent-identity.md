@@ -2,7 +2,7 @@
 
 ## Context
 
-Users launch AI agents in Claude Code, Cursor, or similar tools that interact with Hissuno via MCP or REST API. Each agent should be a trackable identity: "User X's Cursor agent accessed Resource Z". Today, agents authenticate with generic API keys - there's no way to distinguish which agent made a call.
+Users launch AI agents in Claude Code, Cursor, or similar tools that interact with Hissuno via REST API. Each agent should be a trackable identity: "User X's Cursor agent accessed Resource Z". Today, agents authenticate with generic API keys - there's no way to distinguish which agent made a call.
 
 An agent is an ephemeral member of a project - not a separate concept. It shows up alongside human members, has a role, and gets its own project-scoped API key.
 
@@ -10,13 +10,11 @@ Depends on: [Audit Trail](audit-trail.md) - agent actions flow into the audit ev
 
 ### Why Not DCR or CIMD?
 
-- **DCR (Dynamic Client Registration, RFC 7591)** - agents self-register as OAuth clients. Demoted to optional in MCP spec (Nov 2025). Requires runtime registration - not practical for Claude/Cursor agents, which are ephemeral IDE sessions.
+- **DCR (Dynamic Client Registration, RFC 7591)** - agents self-register as OAuth clients. Requires runtime registration - not practical for Claude/Cursor agents, which are ephemeral IDE sessions.
 
-- **CIMD (Client ID Metadata Document, IETF draft)** - the agent's `client_id` is an HTTPS URL hosting metadata. MCP spec's recommended default. **Not viable** - Claude/Cursor agents don't have a web presence or domain to host metadata at.
+- **CIMD (Client ID Metadata Document, IETF draft)** - the agent's `client_id` is an HTTPS URL hosting metadata. **Not viable** - Claude/Cursor agents don't have a web presence or domain to host metadata at.
 
 **Both solve the wrong problem.** They're for autonomous agents that independently register with authorization servers. Hissuno's agents are user-dispatched ephemeral members - the user creates the identity and configures their tool with the key.
-
-**When to revisit:** If Hissuno opens a public MCP server for third-party agents the user doesn't directly control. CIMD (backed by Auth0 for AI Agents or similar) would be the right choice then.
 
 ### Chosen approach: Agent Members + API Key Identity
 
@@ -34,13 +32,8 @@ $ hissuno members add-agent cursor-feedback-bot
 Agent member 'cursor-feedback-bot' added to project.
 API Key: hiss_a1b2c3d4...
 
-Add to your MCP configuration:
-  "hissuno": {
-    "url": "https://app.hissuno.com/api/mcp",
-    "headers": {
-      "Authorization": "Bearer hiss_a1b2c3d4..."
-    }
-  }
+Use with the CLI:
+  hissuno config --api-key hiss_a1b2c3d4...
 ```
 
 ### Management
@@ -171,13 +164,7 @@ When an agent acts, audit events record:
 - Add `x-agent-name` to `ALL_IDENTITY_HEADERS` (stripped on every request)
 - In `hiss_*` API key resolution path: if `resolveApiKey()` returns `agentName`, inject `x-agent-name` header
 
-### 5. MCP Server Auth (`app/src/mcp/auth.ts`)
-
-- `resolveApiKey()` already returns the agent info after step 2
-- Extend `McpContext` in `context.ts` with optional `agentName`
-- Set `ctx.agentName` when the API key has a linked agent member
-
-### 6. Authorization (`app/src/lib/auth/authorization.ts`)
+### 5. Authorization (`app/src/lib/auth/authorization.ts`)
 
 - `assertProjectAccess()`: handle `'agent'` type same as `'api_key'` (uses `createdByUserId` for role check)
 
@@ -205,7 +192,7 @@ POST /api/members/:id/rotate-key  - new; rotates agent member's API key
 ### 9. CLI (`app/packages/cli/src/commands/members.ts`)
 
 Add subcommands:
-- `hissuno members add-agent <name>` - POST to members with agent type, display key + MCP config snippet
+- `hissuno members add-agent <name>` - POST to members with agent type, display key
 - `hissuno members rotate-agent <name>` - POST to rotate-key endpoint
 - Update list display to show member_type column
 
@@ -231,8 +218,6 @@ Replace inline ternaries with `getActingUserId(identity)`.
 | `app/src/lib/auth/authorization.ts` | Handle `'agent'` type |
 | `app/src/lib/auth/project-members.ts` | `addAgentMember()`, `rotateAgentKey()`, update list |
 | `app/src/proxy.ts` | Strip + inject `x-agent-name` header |
-| `app/src/mcp/auth.ts` | Pass agentName to MCP context |
-| `app/src/mcp/context.ts` | Add `agentName` to McpContext |
 | `app/src/app/api/(project)/members/route.ts` | Handle agent member creation in POST |
 | `app/src/app/api/(project)/members/[memberId]/route.ts` | Revoke linked keys on DELETE |
 | `app/src/app/api/(project)/members/[memberId]/rotate-key/route.ts` | **New** - rotate agent key |
@@ -242,9 +227,8 @@ Replace inline ternaries with `getActingUserId(identity)`.
 
 ## Verification
 
-1. `hissuno members add-agent my-bot` -> get API key + MCP config snippet
-2. Configure MCP with agent key -> MCP tools work, `McpContext.agentName` is set
-3. Use agent key on REST API -> identity resolves as `type: 'agent'` with `agentName`
+1. `hissuno members add-agent my-bot` -> get API key
+2. Use agent key on REST API -> identity resolves as `type: 'agent'` with `agentName`
 4. `hissuno members` -> lists agent alongside human members
 5. Audit event shows `actor_type: 'agent'`, `metadata.agent_name: 'my-bot'`
 6. `hissuno members rotate-agent my-bot` -> old key rejected, new key works

@@ -1,4 +1,11 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
+
+export const SECURITY_SCANNER_MODEL: ModelConfig = {
+  name: 'security-scanner',
+  tier: 'small',
+  fallback: 'openai/gpt-5.4-mini',
+}
 
 /**
  * Security Scanner Agent
@@ -96,5 +103,5 @@ Return the content in the same structure, with:
 - Preserve code examples by replacing only the sensitive values
 - Keep descriptions and explanations intact
 `,
-  model: 'openai/gpt-5.4-mini',
+  model: ({ runtimeContext }) => resolveModel(SECURITY_SCANNER_MODEL, runtimeContext),
 })

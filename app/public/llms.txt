@@ -8,7 +8,7 @@ Hissuno is an organizational knowledge layer that connects your customer signals
 
 - Ingests data from tools your team already uses: Slack, Gmail, Linear, GitHub, Intercom, Gong, Jira, Notion, Google Drive
 - Links every entity (customer, feature, issue, doc, code module, product goal) into a knowledge graph with typed relationships
-- Exposes the graph to any AI agent via MCP, CLI, or REST API
+- Exposes the graph to any AI agent via CLI or REST API
 - Agents traverse relationships to build real understanding of your product and organization - not just retrieve snippets
 
 ## Who Hissuno is for
@@ -19,7 +19,6 @@ Product and engineering teams use Hissuno to give their AI agents the full pictu
 
 ## How to integrate
 
-- **MCP**: Connect via Model Context Protocol for native agent integration
 - **CLI**: `npx hissuno` to install and connect from the command line
 - **API**: REST API for programmatic access to the knowledge graph
 

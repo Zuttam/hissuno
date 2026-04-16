@@ -9,13 +9,7 @@ import {
   getIssuesStripAnalytics,
   getProjectAnalytics,
   getCustomerSegmentationAnalytics,
-  getEntityGraphAnalytics,
-  getEdgeEntities,
-  getCategorySubgroups,
-  getCategoryEntities,
-  getChildEntityEdges,
   type AnalyticsPeriod,
-  type EntityGraphCategory,
 } from '@/lib/db/queries/analytics'
 
 export const runtime = 'nodejs'
@@ -68,64 +62,6 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'projectId is required for type=customer-segmentation.' }, { status: 400 })
       }
       const data = await getCustomerSegmentationAnalytics(projectId, period)
-      return NextResponse.json({ data })
-    }
-
-    if (type === 'entity-graph') {
-      if (!projectId) {
-        return NextResponse.json({ error: 'projectId is required for type=entity-graph.' }, { status: 400 })
-      }
-      const data = await getEntityGraphAnalytics(projectId)
-      return NextResponse.json({ data })
-    }
-
-    if (type === 'entity-graph-edge-entities') {
-      if (!projectId) {
-        return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
-      }
-      const sourceCategory = searchParams.get('sourceCategory') as EntityGraphCategory | null
-      const targetCategory = searchParams.get('targetCategory') as EntityGraphCategory | null
-      if (!sourceCategory || !targetCategory) {
-        return NextResponse.json({ error: 'sourceCategory and targetCategory are required.' }, { status: 400 })
-      }
-      const limit = parseInt(searchParams.get('limit') || '10', 10)
-      const data = await getEdgeEntities(projectId, sourceCategory, targetCategory, limit)
-      return NextResponse.json({ data })
-    }
-
-    if (type === 'entity-graph-drilldown') {
-      if (!projectId) {
-        return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
-      }
-      const category = searchParams.get('category') as EntityGraphCategory | null
-      const level = searchParams.get('level') as 'groups' | 'entities' | null
-      if (!category || !level) {
-        return NextResponse.json({ error: 'category and level are required.' }, { status: 400 })
-      }
-      const groupBy = searchParams.get('groupBy') || undefined
-      const groupValue = searchParams.get('groupValue') || undefined
-      const limit = parseInt(searchParams.get('limit') || '20', 10)
-
-      if (level === 'groups') {
-        const groups = await getCategorySubgroups(projectId, category)
-        return NextResponse.json({ data: { groups } })
-      } else {
-        const entities = await getCategoryEntities(projectId, category, groupBy, groupValue, limit)
-        return NextResponse.json({ data: { entities } })
-      }
-    }
-
-    if (type === 'entity-graph-child-edges') {
-      if (!projectId) {
-        return NextResponse.json({ error: 'projectId is required.' }, { status: 400 })
-      }
-      const category = searchParams.get('category') as EntityGraphCategory | null
-      const childIdsParam = searchParams.get('childIds')
-      if (!category || !childIdsParam) {
-        return NextResponse.json({ error: 'category and childIds are required.' }, { status: 400 })
-      }
-      const childIds = childIdsParam.split(',').filter(Boolean)
-      const data = await getChildEntityEdges(projectId, category, childIds)
       return NextResponse.json({ data })
     }
 

@@ -1,5 +1,12 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
 import { Memory } from '@mastra/memory'
+
+export const PRODUCT_MANAGER_MODEL: ModelConfig = {
+  name: 'product-manager',
+  tier: 'default',
+  fallback: 'openai/gpt-5',
+}
 import { userDataTools } from '../tools/data-tools'
 import { feedbackTools } from '../tools/feedback-tools'
 import { analysisKnowledgeTools } from '../tools/analysis-knowledge-tools'
@@ -120,7 +127,7 @@ You are embedded in Hissuno - an open-source unified context layer for product a
 - Proactively suggest related queries or insights
 - Use structured formatting for data-heavy responses
 `,
-  model: 'openai/gpt-5',
+  model: ({ runtimeContext }) => resolveModel(PRODUCT_MANAGER_MODEL, runtimeContext),
   tools: Object.fromEntries(
     [...userDataTools, ...feedbackTools, ...analysisKnowledgeTools].map((tool) => [tool.id, tool])
   ),

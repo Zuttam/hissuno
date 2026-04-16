@@ -235,6 +235,68 @@ function formatScopeRow(item: ResourceItem, name: string): string {
   return `  ${itemName(name)}  ${id}\n    ${parts.join('  ')}`
 }
 
+// ---------------------------------------------------------------------------
+// formatScopeTree — hierarchical tree view of scopes
+// ---------------------------------------------------------------------------
+
+export function formatScopeTree(items: ResourceItem[], total: number): string {
+  const lines: string[] = [heading(`Scopes (${total} total)`), '']
+
+  if (items.length === 0) {
+    lines.push(dimText('No results found.'))
+    return lines.join('\n')
+  }
+
+  // Build parent-child map
+  const byId = new Map<string, ResourceItem>()
+  const children = new Map<string, ResourceItem[]>()
+  const roots: ResourceItem[] = []
+
+  for (const item of items) {
+    const id = item.id as string
+    if (id) byId.set(id, item)
+  }
+
+  for (const item of items) {
+    const parentId = item.parent_id as string | undefined
+    if (parentId && byId.has(parentId)) {
+      const siblings = children.get(parentId) ?? []
+      siblings.push(item)
+      children.set(parentId, siblings)
+    } else {
+      roots.push(item)
+    }
+  }
+
+  function renderNode(item: ResourceItem, depth: number): void {
+    const indent = '  '.repeat(depth)
+    const name = (item.name ?? 'Untitled') as string
+    const id = dimText(truncate(String(item.id ?? ''), 12))
+    const type = item.type ? badge(String(item.type), MAGENTA) : ''
+    const isDefault = item.is_default ? badge('default', GREEN) : ''
+    const goals = Array.isArray(item.goals) && item.goals.length > 0 ? `${item.goals.length} goals` : ''
+    const desc = item.description ? dimText(truncate(String(item.description), 40)) : ''
+    const parts = [type, isDefault, goals, desc].filter(Boolean)
+
+    lines.push(`${indent}  ${itemName(name)}  ${id}`)
+    if (parts.length > 0) lines.push(`${indent}    ${parts.join('  ')}`)
+    lines.push('')
+
+    const kids = children.get(item.id as string)
+    if (kids) {
+      for (const child of kids) {
+        renderNode(child, depth + 1)
+      }
+    }
+  }
+
+  for (const root of roots) {
+    renderNode(root, 0)
+  }
+
+  return lines.join('\n')
+}
+
 function formatKnowledgeRow(item: ResourceItem, name: string): string {
   const id = dimText(truncate(String(item.id ?? ''), 12))
   const type = item.type ? badge(String(item.type), MAGENTA) : ''
@@ -461,8 +523,8 @@ export function formatResourceTypes(): string {
     `  ${label('Add (companies):')} name, domain (required), industry, arr, stage, employee_count, plan_tier, country, notes`,
     '',
     `${BOLD}scopes${RESET}`,
-    '  Product scopes (product areas and initiatives) with goals.',
-    `  ${label('Add:')} name, type (required), description, goals`,
-    `  ${label('Update:')} name, type, description, goals`,
+    '  Product scopes (product areas, initiatives, and experiments) with goals and hierarchical nesting.',
+    `  ${label('Add:')} name, type (required), description, goals, parent_id, content`,
+    `  ${label('Update:')} name, type, description, goals, parent_id, content`,
   ].join('\n')
 }

@@ -26,6 +26,7 @@ import {
   setEntityProductScope,
   linkEntities,
 } from '@/lib/db/queries/entity-relationships'
+import { buildProgrammaticContext } from '@/lib/db/queries/relationship-metadata'
 import { batchEmbedIssues } from '@/lib/issues/embedding-service'
 import { batchEmbedSessions } from '@/lib/sessions/embedding-service'
 import { batchEmbedContacts } from '@/lib/customers/customer-embedding-service'
@@ -173,7 +174,9 @@ export async function createDemoProjectData({
         const companyId = companyIds[ks.companyIndex]
         if (companyId) {
           try {
-            await linkEntities(projectId, 'knowledge_source', created.id, 'company', companyId)
+            await linkEntities(projectId, 'knowledge_source', created.id, 'company', companyId,
+              buildProgrammaticContext('demo-data') as unknown as Record<string, unknown>,
+            )
           } catch (err) {
             console.error('[demo-data-service] failed to link knowledge source to company:', ks.name, err)
           }
@@ -267,7 +270,9 @@ export async function createDemoProjectData({
           const companyId = companyIds[contact.companyIndex]
           if (companyId) {
             try {
-              await linkEntities(projectId, 'session', session.id, 'company', companyId)
+              await linkEntities(projectId, 'session', session.id, 'company', companyId,
+                buildProgrammaticContext('demo-data') as unknown as Record<string, unknown>,
+              )
             } catch (err) {
               console.error('[demo-data-service] failed to link session to company:', demo.name, err)
             }

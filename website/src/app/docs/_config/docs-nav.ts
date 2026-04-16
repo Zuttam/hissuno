@@ -37,7 +37,7 @@ export const DOCS_NAV: DocNavCategory[] = [
         href: '/docs/connect/overview',
         items: [
           { title: 'Overview', slug: 'connect-overview', href: '/docs/connect/overview' },
-          { title: 'MCP Server', slug: 'mcp', href: '/docs/connect/mcp' },
+
           { title: 'CLI', slug: 'cli', href: '/docs/connect/cli' },
           { title: 'Skills', slug: 'skills', href: '/docs/connect/skills' },
           { title: 'API', slug: 'api-overview', href: '/docs/api/overview' },

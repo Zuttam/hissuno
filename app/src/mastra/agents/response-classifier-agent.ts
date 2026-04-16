@@ -1,4 +1,11 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
+
+export const RESPONSE_CLASSIFIER_MODEL: ModelConfig = {
+  name: 'response-classifier',
+  tier: 'small',
+  fallback: 'openai/gpt-5.4-mini',
+}
 
 /**
  * Response Classifier Agent
@@ -61,6 +68,6 @@ Message: "I'll take it from here, thanks Hissuno"
 Response: SKIP
 Human is taking over the conversation.
 `,
-  model: 'openai/gpt-5.4-mini',
+  model: ({ runtimeContext }) => resolveModel(RESPONSE_CLASSIFIER_MODEL, runtimeContext),
   tools: {},
 })

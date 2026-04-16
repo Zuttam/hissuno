@@ -34,6 +34,7 @@ import {
 } from '@/lib/db/schema/app'
 import { sanitizeSearchInput, dateToIso } from '@/lib/db/server'
 import { linkEntities, unlinkEntities, setEntityProductScope, getRelatedIds, batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
+import { buildProgrammaticContext } from '@/lib/db/queries/relationship-metadata'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -205,7 +206,9 @@ export async function deleteIssueById(issueId: string): Promise<boolean> {
 export async function linkSessionToIssue(issueId: string, sessionId: string): Promise<void> {
   const issueRow = await db.select({ project_id: issues.project_id }).from(issues).where(eq(issues.id, issueId)).limit(1)
   if (issueRow[0]) {
-    await linkEntities(issueRow[0].project_id, 'issue', issueId, 'session', sessionId)
+    await linkEntities(issueRow[0].project_id, 'issue', issueId, 'session', sessionId,
+      buildProgrammaticContext('issue-link') as unknown as Record<string, unknown>,
+    )
   }
 }
 

@@ -5,8 +5,10 @@ export interface DemoProductScope {
   color: string
   position: number
   isDefault: boolean
-  type: 'product_area' | 'initiative'
+  type: 'product_area' | 'initiative' | 'experiment'
   goals: Array<{ id: string; text: string }> | null
+  parent_id?: string | null
+  content?: string | null
 }
 
 export const DEMO_PRODUCT_SCOPES: DemoProductScope[] = [

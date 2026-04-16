@@ -19,7 +19,7 @@ Every feedback entry, issue, contact, and knowledge chunk gets a 1536-dimension 
 ### How Embeddings Are Used
 
 - **Deduplication** - When new feedback comes in, its embedding is compared against existing issues to find semantic matches (cosine similarity, threshold 0.5-0.6)
-- **Semantic search** - All resource search tools (MCP, CLI, API) use vector similarity to find relevant content by meaning
+- **Semantic search** - All resource search tools (CLI, API) use vector similarity to find relevant content by meaning
 - **Graph evaluation** - The [relationship discovery pipeline](/docs/architecture/graph-evaluation) uses embeddings to find semantically related entities across all types
 
 Embeddings are managed automatically. They're generated on creation, regenerated when content changes (using a content hash to skip unnecessary recomputation), and removed on deletion.

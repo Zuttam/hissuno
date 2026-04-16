@@ -6,8 +6,8 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
-import { knowledgePackages, knowledgePackageSources, knowledgeSources, projectSettings } from '@/lib/db/schema/app'
-import type { KnowledgePackageWithSources } from '@/lib/knowledge/types'
+import { supportPackages, supportPackageSources, knowledgeSources, projectSettings } from '@/lib/db/schema/app'
+import type { SupportPackageWithSources } from '@/lib/knowledge/types'
 
 export const runtime = 'nodejs'
 
@@ -37,11 +37,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // Fetch the package
     const [pkg] = await db
       .select()
-      .from(knowledgePackages)
+      .from(supportPackages)
       .where(
         and(
-          eq(knowledgePackages.id, packageId),
-          eq(knowledgePackages.project_id, projectId)
+          eq(supportPackages.id, packageId),
+          eq(supportPackages.project_id, projectId)
         )
       )
       .limit(1)
@@ -52,16 +52,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // Get linked sources
     const sourcesData = await db
-      .select({ source_id: knowledgePackageSources.source_id })
-      .from(knowledgePackageSources)
-      .where(eq(knowledgePackageSources.package_id, pkg.id))
+      .select({ source_id: supportPackageSources.source_id })
+      .from(supportPackageSources)
+      .where(eq(supportPackageSources.package_id, pkg.id))
 
     const sourceIds = sourcesData.map((s) => s.source_id)
 
     const rawSources = sourceIds.length > 0
       ? await db.select().from(knowledgeSources).where(inArray(knowledgeSources.id, sourceIds))
       : []
-    const sources = rawSources as unknown as KnowledgePackageWithSources['sources']
+    const sources = rawSources as unknown as SupportPackageWithSources['sources']
 
     // Compute lastAnalyzedAt from source data (analyzed_at is Date from Drizzle)
     const lastAnalyzedAt = rawSources.length > 0
@@ -125,11 +125,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // Verify package exists and belongs to project
     const [existing] = await db
       .select()
-      .from(knowledgePackages)
+      .from(supportPackages)
       .where(
         and(
-          eq(knowledgePackages.id, packageId),
-          eq(knowledgePackages.project_id, projectId)
+          eq(supportPackages.id, packageId),
+          eq(supportPackages.project_id, projectId)
         )
       )
       .limit(1)
@@ -162,13 +162,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       // Check for duplicate name (if changing)
       if (trimmedName !== existing.name) {
         const [duplicate] = await db
-          .select({ id: knowledgePackages.id })
-          .from(knowledgePackages)
+          .select({ id: supportPackages.id })
+          .from(supportPackages)
           .where(
             and(
-              eq(knowledgePackages.project_id, projectId),
-              eq(knowledgePackages.name, trimmedName),
-              ne(knowledgePackages.id, packageId)
+              eq(supportPackages.project_id, projectId),
+              eq(supportPackages.name, trimmedName),
+              ne(supportPackages.id, packageId)
             )
           )
           .limit(1)
@@ -217,12 +217,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     let updated = existing
     if (Object.keys(updates).length > 0) {
       const [result] = await db
-        .update(knowledgePackages)
+        .update(supportPackages)
         .set(updates)
         .where(
           and(
-            eq(knowledgePackages.id, packageId),
-            eq(knowledgePackages.project_id, projectId)
+            eq(supportPackages.id, packageId),
+            eq(supportPackages.project_id, projectId)
           )
         )
         .returning()
@@ -253,34 +253,34 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       // Remove sources no longer in the list
       if (validSourceIds.length > 0) {
         await db
-          .delete(knowledgePackageSources)
+          .delete(supportPackageSources)
           .where(
             and(
-              eq(knowledgePackageSources.package_id, packageId),
-              notInArray(knowledgePackageSources.source_id, validSourceIds)
+              eq(supportPackageSources.package_id, packageId),
+              notInArray(supportPackageSources.source_id, validSourceIds)
             )
           )
       } else {
         // Remove all source associations
         await db
-          .delete(knowledgePackageSources)
-          .where(eq(knowledgePackageSources.package_id, packageId))
+          .delete(supportPackageSources)
+          .where(eq(supportPackageSources.package_id, packageId))
       }
 
       // Insert new associations
       if (validSourceIds.length > 0) {
         // Get existing associations to avoid duplicates
         const existingLinks = await db
-          .select({ source_id: knowledgePackageSources.source_id })
-          .from(knowledgePackageSources)
-          .where(eq(knowledgePackageSources.package_id, packageId))
+          .select({ source_id: supportPackageSources.source_id })
+          .from(supportPackageSources)
+          .where(eq(supportPackageSources.package_id, packageId))
 
         const existingSourceIds = new Set(existingLinks.map((l) => l.source_id))
         const newSourceIds = validSourceIds.filter((id) => !existingSourceIds.has(id))
 
         if (newSourceIds.length > 0) {
           await db
-            .insert(knowledgePackageSources)
+            .insert(supportPackageSources)
             .values(newSourceIds.map((sourceId) => ({
               package_id: packageId,
               source_id: sourceId,
@@ -325,12 +325,12 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     // Verify package exists and belongs to project
     const [existing] = await db
-      .select({ id: knowledgePackages.id, name: knowledgePackages.name })
-      .from(knowledgePackages)
+      .select({ id: supportPackages.id, name: supportPackages.name })
+      .from(supportPackages)
       .where(
         and(
-          eq(knowledgePackages.id, packageId),
-          eq(knowledgePackages.project_id, projectId)
+          eq(supportPackages.id, packageId),
+          eq(supportPackages.project_id, projectId)
         )
       )
       .limit(1)
@@ -356,11 +356,11 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 
     // Delete the package (cascade will handle related records)
     await db
-      .delete(knowledgePackages)
+      .delete(supportPackages)
       .where(
         and(
-          eq(knowledgePackages.id, packageId),
-          eq(knowledgePackages.project_id, projectId)
+          eq(supportPackages.id, packageId),
+          eq(supportPackages.project_id, projectId)
         )
       )
 

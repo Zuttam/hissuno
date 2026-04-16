@@ -10,6 +10,7 @@ export type KnowledgeSourceType =
   | 'uploaded_doc'
   | 'raw_text'
   | 'notion'
+  | 'folder'
 
 /** Origin of a document source (how the content was imported) */
 export type KnowledgeSourceOrigin = 'upload' | 'notion' | 'google_drive'
@@ -38,6 +39,8 @@ export interface KnowledgeSourceRecord {
   enabled: boolean
   /** FK to source_codes - required for type='codebase', null for other types */
   source_code_id: string | null
+  /** Parent source ID for tree nesting (null = root level) */
+  parent_id: string | null
   /** User-defined display name for this source */
   name: string | null
   /** User-defined description for what this source contains */
@@ -50,6 +53,8 @@ export interface KnowledgeSourceRecord {
   origin: KnowledgeSourceOrigin | null
   /** Custom field values */
   custom_fields: Record<string, unknown> | null
+  /** Position within siblings for ordering */
+  sort_order: number
 }
 
 /**
@@ -71,12 +76,14 @@ export interface KnowledgeSourceInsert {
   enabled?: boolean
   /** FK to source_codes - required for type='codebase', null for other types */
   source_code_id?: string | null
+  parent_id?: string | null
   name?: string | null
   description?: string | null
   analyzed_content?: string | null
   notion_page_id?: string | null
   origin?: KnowledgeSourceOrigin | null
   custom_fields?: Record<string, unknown> | null
+  sort_order?: number
 }
 
 /**
@@ -98,12 +105,14 @@ export interface KnowledgeSourceUpdate {
   enabled?: boolean
   /** FK to source_codes - required for type='codebase', null for other types */
   source_code_id?: string | null
+  parent_id?: string | null
   name?: string | null
   description?: string | null
   analyzed_content?: string | null
   notion_page_id?: string | null
   origin?: KnowledgeSourceOrigin | null
   custom_fields?: Record<string, unknown> | null
+  sort_order?: number
 }
 
 /**
@@ -125,13 +134,13 @@ export interface KnowledgeSourceWithCodebase extends KnowledgeSourceRecord {
 }
 
 // ============================================================================
-// KNOWLEDGE PACKAGES
+// SUPPORT PACKAGES
 // ============================================================================
 
 /**
- * Database row type for knowledge_packages table
+ * Database row type for support_packages table
  */
-export interface KnowledgePackageRecord {
+export interface SupportPackageRecord {
   id: string
   project_id: string
   name: string
@@ -148,9 +157,9 @@ export interface KnowledgePackageRecord {
 }
 
 /**
- * Insert type for knowledge_packages table
+ * Insert type for support_packages table
  */
-export interface KnowledgePackageInsert {
+export interface SupportPackageInsert {
   id?: string
   project_id: string
   name: string
@@ -167,9 +176,9 @@ export interface KnowledgePackageInsert {
 }
 
 /**
- * Database row type for knowledge_package_sources junction table
+ * Database row type for support_package_sources junction table
  */
-export interface KnowledgePackageSourceRecord {
+export interface SupportPackageSourceRecord {
   id: string
   package_id: string
   source_id: string
@@ -179,7 +188,7 @@ export interface KnowledgePackageSourceRecord {
 /**
  * Knowledge package with related data for display
  */
-export interface KnowledgePackageWithSources extends KnowledgePackageRecord {
+export interface SupportPackageWithSources extends SupportPackageRecord {
   /** Knowledge sources linked to this package */
   sources: KnowledgeSourceRecord[]
   /** Count of linked sources */
@@ -237,6 +246,7 @@ export function getSourceTypeLabel(type: KnowledgeSourceType): string {
     uploaded_doc: 'Uploaded Document',
     raw_text: 'Raw Text',
     notion: 'Notion',
+    folder: 'Folder',
   }
   return labels[type]
 }
@@ -261,6 +271,8 @@ export function getSourceDisplayValue(source: KnowledgeSourceRecord): string {
         : 'Empty'
     case 'notion':
       return source.name ?? 'Notion page'
+    case 'folder':
+      return source.name ?? 'Untitled folder'
     default:
       return 'Unknown source'
   }

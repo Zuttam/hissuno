@@ -7,10 +7,6 @@ description: "The agentic interfaces and integration points that expose Hissuno'
 
 The Execution layer exposes Hissuno's knowledge graph through a set of interfaces. Each interface gives a different audience - AI agents, developers, customers, or team members - a way to read from and write to the graph.
 
-## MCP Server
-
-Exposes the knowledge graph to AI agents (Claude Desktop, Cursor, Claude Code) via the Model Context Protocol. Agents can search feedback, list issues, query knowledge, create resources, and ask Hissuno questions through a standard tool interface. [Learn more](/docs/connect/mcp)
-
 ## CLI
 
 Terminal access to all project data. Set up instances, configure connections, query and create resources, manage integrations. The CLI supports both interactive and non-interactive (agent-ready) modes for use in scripts and automation pipelines. [Learn more](/docs/connect/cli)
@@ -21,7 +17,7 @@ Claude Code skills that inject Hissuno context into coding workflows. Query prod
 
 ## API
 
-RESTful access to feedback, issues, search, and project data. Build custom integrations or connect tools that don't support MCP. The API uses Bearer token authentication with API keys scoped to individual projects. [Learn more](/docs/api/overview)
+RESTful access to feedback, issues, search, and project data. Build custom integrations and automate workflows. The API uses Bearer token authentication with API keys scoped to individual projects. [Learn more](/docs/api/overview)
 
 ## Widget
 

@@ -1,17 +1,18 @@
 /**
  * Goal Classification
  *
- * Lightweight LLM call to classify which specific product scope goal
- * an entity best contributes to. Uses gpt-5.4-mini for consistency
- * with the extract-topics pattern.
+ * Uses a Mastra agent to classify which specific product scope goal
+ * an entity best contributes to.
  */
 
-import { generateObject } from 'ai'
-import { openai } from '@ai-sdk/openai'
+import { Agent } from '@mastra/core/agent'
 import { z } from 'zod'
+import { resolveModel } from '@/mastra/models'
+import { getAIModelSettingsAdmin } from '@/lib/db/queries/project-settings'
 import type { ProductScopeGoal } from '@/types/product-scope'
 
 export interface ClassifyGoalInput {
+  projectId: string
   entityName: string
   contentSnippet: string       // first ~1500 chars of entity content
   scopeName: string
@@ -25,6 +26,11 @@ export interface ClassifyGoalResult {
   matchedGoalText: string | null
   reasoning: string
 }
+
+const GOAL_SCHEMA = z.object({
+  goalId: z.string().nullable().describe('The ID of the best matching goal, or null if none fit'),
+  reasoning: z.string().describe('Brief explanation of why this goal was chosen (or why none matched)'),
+})
 
 /**
  * Classify which goal an entity serves within a product scope.
@@ -50,13 +56,18 @@ export async function classifyGoal(input: ClassifyGoalInput): Promise<ClassifyGo
   try {
     const goalsText = goals.map((g, i) => `${i + 1}. [${g.id}] ${g.text}`).join('\n')
 
-    const { object } = await generateObject({
-      model: openai('gpt-5.4-mini'),
-      schema: z.object({
-        goalId: z.string().nullable().describe('The ID of the best matching goal, or null if none fit'),
-        reasoning: z.string().describe('Brief explanation of why this goal was chosen (or why none matched)'),
-      }),
-      prompt: `Given this entity and product scope with goals, which goal does this entity best contribute to? Pick one or none.
+    const aiSettings = await getAIModelSettingsAdmin(input.projectId)
+    const goalAgent = new Agent({
+      name: 'Graph Goal Classifier',
+      instructions: 'You classify which product-scope goal an entity best contributes to.',
+      model: resolveModel(
+        { name: 'graph-goal-classifier', tier: 'small', fallback: 'openai/gpt-5.4-mini' },
+        aiSettings,
+      ),
+    })
+
+    const { object } = await goalAgent.generate(
+      `Given this entity and product scope with goals, which goal does this entity best contribute to? Pick one or none.
 
 Entity: ${entityName}
 Content (snippet):
@@ -69,7 +80,8 @@ Goals:
 ${goalsText}
 
 Pick the single goal this entity most directly addresses. If none of the goals are relevant, return goalId as null.`,
-    })
+      { output: GOAL_SCHEMA },
+    )
 
     // Validate the returned goalId actually exists
     const matchedGoal = object.goalId
@@ -81,8 +93,9 @@ Pick the single goal this entity most directly addresses. If none of the goals a
       matchedGoalText: matchedGoal?.text ?? null,
       reasoning: object.reasoning,
     }
-  } catch {
-    // LLM failure is non-fatal - return no goal with fallback reasoning
+  } catch (err) {
+    // Non-fatal: fall back to template reasoning. Log clearly so the failure is visible.
+    console.error(`[classify-goal] LLM goal classification failed, using template fallback:`, err instanceof Error ? err.stack ?? err.message : err)
     return {
       matchedGoalId: null,
       matchedGoalText: null,

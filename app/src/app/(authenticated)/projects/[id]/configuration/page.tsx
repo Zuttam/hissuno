@@ -28,8 +28,10 @@ import {
   getSupportAgentSettings,
   getIssueAnalysisSettings,
   getGraphEvaluationSettingsClient,
+  getAIModelSettingsClient,
+  updateAIModelSettingsClient,
 } from '@/lib/api/settings'
-import type { KnowledgePackageWithSources } from '@/lib/knowledge/types'
+import type { SupportPackageWithSources } from '@/lib/knowledge/types'
 
 const ONTOLOGY_SECTIONS = ['customers', 'issues', 'feedback', 'knowledge', 'products'] as const
 const ONTOLOGY_SECTION_LABELS: Record<(typeof ONTOLOGY_SECTIONS)[number], string> = {
@@ -168,7 +170,7 @@ export default function AgentsSettingsPage() {
   // --- Agent data ---
   const [settings, setSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
   const [isLoading, setIsLoading] = useState(true)
-  const [packages, setPackages] = useState<KnowledgePackageWithSources[]>([])
+  const [packages, setPackages] = useState<SupportPackageWithSources[]>([])
 
   // --- General tab state ---
   const [projectName, setProjectName] = useState('')
@@ -176,6 +178,16 @@ export default function AgentsSettingsPage() {
   const [isSavingGeneral, setIsSavingGeneral] = useState(false)
   const [generalError, setGeneralError] = useState<string | null>(null)
   const [generalSaved, setGeneralSaved] = useState(false)
+
+  // --- AI model settings state ---
+  const [aiProvider, setAiProvider] = useState('openai')
+  const [aiModelDefault, setAiModelDefault] = useState('')
+  const [aiModelSmall, setAiModelSmall] = useState('')
+  const [availableProviders, setAvailableProviders] = useState<string[]>([])
+  const [providerConfigs, setProviderConfigs] = useState<Record<string, { label: string; icon: string; defaults: { default: string; small: string }; models: { default: string[]; small: string[] } }>>({})
+  const [isEditingAiModel, setIsEditingAiModel] = useState(false)
+  const [isSavingAiModel, setIsSavingAiModel] = useState(false)
+  const [aiModelError, setAiModelError] = useState<string | null>(null)
 
   // --- Ontology sub-navigation ---
   const [ontologySection, setOntologySection] = useState<'customers' | 'issues' | 'feedback' | 'knowledge' | 'products'>('customers')
@@ -248,11 +260,70 @@ export default function AgentsSettingsPage() {
   }, [projectId])
 
 
+  // --- AI model helpers ---
+  const splitModel = (full: string) => {
+    const idx = full.indexOf('/')
+    return idx === -1 ? ['openai', full] : [full.slice(0, idx), full.slice(idx + 1)]
+  }
+
+  const fetchAIModelSettings = useCallback(async () => {
+    if (!projectId) return
+    try {
+      const data = await getAIModelSettingsClient(projectId) as {
+        settings: Record<string, unknown>
+        resolved?: { default: string; small: string }
+        availableProviders?: string[]
+        providers?: Record<string, { label: string; icon: string; defaults: { default: string; small: string }; models: { default: string[]; small: string[] } }>
+      }
+      if (data.resolved) {
+        const [provider, model] = splitModel(data.resolved.default)
+        const [, modelSmall] = splitModel(data.resolved.small)
+        setAiProvider(provider)
+        setAiModelDefault(model)
+        setAiModelSmall(modelSmall)
+      }
+      if (data.availableProviders) setAvailableProviders(data.availableProviders)
+      if (data.providers) setProviderConfigs(data.providers)
+    } catch (err) {
+      console.error('[ai-model] Failed to fetch settings:', err)
+    }
+  }, [projectId])
+
   // Fetch all data on mount
   useEffect(() => {
     void fetchSettings()
     void fetchPackages()
-  }, [fetchSettings, fetchPackages])
+    void fetchAIModelSettings()
+  }, [fetchSettings, fetchPackages, fetchAIModelSettings])
+
+  const handleSaveAiModel = async () => {
+    setIsSavingAiModel(true)
+    setAiModelError(null)
+    try {
+      const defaultFull = aiModelDefault.trim() ? `${aiProvider}/${aiModelDefault.trim()}` : null
+      const smallFull = aiModelSmall.trim() ? `${aiProvider}/${aiModelSmall.trim()}` : null
+      await updateAIModelSettingsClient(projectId!, {
+        ai_model: defaultFull,
+        ai_model_small: smallFull,
+      })
+      setIsEditingAiModel(false)
+    } catch (err) {
+      setAiModelError(err instanceof Error ? err.message : 'Failed to save AI model settings')
+    } finally {
+      setIsSavingAiModel(false)
+    }
+  }
+
+  const handleProviderChange = (provider: string) => {
+    setAiProvider(provider)
+    const config = providerConfigs[provider]
+    if (config) {
+      setAiModelDefault(config.defaults.default)
+      setAiModelSmall(config.defaults.small)
+    }
+  }
+
+  const currentProviderConfig = providerConfigs[aiProvider]
 
   // --- Agent event handlers ---
   const activePackage = packages.find((p) => p.id === settings.supportAgent.packageId)
@@ -431,6 +502,117 @@ export default function AgentsSettingsPage() {
 
         {/* Agents & Automations Tab */}
         <TabsPanel value="agents-workflows">
+          {/* AI Model Configuration */}
+          <div className="mb-8 max-w-2xl">
+            <h3 className="mb-4 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
+              AI Model
+            </h3>
+            {!isEditingAiModel ? (
+              <button
+                type="button"
+                onClick={() => setIsEditingAiModel(true)}
+                className="flex w-full items-center justify-between rounded-lg px-1 py-2 text-left transition-colors hover:bg-[color:var(--surface-hover)]"
+              >
+                <span className="flex items-center gap-3 text-sm">
+                  {currentProviderConfig?.icon && (
+                    <img src={currentProviderConfig.icon} alt="" className="h-5 w-5 rounded-sm" />
+                  )}
+                  <span className="font-medium">{currentProviderConfig?.label ?? aiProvider}</span>
+                  <span className="flex items-center gap-1.5 text-[color:var(--text-secondary)]">
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                    {aiModelDefault || '(default)'}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[color:var(--text-tertiary)]">
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                    {aiModelSmall || '(default)'}
+                  </span>
+                  {!availableProviders.includes(aiProvider) && (
+                    <span className="text-xs text-[color:var(--accent-warning)]">(no API key)</span>
+                  )}
+                </span>
+                <svg className="h-4 w-4 text-[color:var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                </svg>
+              </button>
+            ) : (
+              <div className="rounded-lg border border-[color:var(--border-subtle)] p-4 flex flex-col gap-4">
+                <div className="flex flex-col gap-1">
+                  <label className="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)]">
+                    {currentProviderConfig?.icon && (
+                      <img src={currentProviderConfig.icon} alt="" className="h-3 w-3 rounded-sm" />
+                    )}
+                    Provider
+                  </label>
+                  <select
+                    value={aiProvider}
+                    onChange={(e) => handleProviderChange(e.target.value)}
+                    className="w-full rounded-md border border-[color:var(--border-subtle)] bg-transparent px-3 py-2 text-sm focus:border-[color:var(--accent-primary)] focus:outline-none"
+                  >
+                    {Object.entries(providerConfigs).map(([key, config]) => (
+                      <option key={key} value={key} disabled={!availableProviders.includes(key)}>
+                        {config.label}{!availableProviders.includes(key) ? ' (no API key)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1 flex flex-col gap-1">
+                    <label className="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)]">
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                      Default model
+                    </label>
+                    <select
+                      value={aiModelDefault}
+                      onChange={(e) => setAiModelDefault(e.target.value)}
+                      className="w-full rounded-md border border-[color:var(--border-subtle)] bg-transparent px-3 py-2 text-sm focus:border-[color:var(--accent-primary)] focus:outline-none"
+                    >
+                      {(currentProviderConfig?.models.default ?? []).map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-[color:var(--text-tertiary)]">Agents, issue creation, and deep analysis</p>
+                  </div>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <label className="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)]">
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" /></svg>
+                      Small model
+                    </label>
+                    <select
+                      value={aiModelSmall}
+                      onChange={(e) => setAiModelSmall(e.target.value)}
+                      className="w-full rounded-md border border-[color:var(--border-subtle)] bg-transparent px-3 py-2 text-sm focus:border-[color:var(--accent-primary)] focus:outline-none"
+                    >
+                      {(currentProviderConfig?.models.small ?? []).map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-[color:var(--text-tertiary)]">Tagging, classification, summaries, and topic extraction</p>
+                  </div>
+                </div>
+                {aiModelError && (
+                  <p className="text-xs text-[color:var(--accent-danger)]">{aiModelError}</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => void handleSaveAiModel()}
+                    disabled={isSavingAiModel}
+                  >
+                    {isSavingAiModel ? 'Saving...' : 'Save'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={() => { setIsEditingAiModel(false); void fetchAIModelSettings() }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <h3 className="mb-4 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
             Agents
           </h3>
@@ -453,7 +635,7 @@ export default function AgentsSettingsPage() {
             <AgentCard
               avatar="🧭"
               title="Product Co-pilot"
-              description="Team agent with full data access via MCP"
+              description="Team agent with full data access"
               channels={buildSupportChannels(integrationStatuses)}
               onClick={() => setShowProductCopilotDialog(true)}
             />

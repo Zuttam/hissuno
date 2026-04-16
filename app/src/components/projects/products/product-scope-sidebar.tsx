@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo, useRef, type ChangeEvent } from 'react'
-import { LayoutGrid, Rocket } from 'lucide-react'
+import { LayoutGrid, Rocket, FlaskConical } from 'lucide-react'
 import { Button, Dialog, Input, Textarea, Badge, FormField, Select } from '@/components/ui'
 import { RelatedEntitiesSection } from '@/components/shared/related-entities-section'
 import { CustomFieldsRenderer } from '@/components/shared/custom-fields-renderer'
@@ -25,6 +25,7 @@ const COLOR_OPTIONS: { value: TagColorVariant; label: string; colorClass: string
 const TYPE_OPTIONS: { value: ProductScopeType; label: string }[] = [
   { value: 'product_area', label: 'Product Area' },
   { value: 'initiative', label: 'Initiative' },
+  { value: 'experiment', label: 'Experiment' },
 ]
 
 // ============================================================================
@@ -34,6 +35,9 @@ const TYPE_OPTIONS: { value: ProductScopeType; label: string }[] = [
 export function ScopeTypeIcon({ type, size = 14 }: { type: ProductScopeType; size?: number }) {
   if (type === 'initiative') {
     return <Rocket size={size} className="text-[color:var(--accent-warning)]" />
+  }
+  if (type === 'experiment') {
+    return <FlaskConical size={size} className="text-[color:var(--accent-success)]" />
   }
   return <LayoutGrid size={size} className="text-[color:var(--accent-info)]" />
 }
@@ -45,6 +49,7 @@ export function ScopeTypeIcon({ type, size = 14 }: { type: ProductScopeType; siz
 interface ProductScopeSidebarEditProps {
   scope: ProductScopeRecord
   projectId: string
+  allScopes?: ProductScopeRecord[]
   onClose: () => void
   onUpdate: (updates: Record<string, unknown>) => Promise<boolean>
   onDelete: (scopeId: string) => void
@@ -52,6 +57,8 @@ interface ProductScopeSidebarEditProps {
 
 interface ProductScopeSidebarCreateProps {
   projectId: string
+  parentId?: string | null
+  allScopes?: ProductScopeRecord[]
   onClose: () => void
   onCreate: (newScope: {
     name: string
@@ -60,6 +67,8 @@ interface ProductScopeSidebarCreateProps {
     color: TagColorVariant
     type: ProductScopeType
     goals: ProductScopeGoal[] | null
+    parent_id?: string | null
+    content?: string | null
     custom_fields?: Record<string, unknown>
   }) => void
   existingSlugs: string[]
@@ -85,6 +94,7 @@ export function ProductScopeSidebar(props: ProductScopeSidebarProps) {
 function EditModeSidebar({
   scope,
   projectId,
+  allScopes,
   onClose,
   onUpdate,
   onDelete,
@@ -313,6 +323,35 @@ function EditModeSidebar({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
+          {/* Parent Scope */}
+          {!scope.is_default && allScopes && (
+            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+              <ParentScopeSelector
+                currentScopeId={scope.id}
+                parentId={scope.parent_id}
+                allScopes={allScopes}
+                onSave={async (parentId) => {
+                  setIsSaving(true)
+                  await onUpdate({ parent_id: parentId })
+                  setIsSaving(false)
+                }}
+              />
+            </div>
+          )}
+
+          {/* Content (markdown) */}
+          <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
+            <EditableTextField
+              value={scope.content}
+              fieldKey="content"
+              onSave={handleFieldSave}
+              placeholder="Add detailed content (markdown)..."
+              type="textarea"
+              maxLength={50000}
+              label="Content"
+            />
+          </div>
+
           {/* Business Goals */}
           <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
             <EditableGoalsSection
@@ -346,7 +385,7 @@ function EditModeSidebar({
       <Dialog
         open={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
-        title={`Delete ${scope.type === 'initiative' ? 'Initiative' : 'Product Area'}`}
+        title={`Delete ${TYPE_OPTIONS.find(o => o.value === scope.type)?.label ?? 'Scope'}`}
         size="md"
       >
         <p className="text-sm text-[color:var(--text-secondary)]">
@@ -372,6 +411,7 @@ function EditableTextField({
   placeholder,
   type = 'text',
   maxLength,
+  label,
 }: {
   value: string | null | undefined
   fieldKey: string
@@ -379,6 +419,7 @@ function EditableTextField({
   placeholder?: string
   type?: 'text' | 'textarea'
   maxLength?: number
+  label?: string
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(value ?? '')
@@ -460,18 +501,35 @@ function EditableTextField({
   }
 
   return (
-    <div className="group flex items-start gap-1">
-      <p className={`flex-1 text-sm ${value ? 'text-[color:var(--foreground)]' : 'text-[color:var(--text-tertiary)]'}`}>
-        {value || placeholder || '-'}
-      </p>
-      <button
-        type="button"
-        onClick={handleStartEdit}
-        className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
-        aria-label="Edit"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-      </button>
+    <div className="group flex flex-col gap-1">
+      {label && (
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">{label}</span>
+          <button
+            type="button"
+            onClick={handleStartEdit}
+            className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+            aria-label="Edit"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+          </button>
+        </div>
+      )}
+      <div className="flex items-start gap-1">
+        <p className={`flex-1 text-sm ${value ? 'text-[color:var(--foreground)]' : 'text-[color:var(--text-tertiary)]'}`}>
+          {value || placeholder || '-'}
+        </p>
+        {!label && (
+          <button
+            type="button"
+            onClick={handleStartEdit}
+            className="rounded-[4px] p-1 text-[color:var(--text-secondary)] opacity-0 transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] group-hover:opacity-100"
+            aria-label="Edit"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -703,11 +761,69 @@ function EditableGoalsSection({
 }
 
 // ============================================================================
+// Parent Scope Selector
+// ============================================================================
+
+function ParentScopeSelector({
+  currentScopeId,
+  parentId,
+  allScopes,
+  onSave,
+}: {
+  currentScopeId: string
+  parentId: string | null
+  allScopes: ProductScopeRecord[]
+  onSave: (parentId: string | null) => Promise<void>
+}) {
+  // Exclude self and descendants from parent options
+  const getDescendantIds = (scopeId: string): Set<string> => {
+    const ids = new Set<string>()
+    const stack = [scopeId]
+    while (stack.length > 0) {
+      const current = stack.pop()!
+      for (const scope of allScopes) {
+        if (scope.parent_id === current && !ids.has(scope.id)) {
+          ids.add(scope.id)
+          stack.push(scope.id)
+        }
+      }
+    }
+    return ids
+  }
+
+  const descendantIds = useMemo(() => getDescendantIds(currentScopeId), [currentScopeId, allScopes])
+  const parentOptions = useMemo(
+    () => allScopes.filter(s => s.id !== currentScopeId && !descendantIds.has(s.id)),
+    [allScopes, currentScopeId, descendantIds]
+  )
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="font-mono text-xs uppercase tracking-wide text-[color:var(--text-secondary)]">Parent Scope</span>
+      <select
+        value={parentId ?? ''}
+        onChange={(e) => void onSave(e.target.value || null)}
+        className="rounded-[4px] border border-[color:var(--border-subtle)] bg-transparent px-2 py-1.5 text-sm text-[color:var(--foreground)] outline-none focus:border-[color:var(--accent-selected)]"
+      >
+        <option value="">None (root)</option>
+        {parentOptions.map((scope) => (
+          <option key={scope.id} value={scope.id}>
+            {'  '.repeat(scope.depth)}{scope.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
+// ============================================================================
 // Create Mode Sidebar
 // ============================================================================
 
 function CreateModeSidebar({
   projectId,
+  parentId: initialParentId,
+  allScopes,
   onClose,
   onCreate,
   existingSlugs,
@@ -717,6 +833,8 @@ function CreateModeSidebar({
   const [color, setColor] = useState<TagColorVariant>('info')
   const [scopeType, setScopeType] = useState<ProductScopeType>('product_area')
   const [goals, setGoals] = useState<ProductScopeGoal[]>([])
+  const [parentId, setParentId] = useState<string | null>(initialParentId ?? null)
+  const [content, setContent] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
 
@@ -729,7 +847,7 @@ function CreateModeSidebar({
     setCustomFieldValues((prev) => ({ ...prev, [key]: value }))
   }, [])
 
-  const headerLabel = scopeType === 'initiative' ? 'New Initiative' : 'New Product Area'
+  const headerLabel = scopeType === 'initiative' ? 'New Initiative' : scopeType === 'experiment' ? 'New Experiment' : 'New Product Area'
 
   const handleSave = useCallback(() => {
     const trimmedName = name.trim()
@@ -755,9 +873,11 @@ function CreateModeSidebar({
       color,
       type: scopeType,
       goals: filteredGoals.length > 0 ? filteredGoals : null,
+      parent_id: parentId,
+      content: content.trim() || null,
       custom_fields: cfPayload,
     })
-  }, [name, description, color, scopeType, goals, customFieldValues, existingSlugs, onCreate])
+  }, [name, description, color, scopeType, goals, parentId, content, customFieldValues, existingSlugs, onCreate])
 
   const handleAddGoal = useCallback(() => {
     setGoals((prev) => [...prev, { id: `goal_${Date.now()}`, text: '' }])
@@ -842,6 +962,20 @@ function CreateModeSidebar({
                 maxLength={MAX_DESCRIPTION_LENGTH}
               />
             </FormField>
+            {/* Parent scope */}
+            {allScopes && allScopes.length > 0 && (
+              <FormField label="Parent Scope">
+                <Select
+                  value={parentId ?? ''}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setParentId(e.target.value || null)}
+                >
+                  <option value="">None (root)</option>
+                  {allScopes.filter(s => !s.is_default).map((s) => (
+                    <option key={s.id} value={s.id}>{'  '.repeat(s.depth)}{s.name}</option>
+                  ))}
+                </Select>
+              </FormField>
+            )}
             <FormField as="div" label="Color">
               <div className="flex items-center gap-4">
                 <div className="flex gap-2">
@@ -894,6 +1028,18 @@ function CreateModeSidebar({
                   + Add goal
                 </button>
               </div>
+            </FormField>
+            {/* Content (markdown) */}
+            <FormField
+              label="Content"
+              supportingText="Optional markdown content describing this scope in detail"
+            >
+              <Textarea
+                value={content}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setContent(e.target.value)}
+                placeholder="Detailed scope description (markdown)..."
+                rows={4}
+              />
             </FormField>
             {/* Custom fields */}
             {customFields.length > 0 && (

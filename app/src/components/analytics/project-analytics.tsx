@@ -1,8 +1,10 @@
 'use client'
 
 import { useProjectAnalytics, useCustomerSegmentationAnalytics } from '@/hooks/use-analytics'
+import { useCustomerAnalytics } from '@/hooks/use-customer-analytics'
 import { PeriodSelector } from './period-selector'
 import { StatCard, StatCardGrid } from './stat-card'
+import { CustomerAggregatedCard } from './customer-aggregated-card'
 import { LineChart, BarChart } from './charts'
 import { CustomerSegmentation } from './customer-segmentation'
 import { Spinner } from '@/components/ui/spinner'
@@ -56,6 +58,11 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
     period,
   })
 
+  const {
+    data: customerAnalyticsData,
+    isLoading: customerAnalyticsLoading,
+  } = useCustomerAnalytics({ projectId })
+
   if (isLoading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
@@ -83,7 +90,7 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
       </div>
 
       {/* Summary Cards */}
-      <StatCardGrid columns={4}>
+      <StatCardGrid columns={5}>
         <StatCard
           label="Feedback"
           value={data.sessions.total}
@@ -107,6 +114,10 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
           value={data.affectedProducts.value}
           change={data.affectedProducts.change}
           size="sm"
+        />
+        <CustomerAggregatedCard
+          data={customerAnalyticsData}
+          isLoading={customerAnalyticsLoading}
         />
       </StatCardGrid>
 

@@ -2,7 +2,7 @@
 
 **One intelligence layer. Every product agent.**
 
-Hissuno is an open-source unified context layer for product agents. It ingests your codebase, docs, websites, and customer signals into an interconnected knowledge graph - then exposes it through agent-native interfaces (MCP, CLI, API) so any AI agent can traverse and query your product intelligence natively.
+Hissuno is an open-source unified context layer for product agents. It ingests your codebase, docs, websites, and customer signals into an interconnected knowledge graph - then exposes it through agent-native interfaces (CLI, API) so any AI agent can traverse and query your product intelligence natively.
 
 ---
 
@@ -23,7 +23,7 @@ Sessions link to contacts, contacts link to issues, issues link to scopes, scope
 ```
 +-----------------------------------------------------------------+
 |              ANY AI AGENT OR INTERFACE                           |
-|  MCP Server | CLI | API | Widget | Slack | Claude | Cursor      |
+|  CLI | API | Widget | Slack | Claude | Cursor              |
 +-------------------------------+---------------------------------+
                                 |
                                 v
@@ -104,7 +104,7 @@ Customer-facing AI powered by your knowledge graph. Deploy via the embeddable wi
 
 Team-facing AI assistant for PMs, founders, and engineers.
 
-- Available in-app (sidebar), via Slack, or through MCP (Claude Desktop, Cursor)
+- Available in-app (sidebar) or via Slack
 - Query issues, search feedback, explore the knowledge graph conversationally
 - Full access to all project data with semantic search
 - Record feedback on behalf of customers
@@ -281,7 +281,7 @@ Open your Vercel URL and log in with the seeded credentials, or sign up for a ne
 - **LLM**: OpenAI (gpt-5.4, GPT-5)
 - **Storage**: Local filesystem (default) or S3-compatible
 - **Knowledge Graph**: Unified `entity_relationships` table forming a traversable graph across sessions, issues, contacts, scopes, and knowledge sources
-- **Integrations**: Slack, Intercom, Gong, Fathom, Zendesk, GitHub, Notion, Jira, Linear, HubSpot, PostHog, Widget, MCP
+- **Integrations**: Slack, Intercom, Gong, Fathom, Zendesk, GitHub, Notion, Jira, Linear, HubSpot, PostHog, Widget
 
 ---
 
@@ -331,16 +331,6 @@ Connect your tools to feed data into the knowledge graph. 12 integrations availa
 
 Coming soon: Gmail, Google Drive, Amplitude, Salesforce.
 
-### MCP Server
-
-Hissuno exposes an MCP (Model Context Protocol) server that lets external AI agents - Claude Desktop, Cursor, and other MCP clients - traverse the knowledge graph natively:
-
-- **`ask_hissuno`** - Conversational tool: ask questions about your product, customers, issues, or feedback
-- **`list_resources` / `get_resource` / `search_resources`** - Structured access to knowledge, feedback, issues, and contacts
-- **`add_resource`** - Create new feedback, issues, or contacts programmatically
-
-Two auth modes: **user mode** (full project access via API key) or **contact mode** (scoped to a single contact via widget token).
-
 ### CLI
 
 A command-line interface for interacting with your Hissuno instance - create projects, query feedback, manage issues, connect integrations:
@@ -370,7 +360,6 @@ app/
       agents/               # Agent definitions
       tools/                # Agent tools
       workflows/            # Workflow definitions
-    mcp/                    # MCP server
     types/                  # TypeScript types
   packages/
     widget/                 # @hissuno/widget npm package
@@ -396,8 +385,6 @@ app/
 
 /api/issues/                   # Issue management
 /api/issues/[id]/generate-brief/ # Brief generation
-
-/api/mcp                       # MCP server endpoint
 
 /api/integrations/github/      # GitHub OAuth
 /api/integrations/slack/       # Slack integration

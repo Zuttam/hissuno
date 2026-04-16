@@ -20,7 +20,7 @@ interface KnowledgeSourceSidebarEditProps {
   source: KnowledgeSourceWithCodebase
   onClose: () => void
   onUpdate: (sourceId: string, updates: Record<string, unknown>) => Promise<boolean>
-  onDelete: (sourceId: string) => Promise<boolean>
+  onDelete: (sourceId: string, options?: { children?: 'reparent' | 'delete' }) => Promise<boolean>
   onAnalyze?: (sourceId: string) => Promise<void>
   isAnalyzing?: boolean
   analysisEvents?: AnalysisEvent[]
@@ -47,6 +47,7 @@ const TYPE_ICONS: Record<KnowledgeSourceType, React.ReactNode> = {
   uploaded_doc: <span>📄</span>,
   raw_text: <span>📝</span>,
   notion: <Image src="/logos/notion.svg" alt="Notion" width={16} height={16} className="dark:invert" />,
+  folder: <span>📁</span>,
 }
 
 const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
@@ -157,8 +158,8 @@ function EditModeSidebar({
           />
           {/* Row 3: Action buttons */}
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {/* Build / Re-analyze */}
-            {onAnalyze && (
+            {/* Build / Re-analyze (not for folders) */}
+            {onAnalyze && source.type !== 'folder' && (
               <button
                 type="button"
                 onClick={() => void handleAnalyze()}
@@ -289,13 +290,31 @@ function EditModeSidebar({
       </aside>
 
       {/* Delete confirmation */}
-      <Dialog open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="Delete Source" size="md">
+      <Dialog open={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title={source.type === 'folder' ? 'Delete Folder' : 'Delete Source'} size="md">
         <p className="text-sm text-[color:var(--text-secondary)]">
-          Are you sure you want to delete this knowledge source? This action cannot be undone.
+          {source.type === 'folder'
+            ? 'What should happen to the items inside this folder?'
+            : 'Are you sure you want to delete this knowledge source? This action cannot be undone.'}
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
-          <Button variant="danger" size="sm" onClick={() => void handleDelete()} loading={isDeleting}>Delete</Button>
+          {source.type === 'folder' ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => void handleDelete()} loading={isDeleting}>
+                Move items out & delete folder
+              </Button>
+              <Button variant="danger" size="sm" onClick={async () => {
+                setIsDeleting(true)
+                const success = await onDelete(source.id, { children: 'delete' })
+                setIsDeleting(false)
+                if (success) { setShowDeleteConfirm(false); onClose() }
+              }} loading={isDeleting}>
+                Delete everything
+              </Button>
+            </>
+          ) : (
+            <Button variant="danger" size="sm" onClick={() => void handleDelete()} loading={isDeleting}>Delete</Button>
+          )}
         </div>
       </Dialog>
     </>

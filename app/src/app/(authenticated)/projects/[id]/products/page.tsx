@@ -40,6 +40,8 @@ export default function ProductsPage() {
     color: TagColorVariant
     type: ProductScopeType
     goals: ProductScopeGoal[] | null
+    parent_id?: string | null
+    content?: string | null
     custom_fields?: Record<string, unknown>
   }) => {
     if (!projectId) return
@@ -50,6 +52,8 @@ export default function ProductsPage() {
       color: newScope.color,
       type: newScope.type,
       goals: newScope.goals,
+      parent_id: newScope.parent_id,
+      content: newScope.content,
       custom_fields: newScope.custom_fields,
     })
     setIsCreating(false)
@@ -81,7 +85,7 @@ export default function ProductsPage() {
   if (isLoadingProject || !projectId) {
     return (
       <>
-        <PageHeader title="Scopes (product areas and initiatives)" />
+        <PageHeader title="Scopes" />
         <div className="flex-1 flex items-center justify-center">
           <Spinner size="lg" />
         </div>
@@ -92,12 +96,12 @@ export default function ProductsPage() {
   return (
     <>
       <PageHeader
-        title="Scopes (product areas and initiatives)"
+        title="Scopes"
         actions={
           <button
             type="button"
             onClick={() => { setSelectedScopeId(null); setIsCreating(true) }}
-            disabled={scopes.length >= 20}
+            disabled={scopes.length >= 50}
             className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={14} />
@@ -141,6 +145,7 @@ export default function ProductsPage() {
         <ProductScopeSidebar
           scope={selectedScope}
           projectId={projectId}
+          allScopes={scopes}
           onClose={() => setSelectedScopeId(null)}
           onUpdate={handleUpdate}
           onDelete={(id) => void handleDelete(id)}
@@ -151,6 +156,7 @@ export default function ProductsPage() {
       {isCreating && (
         <ProductScopeSidebar
           projectId={projectId}
+          allScopes={scopes}
           onClose={() => setIsCreating(false)}
           onCreate={(newScope) => void handleCreate(newScope)}
           existingSlugs={scopes.map((s) => s.slug)}

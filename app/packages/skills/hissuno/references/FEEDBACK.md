@@ -41,13 +41,6 @@ Interactive prompts:
 2. Name/title (optional)
 3. Tags (optional, comma-separated)
 
-**MCP add fields:**
-
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `messages` | Yes | array | `[{role: "user"|"assistant", content: string}]` |
-| `name` | No | string | Name/title for the session |
-| `tags` | No | string[] | Classification tags |
 
 ## Relationships
 

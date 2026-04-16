@@ -232,7 +232,7 @@ setupCommand.action(async (opts) => {
 
     // 10. Start server or print next steps
     if (run('start')) {
-      await startServer(appDir, seeded, apiKey, opts.start)
+      await startServer(appDir, seeded, opts.start)
     }
   } catch (err: any) {
     log.fatal(err.message)

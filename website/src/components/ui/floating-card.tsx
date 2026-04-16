@@ -1,12 +1,8 @@
 'use client'
 
-import { useRef, useEffect, useId, type ReactNode } from 'react'
-import { motion, useSpring, useTransform } from 'motion/react'
+import { useRef, useEffect, type ReactNode } from 'react'
+import { motion, useSpring } from 'motion/react'
 import { cn } from '@/lib/utils/class'
-import {
-  useWaterWebGLOptional,
-  type RippleEvent,
-} from '@/components/water-webgl/WaterWebGLContext'
 import { cardBaseClasses } from './card'
 import { useThemePreference } from '@/hooks/use-theme-preference'
 
@@ -42,8 +38,6 @@ const FLOATING_PRESETS = {
 } as const
 
 // Shadow configurations for each variant
-// Light mode uses warm teal-gray shadows for onsen atmosphere
-// Dark mode uses neutral shadows
 const SHADOW_CONFIGS = {
   light: {
     default: {
@@ -62,18 +56,18 @@ const SHADOW_CONFIGS = {
     },
     elevated: {
       base: [
-        '0 1px 2px rgba(0, 0, 0, 0.3)', // Tight contact shadow
-        '0 4px 8px rgba(0, 0, 0, 0.25)', // Close shadow
-        '0 12px 24px rgba(0, 0, 0, 0.25)', // Mid-range diffuse
-        '0 24px 48px rgba(0, 0, 0, 0.20)', // Far ambient
-        'inset 0 1px 0 rgba(255, 255, 255, 0.03)', // Subtle top highlight
+        '0 1px 2px rgba(0, 0, 0, 0.3)',
+        '0 4px 8px rgba(0, 0, 0, 0.25)',
+        '0 12px 24px rgba(0, 0, 0, 0.25)',
+        '0 24px 48px rgba(0, 0, 0, 0.20)',
+        'inset 0 1px 0 rgba(255, 255, 255, 0.03)',
       ].join(', '),
       hover: [
-        '0 2px 4px rgba(0, 0, 0, 0.3)', // Tight contact shadow
-        '0 8px 16px rgba(0, 0, 0, 0.28)', // Close shadow
-        '0 20px 40px rgba(0, 0, 0, 0.28)', // Mid-range diffuse
-        '0 40px 80px rgba(0, 0, 0, 0.22)', // Far ambient
-        'inset 0 1px 0 rgba(255, 255, 255, 0.05)', // Subtle top highlight
+        '0 2px 4px rgba(0, 0, 0, 0.3)',
+        '0 8px 16px rgba(0, 0, 0, 0.28)',
+        '0 20px 40px rgba(0, 0, 0, 0.28)',
+        '0 40px 80px rgba(0, 0, 0, 0.22)',
+        'inset 0 1px 0 rgba(255, 255, 255, 0.05)',
       ].join(', '),
     },
   },
@@ -82,14 +76,9 @@ const SHADOW_CONFIGS = {
 interface FloatingCardProps {
   children?: ReactNode
   className?: string
-  /** Optional inline styles */
   style?: React.CSSProperties
-  /** Controls the ambient floating animation intensity */
   floating?: FloatingPreset
-  /** Controls the shadow depth appearance */
   variant?: FloatingCardVariant
-  /** Controls whether the card responds to ripple events */
-  respondToRipple?: boolean
 }
 
 export function FloatingCard({
@@ -98,40 +87,18 @@ export function FloatingCard({
   style,
   floating = 'gentle',
   variant = 'elevated',
-  respondToRipple = false,
 }: FloatingCardProps) {
   const ref = useRef<HTMLElement>(null)
-  const water = useWaterWebGLOptional()
-  const componentId = useId()
   const { resolvedTheme } = useThemePreference()
   const isDarkMode = resolvedTheme === 'dark'
 
-  // Resolve floating preset (handle boolean for backward compatibility)
   const resolvedFloating: 'none' | 'gentle' | 'moderate' | 'active' =
     floating === true ? 'moderate' : floating === false ? 'none' : floating
 
-  // Spring-animated motion values for ripple response
-  const nudgeX = useSpring(0, { stiffness: 150, damping: 15 })
-  const nudgeY = useSpring(0, { stiffness: 150, damping: 15 })
-  const tilt = useSpring(0, { stiffness: 200, damping: 20 })
-
-  // Ambient floating springs (separate from ripple response)
   const driftX = useSpring(0, { stiffness: 80, damping: 12 })
   const driftY = useSpring(0, { stiffness: 80, damping: 12 })
 
-  // Combine ripple nudge with ambient drift
-  const combinedX = useTransform(
-    [nudgeX, driftX],
-    ([nudge, drift]) => (nudge as number) + (drift as number)
-  )
-  const combinedY = useTransform(
-    [nudgeY, driftY],
-    ([nudge, drift]) => (nudge as number) + (drift as number)
-  )
-
-  // Ambient floating animation
   useEffect(() => {
-    // If floating is disabled, ensure drift values are zero and exit
     if (resolvedFloating === 'none') {
       driftX.set(0)
       driftY.set(0)
@@ -144,20 +111,8 @@ export function FloatingCard({
 
     const animate = () => {
       const t = Date.now() / 1000
-
-      // Horizontal sway
-      const xValue =
-        Math.sin(t * config.xFrequency * Math.PI * 2 + offset) *
-        config.xAmplitude
-
-      // Vertical bob with phase offset for organic movement
-      const yValue =
-        Math.sin(
-          t * config.yFrequency * Math.PI * 2 + offset + config.phaseOffset
-        ) * config.yAmplitude
-
-      driftX.set(xValue)
-      driftY.set(yValue)
+      driftX.set(Math.sin(t * config.xFrequency * Math.PI * 2 + offset) * config.xAmplitude)
+      driftY.set(Math.sin(t * config.yFrequency * Math.PI * 2 + offset + config.phaseOffset) * config.yAmplitude)
       frame = requestAnimationFrame(animate)
     }
     animate()
@@ -165,42 +120,6 @@ export function FloatingCard({
     return () => cancelAnimationFrame(frame)
   }, [resolvedFloating, driftX, driftY])
 
-  // Subscribe to ripple events
-  useEffect(() => {
-    if (!respondToRipple || !water || !ref.current) return
-
-    const getRect = () => ref.current!.getBoundingClientRect()
-
-    const handleRipple = (
-      _event: RippleEvent,
-      distance: number,
-      angle: number
-    ) => {
-      // Calculate nudge based on distance (closer = stronger)
-      const maxDistance = 600
-      const strength = Math.pow(1 - distance / maxDistance, 2)
-
-      // Push away from ripple origin
-      const pushX = Math.cos(angle) * strength * 30
-      const pushY = Math.sin(angle) * strength * 30
-      const tiltAmount = strength * 5 * (angle > 0 ? 1 : -1)
-
-      nudgeX.set(pushX)
-      nudgeY.set(pushY)
-      tilt.set(tiltAmount)
-
-      // Return to neutral after delay
-      setTimeout(() => {
-        nudgeX.set(0)
-        nudgeY.set(0)
-        tilt.set(0)
-      }, 800)
-    }
-
-    return water.subscribeToRipples(componentId, getRect, handleRipple)
-  }, [respondToRipple, water, componentId, nudgeX, nudgeY, tilt])
-
-  // Get shadow config based on variant and theme
   const themeConfig = isDarkMode ? SHADOW_CONFIGS.dark : SHADOW_CONFIGS.light
   const shadowConfig = themeConfig[variant]
 
@@ -208,12 +127,10 @@ export function FloatingCard({
     <motion.section
       ref={ref as React.RefObject<HTMLElement>}
       className={cn(cardBaseClasses, className)}
-      data-no-ripple
       style={{
         ...style,
-        x: combinedX,
-        y: combinedY,
-        rotate: tilt,
+        x: driftX,
+        y: driftY,
         boxShadow: shadowConfig.base,
       }}
       whileHover={{

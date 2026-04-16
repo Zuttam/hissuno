@@ -124,16 +124,16 @@ export async function GET(request: NextRequest) {
         emitEvent('connected', { message: 'Connected to chat stream' })
 
         // Get the knowledge package ID - use override from metadata if provided, otherwise fetch from settings
-        let knowledgePackageId: string | null = metadata?.packageId as string | null
-        if (!knowledgePackageId) {
+        let supportPackageId: string | null = metadata?.packageId as string | null
+        if (!supportPackageId) {
           const agentSettings = await getSupportAgentSettingsAdmin(projectId)
-          knowledgePackageId = agentSettings.support_agent_package_id
+          supportPackageId = agentSettings.support_agent_package_id
         }
 
         // Resolve agent via router (support or PM based on contactId)
         const { agent, systemMessages } = await resolveAgent({
           contactId: widgetContactId,
-          knowledgePackageId,
+          supportPackageId,
           projectId,
         })
 
@@ -143,8 +143,7 @@ export async function GET(request: NextRequest) {
         runtimeContext.set('userId', (metadata?.userId as string) || null)
         runtimeContext.set('userMetadata', (metadata?.userMetadata as Record<string, string>) || null)
         runtimeContext.set('sessionId', sessionId)
-        runtimeContext.set('knowledgePackageId', knowledgePackageId)
-        runtimeContext.set('contactToken', null)
+        runtimeContext.set('supportPackageId', supportPackageId)
         runtimeContext.set('contactId', widgetContactId)
 
         // Convert messages to ModelMessage format, with knowledge injected as system messages

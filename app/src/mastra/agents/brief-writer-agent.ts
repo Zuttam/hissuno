@@ -1,5 +1,12 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
 import { saveBriefTool } from '../tools/save-brief-tool'
+
+export const BRIEF_WRITER_MODEL: ModelConfig = {
+  name: 'brief-writer',
+  tier: 'default',
+  fallback: 'openai/gpt-5.2',
+}
 import { analysisKnowledgeTools } from '../tools/analysis-knowledge-tools'
 import { webSearchTool } from '../tools/web-search-tool'
 
@@ -113,6 +120,6 @@ Use \`save-brief\` to store the completed brief.
 - Action-oriented
 - Evidence-based
 `,
-  model: 'openai/gpt-5.2',
+  model: ({ runtimeContext }) => resolveModel(BRIEF_WRITER_MODEL, runtimeContext),
   tools: Object.fromEntries(briefWriterTools.map((tool) => [tool.id, tool])),
 })

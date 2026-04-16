@@ -1,9 +1,16 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
 import {
   listCodebaseFilesTool,
   readCodebaseFileTool,
   searchCodebaseFilesTool,
 } from '../tools/codebase-tools'
+
+export const CODEBASE_ANALYZER_MODEL: ModelConfig = {
+  name: 'codebase-analyzer',
+  tier: 'default',
+  fallback: 'openai/gpt-5.2',
+}
 
 /**
  * Codebase Analyzer Agent
@@ -113,7 +120,7 @@ Important domain terms or patterns a support agent should know.
 - Keep the entire output under 1000 words if possible
 - Be efficient with tool calls - you have limited iterations
 `,
-  model: 'openai/gpt-5.2',
+  model: ({ runtimeContext }) => resolveModel(CODEBASE_ANALYZER_MODEL, runtimeContext),
   tools: {
     listCodebaseFiles: listCodebaseFilesTool,
     readCodebaseFile: readCodebaseFileTool,

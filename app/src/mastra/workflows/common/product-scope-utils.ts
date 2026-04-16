@@ -11,10 +11,47 @@ export function buildProductScopePromptSection(
     return ''
   }
 
-  const scopeRows = scopes
+  // Build a parent-id lookup so we can group children under parents
+  const parentMap = new Map<string | null, ProductScopeRecord[]>()
+  for (const scope of scopes) {
+    const key = scope.parent_id
+    if (!parentMap.has(key)) parentMap.set(key, [])
+    parentMap.get(key)!.push(scope)
+  }
+
+  // Recursively flatten scopes in tree order
+  function flattenScopes(parentId: string | null): ProductScopeRecord[] {
+    const children = parentMap.get(parentId) ?? []
+    const result: ProductScopeRecord[] = []
+    for (const child of children) {
+      result.push(child)
+      result.push(...flattenScopes(child.id))
+    }
+    return result
+  }
+
+  const orderedScopes = flattenScopes(null)
+  // Include any scopes whose parent isn't in the list (orphans)
+  const orderedIds = new Set(orderedScopes.map((s) => s.id))
+  for (const scope of scopes) {
+    if (!orderedIds.has(scope.id)) orderedScopes.push(scope)
+  }
+
+  const scopeRows = orderedScopes
     .map((scope) => {
-      const typeLabel = scope.type === 'initiative' ? 'Initiative' : 'Product Area'
-      return `| ${scope.slug} | ${scope.name} | ${typeLabel} | ${scope.description} |${scope.is_default ? ' (default)' : ''}`
+      const typeLabel =
+        scope.type === 'initiative'
+          ? 'Initiative'
+          : scope.type === 'experiment'
+            ? 'Experiment'
+            : 'Product Area'
+      const indent = scope.parent_id ? '  - ' : ''
+      const contentExcerpt =
+        scope.content && scope.content.length > 0
+          ? ` ${scope.content.slice(0, 100).replace(/\n/g, ' ')}${scope.content.length > 100 ? '...' : ''}`
+          : ''
+      const description = `${scope.description}${contentExcerpt}`
+      return `| ${indent}${scope.slug} | ${scope.name} | ${typeLabel} | ${description} |${scope.is_default ? ' (default)' : ''}`
     })
     .join('\n')
 

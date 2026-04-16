@@ -1,9 +1,16 @@
 import { Agent } from '@mastra/core/agent'
+import { resolveModel, type ModelConfig } from '@/mastra/models'
 import {
   listCodebaseFilesTool,
   readCodebaseFileTool,
   searchCodebaseFilesTool,
 } from '../tools/codebase-tools'
+
+export const TECHNICAL_ANALYST_MODEL: ModelConfig = {
+  name: 'technical-analyst',
+  tier: 'default',
+  fallback: 'openai/gpt-5.2-codex',
+}
 
 /**
  * Technical Analyst Agent
@@ -109,7 +116,7 @@ Rate your overall confidence in the entire analysis (impact + effort + affected 
 - Always provide reasoning for your assessments
 - Return ONLY the JSON object, no additional text
 `,
-  model: 'openai/gpt-5.2-codex',
+  model: ({ runtimeContext }) => resolveModel(TECHNICAL_ANALYST_MODEL, runtimeContext),
   tools: {
     listCodebaseFiles: listCodebaseFilesTool,
     readCodebaseFile: readCodebaseFileTool,

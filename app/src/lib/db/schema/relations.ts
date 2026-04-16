@@ -22,18 +22,18 @@ import {
   sourceCodes,
   knowledgeSources,
   knowledgeEmbeddings,
-  knowledgePackages,
-  knowledgePackageSources,
+  supportPackages,
+  supportPackageSources,
   entityRelationships,
   embeddings,
   slackWorkspaceTokens,
   slackChannels,
   slackThreadSessions,
   githubAppInstallations,
+  githubSyncConfigs,
+  githubSyncedIssues,
   jiraConnections,
-  jiraIssueSyncs,
   linearConnections,
-  linearIssueSyncs,
   zendeskConnections,
   zendeskSyncRuns,
   zendeskSyncedTickets,
@@ -84,7 +84,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   sessions: many(sessions),
   issues: many(issues),
   knowledgeSources: many(knowledgeSources),
-  knowledgePackages: many(knowledgePackages),
+  supportPackages: many(supportPackages),
   // Integrations (one-to-one)
   widgetIntegration: one(widgetIntegrations, { fields: [projects.id], references: [widgetIntegrations.project_id] }),
   slackWorkspaceToken: one(slackWorkspaceTokens, { fields: [projects.id], references: [slackWorkspaceTokens.project_id] }),
@@ -103,7 +103,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 
 export const projectSettingsRelations = relations(projectSettings, ({ one }) => ({
   project: one(projects, { fields: [projectSettings.project_id], references: [projects.id] }),
-  supportAgentPackage: one(knowledgePackages, { fields: [projectSettings.support_agent_package_id], references: [knowledgePackages.id] }),
+  supportAgentPackage: one(supportPackages, { fields: [projectSettings.support_agent_package_id], references: [supportPackages.id] }),
 }))
 
 export const graphEvaluationSettingsRelations = relations(graphEvaluationSettings, ({ one }) => ({
@@ -142,6 +142,8 @@ export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
 
 export const productScopesRelations = relations(productScopes, ({ one, many }) => ({
   project: one(projects, { fields: [productScopes.project_id], references: [projects.id] }),
+  parent: one(productScopes, { fields: [productScopes.parent_id], references: [productScopes.id], relationName: 'scopeHierarchy' }),
+  children: many(productScopes, { relationName: 'scopeHierarchy' }),
   entityRelationships: many(entityRelationships),
 }))
 
@@ -202,8 +204,6 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
   project: one(projects, { fields: [issues.project_id], references: [projects.id] }),
   analysisRuns: many(issueAnalysisRuns),
   embedding: one(embeddings, { fields: [issues.id], references: [embeddings.entity_id] }),
-  jiraSync: one(jiraIssueSyncs, { fields: [issues.id], references: [jiraIssueSyncs.issue_id] }),
-  linearSync: one(linearIssueSyncs, { fields: [issues.id], references: [linearIssueSyncs.issue_id] }),
   notionSync: one(notionIssueSyncs, { fields: [issues.id], references: [notionIssueSyncs.issue_id] }),
   entityRelationships: many(entityRelationships),
 }))
@@ -224,8 +224,10 @@ export const sourceCodesRelations = relations(sourceCodes, ({ many }) => ({
 export const knowledgeSourcesRelations = relations(knowledgeSources, ({ one, many }) => ({
   project: one(projects, { fields: [knowledgeSources.project_id], references: [projects.id] }),
   sourceCode: one(sourceCodes, { fields: [knowledgeSources.source_code_id], references: [sourceCodes.id] }),
+  parent: one(knowledgeSources, { fields: [knowledgeSources.parent_id], references: [knowledgeSources.id], relationName: 'parentChild' }),
+  children: many(knowledgeSources, { relationName: 'parentChild' }),
   embeddings: many(knowledgeEmbeddings),
-  knowledgePackageSources: many(knowledgePackageSources),
+  supportPackageSources: many(supportPackageSources),
   entityRelationships: many(entityRelationships),
 }))
 
@@ -234,14 +236,14 @@ export const knowledgeEmbeddingsRelations = relations(knowledgeEmbeddings, ({ on
   source: one(knowledgeSources, { fields: [knowledgeEmbeddings.source_id], references: [knowledgeSources.id] }),
 }))
 
-export const knowledgePackagesRelations = relations(knowledgePackages, ({ one, many }) => ({
-  project: one(projects, { fields: [knowledgePackages.project_id], references: [projects.id] }),
-  sources: many(knowledgePackageSources),
+export const supportPackagesRelations = relations(supportPackages, ({ one, many }) => ({
+  project: one(projects, { fields: [supportPackages.project_id], references: [projects.id] }),
+  sources: many(supportPackageSources),
 }))
 
-export const knowledgePackageSourcesRelations = relations(knowledgePackageSources, ({ one }) => ({
-  package: one(knowledgePackages, { fields: [knowledgePackageSources.package_id], references: [knowledgePackages.id] }),
-  source: one(knowledgeSources, { fields: [knowledgePackageSources.source_id], references: [knowledgeSources.id] }),
+export const supportPackageSourcesRelations = relations(supportPackageSources, ({ one }) => ({
+  package: one(supportPackages, { fields: [supportPackageSources.package_id], references: [supportPackages.id] }),
+  source: one(knowledgeSources, { fields: [supportPackageSources.source_id], references: [knowledgeSources.id] }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -289,8 +291,20 @@ export const slackThreadSessionsRelations = relations(slackThreadSessions, ({ on
 // Integrations: GitHub
 // ---------------------------------------------------------------------------
 
-export const githubAppInstallationsRelations = relations(githubAppInstallations, ({ one }) => ({
+export const githubAppInstallationsRelations = relations(githubAppInstallations, ({ one, many }) => ({
   project: one(projects, { fields: [githubAppInstallations.project_id], references: [projects.id] }),
+  syncConfigs: many(githubSyncConfigs),
+  syncedIssues: many(githubSyncedIssues),
+}))
+
+export const githubSyncConfigsRelations = relations(githubSyncConfigs, ({ one }) => ({
+  installation: one(githubAppInstallations, { fields: [githubSyncConfigs.installation_id], references: [githubAppInstallations.id] }),
+  project: one(projects, { fields: [githubSyncConfigs.project_id], references: [projects.id] }),
+}))
+
+export const githubSyncedIssuesRelations = relations(githubSyncedIssues, ({ one }) => ({
+  installation: one(githubAppInstallations, { fields: [githubSyncedIssues.installation_id], references: [githubAppInstallations.id] }),
+  session: one(sessions, { fields: [githubSyncedIssues.session_id], references: [sessions.id] }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -299,27 +313,16 @@ export const githubAppInstallationsRelations = relations(githubAppInstallations,
 
 export const jiraConnectionsRelations = relations(jiraConnections, ({ one, many }) => ({
   project: one(projects, { fields: [jiraConnections.project_id], references: [projects.id] }),
-  issueSyncs: many(jiraIssueSyncs),
-}))
-
-export const jiraIssueSyncsRelations = relations(jiraIssueSyncs, ({ one }) => ({
-  connection: one(jiraConnections, { fields: [jiraIssueSyncs.connection_id], references: [jiraConnections.id] }),
-  issue: one(issues, { fields: [jiraIssueSyncs.issue_id], references: [issues.id] }),
 }))
 
 // ---------------------------------------------------------------------------
 // Integrations: Linear
 // ---------------------------------------------------------------------------
 
-export const linearConnectionsRelations = relations(linearConnections, ({ one, many }) => ({
+export const linearConnectionsRelations = relations(linearConnections, ({ one }) => ({
   project: one(projects, { fields: [linearConnections.project_id], references: [projects.id] }),
-  issueSyncs: many(linearIssueSyncs),
 }))
 
-export const linearIssueSyncsRelations = relations(linearIssueSyncs, ({ one }) => ({
-  connection: one(linearConnections, { fields: [linearIssueSyncs.connection_id], references: [linearConnections.id] }),
-  issue: one(issues, { fields: [linearIssueSyncs.issue_id], references: [issues.id] }),
-}))
 
 // ---------------------------------------------------------------------------
 // Integrations: Zendesk

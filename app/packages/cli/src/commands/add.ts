@@ -16,7 +16,7 @@ type AddOpts = Record<string, string | boolean | undefined>
 
 const ISSUE_TYPES = ['bug', 'feature_request', 'change_request'] as const
 const PRIORITIES = ['low', 'medium', 'high'] as const
-const SCOPE_TYPES = ['product_area', 'initiative'] as const
+const SCOPE_TYPES = ['product_area', 'initiative', 'experiment'] as const
 const STAGES = ['prospect', 'onboarding', 'active', 'churned', 'expansion'] as const
 
 async function addIssue(opts: AddOpts): Promise<Record<string, unknown>> {
@@ -263,6 +263,7 @@ async function addScope(opts: AddOpts): Promise<Record<string, unknown>> {
       choices: [
         { value: 'product_area', name: 'Product Area' },
         { value: 'initiative', name: 'Initiative' },
+        { value: 'experiment', name: 'Experiment' },
       ],
     })
   }
@@ -277,6 +278,8 @@ async function addScope(opts: AddOpts): Promise<Record<string, unknown>> {
 
   const data: Record<string, unknown> = { name, type }
   if (description) data.description = description
+  if (opts.parentId) data.parent_id = opts.parentId as string
+  if (opts.content) data.content = opts.content as string
 
   // Goals
   if (opts.goals !== undefined) {
@@ -444,7 +447,7 @@ export const addCommand = new Command('add')
   .description('Create a new resource interactively')
   .argument('<type>', 'Resource type: feedback, issues, customers, scopes')
   .option('--customer-type <type>', 'Customer sub-type: contacts (default) or companies')
-  .option('--type <type>', 'Issue type (bug, feature_request, change_request) or scope type (product_area, initiative)')
+  .option('--type <type>', 'Issue type (bug, feature_request, change_request) or scope type (product_area, initiative, experiment)')
   .option('--title <text>', 'Title for issues')
   .option('--description <text>', 'Description')
   .option('--priority <priority>', 'Priority (low, medium, high)')
@@ -466,6 +469,8 @@ export const addCommand = new Command('add')
   .option('--transcript <text>', 'Raw transcript text for non-turn-based feedback (e.g. meeting)')
   .option('--tags <tags>', 'Comma-separated tags for feedback')
   .option('--contact-email <email>', 'Contact email for feedback (resolves or creates a contact)')
+  .option('--parent-id <id>', 'Parent scope ID for hierarchical scopes')
+  .option('--content <text>', 'Markdown content for scopes')
   .option('--goals <goals>', 'Comma-separated goals for scopes')
   .action(async (type, opts, cmd) => {
     const config = requireConfig()

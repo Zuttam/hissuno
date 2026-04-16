@@ -157,7 +157,3 @@ These are templates. To create your own workflow skill:
 4. Run `hissuno skills install` to deploy
 
 See any existing workflow skill's `SKILL.md` for the pattern.
-
-## MCP Access (Alternative)
-
-Everything above can also be accessed via MCP tools if you prefer structured tool calls over CLI. See `references/MCP-TOOLS.md` for setup and usage.

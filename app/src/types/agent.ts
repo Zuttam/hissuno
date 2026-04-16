@@ -7,10 +7,8 @@ export type SupportAgentContext = {
   userId: string | null
   userMetadata: Record<string, string> | null
   sessionId: string
-  /** Knowledge package ID to use for this session */
-  knowledgePackageId: string | null
-  /** Contact JWT for MCP server contact-mode auth (generated from Slack user email) */
-  contactToken: string | null
+  /** Support package ID to use for this session */
+  supportPackageId: string | null
   /** Contact ID for data tool scoping — null = user mode (full access), set = contact mode (scoped) */
   contactId: string | null
 }

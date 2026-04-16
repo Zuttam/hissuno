@@ -30,8 +30,10 @@ export interface CreateProductScopeParams {
   slug?: string
   description?: string
   color?: string
-  type?: 'product_area' | 'initiative'
+  type?: 'product_area' | 'initiative' | 'experiment'
   goals?: Array<{ id: string; text: string }> | null
+  parent_id?: string | null
+  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -53,8 +55,10 @@ export interface UpdateProductScopeParams {
   slug?: string
   description?: string
   color?: string
-  type?: 'product_area' | 'initiative'
+  type?: 'product_area' | 'initiative' | 'experiment'
   goals?: Array<{ id: string; text: string }> | null
+  parent_id?: string | null
+  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -72,8 +76,14 @@ export async function updateProductScope(
   return scope
 }
 
-export async function deleteProductScope(projectId: string, scopeId: string): Promise<void> {
-  const url = buildUrl(`${paths.productScopes}/${scopeId}`, { projectId })
+export async function deleteProductScope(
+  projectId: string,
+  scopeId: string,
+  childrenMode: 'reparent' | 'delete' = 'reparent',
+): Promise<void> {
+  const params: Record<string, string> = { projectId }
+  if (childrenMode === 'delete') params.children = 'delete'
+  const url = buildUrl(`${paths.productScopes}/${scopeId}`, params)
   await fetchApi<{ success: boolean }>(url, {
     method: 'DELETE',
     errorMessage: 'Failed to delete product scope.',
@@ -140,4 +150,8 @@ export const updateKnowledgeAnalysisSettings = knowledgeAnalysis.update
 const graphEvaluation = createSettingsAccessor('graph-evaluation', 'graph evaluation')
 export const getGraphEvaluationSettingsClient = graphEvaluation.get
 export const updateGraphEvaluationSettingsClient = graphEvaluation.update
+
+const aiModel = createSettingsAccessor('ai-model', 'AI model')
+export const getAIModelSettingsClient = aiModel.get
+export const updateAIModelSettingsClient = aiModel.update
 
