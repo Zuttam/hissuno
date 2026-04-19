@@ -44,17 +44,6 @@ CREATE TABLE "compilation_runs" (
 	"created_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "contact_embeddings" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"contact_id" uuid NOT NULL,
-	"project_id" uuid NOT NULL,
-	"embedding" vector(1536) NOT NULL,
-	"text_hash" text NOT NULL,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "contact_embeddings_contact_id_unique" UNIQUE("contact_id")
-);
---> statement-breakpoint
 CREATE TABLE "contacts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"project_id" uuid NOT NULL,
@@ -74,18 +63,6 @@ CREATE TABLE "contacts" (
 	"updated_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "custom_tags" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"name" text NOT NULL,
-	"slug" text NOT NULL,
-	"description" text DEFAULT '' NOT NULL,
-	"color" text,
-	"position" integer DEFAULT 0 NOT NULL,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
 CREATE TABLE "customer_custom_field_definitions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"project_id" uuid NOT NULL,
@@ -98,6 +75,18 @@ CREATE TABLE "customer_custom_field_definitions" (
 	"position" integer DEFAULT 0 NOT NULL,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "embeddings" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"entity_id" uuid NOT NULL,
+	"entity_type" text NOT NULL,
+	"project_id" uuid NOT NULL,
+	"embedding" vector(1536) NOT NULL,
+	"text_hash" text NOT NULL,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	CONSTRAINT "embeddings_entity_id_unique" UNIQUE("entity_id")
 );
 --> statement-breakpoint
 CREATE TABLE "entity_relationships" (
@@ -113,206 +102,67 @@ CREATE TABLE "entity_relationships" (
 	"created_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "fathom_connections" (
+CREATE TABLE "graph_evaluation_settings" (
+	"project_id" uuid PRIMARY KEY NOT NULL,
+	"config" jsonb NOT NULL,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "integration_connections" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"project_id" uuid NOT NULL,
-	"api_key" text NOT NULL,
-	"sync_frequency" text DEFAULT 'manual' NOT NULL,
-	"sync_enabled" boolean DEFAULT false NOT NULL,
+	"plugin_id" text NOT NULL,
+	"external_account_id" text NOT NULL,
+	"account_label" text NOT NULL,
+	"credentials" jsonb NOT NULL,
+	"settings" jsonb,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	CONSTRAINT "integration_connections_unique" UNIQUE("project_id","plugin_id","external_account_id")
+);
+--> statement-breakpoint
+CREATE TABLE "integration_streams" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"connection_id" uuid NOT NULL,
+	"plugin_id" text NOT NULL,
+	"stream_id" text NOT NULL,
+	"stream_kind" text NOT NULL,
+	"enabled" boolean DEFAULT true NOT NULL,
+	"frequency" text DEFAULT 'manual' NOT NULL,
 	"filter_config" jsonb,
+	"settings" jsonb,
 	"last_sync_at" timestamp,
 	"last_sync_status" text,
 	"last_sync_error" text,
-	"last_sync_meetings_count" integer,
+	"last_sync_counts" jsonb,
 	"next_sync_at" timestamp,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "fathom_connections_project_id_unique" UNIQUE("project_id")
+	CONSTRAINT "integration_streams_unique" UNIQUE("connection_id","stream_id")
 );
 --> statement-breakpoint
-CREATE TABLE "fathom_sync_runs" (
+CREATE TABLE "integration_sync_runs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"connection_id" uuid NOT NULL,
-	"triggered_by" text DEFAULT 'manual' NOT NULL,
+	"plugin_id" text NOT NULL,
+	"stream_id" text,
+	"triggered_by" text NOT NULL,
 	"status" text DEFAULT 'in_progress' NOT NULL,
-	"meetings_found" integer,
-	"meetings_synced" integer,
-	"meetings_skipped" integer,
+	"counts" jsonb,
 	"error_message" text,
 	"started_at" timestamp DEFAULT now(),
 	"completed_at" timestamp
 );
 --> statement-breakpoint
-CREATE TABLE "fathom_synced_meetings" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+CREATE TABLE "integration_synced_records" (
 	"connection_id" uuid NOT NULL,
-	"fathom_meeting_id" text NOT NULL,
-	"session_id" text NOT NULL,
-	"meeting_created_at" timestamp,
-	"meeting_duration_seconds" integer,
-	"messages_count" integer,
-	"synced_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
-CREATE TABLE "github_app_installations" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"installation_id" integer,
-	"account_id" integer NOT NULL,
-	"account_login" text NOT NULL,
-	"target_type" text,
-	"scope" text,
-	"auth_method" text DEFAULT 'app' NOT NULL,
-	"access_token" text,
-	"installed_by_user_id" text,
-	"installed_by_email" text,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "github_app_installations_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "gong_connections" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"base_url" text DEFAULT 'https://api.gong.io' NOT NULL,
-	"access_key" text NOT NULL,
-	"access_key_secret" text NOT NULL,
-	"sync_enabled" boolean DEFAULT false NOT NULL,
-	"sync_frequency" text DEFAULT 'manual' NOT NULL,
-	"filter_config" jsonb,
-	"last_sync_at" timestamp,
-	"last_sync_status" text,
-	"last_sync_error" text,
-	"last_sync_calls_count" integer,
-	"next_sync_at" timestamp,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "gong_connections_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "gong_sync_runs" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"status" text DEFAULT 'running' NOT NULL,
-	"triggered_by" text NOT NULL,
-	"calls_found" integer,
-	"calls_synced" integer,
-	"calls_skipped" integer,
-	"error_message" text,
-	"started_at" timestamp DEFAULT now(),
-	"completed_at" timestamp
-);
---> statement-breakpoint
-CREATE TABLE "gong_synced_calls" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"session_id" uuid NOT NULL,
-	"gong_call_id" text NOT NULL,
-	"call_duration_seconds" integer,
-	"call_created_at" timestamp,
-	"messages_count" integer,
-	"synced_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
-CREATE TABLE "hubspot_connections" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"hub_id" text NOT NULL,
-	"hub_name" text,
-	"auth_method" text DEFAULT 'oauth' NOT NULL,
-	"access_token" text NOT NULL,
-	"refresh_token" text,
-	"token_expires_at" timestamp,
-	"sync_enabled" boolean DEFAULT false NOT NULL,
-	"sync_frequency" text DEFAULT 'manual' NOT NULL,
-	"filter_config" jsonb,
-	"last_sync_at" timestamp,
-	"last_sync_status" text,
-	"last_sync_error" text,
-	"last_sync_companies_count" integer,
-	"last_sync_contacts_count" integer,
-	"next_sync_at" timestamp,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "hubspot_connections_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "hubspot_sync_runs" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"status" text DEFAULT 'running' NOT NULL,
-	"triggered_by" text NOT NULL,
-	"companies_found" integer,
-	"companies_synced" integer,
-	"companies_skipped" integer,
-	"contacts_found" integer,
-	"contacts_synced" integer,
-	"contacts_skipped" integer,
-	"error_message" text,
-	"started_at" timestamp DEFAULT now(),
-	"completed_at" timestamp
-);
---> statement-breakpoint
-CREATE TABLE "hubspot_synced_companies" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"company_id" uuid NOT NULL,
-	"hubspot_company_id" text NOT NULL,
-	"hubspot_updated_at" timestamp,
-	"synced_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
-CREATE TABLE "hubspot_synced_contacts" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"contact_id" uuid NOT NULL,
-	"hubspot_contact_id" text NOT NULL,
-	"hubspot_updated_at" timestamp,
-	"synced_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
-CREATE TABLE "intercom_connections" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"workspace_id" text NOT NULL,
-	"workspace_name" text,
-	"access_token" text NOT NULL,
-	"auth_method" text DEFAULT 'oauth' NOT NULL,
-	"sync_enabled" boolean DEFAULT false NOT NULL,
-	"sync_frequency" text DEFAULT 'manual' NOT NULL,
-	"filter_config" jsonb,
-	"last_sync_at" timestamp,
-	"last_sync_status" text,
-	"last_sync_error" text,
-	"last_sync_conversations_count" integer,
-	"next_sync_at" timestamp,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "intercom_connections_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "intercom_sync_runs" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"status" text DEFAULT 'running' NOT NULL,
-	"triggered_by" text NOT NULL,
-	"conversations_found" integer,
-	"conversations_synced" integer,
-	"conversations_skipped" integer,
-	"error_message" text,
-	"started_at" timestamp DEFAULT now(),
-	"completed_at" timestamp
-);
---> statement-breakpoint
-CREATE TABLE "intercom_synced_conversations" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"session_id" uuid NOT NULL,
-	"intercom_conversation_id" text NOT NULL,
-	"parts_count" integer,
-	"conversation_created_at" timestamp,
-	"conversation_updated_at" timestamp,
-	"synced_at" timestamp DEFAULT now()
+	"stream_id" text NOT NULL,
+	"external_id" text NOT NULL,
+	"hissuno_id" text NOT NULL,
+	"hissuno_kind" text NOT NULL,
+	"synced_at" timestamp DEFAULT now(),
+	CONSTRAINT "integration_synced_records_pk" UNIQUE("connection_id","stream_id","external_id")
 );
 --> statement-breakpoint
 CREATE TABLE "issue_analysis_runs" (
@@ -327,27 +177,16 @@ CREATE TABLE "issue_analysis_runs" (
 	"completed_at" timestamp
 );
 --> statement-breakpoint
-CREATE TABLE "issue_embeddings" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"issue_id" uuid NOT NULL,
-	"project_id" uuid NOT NULL,
-	"embedding" vector(1536) NOT NULL,
-	"text_hash" text NOT NULL,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "issue_embeddings_issue_id_unique" UNIQUE("issue_id")
-);
---> statement-breakpoint
 CREATE TABLE "issues" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"project_id" uuid NOT NULL,
-	"title" text NOT NULL,
+	"name" text NOT NULL,
 	"description" text NOT NULL,
 	"type" text NOT NULL,
 	"priority" text DEFAULT 'medium' NOT NULL,
 	"status" text,
 	"is_archived" boolean DEFAULT false NOT NULL,
-	"upvote_count" integer DEFAULT 0,
+	"custom_fields" jsonb,
 	"priority_manual_override" boolean DEFAULT false,
 	"reach_score" double precision,
 	"reach_reasoning" text,
@@ -361,49 +200,9 @@ CREATE TABLE "issues" (
 	"analysis_computed_at" timestamp,
 	"brief" text,
 	"brief_generated_at" timestamp,
+	"pr_url" text,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
-CREATE TABLE "jira_connections" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"cloud_id" text NOT NULL,
-	"site_url" text NOT NULL,
-	"access_token" text NOT NULL,
-	"refresh_token" text NOT NULL,
-	"token_expires_at" timestamp NOT NULL,
-	"is_enabled" boolean DEFAULT true NOT NULL,
-	"auto_sync_enabled" boolean DEFAULT false NOT NULL,
-	"jira_project_id" text,
-	"jira_project_key" text,
-	"issue_type_id" text,
-	"issue_type_name" text,
-	"webhook_id" text,
-	"webhook_secret" text,
-	"installed_by_user_id" text,
-	"installed_by_email" text,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "jira_connections_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "jira_issue_syncs" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"issue_id" uuid NOT NULL,
-	"jira_issue_id" text,
-	"jira_issue_key" text,
-	"jira_issue_url" text,
-	"last_jira_status" text,
-	"last_sync_status" text DEFAULT 'pending' NOT NULL,
-	"last_sync_action" text,
-	"last_sync_error" text,
-	"last_synced_at" timestamp,
-	"last_webhook_received_at" timestamp,
-	"retry_count" integer DEFAULT 0 NOT NULL,
-	"created_at" timestamp DEFAULT now(),
-	CONSTRAINT "jira_issue_syncs_issue_id_unique" UNIQUE("issue_id")
 );
 --> statement-breakpoint
 CREATE TABLE "knowledge_embeddings" (
@@ -422,33 +221,11 @@ CREATE TABLE "knowledge_embeddings" (
 	"updated_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "knowledge_package_sources" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"package_id" uuid NOT NULL,
-	"source_id" uuid NOT NULL,
-	"created_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
-CREATE TABLE "knowledge_packages" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"name" text NOT NULL,
-	"description" text,
-	"guidelines" text,
-	"faq_content" text,
-	"howto_content" text,
-	"feature_docs_content" text,
-	"troubleshooting_content" text,
-	"compiled_at" timestamp,
-	"source_snapshot" jsonb,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
 CREATE TABLE "knowledge_sources" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"project_id" uuid NOT NULL,
 	"source_code_id" uuid,
+	"parent_id" uuid,
 	"name" text,
 	"description" text,
 	"type" text NOT NULL,
@@ -460,111 +237,30 @@ CREATE TABLE "knowledge_sources" (
 	"analysis_scope" text,
 	"notion_page_id" text,
 	"origin" text,
+	"custom_fields" jsonb,
 	"analyzed_at" timestamp,
 	"enabled" boolean DEFAULT true,
 	"error_message" text,
+	"sort_order" integer DEFAULT 0,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
-CREATE TABLE "linear_connections" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"organization_id" text NOT NULL,
-	"organization_name" text NOT NULL,
-	"auth_method" text DEFAULT 'oauth' NOT NULL,
-	"access_token" text NOT NULL,
-	"refresh_token" text,
-	"token_expires_at" timestamp,
-	"is_enabled" boolean DEFAULT true NOT NULL,
-	"auto_sync_enabled" boolean DEFAULT false NOT NULL,
-	"team_id" text,
-	"team_key" text,
-	"team_name" text,
-	"installed_by_user_id" text,
-	"installed_by_email" text,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "linear_connections_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "linear_issue_syncs" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"issue_id" uuid NOT NULL,
-	"linear_issue_id" text,
-	"linear_issue_identifier" text,
-	"linear_issue_url" text,
-	"last_linear_state" text,
-	"last_linear_state_type" text,
-	"last_sync_status" text DEFAULT 'pending' NOT NULL,
-	"last_sync_action" text,
-	"last_sync_error" text,
-	"last_synced_at" timestamp,
-	"last_webhook_received_at" timestamp,
-	"retry_count" integer DEFAULT 0 NOT NULL,
-	"created_at" timestamp DEFAULT now(),
-	CONSTRAINT "linear_issue_syncs_issue_id_unique" UNIQUE("issue_id")
-);
---> statement-breakpoint
-CREATE TABLE "notion_connections" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"access_token" text NOT NULL,
-	"workspace_id" text NOT NULL,
-	"workspace_name" text,
-	"workspace_icon" text,
-	"bot_id" text,
-	"auth_method" text DEFAULT 'oauth' NOT NULL,
-	"installed_by_user_id" text,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "notion_connections_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "posthog_connections" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"api_key" text NOT NULL,
-	"host" text DEFAULT 'https://app.posthog.com' NOT NULL,
-	"posthog_project_id" text NOT NULL,
-	"event_config" jsonb,
-	"sync_enabled" boolean DEFAULT false NOT NULL,
-	"sync_frequency" text DEFAULT 'manual' NOT NULL,
-	"filter_config" jsonb,
-	"last_sync_at" timestamp,
-	"last_sync_status" text,
-	"last_sync_error" text,
-	"next_sync_at" timestamp,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "posthog_connections_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "posthog_sync_runs" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"status" text DEFAULT 'running' NOT NULL,
-	"contacts_matched" integer,
-	"sessions_created" integer,
-	"contacts_created" integer,
-	"error_message" text,
-	"started_at" timestamp DEFAULT now(),
-	"completed_at" timestamp
 );
 --> statement-breakpoint
 CREATE TABLE "product_scopes" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"project_id" uuid NOT NULL,
+	"parent_id" uuid,
 	"name" text NOT NULL,
 	"slug" text NOT NULL,
 	"description" text DEFAULT '' NOT NULL,
 	"color" text DEFAULT '' NOT NULL,
 	"position" integer DEFAULT 0 NOT NULL,
+	"depth" integer DEFAULT 0 NOT NULL,
 	"is_default" boolean DEFAULT false NOT NULL,
 	"type" text DEFAULT 'product_area' NOT NULL,
 	"goals" jsonb,
+	"content" text,
+	"custom_fields" jsonb,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
 );
@@ -599,15 +295,16 @@ CREATE TABLE "project_settings" (
 	"session_idle_timeout_minutes" integer,
 	"session_goodbye_delay_seconds" integer,
 	"session_idle_response_timeout_seconds" integer,
-	"issue_tracking_enabled" boolean,
-	"pm_dedup_include_closed" boolean,
 	"classification_guidelines" text,
 	"brief_guidelines" text,
 	"analysis_guidelines" text,
+	"issue_analysis_enabled" boolean,
 	"support_agent_package_id" uuid,
 	"support_agent_tone" text,
 	"brand_guidelines" text,
 	"knowledge_relationship_guidelines" text,
+	"ai_model" text,
+	"ai_model_small" text,
 	"created_at" timestamp DEFAULT now(),
 	"updated_at" timestamp DEFAULT now()
 );
@@ -623,15 +320,10 @@ CREATE TABLE "projects" (
 	"updated_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
-CREATE TABLE "session_embeddings" (
+CREATE TABLE "rate_limit_events" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"session_id" uuid NOT NULL,
-	"project_id" uuid NOT NULL,
-	"embedding" vector(1536) NOT NULL,
-	"text_hash" text NOT NULL,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "session_embeddings_session_id_unique" UNIQUE("session_id")
+	"key" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "session_messages" (
@@ -671,14 +363,13 @@ CREATE TABLE "sessions" (
 	"page_url" text,
 	"page_title" text,
 	"user_metadata" jsonb,
+	"custom_fields" jsonb,
 	"first_message_at" timestamp,
 	"last_activity_at" timestamp,
 	"goodbye_detected_at" timestamp,
 	"scheduled_close_at" timestamp,
 	"idle_prompt_sent_at" timestamp,
-	"analysis_status" text DEFAULT 'pending' NOT NULL,
-	"pm_reviewed_at" timestamp,
-	"tags_auto_applied_at" timestamp,
+	"base_processed_at" timestamp,
 	"is_human_takeover" boolean DEFAULT false NOT NULL,
 	"human_takeover_at" timestamp,
 	"is_archived" boolean DEFAULT false NOT NULL,
@@ -741,6 +432,29 @@ CREATE TABLE "source_codes" (
 	"updated_at" timestamp DEFAULT now()
 );
 --> statement-breakpoint
+CREATE TABLE "support_package_sources" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"package_id" uuid NOT NULL,
+	"source_id" uuid NOT NULL,
+	"created_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "support_packages" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"project_id" uuid NOT NULL,
+	"name" text NOT NULL,
+	"description" text,
+	"guidelines" text,
+	"faq_content" text,
+	"howto_content" text,
+	"feature_docs_content" text,
+	"troubleshooting_content" text,
+	"compiled_at" timestamp,
+	"source_snapshot" jsonb,
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now()
+);
+--> statement-breakpoint
 CREATE TABLE "user_notifications" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
@@ -789,50 +503,6 @@ CREATE TABLE "widget_integrations" (
 	CONSTRAINT "widget_integrations_project_id_unique" UNIQUE("project_id")
 );
 --> statement-breakpoint
-CREATE TABLE "zendesk_connections" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"subdomain" text NOT NULL,
-	"admin_email" text NOT NULL,
-	"api_token" text NOT NULL,
-	"account_name" text,
-	"sync_enabled" boolean DEFAULT false NOT NULL,
-	"sync_frequency" text DEFAULT 'manual' NOT NULL,
-	"filter_config" jsonb,
-	"last_sync_at" timestamp,
-	"last_sync_status" text,
-	"last_sync_error" text,
-	"last_sync_tickets_count" integer,
-	"next_sync_at" timestamp,
-	"created_at" timestamp DEFAULT now(),
-	"updated_at" timestamp DEFAULT now(),
-	CONSTRAINT "zendesk_connections_project_id_unique" UNIQUE("project_id")
-);
---> statement-breakpoint
-CREATE TABLE "zendesk_sync_runs" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"status" text DEFAULT 'running' NOT NULL,
-	"triggered_by" text NOT NULL,
-	"tickets_found" integer,
-	"tickets_synced" integer,
-	"tickets_skipped" integer,
-	"error_message" text,
-	"started_at" timestamp DEFAULT now(),
-	"completed_at" timestamp
-);
---> statement-breakpoint
-CREATE TABLE "zendesk_synced_tickets" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"connection_id" uuid NOT NULL,
-	"session_id" uuid NOT NULL,
-	"zendesk_ticket_id" integer NOT NULL,
-	"comments_count" integer,
-	"ticket_created_at" timestamp,
-	"ticket_updated_at" timestamp,
-	"synced_at" timestamp DEFAULT now()
-);
---> statement-breakpoint
 CREATE TABLE "accounts" (
 	"userId" uuid NOT NULL,
 	"type" text NOT NULL,
@@ -877,12 +547,10 @@ ALTER TABLE "chat_runs" ADD CONSTRAINT "chat_runs_session_id_sessions_id_fk" FOR
 ALTER TABLE "chat_runs" ADD CONSTRAINT "chat_runs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "companies" ADD CONSTRAINT "companies_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "compilation_runs" ADD CONSTRAINT "compilation_runs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "contact_embeddings" ADD CONSTRAINT "contact_embeddings_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "public"."contacts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "contact_embeddings" ADD CONSTRAINT "contact_embeddings_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "contacts" ADD CONSTRAINT "contacts_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "contacts" ADD CONSTRAINT "contacts_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "custom_tags" ADD CONSTRAINT "custom_tags_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "customer_custom_field_definitions" ADD CONSTRAINT "customer_custom_field_definitions_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "embeddings" ADD CONSTRAINT "embeddings_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_relationships" ADD CONSTRAINT "entity_relationships_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_relationships" ADD CONSTRAINT "entity_relationships_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_relationships" ADD CONSTRAINT "entity_relationships_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "public"."contacts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -890,54 +558,24 @@ ALTER TABLE "entity_relationships" ADD CONSTRAINT "entity_relationships_issue_id
 ALTER TABLE "entity_relationships" ADD CONSTRAINT "entity_relationships_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_relationships" ADD CONSTRAINT "entity_relationships_knowledge_source_id_knowledge_sources_id_fk" FOREIGN KEY ("knowledge_source_id") REFERENCES "public"."knowledge_sources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_relationships" ADD CONSTRAINT "entity_relationships_product_scope_id_product_scopes_id_fk" FOREIGN KEY ("product_scope_id") REFERENCES "public"."product_scopes"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fathom_connections" ADD CONSTRAINT "fathom_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fathom_sync_runs" ADD CONSTRAINT "fathom_sync_runs_connection_id_fathom_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."fathom_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "fathom_synced_meetings" ADD CONSTRAINT "fathom_synced_meetings_connection_id_fathom_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."fathom_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "github_app_installations" ADD CONSTRAINT "github_app_installations_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "gong_connections" ADD CONSTRAINT "gong_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "gong_sync_runs" ADD CONSTRAINT "gong_sync_runs_connection_id_gong_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."gong_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "gong_synced_calls" ADD CONSTRAINT "gong_synced_calls_connection_id_gong_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."gong_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "gong_synced_calls" ADD CONSTRAINT "gong_synced_calls_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "hubspot_connections" ADD CONSTRAINT "hubspot_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "hubspot_sync_runs" ADD CONSTRAINT "hubspot_sync_runs_connection_id_hubspot_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."hubspot_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "hubspot_synced_companies" ADD CONSTRAINT "hubspot_synced_companies_connection_id_hubspot_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."hubspot_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "hubspot_synced_companies" ADD CONSTRAINT "hubspot_synced_companies_company_id_companies_id_fk" FOREIGN KEY ("company_id") REFERENCES "public"."companies"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "hubspot_synced_contacts" ADD CONSTRAINT "hubspot_synced_contacts_connection_id_hubspot_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."hubspot_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "hubspot_synced_contacts" ADD CONSTRAINT "hubspot_synced_contacts_contact_id_contacts_id_fk" FOREIGN KEY ("contact_id") REFERENCES "public"."contacts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "intercom_connections" ADD CONSTRAINT "intercom_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "intercom_sync_runs" ADD CONSTRAINT "intercom_sync_runs_connection_id_intercom_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."intercom_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "intercom_synced_conversations" ADD CONSTRAINT "intercom_synced_conversations_connection_id_intercom_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."intercom_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "intercom_synced_conversations" ADD CONSTRAINT "intercom_synced_conversations_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "graph_evaluation_settings" ADD CONSTRAINT "graph_evaluation_settings_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "integration_connections" ADD CONSTRAINT "integration_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "integration_streams" ADD CONSTRAINT "integration_streams_connection_id_integration_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."integration_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "integration_sync_runs" ADD CONSTRAINT "integration_sync_runs_connection_id_integration_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."integration_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "integration_synced_records" ADD CONSTRAINT "integration_synced_records_connection_id_integration_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."integration_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "issue_analysis_runs" ADD CONSTRAINT "issue_analysis_runs_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "issue_analysis_runs" ADD CONSTRAINT "issue_analysis_runs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "issue_embeddings" ADD CONSTRAINT "issue_embeddings_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "issue_embeddings" ADD CONSTRAINT "issue_embeddings_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "issues" ADD CONSTRAINT "issues_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "jira_connections" ADD CONSTRAINT "jira_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "jira_issue_syncs" ADD CONSTRAINT "jira_issue_syncs_connection_id_jira_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."jira_connections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "jira_issue_syncs" ADD CONSTRAINT "jira_issue_syncs_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_embeddings" ADD CONSTRAINT "knowledge_embeddings_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_embeddings" ADD CONSTRAINT "knowledge_embeddings_source_id_knowledge_sources_id_fk" FOREIGN KEY ("source_id") REFERENCES "public"."knowledge_sources"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_package_sources" ADD CONSTRAINT "knowledge_package_sources_package_id_knowledge_packages_id_fk" FOREIGN KEY ("package_id") REFERENCES "public"."knowledge_packages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_package_sources" ADD CONSTRAINT "knowledge_package_sources_source_id_knowledge_sources_id_fk" FOREIGN KEY ("source_id") REFERENCES "public"."knowledge_sources"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "knowledge_packages" ADD CONSTRAINT "knowledge_packages_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_sources" ADD CONSTRAINT "knowledge_sources_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "knowledge_sources" ADD CONSTRAINT "knowledge_sources_source_code_id_source_codes_id_fk" FOREIGN KEY ("source_code_id") REFERENCES "public"."source_codes"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "linear_connections" ADD CONSTRAINT "linear_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "linear_issue_syncs" ADD CONSTRAINT "linear_issue_syncs_connection_id_linear_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."linear_connections"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "linear_issue_syncs" ADD CONSTRAINT "linear_issue_syncs_issue_id_issues_id_fk" FOREIGN KEY ("issue_id") REFERENCES "public"."issues"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "notion_connections" ADD CONSTRAINT "notion_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "posthog_connections" ADD CONSTRAINT "posthog_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "posthog_sync_runs" ADD CONSTRAINT "posthog_sync_runs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "posthog_sync_runs" ADD CONSTRAINT "posthog_sync_runs_connection_id_posthog_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."posthog_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "product_scopes" ADD CONSTRAINT "product_scopes_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "project_api_keys" ADD CONSTRAINT "project_api_keys_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "project_api_keys" ADD CONSTRAINT "project_api_keys_created_by_user_id_users_id_fk" FOREIGN KEY ("created_by_user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "project_members" ADD CONSTRAINT "project_members_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "project_members" ADD CONSTRAINT "project_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "project_settings" ADD CONSTRAINT "project_settings_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "session_embeddings" ADD CONSTRAINT "session_embeddings_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "session_embeddings" ADD CONSTRAINT "session_embeddings_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session_messages" ADD CONSTRAINT "session_messages_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session_messages" ADD CONSTRAINT "session_messages_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session_reviews" ADD CONSTRAINT "session_reviews_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
@@ -947,12 +585,19 @@ ALTER TABLE "slack_channels" ADD CONSTRAINT "slack_channels_workspace_token_id_s
 ALTER TABLE "slack_thread_sessions" ADD CONSTRAINT "slack_thread_sessions_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "slack_thread_sessions" ADD CONSTRAINT "slack_thread_sessions_channel_id_slack_channels_id_fk" FOREIGN KEY ("channel_id") REFERENCES "public"."slack_channels"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "slack_workspace_tokens" ADD CONSTRAINT "slack_workspace_tokens_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "support_package_sources" ADD CONSTRAINT "support_package_sources_package_id_support_packages_id_fk" FOREIGN KEY ("package_id") REFERENCES "public"."support_packages"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "support_package_sources" ADD CONSTRAINT "support_package_sources_source_id_knowledge_sources_id_fk" FOREIGN KEY ("source_id") REFERENCES "public"."knowledge_sources"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "support_packages" ADD CONSTRAINT "support_packages_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_notifications" ADD CONSTRAINT "user_notifications_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "widget_integrations" ADD CONSTRAINT "widget_integrations_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "zendesk_connections" ADD CONSTRAINT "zendesk_connections_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "zendesk_sync_runs" ADD CONSTRAINT "zendesk_sync_runs_connection_id_zendesk_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."zendesk_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "zendesk_synced_tickets" ADD CONSTRAINT "zendesk_synced_tickets_connection_id_zendesk_connections_id_fk" FOREIGN KEY ("connection_id") REFERENCES "public"."zendesk_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "zendesk_synced_tickets" ADD CONSTRAINT "zendesk_synced_tickets_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "authjs_sessions" ADD CONSTRAINT "authjs_sessions_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "authjs_sessions" ADD CONSTRAINT "authjs_sessions_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "idx_integration_connections_project" ON "integration_connections" USING btree ("project_id");--> statement-breakpoint
+CREATE INDEX "idx_integration_connections_plugin" ON "integration_connections" USING btree ("plugin_id");--> statement-breakpoint
+CREATE INDEX "idx_integration_streams_connection" ON "integration_streams" USING btree ("connection_id");--> statement-breakpoint
+CREATE INDEX "idx_integration_streams_due" ON "integration_streams" USING btree ("enabled","frequency","next_sync_at");--> statement-breakpoint
+CREATE INDEX "idx_integration_sync_runs_connection" ON "integration_sync_runs" USING btree ("connection_id");--> statement-breakpoint
+CREATE INDEX "idx_integration_sync_runs_started" ON "integration_sync_runs" USING btree ("started_at");--> statement-breakpoint
+CREATE INDEX "idx_integration_synced_records_connection" ON "integration_synced_records" USING btree ("connection_id");--> statement-breakpoint
+CREATE INDEX "idx_rate_limit_key_created" ON "rate_limit_events" USING btree ("key","created_at");
