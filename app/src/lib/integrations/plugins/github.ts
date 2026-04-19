@@ -98,12 +98,12 @@ export const githubPlugin = definePlugin({
 
       // Default path: GitHub App install flow.
       if (!body.installationId || !body.accountLogin) {
-        const clientId = process.env.GITHUB_APP_CLIENT_ID ?? process.env.GITHUB_APP_NAME
+        const appSlug = process.env.GITHUB_APP_SLUG ?? process.env.GITHUB_APP_NAME
         return NextResponse.json({
-          authorizeUrl: clientId
-            ? `https://github.com/apps/${clientId}/installations/new?state=${ctx.projectId}`
+          authorizeUrl: appSlug
+            ? `https://github.com/apps/${appSlug}/installations/new?state=${ctx.projectId}`
             : undefined,
-          error: clientId ? undefined : 'GitHub App client id not configured.',
+          error: appSlug ? undefined : 'GitHub App slug not configured.',
         })
       }
       const result = await ctx.saveConnection({
