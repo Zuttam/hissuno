@@ -5,7 +5,7 @@
  * contacts, companies) by extracting topics and running semantic + text matching.
  *
  * Usage:
- * - Inline: `await evaluateEntityRelationships(projectId, entityType, entityId)`
+ * - Inline: `await evaluateEntityRelationships(projectId, entityType, entityId, creationContext, config)`
  * - Fire-and-forget: `fireGraphEval(projectId, entityType, entityId)` from `@/lib/utils/graph-eval`
  */
 
@@ -13,22 +13,29 @@ import type { GraphEvaluationOutput, GraphEntityType, CreationContext } from './
 import { loadEntityContent } from './steps/load-entity-content'
 import { extractTopics } from './steps/extract-topics'
 import { discoverRelationships } from './steps/discover-relationships'
+import { runContactCreationPolicy } from './steps/create-contact'
+import { runIssueCreationPolicy, primaryAction } from './steps/create-issue'
+import { DEFAULT_GRAPH_EVAL_CONFIG, type GraphEvaluationConfig } from './config'
+import { getGraphEvaluationSettingsAdmin } from '@/lib/db/queries/graph-evaluation-settings'
 
 /**
  * Evaluate entity relationships synchronously. Returns discovered relationships,
  * product scope assignment, and optional creation policy results.
  *
- * @param creationContext - When provided and entityType is 'session', runs Phase 2
- *   creation policies (contact + issue creation) after relationship discovery.
+ * @param creationContext - When provided and entityType is 'session', Phase 2
+ *   (contact + issue creation) may run based on per-entity flags in `config`.
+ * @param config - Optional pre-fetched config; when omitted it's loaded from DB.
  */
 export async function evaluateEntityRelationships(
   projectId: string,
   entityType: GraphEntityType,
   entityId: string,
   creationContext?: CreationContext,
+  config?: GraphEvaluationConfig,
 ): Promise<GraphEvaluationOutput> {
   try {
-    // Step 1: Load entity content
+    const resolvedConfig = config ?? (await getGraphEvaluationSettingsAdmin(projectId))
+
     const content = await loadEntityContent(projectId, entityType, entityId)
 
     if (!content.contentForSearch && !content.contentForTextMatch) {
@@ -47,7 +54,6 @@ export async function evaluateEntityRelationships(
       }
     }
 
-    // Step 2: Extract topics
     const topicsResult = await extractTopics(
       content.contentForSearch,
       content.entityName,
@@ -56,7 +62,6 @@ export async function evaluateEntityRelationships(
       projectId,
     )
 
-    // Step 3: Discover relationships
     const discoveryResult = await discoverRelationships({
       projectId,
       entityType,
@@ -66,6 +71,7 @@ export async function evaluateEntityRelationships(
       contentForTextMatch: content.contentForTextMatch,
       entityName: content.entityName,
       contentForSearch: content.contentForSearch,
+      config: resolvedConfig,
     })
 
     // Phase 2: Creation policies (only for sessions with creationContext)
@@ -76,43 +82,44 @@ export async function evaluateEntityRelationships(
     let pmSkipReason: string | null = null
 
     if (creationContext && entityType === 'session') {
-      // Step 4: Contact creation policy
-      try {
-        const { runContactCreationPolicy } = await import('./steps/create-contact')
-        const contactResult = await runContactCreationPolicy({
-          projectId,
-          sessionId: entityId,
-          userMetadata: creationContext.userMetadata,
-        })
-        createdContactId = contactResult.contactId
-      } catch (err) {
-        discoveryResult.errors.push(`Contact creation failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+      if (resolvedConfig.creation.contacts.enabled) {
+        try {
+          const contactResult = await runContactCreationPolicy({
+            projectId,
+            sessionId: entityId,
+            userMetadata: creationContext.userMetadata,
+          })
+          createdContactId = contactResult.contactId
+        } catch (err) {
+          discoveryResult.errors.push(`Contact creation failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+        }
       }
 
-      // Step 5: Issue creation policy (supports multiple issues)
-      try {
-        const { runIssueCreationPolicy, primaryAction } = await import('./steps/create-issue')
-        const issueResult = await runIssueCreationPolicy({
-          projectId,
-          sessionId: entityId,
-          tags: creationContext.tags,
-          messages: creationContext.messages,
-          productScopeId: discoveryResult.productScopeId,
-          issueMatches: discoveryResult.issueMatches,
-          productScopeContext: null,
-        })
-        createdIssueIds = issueResult.results
-          .filter(r => r.action === 'created' && r.issueId)
-          .map(r => r.issueId!)
-        issueResults = issueResult.results
-          .filter(r => r.action !== 'skipped')
-          .map(r => ({ action: r.action, issueId: r.issueId, issueName: r.issueName }))
-        pmAction = primaryAction(issueResult)
-        pmSkipReason = issueResult.results.every(r => r.action === 'skipped')
-          ? issueResult.results[0]?.skipReason ?? null
-          : null
-      } catch (err) {
-        discoveryResult.errors.push(`Issue creation failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+      if (resolvedConfig.creation.issues.enabled) {
+        try {
+          const issueResult = await runIssueCreationPolicy({
+            projectId,
+            sessionId: entityId,
+            tags: creationContext.tags,
+            messages: creationContext.messages,
+            productScopeId: discoveryResult.productScopeId,
+            issueMatches: discoveryResult.issueMatches,
+            productScopeContext: null,
+            issueConfig: resolvedConfig.creation.issues,
+          })
+          createdIssueIds = issueResult.results
+            .filter(r => r.action === 'created' && r.issueId)
+            .map(r => r.issueId!)
+          issueResults = issueResult.results
+            .filter(r => r.action !== 'skipped')
+            .map(r => ({ action: r.action, issueId: r.issueId, issueName: r.issueName }))
+          pmAction = primaryAction(issueResult)
+          pmSkipReason = issueResult.results.every(r => r.action === 'skipped')
+            ? issueResult.results[0]?.skipReason ?? null
+            : null
+        } catch (err) {
+          discoveryResult.errors.push(`Issue creation failed: ${err instanceof Error ? err.message : 'Unknown'}`)
+        }
       }
     }
 
@@ -147,3 +154,4 @@ export async function evaluateEntityRelationships(
 }
 
 export * from './schemas'
+export * from './config'

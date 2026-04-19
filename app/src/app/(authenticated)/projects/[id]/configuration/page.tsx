@@ -10,13 +10,14 @@ import { useProjectApiKeys } from '@/hooks/use-project-api-keys'
 import { MembersSection } from '@/components/access/members-section'
 import { ApiKeysSection } from '@/components/access/api-keys-section'
 import { TestAgentDialog } from '@/components/projects/test-agent-dialog'
-import { AgentCard, buildSupportChannels } from '@/components/projects/agents/agent-card'
+import { buildSupportChannels } from '@/components/projects/agents/agent-card'
+import { SettingRow, StatusPill, ChannelsMeta } from '@/components/projects/agents/setting-row'
 import { SupportAgentDialog } from '@/components/projects/agents/support-agent-dialog'
 import { ProductCopilotDialog } from '@/components/projects/agents/product-copilot-dialog'
-import { WorkflowCard } from '@/components/projects/workflows/workflow-card'
 import { IssueAnalysisDialog } from '@/components/projects/workflows/issue-analysis-dialog'
-import { GraphEvaluationDialog } from '@/components/projects/workflows/graph-evaluation-dialog'
-import { ProjectInfoSection } from '@/components/projects/configuration/project-info-section'
+import { GraphEvaluationPanel } from '@/components/projects/workflows/graph-evaluation-panel'
+import { DEFAULT_GRAPH_EVAL_CONFIG, type GraphEvaluationConfig } from '@/mastra/workflows/graph-evaluation/config'
+import { ProjectInfoSection } from '@/components/projects/project-info-section'
 import { DangerZoneSection } from '@/components/projects/configuration/danger-zone-section'
 import { FieldsEditor, type BuiltInField } from '@/components/customers/custom-fields-settings-dialog'
 import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
@@ -38,7 +39,7 @@ const ONTOLOGY_SECTION_LABELS: Record<(typeof ONTOLOGY_SECTIONS)[number], string
   customers: 'Customers', issues: 'Issues', feedback: 'Feedback', knowledge: 'Knowledge', products: 'Scopes',
 }
 
-const VALID_TABS = ['general', 'access', 'ontology', 'agents-workflows'] as const
+const VALID_TABS = ['general', 'access', 'ontology', 'agents-workflows', 'graph-evaluation'] as const
 const LEGACY_TAB_REDIRECTS: Record<string, string> = { customers: 'ontology', feedback: 'ontology' }
 type SettingsTab = (typeof VALID_TABS)[number]
 
@@ -111,9 +112,7 @@ interface AgentSettings {
     briefGuidelines: string
     issueAnalysisEnabled: boolean
   }
-  graphEvaluation: {
-    creationPolicyEnabled: boolean
-  }
+  graphEvaluation: GraphEvaluationConfig
 }
 
 const DEFAULT_SETTINGS: AgentSettings = {
@@ -130,9 +129,7 @@ const DEFAULT_SETTINGS: AgentSettings = {
     briefGuidelines: '',
     issueAnalysisEnabled: true,
   },
-  graphEvaluation: {
-    creationPolicyEnabled: true,
-  },
+  graphEvaluation: DEFAULT_GRAPH_EVAL_CONFIG,
 }
 
 export default function AgentsSettingsPage() {
@@ -164,7 +161,6 @@ export default function AgentsSettingsPage() {
   const [showProductCopilotDialog, setShowProductCopilotDialog] = useState(false)
   const [showTestAgent, setShowTestAgent] = useState(false)
   const [showIssueAnalysisDialog, setShowIssueAnalysisDialog] = useState(false)
-  const [showGraphEvalDialog, setShowGraphEvalDialog] = useState(false)
 
 
   // --- Agent data ---
@@ -233,11 +229,8 @@ export default function AgentsSettingsPage() {
             issueAnalysisEnabled: (s.issue_analysis_enabled as boolean) ?? true,
           }
         }
-        if (graphEvalData?.settings) {
-          const s = graphEvalData.settings
-          next.graphEvaluation = {
-            creationPolicyEnabled: (s.creation_policy_enabled as boolean) ?? true,
-          }
+        if (graphEvalData?.config) {
+          next.graphEvaluation = graphEvalData.config
         }
         return next
       })
@@ -394,6 +387,7 @@ export default function AgentsSettingsPage() {
           <Tab value="access">Access</Tab>
           <Tab value="ontology">Ontology</Tab>
           <Tab value="agents-workflows">Agents & Automations</Tab>
+          <Tab value="graph-evaluation">Graph Evaluation</Tab>
         </TabsList>
 
         {/* General Tab */}
@@ -613,56 +607,65 @@ export default function AgentsSettingsPage() {
             )}
           </div>
 
-          <h3 className="mb-4 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
-            Agents
-          </h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <AgentCard
-              avatar="🎧"
-              title="Customer Agent"
-              description="Customer-facing support with knowledge base"
-              channels={buildSupportChannels(integrationStatuses)}
-              onClick={() => setShowSupportDialog(true)}
-              knowledgeRow={{
-                label: activePackage ? activePackage.name : 'Not assigned',
-                meta: knowledgeRowMeta,
-                onClick: (e) => {
-                  e.stopPropagation()
-                  setShowSupportDialog(true)
-                },
-              }}
-            />
-            <AgentCard
-              avatar="🧭"
-              title="Product Co-pilot"
-              description="Team agent with full data access"
-              channels={buildSupportChannels(integrationStatuses)}
-              onClick={() => setShowProductCopilotDialog(true)}
-            />
-          </div>
-
-          <div className="mt-8">
-            <h3 className="mb-4 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
-              Agentic Automations
-            </h3>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <WorkflowCard
-                icon="🕸️"
-                title="Graph Evaluation"
-                description="Discovers relationships and creates entities from feedback"
-                steps={['Load Entity Content', 'Extract Topics', 'Discover Relationships', 'Create New Resources']}
-                enabled={settings.graphEvaluation.creationPolicyEnabled}
-                onClick={() => setShowGraphEvalDialog(true)}
-              />
-              <WorkflowCard
-                icon="📊"
-                title="Issue Analysis"
-                description="Scores reach, impact, confidence, effort and generates a brief"
-                steps={['Analyze Impact & Effort', 'Compute Scores', 'Generate Brief']}
-                enabled={settings.issueAnalysis.issueAnalysisEnabled}
-                onClick={() => setShowIssueAnalysisDialog(true)}
-              />
+          <div className="max-w-2xl flex flex-col gap-8">
+            <div>
+              <h3 className="mb-3 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
+                Agents
+              </h3>
+              <div className="rounded-md border border-[color:var(--border-subtle)] overflow-hidden">
+                <SettingRow
+                  icon="🎧"
+                  title="Customer Agent"
+                  description={
+                    activePackage
+                      ? `Knowledge: ${activePackage.name}${knowledgeRowMeta ? ` · ${knowledgeRowMeta}` : ''}`
+                      : 'Customer-facing support with knowledge base'
+                  }
+                  rightMeta={<ChannelsMeta channels={buildSupportChannels(integrationStatuses)} />}
+                  onClick={() => setShowSupportDialog(true)}
+                />
+                <SettingRow
+                  icon="🧭"
+                  title="Product Co-pilot"
+                  description="Team agent with full data access"
+                  rightMeta={<ChannelsMeta channels={buildSupportChannels(integrationStatuses)} />}
+                  onClick={() => setShowProductCopilotDialog(true)}
+                />
+              </div>
             </div>
+
+            <div>
+              <h3 className="mb-3 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
+                Automations
+              </h3>
+              <div className="rounded-md border border-[color:var(--border-subtle)] overflow-hidden">
+                <SettingRow
+                  icon="🎯"
+                  title="Issue Analysis"
+                  description="Scores reach, impact, confidence, effort and generates a brief"
+                  rightMeta={<StatusPill enabled={settings.issueAnalysis.issueAnalysisEnabled} />}
+                  onClick={() => setShowIssueAnalysisDialog(true)}
+                  disabled={!settings.issueAnalysis.issueAnalysisEnabled}
+                />
+              </div>
+            </div>
+          </div>
+        </TabsPanel>
+
+        {/* Graph Evaluation Tab */}
+        <TabsPanel value="graph-evaluation">
+          <div className="max-w-2xl flex flex-col gap-6">
+            <div>
+              <Heading as="h3" size="subsection">Graph Evaluation</Heading>
+              <p className="text-sm text-[color:var(--text-secondary)] mt-1">
+                Discovers relationships between entities and optionally creates new ones from feedback.
+              </p>
+            </div>
+            <GraphEvaluationPanel
+              projectId={projectId}
+              config={settings.graphEvaluation}
+              onSaved={handleSettingsSaved}
+            />
           </div>
         </TabsPanel>
 
@@ -694,13 +697,6 @@ export default function AgentsSettingsPage() {
         analysisGuidelines={settings.issueAnalysis.analysisGuidelines}
         briefGuidelines={settings.issueAnalysis.briefGuidelines}
         issueAnalysisEnabled={settings.issueAnalysis.issueAnalysisEnabled}
-        onSaved={handleSettingsSaved}
-      />
-      <GraphEvaluationDialog
-        open={showGraphEvalDialog}
-        onClose={() => setShowGraphEvalDialog(false)}
-        projectId={projectId}
-        creationPolicyEnabled={settings.graphEvaluation.creationPolicyEnabled}
         onSaved={handleSettingsSaved}
       />
       {showTestAgent && (

@@ -1,14 +1,7 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import {
-  fetchWidgetStatus,
-  fetchSlackStatus,
-  fetchGithubStatus,
-  fetchIntercomStatus,
-  fetchGongStatus,
-  fetchJiraStatus,
-} from '@/lib/api/integrations'
+import { useCallback, useEffect, useState } from 'react'
+import { fetchPluginConnections } from '@/lib/api/plugins'
 
 export interface IntegrationStatuses {
   widget: boolean
@@ -28,52 +21,43 @@ const DEFAULT_STATUSES: IntegrationStatuses = {
   jira: false,
 }
 
+async function hasAnyConnection(pluginId: string, projectId: string): Promise<boolean> {
+  try {
+    const data = await fetchPluginConnections(pluginId, projectId)
+    return data.connections.length > 0
+  } catch {
+    return false
+  }
+}
+
+async function hasWidget(projectId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/integrations/widget?projectId=${encodeURIComponent(projectId)}`)
+    if (!res.ok) return false
+    const data = (await res.json()) as { stats?: { hasAnySessions?: boolean; isActive?: boolean } }
+    return Boolean(data.stats?.hasAnySessions || data.stats?.isActive)
+  } catch {
+    return false
+  }
+}
+
 export function useIntegrationStatuses(projectId: string | null) {
   const [statuses, setStatuses] = useState<IntegrationStatuses>(DEFAULT_STATUSES)
   const [isLoading, setIsLoading] = useState(true)
 
   const refresh = useCallback(async () => {
     if (!projectId) return
-
     setIsLoading(true)
     try {
-      const [widgetRes, slackRes, githubRes, intercomRes, gongRes, jiraRes] = await Promise.all([
-        fetchWidgetStatus(projectId),
-        fetchSlackStatus(projectId),
-        fetchGithubStatus(projectId),
-        fetchIntercomStatus(projectId),
-        fetchGongStatus(projectId),
-        fetchJiraStatus(projectId),
+      const [widget, slack, github, intercom, gong, jira] = await Promise.all([
+        hasWidget(projectId),
+        hasAnyConnection('slack', projectId),
+        hasAnyConnection('github', projectId),
+        hasAnyConnection('intercom', projectId),
+        hasAnyConnection('gong', projectId),
+        hasAnyConnection('jira', projectId),
       ])
-
-      const updated = { ...DEFAULT_STATUSES }
-
-      if (widgetRes.ok) {
-        const data = await widgetRes.json()
-        updated.widget = data.stats?.hasAnySessions ?? false
-      }
-      if (slackRes.ok) {
-        const data = await slackRes.json()
-        updated.slack = data.connected ?? false
-      }
-      if (githubRes.ok) {
-        const data = await githubRes.json()
-        updated.github = data.connected ?? false
-      }
-      if (intercomRes.ok) {
-        const data = await intercomRes.json()
-        updated.intercom = data.connected ?? false
-      }
-      if (gongRes.ok) {
-        const data = await gongRes.json()
-        updated.gong = data.connected ?? false
-      }
-      if (jiraRes.ok) {
-        const data = await jiraRes.json()
-        updated.jira = data.connected ?? false
-      }
-
-      setStatuses(updated)
+      setStatuses({ widget, slack, github, intercom, gong, jira })
     } catch (err) {
       console.error('[use-integration-statuses] Failed to fetch:', err)
     } finally {

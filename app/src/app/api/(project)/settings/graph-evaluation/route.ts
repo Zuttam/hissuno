@@ -6,8 +6,10 @@ import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import {
   getGraphEvaluationSettings,
-  updateGraphEvaluationSettings,
+  setGraphEvaluationSettings,
 } from '@/lib/db/queries/graph-evaluation-settings'
+import { mergeAndValidateConfig } from '@/mastra/workflows/graph-evaluation/config'
+import { ZodError } from 'zod'
 
 export const runtime = 'nodejs'
 
@@ -21,8 +23,8 @@ export async function GET(request: NextRequest) {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
 
-    const settings = await getGraphEvaluationSettings(projectId)
-    return NextResponse.json({ settings })
+    const config = await getGraphEvaluationSettings(projectId)
+    return NextResponse.json({ config })
   } catch (error) {
     if (error instanceof MissingProjectIdError) return NextResponse.json({ error: error.message }, { status: 400 })
     if (error instanceof UnauthorizedError) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
@@ -43,17 +45,16 @@ export async function PATCH(request: NextRequest) {
     await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
-    const { creation_policy_enabled } = body
+    const current = await getGraphEvaluationSettings(projectId)
+    const next = mergeAndValidateConfig(current, body)
+    const saved = await setGraphEvaluationSettings(projectId, next)
 
-    const updated = await updateGraphEvaluationSettings(projectId, {
-      creation_policy_enabled,
-    })
-
-    return NextResponse.json({ settings: updated })
+    return NextResponse.json({ config: saved })
   } catch (error) {
     if (error instanceof MissingProjectIdError) return NextResponse.json({ error: error.message }, { status: 400 })
     if (error instanceof UnauthorizedError) return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     if (error instanceof ForbiddenError) return NextResponse.json({ error: 'Forbidden.' }, { status: 403 })
+    if (error instanceof ZodError) return NextResponse.json({ error: 'Invalid config', details: error.issues }, { status: 400 })
     console.error('[settings.graph-evaluation] PATCH error', error)
     return NextResponse.json({ error: 'Failed to update graph evaluation settings.' }, { status: 500 })
   }

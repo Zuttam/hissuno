@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { ProjectInfoSection } from '@/components/projects/configuration/project-info-section'
+import { ProjectInfoSection } from '@/components/projects/project-info-section'
 import { Dialog, Button, Alert } from '@/components/ui'
 import { fetchApiRaw } from '@/lib/api/fetch'
 

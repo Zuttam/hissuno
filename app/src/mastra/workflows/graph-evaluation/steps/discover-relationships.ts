@@ -33,6 +33,7 @@ import {
 } from '@/lib/db/queries/relationship-metadata'
 import { enrichRelationshipContext, type DiscoveredMatch } from './enrich-relationship-context'
 import type { GraphEntityType } from '../schemas'
+import type { GraphEvaluationConfig } from '../config'
 import type { ProductScopeGoal } from '@/types/product-scope'
 
 interface DiscoverInput {
@@ -44,6 +45,7 @@ interface DiscoverInput {
   contentForTextMatch: string
   entityName?: string
   contentForSearch?: string
+  config: GraphEvaluationConfig
 }
 
 /**
@@ -55,6 +57,7 @@ export async function matchProductScope(
   topics: string[],
   entityName: string,
   contentSnippet: string,
+  options: { requireFullTopicMatch?: boolean; llmClassification?: boolean } = {},
 ): Promise<{
   scopeId: string
   scopeName: string
@@ -62,6 +65,7 @@ export async function matchProductScope(
   matchedGoalId: string | null
   matchedGoalText: string | null
 } | null> {
+  const { requireFullTopicMatch = false, llmClassification = true } = options
   const scopes = await db
     .select({ id: productScopes.id, name: productScopes.name, description: productScopes.description, goals: productScopes.goals })
     .from(productScopes)
@@ -73,9 +77,20 @@ export async function matchProductScope(
     const goalTexts = scopeGoals.map(g => g.text.toLowerCase()).join(' ')
     const scopeText = `${scope.name} ${scope.description || ''} ${goalTexts}`.toLowerCase()
     const matchedTopic = topicsLower.find(topic =>
-      scopeText.includes(topic) || topic.includes(scope.name.toLowerCase())
+      requireFullTopicMatch
+        ? scopeText.includes(topic)
+        : scopeText.includes(topic) || topic.includes(scope.name.toLowerCase())
     )
     if (matchedTopic) {
+      if (!llmClassification) {
+        return {
+          scopeId: scope.id,
+          scopeName: scope.name,
+          reasoning: null,
+          matchedGoalId: null,
+          matchedGoalText: null,
+        }
+      }
       try {
         const classification = await classifyGoal({
           projectId,
@@ -126,7 +141,8 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
   errors: string[]
   issueMatches: IssueMatch[]
 }> {
-  const { projectId, entityType, entityId, topics, combinedQuery, contentForTextMatch, entityName, contentForSearch } = input
+  const { projectId, entityType, entityId, topics, combinedQuery, contentForTextMatch, entityName, contentForSearch, config } = input
+  const { strategies } = config
   let relationshipsCreated = 0
   let productScopeId: string | null = null
   const errors: string[] = []
@@ -141,7 +157,7 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
 
   // 1. Product scope text match
   // Product scope already has LLM reasoning via classifyGoal, so it links directly.
-  {
+  if (strategies.productScope.enabled) {
     try {
       const existingScopes = await getRelatedIds(projectId, entityType, entityId, 'product_scope')
       if (existingScopes.length === 0) {
@@ -150,6 +166,10 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
           topics,
           entityName ?? '',
           contentForSearch?.slice(0, 1500) ?? contentForTextMatch.slice(0, 1500),
+          {
+            requireFullTopicMatch: strategies.productScope.requireFullTopicMatch,
+            llmClassification: strategies.productScope.llmClassification,
+          },
         )
         if (match) {
           try {
@@ -182,11 +202,11 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     const searchTasks: Array<{ label: string; run: () => Promise<void> }> = []
 
     // 2. Semantic session search (skip if entityType=session)
-    if (entityType !== 'session') {
+    if (entityType !== 'session' && strategies.session.enabled) {
       searchTasks.push({
         label: 'Session search',
         run: async () => {
-          const results = await searchSessionsSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
+          const results = await searchSessionsSemantic(projectId, combinedQuery, { limit: 10, threshold: strategies.session.threshold })
           for (const session of results.slice(0, 5)) {
             discoveredMatches.push({
               targetType: 'session',
@@ -202,11 +222,11 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     }
 
     // 3. Semantic issue search (skip if entityType=issue)
-    if (entityType !== 'issue') {
+    if (entityType !== 'issue' && strategies.issue.enabled) {
       searchTasks.push({
         label: 'Issue search',
         run: async () => {
-          const results = await searchSimilarIssues(projectId, combinedQuery, '', { limit: 10, threshold: 0.6 })
+          const results = await searchSimilarIssues(projectId, combinedQuery, '', { limit: 10, threshold: strategies.issue.threshold })
           issueMatches = results.slice(0, 5).map((issue) => ({
             issueId: issue.issueId,
             name: issue.name,
@@ -230,11 +250,11 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     }
 
     // 4. Semantic knowledge search (skip if entityType=knowledge_source)
-    if (entityType !== 'knowledge_source') {
+    if (entityType !== 'knowledge_source' && strategies.knowledge.enabled) {
       searchTasks.push({
         label: 'Knowledge search',
         run: async () => {
-          const results = await searchKnowledgeBySourceIds(projectId, combinedQuery, { limit: 10, similarityThreshold: 0.6 })
+          const results = await searchKnowledgeBySourceIds(projectId, combinedQuery, { limit: 10, similarityThreshold: strategies.knowledge.threshold })
           const seenSourceIds = new Set<string>()
           const sourceBySimilarity = new Map<string, number>()
           for (const chunk of results) {
@@ -261,11 +281,11 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     }
 
     // 5. Semantic contact search (skip if entityType=contact)
-    if (entityType !== 'contact') {
+    if (entityType !== 'contact' && strategies.contact.enabled) {
       searchTasks.push({
         label: 'Contact search',
         run: async () => {
-          const results = await searchContactsSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
+          const results = await searchContactsSemantic(projectId, combinedQuery, { limit: 10, threshold: strategies.contact.threshold })
           for (const contact of results.slice(0, 5)) {
             discoveredMatches.push({
               targetType: 'contact',
@@ -280,11 +300,11 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
     }
 
     // 6. Semantic company search (skip for contacts and company=self)
-    if (entityType !== 'contact' && entityType !== 'company') {
+    if (entityType !== 'contact' && entityType !== 'company' && strategies.company.semanticEnabled) {
       searchTasks.push({
         label: 'Company semantic search',
         run: async () => {
-          const results = await searchCompaniesSemantic(projectId, combinedQuery, { limit: 10, threshold: 0.6 })
+          const results = await searchCompaniesSemantic(projectId, combinedQuery, { limit: 10, threshold: strategies.company.semanticThreshold })
           for (const company of results.slice(0, 5)) {
             discoveredMatches.push({
               targetType: 'company',
@@ -307,7 +327,7 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
   }
 
   // 7. Company text match fallback (skip for contacts and company=self)
-  if (entityType !== 'contact' && entityType !== 'company') {
+  if (entityType !== 'contact' && entityType !== 'company' && strategies.company.textMatchEnabled) {
     try {
       const allCompanies = await db
         .select({ id: companies.id, name: companies.name, domain: companies.domain })
@@ -315,8 +335,9 @@ export async function discoverRelationships(input: DiscoverInput): Promise<{
         .where(eq(companies.project_id, projectId))
 
       const contentLower = contentForTextMatch.toLowerCase()
+      const minNameLength = strategies.company.textMatchMinNameLength
       for (const company of allCompanies) {
-        const nameMatch = company.name.length > 2 && contentLower.includes(company.name.toLowerCase())
+        const nameMatch = company.name.length >= minNameLength && contentLower.includes(company.name.toLowerCase())
         const domainMatch = company.domain && contentLower.includes(company.domain.toLowerCase())
         if (nameMatch) {
           discoveredMatches.push({

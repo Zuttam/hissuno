@@ -22,6 +22,7 @@ interface UpdateIssueOpts {
   name?: string
   description?: string
   issueType?: string
+  prUrl?: string
 }
 
 export const VALID_ISSUE_STATUSES = ['open', 'ready', 'in_progress', 'resolved', 'closed']
@@ -57,6 +58,10 @@ export async function updateIssue(
       throw new Error(`Invalid issue type "${opts.issueType}". Valid: ${VALID_ISSUE_TYPES.join(', ')}`)
     }
     data.type = opts.issueType
+  }
+
+  if (opts.prUrl !== undefined) {
+    data.pr_url = opts.prUrl || null
   }
 
   return data
@@ -364,6 +369,7 @@ export const updateCommand = new Command('update')
   .option('--status <status>', 'Status (varies by type)')
   .option('--priority <priority>', 'Issue priority: low, medium, high')
   .option('--issue-type <type>', 'Issue type: bug, feature_request, change_request')
+  .option('--pr-url <url>', 'Issue PR URL (empty string to clear)')
   // Customer options
   .option('--customer-type <type>', 'Customer sub-type: contacts (default) or companies')
   .option('--email <email>', 'Contact email')

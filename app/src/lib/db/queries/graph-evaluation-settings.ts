@@ -1,88 +1,70 @@
 /**
  * Graph Evaluation Settings Queries (Drizzle)
  *
- * Manages graph evaluation configuration: creation policy toggle.
+ * Manages graph evaluation configuration: per-strategy matching knobs and
+ * creation policies. Stored as a single jsonb `config` column.
  */
 
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { graphEvaluationSettings } from '@/lib/db/schema/app'
+import {
+  DEFAULT_GRAPH_EVAL_CONFIG,
+  parseGraphEvalConfig,
+  type GraphEvaluationConfig,
+} from '@/mastra/workflows/graph-evaluation/config'
 
-export interface GraphEvaluationSettingsRecord {
-  creation_policy_enabled: boolean
-}
+export type { GraphEvaluationConfig } from '@/mastra/workflows/graph-evaluation/config'
+export { DEFAULT_GRAPH_EVAL_CONFIG, parseGraphEvalConfig } from '@/mastra/workflows/graph-evaluation/config'
 
-export type GraphEvaluationSettingsInput = Partial<GraphEvaluationSettingsRecord>
-
-const DEFAULT_GRAPH_EVAL_SETTINGS: GraphEvaluationSettingsRecord = {
-  creation_policy_enabled: true,
-}
-
-export async function getGraphEvaluationSettings(projectId: string): Promise<GraphEvaluationSettingsRecord> {
+export async function getGraphEvaluationSettings(projectId: string): Promise<GraphEvaluationConfig> {
   try {
     const row = await db.query.graphEvaluationSettings.findFirst({
       where: eq(graphEvaluationSettings.project_id, projectId),
-      columns: {
-        creation_policy_enabled: true,
-      },
+      columns: { config: true },
     })
 
-    if (!row) {
-      return DEFAULT_GRAPH_EVAL_SETTINGS
-    }
-
-    return {
-      creation_policy_enabled: row.creation_policy_enabled,
-    }
+    if (!row) return DEFAULT_GRAPH_EVAL_CONFIG
+    return parseGraphEvalConfig(row.config)
   } catch (error) {
     console.error('[graph-evaluation-settings] unexpected error', projectId, error)
     throw error
   }
 }
 
-export async function getGraphEvaluationSettingsAdmin(projectId: string): Promise<GraphEvaluationSettingsRecord> {
+export async function getGraphEvaluationSettingsAdmin(projectId: string): Promise<GraphEvaluationConfig> {
   try {
     return await getGraphEvaluationSettings(projectId)
   } catch (error) {
     console.error('[graph-evaluation-settings] unexpected error (admin)', projectId, error)
-    return DEFAULT_GRAPH_EVAL_SETTINGS
+    return DEFAULT_GRAPH_EVAL_CONFIG
   }
 }
 
-export async function updateGraphEvaluationSettings(
+/**
+ * Upsert the full config for a project. Callers are expected to have already
+ * merged any partial patch with the current config (see mergeAndValidateConfig).
+ */
+export async function setGraphEvaluationSettings(
   projectId: string,
-  settings: GraphEvaluationSettingsInput
-): Promise<GraphEvaluationSettingsRecord> {
+  config: GraphEvaluationConfig,
+): Promise<GraphEvaluationConfig> {
   try {
-    const updatePayload: Record<string, unknown> = {
-      updated_at: new Date(),
-    }
-
-    if (settings.creation_policy_enabled !== undefined) {
-      updatePayload.creation_policy_enabled = settings.creation_policy_enabled
-    }
-
     const [row] = await db
       .insert(graphEvaluationSettings)
       .values({
         project_id: projectId,
-        ...updatePayload,
+        config,
+        updated_at: new Date(),
       })
       .onConflictDoUpdate({
         target: graphEvaluationSettings.project_id,
-        set: updatePayload,
+        set: { config, updated_at: new Date() },
       })
-      .returning({
-        creation_policy_enabled: graphEvaluationSettings.creation_policy_enabled,
-      })
+      .returning({ config: graphEvaluationSettings.config })
 
-    if (!row) {
-      throw new Error('Unable to update graph evaluation settings.')
-    }
-
-    return {
-      creation_policy_enabled: row.creation_policy_enabled,
-    }
+    if (!row) throw new Error('Unable to update graph evaluation settings.')
+    return parseGraphEvalConfig(row.config)
   } catch (error) {
     console.error('[graph-evaluation-settings] unexpected error updating', projectId, error)
     throw error

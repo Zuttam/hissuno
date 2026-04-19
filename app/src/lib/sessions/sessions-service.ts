@@ -22,7 +22,7 @@ import { fireSessionProcessing } from '@/lib/utils/session-processing'
 import { setSessionContact, linkEntities } from '@/lib/db/queries/entity-relationships'
 import { buildProgrammaticContext } from '@/lib/db/queries/relationship-metadata'
 import { rowToSessionRecord, enrichSessionsWithEntityRelationships, toSessionWithProject, updateSessionTags } from '@/lib/db/queries/sessions'
-import { saveSessionMessage, getSessionMessages } from '@/lib/db/queries/session-messages'
+import { getSessionMessages } from '@/lib/db/queries/session-messages'
 import { generateDefaultName } from '@/lib/sessions/name-generator'
 import { searchSessionsSemantic, buildSessionEmbeddingText } from '@/lib/sessions/embedding-service'
 import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
@@ -202,17 +202,16 @@ export async function createSessionAdmin(
       })
       .returning()
 
-    // Store messages in session_messages table if provided
     if (input.messages && input.messages.length > 0) {
       try {
-        for (const msg of input.messages) {
-          await saveSessionMessage({
-            sessionId,
-            projectId: input.project_id,
-            senderType: msg.role === 'user' ? 'user' : 'ai',
+        await db.insert(sessionMessages).values(
+          input.messages.map((msg) => ({
+            session_id: sessionId,
+            project_id: input.project_id,
+            sender_type: msg.role === 'user' ? 'user' : 'ai',
             content: msg.content,
-          })
-        }
+          }))
+        )
       } catch (msgError) {
         console.error('[sessions-service] Failed to store messages:', msgError)
       }
@@ -432,7 +431,7 @@ Generate a concise title (max 8 words) and a 2-3 sentence description summarizin
 
   // ---- Step 3: Graph eval ----
   try {
-    const [sessionRow, graphSettings] = await Promise.all([
+    const [sessionRow, graphConfig] = await Promise.all([
       db.query.sessions.findFirst({
         where: eq(sessions.id, sessionId),
         columns: { user_metadata: true },
@@ -442,16 +441,14 @@ Generate a concise title (max 8 words) and a 2-3 sentence description summarizin
 
     const userMetadata = (sessionRow?.user_metadata as Record<string, string> | null) ?? null
 
-    let creationContext: CreationContext | undefined
-    if (graphSettings.creation_policy_enabled) {
-      creationContext = {
-        tags,
-        messages,
-        userMetadata,
-      }
+    // Always build creation context for sessions; per-entity gating lives inside the workflow.
+    const creationContext: CreationContext = {
+      tags,
+      messages,
+      userMetadata,
     }
 
-    await evaluateEntityRelationships(projectId, 'session', sessionId, creationContext)
+    await evaluateEntityRelationships(projectId, 'session', sessionId, creationContext, graphConfig)
   } catch (error) {
     // Non-fatal: session still gets marked as processed so it isn't reprocessed forever.
     // Log stack trace so failures are visible instead of silently swallowed.

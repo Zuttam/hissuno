@@ -1,20 +1,28 @@
 # Hissuno
 
-**One intelligence layer. Every product agent.**
+**The memory and management layer for autonomous product operations.**
 
-Hissuno is an open-source unified context layer for product agents. It ingests your codebase, docs, websites, and customer signals into an interconnected knowledge graph - then exposes it through agent-native interfaces (CLI, API) so any AI agent can traverse and query your product intelligence natively.
+Hissuno is the open-source substrate that lets AI agents actually *run* product operations - triaging feedback, managing issues, talking to customers, shipping decisions - without losing the plot between sessions. It unifies your codebase, docs, conversations, and customer signals into a persistent knowledge graph that agents read from, write back to, and act on.
 
 ---
 
 ## The Problem
 
-Product agents - support bots, coding assistants, sales copilots, internal tools - all need the same underlying context: your codebase, docs, customer history, feedback, and product knowledge. But today each agent has to build its own integrations to 10+ scattered sources. The result is fragmented, inconsistent, and expensive to maintain.
+Autonomous product operations are bottlenecked by two missing pieces: **memory** and **management**.
+
+- **Memory** - Agents have no durable, shared understanding of your product, customers, or prior decisions. Every run starts from zero, or worse, from whatever slice of context fits in a prompt.
+- **Management** - There's no system of record for the work agents do. Triage decisions, issue updates, customer replies, and briefs live across disconnected tools, so nothing compounds and nothing is accountable.
+
+Without both, agents can answer questions but can't own outcomes.
 
 ---
 
 ## The Solution
 
-Hissuno solves this by building a single **interconnected knowledge graph** from your product data, where every entity - sessions, contacts, issues, scopes, knowledge sources - is connected. Agents don't just retrieve isolated facts; they traverse relationships to build real understanding.
+Hissuno gives autonomous product operations a shared brain and a shared worksurface.
+
+- **Memory** - a single **interconnected knowledge graph** where sessions, contacts, issues, scopes, and knowledge sources are linked. Agents traverse relationships instead of retrieving isolated facts, and every new interaction enriches the graph for the next agent that touches it.
+- **Management** - built-in workflows for the operational loop (feedback triage, issue creation and prioritization, brief generation, customer responses), plus agent-native interfaces (CLI, API, widget) so agents don't just read context - they execute the work and write the results back.
 
 ### The Graph
 

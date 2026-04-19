@@ -125,7 +125,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           // Fetch session data and messages in parallel
           emitEvent('graph-eval-start', { stepName: 'Graph Evaluation', message: 'Loading session data...' })
 
-          const [sessionRow, messages, graphSettings] = await Promise.all([
+          const [sessionRow, messages, graphConfig] = await Promise.all([
             db.query.sessions.findFirst({
               where: eq(sessions.id, sessionId),
               columns: { tags: true, user_metadata: true },
@@ -139,24 +139,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
           const tags = ((sessionRow?.tags ?? []) as SessionTag[])
           const userMetadata = (sessionRow?.user_metadata as Record<string, string> | null) ?? null
 
-          // Only build creation context if creation policy is enabled
-          let creationContext: CreationContext | undefined
-          if (graphSettings.creation_policy_enabled) {
-            creationContext = {
-              tags,
-              messages: messages.map((m) => ({
-                role: m.role,
-                content: m.content,
-                createdAt: m.createdAt,
-              })),
-              userMetadata,
-            }
+          // Always build creation context for sessions; per-entity gating lives inside the workflow.
+          const creationContext: CreationContext = {
+            tags,
+            messages: messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+              createdAt: m.createdAt,
+            })),
+            userMetadata,
           }
 
           emitEvent('graph-eval-progress', { stepName: 'Graph Evaluation', message: 'Evaluating relationships...' })
 
           // Run unified graph evaluation with creation policies (or discovery only)
-          const evalResult = await evaluateEntityRelationships(projectId, 'session', sessionId, creationContext)
+          const evalResult = await evaluateEntityRelationships(projectId, 'session', sessionId, creationContext, graphConfig)
 
           if (isClosed()) return
 

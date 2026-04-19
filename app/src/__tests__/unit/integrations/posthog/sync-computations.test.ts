@@ -6,7 +6,7 @@ import {
   computeRecentSignals,
 } from '@/lib/integrations/posthog/sync-computations'
 import type { PosthogEvent } from '@/lib/integrations/posthog/client'
-import type { PosthogEventConfig } from '@/lib/integrations/posthog/index'
+import type { PosthogEventConfig } from '@/lib/integrations/posthog/sync-computations'
 
 // ============================================================================
 // Helpers

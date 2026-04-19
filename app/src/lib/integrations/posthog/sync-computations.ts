@@ -4,7 +4,12 @@
  */
 
 import type { PosthogEvent } from './client'
-import type { PosthogEventConfig } from './index'
+
+export interface PosthogEventConfig {
+  feature_mapping?: Record<string, string[]>
+  signal_events?: string[]
+  person_properties?: string[]
+}
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 

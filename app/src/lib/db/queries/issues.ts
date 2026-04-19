@@ -65,6 +65,7 @@ function rowToIssueRecord(row: typeof issues.$inferSelect): IssueRecord {
     status: (row.status ?? 'open') as IssueRecord['status'],
     brief: row.brief ?? null,
     brief_generated_at: dateToIso(row.brief_generated_at),
+    pr_url: row.pr_url ?? null,
     is_archived: row.is_archived,
     custom_fields: (row.custom_fields as Record<string, unknown>) ?? {},
     impact_score: row.impact_score ?? null,
@@ -173,6 +174,7 @@ export async function updateIssueById(issueId: string, data: UpdateIssueInput): 
   if (data.confidence_score !== undefined) updates.confidence_score = data.confidence_score
   if (data.effort_score !== undefined) updates.effort_score = data.effort_score
   if (data.custom_fields !== undefined) updates.custom_fields = data.custom_fields
+  if (data.pr_url !== undefined) updates.pr_url = data.pr_url
 
   const [issue] = await db
     .update(issues)

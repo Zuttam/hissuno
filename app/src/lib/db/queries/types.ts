@@ -30,12 +30,10 @@ import type {
   slackWorkspaceTokens,
   slackChannels,
   slackThreadSessions,
-  githubAppInstallations,
-  jiraConnections,
-  linearConnections,
-  zendeskConnections,
-  intercomConnections,
-  gongConnections,
+  integrationConnections,
+  integrationStreams,
+  integrationSyncRuns,
+  integrationSyncedRecords,
   userNotifications,
 } from '@/lib/db/schema/app'
 
@@ -147,15 +145,14 @@ export type SlackWorkspaceTokenRow = typeof slackWorkspaceTokens.$inferSelect
 export type SlackChannelRow = typeof slackChannels.$inferSelect
 export type SlackThreadSessionRow = typeof slackThreadSessions.$inferSelect
 
-export type GithubAppInstallationRow = typeof githubAppInstallations.$inferSelect
-
-export type JiraConnectionRow = typeof jiraConnections.$inferSelect
-
-export type LinearConnectionRow = typeof linearConnections.$inferSelect
-
-export type ZendeskConnectionRow = typeof zendeskConnections.$inferSelect
-export type IntercomConnectionRow = typeof intercomConnections.$inferSelect
-export type GongConnectionRow = typeof gongConnections.$inferSelect
+export type IntegrationConnectionRow = typeof integrationConnections.$inferSelect
+export type IntegrationConnectionInsert = typeof integrationConnections.$inferInsert
+export type IntegrationStreamRow = typeof integrationStreams.$inferSelect
+export type IntegrationStreamInsert = typeof integrationStreams.$inferInsert
+export type IntegrationSyncRunRow = typeof integrationSyncRuns.$inferSelect
+export type IntegrationSyncRunInsert = typeof integrationSyncRuns.$inferInsert
+export type IntegrationSyncedRecordRow = typeof integrationSyncedRecords.$inferSelect
+export type IntegrationSyncedRecordInsert = typeof integrationSyncedRecords.$inferInsert
 
 // ---------------------------------------------------------------------------
 // Notifications

@@ -6,7 +6,6 @@ import {
   timestamp,
   jsonb,
   integer,
-  bigint,
   doublePrecision,
   unique,
   index,
@@ -59,7 +58,7 @@ export const graphEvaluationSettings = pgTable('graph_evaluation_settings', {
   project_id: uuid('project_id')
     .primaryKey()
     .references(() => projects.id),
-  creation_policy_enabled: boolean('creation_policy_enabled').notNull().default(true),
+  config: jsonb('config').notNull(),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
@@ -360,6 +359,8 @@ export const issues = pgTable('issues', {
   // Brief
   brief: text('brief'),
   brief_generated_at: timestamp('brief_generated_at', { mode: 'date' }),
+  // PR link (set by autonomous dev skill when an issue ships)
+  pr_url: text('pr_url'),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
@@ -561,534 +562,6 @@ export const slackThreadSessions = pgTable('slack_thread_sessions', {
 })
 
 // ---------------------------------------------------------------------------
-// Integrations: GitHub
-// ---------------------------------------------------------------------------
-
-export const githubAppInstallations = pgTable('github_app_installations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id),
-  installation_id: integer('installation_id'),
-  account_id: integer('account_id').notNull(),
-  account_login: text('account_login').notNull(),
-  target_type: text('target_type'),
-  scope: text('scope'),
-  auth_method: text('auth_method').notNull().default('app'),
-  access_token: text('access_token'),
-  installed_by_user_id: text('installed_by_user_id'),
-  installed_by_email: text('installed_by_email'),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const githubSyncConfigs = pgTable('github_sync_configs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  installation_id: uuid('installation_id')
-    .notNull()
-    .references(() => githubAppInstallations.id, { onDelete: 'cascade' }),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  sync_type: text('sync_type').notNull(), // 'feedback'
-  github_repo_ids: jsonb('github_repo_ids'), // array of {id, fullName}
-  github_label_filter: text('github_label_filter'),
-  github_label_tag_map: jsonb('github_label_tag_map'), // {githubLabel: sessionTag}
-  sync_enabled: boolean('sync_enabled').notNull().default(false),
-  sync_frequency: text('sync_frequency').notNull().default('manual'),
-  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-  last_sync_status: text('last_sync_status'),
-  last_sync_error: text('last_sync_error'),
-  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-  last_sync_count: integer('last_sync_count'),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-}, (table) => [
-  unique().on(table.installation_id, table.sync_type),
-])
-
-export const githubSyncedIssues = pgTable('github_synced_issues', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  installation_id: uuid('installation_id')
-    .notNull()
-    .references(() => githubAppInstallations.id, { onDelete: 'cascade' }),
-  session_id: uuid('session_id')
-    .notNull()
-    .references(() => sessions.id),
-  github_issue_id: bigint('github_issue_id', { mode: 'number' }).notNull(),
-  github_issue_number: integer('github_issue_number').notNull(),
-  github_repo_full_name: text('github_repo_full_name').notNull(),
-  github_issue_url: text('github_issue_url'),
-  github_issue_updated_at: timestamp('github_issue_updated_at', { mode: 'date' }),
-  last_synced_at: timestamp('last_synced_at', { mode: 'date' }).defaultNow(),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-})
-
-// ---------------------------------------------------------------------------
-// Integrations: Jira
-// ---------------------------------------------------------------------------
-
-export const jiraConnections = pgTable('jira_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id),
-  cloud_id: text('cloud_id').notNull(),
-  site_url: text('site_url').notNull(),
-  access_token: text('access_token').notNull(),
-  refresh_token: text('refresh_token').notNull(),
-  token_expires_at: timestamp('token_expires_at', { mode: 'date' }).notNull(),
-  is_enabled: boolean('is_enabled').notNull().default(true),
-  auto_sync_enabled: boolean('auto_sync_enabled').notNull().default(false),
-  jira_project_id: text('jira_project_id'),
-  jira_project_key: text('jira_project_key'),
-  issue_type_id: text('issue_type_id'),
-  issue_type_name: text('issue_type_name'),
-  webhook_id: text('webhook_id'),
-  webhook_secret: text('webhook_secret'),
-  installed_by_user_id: text('installed_by_user_id'),
-  installed_by_email: text('installed_by_email'),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-// ---------------------------------------------------------------------------
-// Integrations: Linear
-// ---------------------------------------------------------------------------
-
-export const linearConnections = pgTable('linear_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id),
-  organization_id: text('organization_id').notNull(),
-  organization_name: text('organization_name').notNull(),
-  auth_method: text('auth_method').notNull().default('oauth'),
-  access_token: text('access_token').notNull(),
-  refresh_token: text('refresh_token'),
-  token_expires_at: timestamp('token_expires_at', { mode: 'date' }),
-  is_enabled: boolean('is_enabled').notNull().default(true),
-  auto_sync_enabled: boolean('auto_sync_enabled').notNull().default(false),
-  team_id: text('team_id'),
-  team_key: text('team_key'),
-  team_name: text('team_name'),
-  installed_by_user_id: text('installed_by_user_id'),
-  installed_by_email: text('installed_by_email'),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-
-// ---------------------------------------------------------------------------
-// Integrations: Zendesk
-// ---------------------------------------------------------------------------
-
-export const zendeskConnections = pgTable('zendesk_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id),
-  subdomain: text('subdomain').notNull(),
-  admin_email: text('admin_email').notNull(),
-  api_token: text('api_token').notNull(),
-  account_name: text('account_name'),
-  sync_enabled: boolean('sync_enabled').notNull().default(false),
-  sync_frequency: text('sync_frequency').notNull().default('manual'),
-  filter_config: jsonb('filter_config'),
-  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-  last_sync_status: text('last_sync_status'),
-  last_sync_error: text('last_sync_error'),
-  last_sync_tickets_count: integer('last_sync_tickets_count'),
-  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const zendeskSyncRuns = pgTable('zendesk_sync_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => zendeskConnections.id, { onDelete: 'cascade' }),
-  status: text('status').notNull().default('running'),
-  triggered_by: text('triggered_by').notNull(),
-  tickets_found: integer('tickets_found'),
-  tickets_synced: integer('tickets_synced'),
-  tickets_skipped: integer('tickets_skipped'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-})
-
-export const zendeskSyncedTickets = pgTable('zendesk_synced_tickets', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => zendeskConnections.id, { onDelete: 'cascade' }),
-  session_id: uuid('session_id')
-    .notNull()
-    .references(() => sessions.id),
-  zendesk_ticket_id: integer('zendesk_ticket_id').notNull(),
-  comments_count: integer('comments_count'),
-  ticket_created_at: timestamp('ticket_created_at', { mode: 'date' }),
-  ticket_updated_at: timestamp('ticket_updated_at', { mode: 'date' }),
-  synced_at: timestamp('synced_at', { mode: 'date' }).defaultNow(),
-})
-
-// ---------------------------------------------------------------------------
-// Integrations: Intercom
-// ---------------------------------------------------------------------------
-
-export const intercomConnections = pgTable('intercom_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id),
-  workspace_id: text('workspace_id').notNull(),
-  workspace_name: text('workspace_name'),
-  access_token: text('access_token').notNull(),
-  auth_method: text('auth_method').notNull().default('oauth'),
-  sync_enabled: boolean('sync_enabled').notNull().default(false),
-  sync_frequency: text('sync_frequency').notNull().default('manual'),
-  filter_config: jsonb('filter_config'),
-  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-  last_sync_status: text('last_sync_status'),
-  last_sync_error: text('last_sync_error'),
-  last_sync_conversations_count: integer('last_sync_conversations_count'),
-  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const intercomSyncRuns = pgTable('intercom_sync_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => intercomConnections.id, { onDelete: 'cascade' }),
-  status: text('status').notNull().default('running'),
-  triggered_by: text('triggered_by').notNull(),
-  conversations_found: integer('conversations_found'),
-  conversations_synced: integer('conversations_synced'),
-  conversations_skipped: integer('conversations_skipped'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-})
-
-export const intercomSyncedConversations = pgTable('intercom_synced_conversations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => intercomConnections.id, { onDelete: 'cascade' }),
-  session_id: uuid('session_id')
-    .notNull()
-    .references(() => sessions.id),
-  intercom_conversation_id: text('intercom_conversation_id').notNull(),
-  parts_count: integer('parts_count'),
-  conversation_created_at: timestamp('conversation_created_at', { mode: 'date' }),
-  conversation_updated_at: timestamp('conversation_updated_at', { mode: 'date' }),
-  synced_at: timestamp('synced_at', { mode: 'date' }).defaultNow(),
-})
-
-// ---------------------------------------------------------------------------
-// Integrations: Gong
-// ---------------------------------------------------------------------------
-
-export const gongConnections = pgTable('gong_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id),
-  base_url: text('base_url').notNull().default('https://api.gong.io'),
-  access_key: text('access_key').notNull(),
-  access_key_secret: text('access_key_secret').notNull(),
-  sync_enabled: boolean('sync_enabled').notNull().default(false),
-  sync_frequency: text('sync_frequency').notNull().default('manual'),
-  filter_config: jsonb('filter_config'),
-  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-  last_sync_status: text('last_sync_status'),
-  last_sync_error: text('last_sync_error'),
-  last_sync_calls_count: integer('last_sync_calls_count'),
-  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const gongSyncRuns = pgTable('gong_sync_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => gongConnections.id, { onDelete: 'cascade' }),
-  status: text('status').notNull().default('running'),
-  triggered_by: text('triggered_by').notNull(),
-  calls_found: integer('calls_found'),
-  calls_synced: integer('calls_synced'),
-  calls_skipped: integer('calls_skipped'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-})
-
-export const gongSyncedCalls = pgTable('gong_synced_calls', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => gongConnections.id, { onDelete: 'cascade' }),
-  session_id: uuid('session_id')
-    .notNull()
-    .references(() => sessions.id),
-  gong_call_id: text('gong_call_id').notNull(),
-  call_duration_seconds: integer('call_duration_seconds'),
-  call_created_at: timestamp('call_created_at', { mode: 'date' }),
-  messages_count: integer('messages_count'),
-  synced_at: timestamp('synced_at', { mode: 'date' }).defaultNow(),
-})
-
-// ---------------------------------------------------------------------------
-// Integrations: PostHog
-// ---------------------------------------------------------------------------
-
-export const posthogConnections = pgTable('posthog_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id),
-  api_key: text('api_key').notNull(),
-  host: text('host').notNull().default('https://app.posthog.com'),
-  posthog_project_id: text('posthog_project_id').notNull(),
-  event_config: jsonb('event_config'),
-  sync_enabled: boolean('sync_enabled').notNull().default(false),
-  sync_frequency: text('sync_frequency').notNull().default('manual'),
-  filter_config: jsonb('filter_config'),
-  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-  last_sync_status: text('last_sync_status'),
-  last_sync_error: text('last_sync_error'),
-  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const posthogSyncRuns = pgTable('posthog_sync_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => posthogConnections.id, { onDelete: 'cascade' }),
-  status: text('status').notNull().default('running'),
-  contacts_matched: integer('contacts_matched'),
-  sessions_created: integer('sessions_created'),
-  contacts_created: integer('contacts_created'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-})
-
-// ---------------------------------------------------------------------------
-// Integrations: Notion
-// ---------------------------------------------------------------------------
-
-export const notionConnections = pgTable('notion_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id),
-  access_token: text('access_token').notNull(),
-  workspace_id: text('workspace_id').notNull(),
-  workspace_name: text('workspace_name'),
-  workspace_icon: text('workspace_icon'),
-  bot_id: text('bot_id'),
-  auth_method: text('auth_method').notNull().default('oauth'),
-  installed_by_user_id: text('installed_by_user_id'),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const notionSyncConfigs = pgTable('notion_sync_configs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => notionConnections.id, { onDelete: 'cascade' }),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  sync_type: text('sync_type').notNull(), // 'issues' | 'knowledge'
-  // Issue sync specific
-  notion_database_id: text('notion_database_id'),
-  notion_database_name: text('notion_database_name'),
-  field_mapping: jsonb('field_mapping'),
-  // Knowledge sync specific
-  notion_root_page_ids: jsonb('notion_root_page_ids'),
-  include_children: boolean('include_children').default(true),
-  // Shared sync state
-  sync_enabled: boolean('sync_enabled').notNull().default(false),
-  sync_frequency: text('sync_frequency').notNull().default('manual'),
-  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-  last_sync_status: text('last_sync_status'),
-  last_sync_error: text('last_sync_error'),
-  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-  last_sync_count: integer('last_sync_count'),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-}, (table) => [
-  unique().on(table.connection_id, table.sync_type),
-])
-
-export const notionIssueSyncs = pgTable('notion_issue_syncs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => notionConnections.id, { onDelete: 'cascade' }),
-  issue_id: uuid('issue_id')
-    .notNull()
-    .unique()
-    .references(() => issues.id, { onDelete: 'cascade' }),
-  notion_page_id: text('notion_page_id').notNull(),
-  notion_page_url: text('notion_page_url'),
-  last_notion_edited_time: timestamp('last_notion_edited_time', { mode: 'date' }),
-  last_sync_status: text('last_sync_status').notNull().default('synced'),
-  last_synced_at: timestamp('last_synced_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-})
-
-// ---------------------------------------------------------------------------
-// Integrations: HubSpot
-// ---------------------------------------------------------------------------
-
-export const hubspotConnections = pgTable('hubspot_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id, { onDelete: 'cascade' }),
-  hub_id: text('hub_id').notNull(),
-  hub_name: text('hub_name'),
-  auth_method: text('auth_method').notNull().default('oauth'),
-  access_token: text('access_token').notNull(),
-  refresh_token: text('refresh_token'),
-  token_expires_at: timestamp('token_expires_at', { mode: 'date' }),
-  sync_enabled: boolean('sync_enabled').notNull().default(false),
-  sync_frequency: text('sync_frequency').notNull().default('manual'),
-  filter_config: jsonb('filter_config'),
-  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-  last_sync_status: text('last_sync_status'),
-  last_sync_error: text('last_sync_error'),
-  last_sync_companies_count: integer('last_sync_companies_count'),
-  last_sync_contacts_count: integer('last_sync_contacts_count'),
-  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const hubspotSyncRuns = pgTable('hubspot_sync_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => hubspotConnections.id, { onDelete: 'cascade' }),
-  status: text('status').notNull().default('running'),
-  triggered_by: text('triggered_by').notNull(),
-  companies_found: integer('companies_found'),
-  companies_synced: integer('companies_synced'),
-  companies_skipped: integer('companies_skipped'),
-  contacts_found: integer('contacts_found'),
-  contacts_synced: integer('contacts_synced'),
-  contacts_skipped: integer('contacts_skipped'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-})
-
-export const hubspotSyncedCompanies = pgTable('hubspot_synced_companies', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => hubspotConnections.id, { onDelete: 'cascade' }),
-  company_id: uuid('company_id')
-    .notNull()
-    .references(() => companies.id, { onDelete: 'cascade' }),
-  hubspot_company_id: text('hubspot_company_id').notNull(),
-  hubspot_updated_at: timestamp('hubspot_updated_at', { mode: 'date' }),
-  synced_at: timestamp('synced_at', { mode: 'date' }).defaultNow(),
-})
-
-export const hubspotSyncedContacts = pgTable('hubspot_synced_contacts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => hubspotConnections.id, { onDelete: 'cascade' }),
-  contact_id: uuid('contact_id')
-    .notNull()
-    .references(() => contacts.id, { onDelete: 'cascade' }),
-  hubspot_contact_id: text('hubspot_contact_id').notNull(),
-  hubspot_updated_at: timestamp('hubspot_updated_at', { mode: 'date' }),
-  synced_at: timestamp('synced_at', { mode: 'date' }).defaultNow(),
-})
-
-// ---------------------------------------------------------------------------
-// Integrations: Fathom
-// ---------------------------------------------------------------------------
-
-export const fathomConnections = pgTable('fathom_connections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .unique()
-    .references(() => projects.id, { onDelete: 'cascade' }),
-  api_key: text('api_key').notNull(),
-  account_name: text('account_name'),
-  sync_frequency: text('sync_frequency').notNull().default('manual'),
-  sync_enabled: boolean('sync_enabled').notNull().default(false),
-  filter_config: jsonb('filter_config'),
-  last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-  last_sync_status: text('last_sync_status'),
-  last_sync_error: text('last_sync_error'),
-  last_sync_meetings_count: integer('last_sync_meetings_count'),
-  next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-  updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-})
-
-export const fathomSyncedMeetings = pgTable('fathom_synced_meetings', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => fathomConnections.id, { onDelete: 'cascade' }),
-  fathom_meeting_id: text('fathom_meeting_id').notNull(),
-  session_id: text('session_id').notNull(),
-  meeting_created_at: timestamp('meeting_created_at', { mode: 'date' }),
-  meeting_duration_seconds: integer('meeting_duration_seconds'),
-  messages_count: integer('messages_count'),
-  synced_at: timestamp('synced_at', { mode: 'date' }).defaultNow(),
-})
-
-export const fathomSyncRuns = pgTable('fathom_sync_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  connection_id: uuid('connection_id')
-    .notNull()
-    .references(() => fathomConnections.id, { onDelete: 'cascade' }),
-  triggered_by: text('triggered_by').notNull().default('manual'),
-  status: text('status').notNull().default('in_progress'),
-  meetings_found: integer('meetings_found'),
-  meetings_synced: integer('meetings_synced'),
-  meetings_skipped: integer('meetings_skipped'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-})
-
-// ---------------------------------------------------------------------------
-// Notifications
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Infrastructure: Rate Limiting
 // ---------------------------------------------------------------------------
 
@@ -1119,4 +592,123 @@ export const userNotifications = pgTable('user_notifications', {
 // ---------------------------------------------------------------------------
 // Automations
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Integrations (plugin-kit)
+// ---------------------------------------------------------------------------
+
+export const integrationConnections = pgTable(
+  'integration_connections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    project_id: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    plugin_id: text('plugin_id').notNull(),
+    /** Stable identifier from the provider (workspace id, subdomain, installation id, ...). */
+    external_account_id: text('external_account_id').notNull(),
+    /** Human-readable label shown in the UI. */
+    account_label: text('account_label').notNull(),
+    /** Auth tokens / api keys. Currently plaintext; encryption is a follow-up. */
+    credentials: jsonb('credentials').notNull(),
+    /** Connection-level settings (not stream-specific). */
+    settings: jsonb('settings'),
+    created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
+    updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+  },
+  (table) => [
+    unique('integration_connections_unique').on(
+      table.project_id,
+      table.plugin_id,
+      table.external_account_id
+    ),
+    index('idx_integration_connections_project').on(table.project_id),
+    index('idx_integration_connections_plugin').on(table.plugin_id),
+  ]
+)
+
+export const integrationStreams = pgTable(
+  'integration_streams',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    connection_id: uuid('connection_id')
+      .notNull()
+      .references(() => integrationConnections.id, { onDelete: 'cascade' }),
+    plugin_id: text('plugin_id').notNull(),
+    /**
+     * Full stream key. For singleton streams equals the plugin's stream def key
+     * (e.g. "tickets"). For parameterized streams encodes instance id
+     * ("codebase:acme/repo"). See plugin-kit.buildStreamId / parseStreamId.
+     */
+    stream_id: text('stream_id').notNull(),
+    /** The stream kind ("sessions", "contacts", ...) for analytics/indexing. */
+    stream_kind: text('stream_kind').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    /** 'manual' | '1h' | '6h' | '24h' | 'webhook' */
+    frequency: text('frequency').notNull().default('manual'),
+    filter_config: jsonb('filter_config'),
+    /** Stream-specific settings (e.g. per-channel "join-on-mention" flag). */
+    settings: jsonb('settings'),
+    last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
+    last_sync_status: text('last_sync_status'),
+    last_sync_error: text('last_sync_error'),
+    last_sync_counts: jsonb('last_sync_counts'),
+    next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
+    created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
+    updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
+  },
+  (table) => [
+    unique('integration_streams_unique').on(table.connection_id, table.stream_id),
+    index('idx_integration_streams_connection').on(table.connection_id),
+    index('idx_integration_streams_due').on(table.enabled, table.frequency, table.next_sync_at),
+  ]
+)
+
+export const integrationSyncRuns = pgTable(
+  'integration_sync_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    connection_id: uuid('connection_id')
+      .notNull()
+      .references(() => integrationConnections.id, { onDelete: 'cascade' }),
+    plugin_id: text('plugin_id').notNull(),
+    /** Null for connection-level runs (currently unused but reserved). */
+    stream_id: text('stream_id'),
+    triggered_by: text('triggered_by').notNull(),
+    status: text('status').notNull().default('in_progress'),
+    counts: jsonb('counts'),
+    error_message: text('error_message'),
+    started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
+    completed_at: timestamp('completed_at', { mode: 'date' }),
+  },
+  (table) => [
+    index('idx_integration_sync_runs_connection').on(table.connection_id),
+    index('idx_integration_sync_runs_started').on(table.started_at),
+  ]
+)
+
+export const integrationSyncedRecords = pgTable(
+  'integration_synced_records',
+  {
+    connection_id: uuid('connection_id')
+      .notNull()
+      .references(() => integrationConnections.id, { onDelete: 'cascade' }),
+    stream_id: text('stream_id').notNull(),
+    /** External id (provider's primary key for the record, e.g. "ticket:12345"). */
+    external_id: text('external_id').notNull(),
+    /** The hissuno id the external record was mapped to (session id, issue id, ...). */
+    hissuno_id: text('hissuno_id').notNull(),
+    hissuno_kind: text('hissuno_kind').notNull(),
+    synced_at: timestamp('synced_at', { mode: 'date' }).defaultNow(),
+  },
+  (table) => [
+    // Composite PK — we look up by (connection, stream, external).
+    unique('integration_synced_records_pk').on(
+      table.connection_id,
+      table.stream_id,
+      table.external_id
+    ),
+    index('idx_integration_synced_records_connection').on(table.connection_id),
+  ]
+)
 
