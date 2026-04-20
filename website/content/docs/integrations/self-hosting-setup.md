@@ -13,12 +13,14 @@ Hissuno integrations that use OAuth require you to create your own app/credentia
 
 All environment variables referenced below are documented in `env.example` at the root of the Hissuno repository.
 
+To add a new integration beyond the ones listed here, see [Plugin System](/docs/architecture/plugin-system).
+
 ## Callback URL Pattern
 
 All OAuth callbacks follow the same pattern:
 
 ```
-{NEXT_PUBLIC_APP_URL}/api/integrations/{provider}/callback
+{NEXT_PUBLIC_APP_URL}/api/plugins/oauth/{pluginId}/callback
 ```
 
 Replace `{NEXT_PUBLIC_APP_URL}` with your instance URL (e.g. `https://hissuno.yourcompany.com`).

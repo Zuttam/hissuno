@@ -58,6 +58,7 @@ export const DOCS_NAV: DocNavCategory[] = [
       { title: 'Knowledge Graph', slug: 'knowledge-graph', href: '/docs/architecture/knowledge-graph' },
       { title: 'Embeddings', slug: 'embeddings', href: '/docs/architecture/embeddings' },
       { title: 'Graph Evaluation', slug: 'graph-evaluation', href: '/docs/architecture/graph-evaluation' },
+      { title: 'Plugin System (Integrations)', slug: 'plugin-system', href: '/docs/architecture/plugin-system' },
     ],
     subsections: [
       {
@@ -89,8 +90,12 @@ export const DOCS_NAV: DocNavCategory[] = [
       { title: 'Slack', slug: 'slack', href: '/docs/integrations/slack' },
       { title: 'Intercom', slug: 'intercom', href: '/docs/integrations/intercom' },
       { title: 'Gong', slug: 'gong', href: '/docs/integrations/gong' },
+      { title: 'Fathom', slug: 'fathom', href: '/docs/integrations/fathom' },
       { title: 'Jira', slug: 'jira', href: '/docs/integrations/jira' },
       { title: 'Linear', slug: 'linear', href: '/docs/integrations/linear' },
+      { title: 'Notion', slug: 'notion', href: '/docs/integrations/notion' },
+      { title: 'HubSpot', slug: 'hubspot', href: '/docs/integrations/hubspot' },
+      { title: 'PostHog', slug: 'posthog', href: '/docs/integrations/posthog' },
       { title: 'Zendesk', slug: 'zendesk', href: '/docs/integrations/zendesk' },
       { title: 'Troubleshooting', slug: 'troubleshooting', href: '/docs/integrations/troubleshooting' },
     ],

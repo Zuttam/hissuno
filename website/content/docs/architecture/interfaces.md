@@ -26,3 +26,7 @@ Embeddable chat component for websites and applications. Connects customers dire
 ## Slack
 
 Bot integration for workspace channels. Captures customer conversations as feedback, supports interactive and passive channel modes, and enables human takeover. When a customer messages in a connected channel, the Support Agent responds and the conversation is recorded in the knowledge graph. [Learn more](/docs/integrations/slack)
+
+## Integration Plugins
+
+Every provider that feeds data into Hissuno - Slack, GitHub, Linear, Jira, Intercom, Zendesk, Notion, HubSpot, Gong, Fathom, PostHog - is a **plugin** built on a unified plugin kit. A plugin declares its auth schema and data streams; shared infrastructure handles routing, cron, credential storage, deduplication, and ingestion. Plugins can ship live webhook handlers, scheduled syncs, per-instance configuration, and custom API endpoints. [Learn more](/docs/architecture/plugin-system)
