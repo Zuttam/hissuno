@@ -8,9 +8,7 @@ import { NotionPickerDialog } from '@/components/projects/knowledge/notion-picke
 import type { KnowledgeSourceType, KnowledgeSourceWithCodebase } from '@/lib/knowledge/types'
 import { getSourceDisplayValue, getSourceTypeLabel } from '@/lib/knowledge/types'
 import type { ProductScopeRecord } from '@/types/product-scope'
-import type { AnalysisEvent } from '@/hooks/use-issue-analysis'
 import { formatDateTime } from '@/lib/utils/format-time'
-import { WorkflowProgress } from '@/components/issues/workflow-progress'
 import { RelatedEntitiesSection } from '@/components/shared/related-entities-section'
 import { CustomFieldsRenderer } from '@/components/shared/custom-fields-renderer'
 import { useCustomFields } from '@/hooks/use-custom-fields'
@@ -23,7 +21,6 @@ interface KnowledgeSourceSidebarEditProps {
   onDelete: (sourceId: string, options?: { children?: 'reparent' | 'delete' }) => Promise<boolean>
   onAnalyze?: (sourceId: string) => Promise<void>
   isAnalyzing?: boolean
-  analysisEvents?: AnalysisEvent[]
   productScopes?: ProductScopeRecord[]
 }
 
@@ -75,7 +72,6 @@ function EditModeSidebar({
   onDelete,
   onAnalyze,
   isAnalyzing: isAnalyzingProp = false,
-  analysisEvents,
 }: KnowledgeSourceSidebarEditProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -208,16 +204,6 @@ function EditModeSidebar({
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
-          {/* Analysis Progress */}
-          {isAnalyzing && analysisEvents && (
-            <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-              <WorkflowProgress
-                events={analysisEvents}
-                isProcessing={isAnalyzing}
-              />
-            </div>
-          )}
-
           {/* Details section */}
           <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
             <CollapsibleSection title="Details" variant="flat" defaultExpanded>

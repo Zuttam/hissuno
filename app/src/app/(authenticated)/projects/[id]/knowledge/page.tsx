@@ -6,9 +6,9 @@ import Image from 'next/image'
 import { useProject } from '@/components/providers/project-provider'
 import { useProductScopes } from '@/hooks/use-product-scopes'
 import { useKnowledgeSources } from '@/hooks/use-knowledge-sources'
-import { useSourceAnalysis } from '@/hooks/use-source-analysis'
 import { KnowledgeSourceTree } from '@/components/projects/knowledge/knowledge-source-tree'
 import { KnowledgeSourceSidebar } from '@/components/projects/knowledge/knowledge-source-sidebar'
+import { reanalyzeKnowledgeSource } from '@/lib/api/knowledge'
 import { fetchGithubStatus } from '@/lib/api/plugins'
 import { PageHeader, Spinner, FilterChip, FilterLabel, Input } from '@/components/ui'
 import { type KnowledgeSourceType, getSourceTypeLabel } from '@/lib/knowledge/types'
@@ -45,16 +45,17 @@ export default function KnowledgePage() {
     projectId: projectId ?? '',
   })
 
-  const {
-    isAnalyzing: isSourceAnalyzing,
-    analyzingSourceId,
-    events: analysisEvents,
-    startAnalysis,
-    reconnectToStream,
-  } = useSourceAnalysis({
-    projectId: projectId ?? '',
-    onComplete: () => void refresh(),
-  })
+  // Poll while any source is in-flight so the UI reflects pending/analyzing → done/failed
+  // transitions without SSE. Matches the session-ingestion UX pattern.
+  const hasInFlightSource = useMemo(
+    () => sources.some((s) => s.status === 'pending' || s.status === 'analyzing'),
+    [sources],
+  )
+  useEffect(() => {
+    if (!hasInFlightSource) return
+    const interval = setInterval(() => { void refresh() }, 2500)
+    return () => clearInterval(interval)
+  }, [hasInFlightSource, refresh])
 
   // Close add dropdown on outside click / escape
   useEffect(() => {
@@ -92,28 +93,17 @@ export default function KnowledgePage() {
     void checkGitHub()
   }, [projectId])
 
-  // Auto-reconnect to in-progress analysis after page refresh
-  const hasReconnected = useRef(false)
-  useEffect(() => {
-    if (isLoading || hasReconnected.current || isSourceAnalyzing) return
-    const analyzingSource = sources.find(s => s.status === 'analyzing')
-    if (analyzingSource) {
-      hasReconnected.current = true
-      setSelectedSourceId(analyzingSource.id)
-      reconnectToStream(analyzingSource.id)
-    }
-  }, [sources, isLoading, isSourceAnalyzing, reconnectToStream])
-
-  // Auto-start analysis after adding a source
+  // Source analysis is fire-and-forget: the create route kicks off background
+  // processing (when the source type needs fetching) and the poll above
+  // surfaces status transitions. No reconnect/stream plumbing required.
   const handleAddSource = useCallback(async (data: FormData | Record<string, unknown>) => {
     const source = await addSource(data)
     if (source) {
       setAddingType(null)
       setSelectedSourceId(source.id)
-      void startAnalysis(source.id)
     }
     return source
-  }, [addSource, startAnalysis])
+  }, [addSource])
 
   const defaultAreaId = useMemo(
     () => productScopes.find(a => a.is_default)?.id,
@@ -199,8 +189,14 @@ export default function KnowledgePage() {
   }, [addSource])
 
   const handleAnalyze = useCallback(async (sourceId: string) => {
-    await startAnalysis(sourceId)
-  }, [startAnalysis])
+    if (!projectId) return
+    try {
+      await reanalyzeKnowledgeSource(projectId, sourceId)
+    } catch (err) {
+      console.error('[knowledge-page] reanalyze failed', err)
+    }
+    void refresh()
+  }, [projectId, refresh])
 
   if (isLoadingProject || !projectId) {
     return (
@@ -344,8 +340,7 @@ export default function KnowledgePage() {
           onUpdate={updateSource}
           onDelete={deleteSource}
           onAnalyze={handleAnalyze}
-          isAnalyzing={isSourceAnalyzing && analyzingSourceId === selectedSource.id}
-          analysisEvents={isSourceAnalyzing && analyzingSourceId === selectedSource.id ? analysisEvents : undefined}
+          isAnalyzing={selectedSource.status === 'analyzing'}
           productScopes={productScopes}
         />
       )}
