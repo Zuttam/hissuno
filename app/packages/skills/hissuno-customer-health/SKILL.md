@@ -12,7 +12,6 @@ metadata:
   author: hissuno
 triggers:
   manual: { entity: customer }
-  scheduled: { cron: '0 8 * * 1' }
 input:
   customerId:
     type: string

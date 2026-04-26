@@ -162,6 +162,26 @@ export async function markAutomationRunCancelled(runId: string): Promise<void> {
     .where(eq(automationRuns.id, runId))
 }
 
+/**
+ * Returns the most recent run of (project, skill, triggerType) — used by the
+ * cron worker to dedup scheduled fires. Returns null if there's no prior run.
+ */
+export async function getLatestRunByTrigger(opts: {
+  projectId: string
+  skillId: string
+  triggerType: TriggerType
+}): Promise<AutomationRunRow | null> {
+  const row = await db.query.automationRuns.findFirst({
+    where: and(
+      eq(automationRuns.project_id, opts.projectId),
+      eq(automationRuns.skill_id, opts.skillId),
+      eq(automationRuns.trigger_type, opts.triggerType),
+    ),
+    orderBy: desc(automationRuns.created_at),
+  })
+  return row ?? null
+}
+
 export async function appendProgressEvent(
   runId: string,
   event: ProgressEvent,
