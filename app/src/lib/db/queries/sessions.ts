@@ -603,6 +603,11 @@ export async function updateSession(
     if (input.status === 'closed') {
       const { fireSessionProcessing } = await import('@/lib/utils/session-processing')
       fireSessionProcessing(sessionId, result.project_id)
+      const { notifyAutomationEvent } = await import('@/lib/automations/events')
+      notifyAutomationEvent('session.closed', {
+        projectId: result.project_id,
+        entity: { type: 'session', id: sessionId },
+      })
     }
 
     return result

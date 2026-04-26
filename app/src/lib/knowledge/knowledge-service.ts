@@ -727,6 +727,14 @@ export async function createKnowledgeSourceAdmin(
     }
   }
 
+  if (input.type !== 'folder') {
+    const { notifyAutomationEvent } = await import('@/lib/automations/events')
+    notifyAutomationEvent('knowledge.created', {
+      projectId: input.projectId,
+      entity: { type: 'knowledge_source', id: source.id },
+    })
+  }
+
   return source
 }
 
