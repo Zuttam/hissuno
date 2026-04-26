@@ -19,6 +19,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readCustomSkillContent } from '@/lib/automations/dispatch'
+import { getCustomSkill } from '@/lib/db/queries/custom-skills'
+import { readCustomSkillFile } from '@/lib/automations/custom-skills'
 import type { SkillDescriptor } from '@/lib/automations/types'
 
 export type WorkspaceForRunOptions = {
@@ -60,10 +62,10 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
   const workDir = join(tmpdir(), 'hissuno-automation', opts.runId)
   await mkdir(workDir, { recursive: true })
 
-  // For custom skills, materialize the SKILL.md from blob storage into a
-  // per-run skills directory and add it to the Workspace skills array. This
-  // lets Mastra's skill loader treat custom skills the same as bundled ones
-  // without us having to implement a custom SkillSource adapter.
+  // For custom skills, materialize the SKILL.md (plus any references/ +
+  // scripts/ files from the manifest) from blob storage into a per-run
+  // skills directory and add it to the Workspace skills array. Mastra's
+  // skill loader then treats custom skills the same as bundled ones.
   const skillDirs: string[] = [bundledSkillsDir]
   if (opts.skill.source === 'custom') {
     const content = await readCustomSkillContent(opts.projectId, opts.skill.id)
@@ -74,6 +76,17 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
     const customSkillDir = join(customSkillsRoot, opts.skill.id)
     await mkdir(customSkillDir, { recursive: true })
     await writeFile(join(customSkillDir, 'SKILL.md'), content, 'utf8')
+
+    const row = await getCustomSkill(opts.projectId, opts.skill.id)
+    const files = ((row?.files as unknown as { path: string }[] | null) ?? [])
+    for (const f of files) {
+      const fileContent = await readCustomSkillFile(opts.projectId, opts.skill.id, f.path)
+      if (fileContent === null) continue
+      const target = join(customSkillDir, f.path)
+      await mkdir(dirname(target), { recursive: true })
+      await writeFile(target, fileContent, 'utf8')
+    }
+
     skillDirs.push(customSkillsRoot)
   }
 

@@ -1,0 +1,1 @@
+ALTER TABLE "custom_skills" ADD COLUMN "files" jsonb DEFAULT '[]'::jsonb NOT NULL;

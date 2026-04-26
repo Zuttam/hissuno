@@ -394,6 +394,12 @@ export const customSkills = pgTable(
     blob_path: text('blob_path').notNull(),
     /** Frontmatter snapshot - duplicated from SKILL.md for fast catalog reads. */
     frontmatter: jsonb('frontmatter').notNull().default({}),
+    /**
+     * Manifest of additional files (references/, scripts/) the skill ships
+     * with. Each entry: { path, size, contentType }. SKILL.md isn't listed
+     * here - it's at blob_path. Empty array for SKILL.md-only skills.
+     */
+    files: jsonb('files').notNull().default([]),
     created_by_user_id: uuid('created_by_user_id').references(() => users.id),
     created_at: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
