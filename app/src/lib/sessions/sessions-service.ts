@@ -158,18 +158,21 @@ export async function createSessionWithMessagesAdmin(
     fireGraphEval(input.projectId, 'session', sessionId)
   }
 
-  notifyAutomationEvent('session.created', {
-    projectId: input.projectId,
-    entity: { type: 'session', id: sessionId },
-  })
-  if (input.status === 'closed') {
-    notifyAutomationEvent('session.closed', {
-      projectId: input.projectId,
-      entity: { type: 'session', id: sessionId },
-    })
-  }
+  notifySessionLifecycle(input.projectId, sessionId, input.status ?? 'active')
 
   return { sessionId, messageCount: input.messages.length }
+}
+
+function notifySessionLifecycle(
+  projectId: string,
+  sessionId: string,
+  status: 'active' | 'closed',
+): void {
+  const entity = { type: 'session' as const, id: sessionId }
+  notifyAutomationEvent('session.created', { projectId, entity })
+  if (status === 'closed') {
+    notifyAutomationEvent('session.closed', { projectId, entity })
+  }
 }
 
 /**
@@ -264,16 +267,7 @@ export async function createSessionAdmin(
       fireGraphEval(input.project_id, 'session', sessionId)
     }
 
-    notifyAutomationEvent('session.created', {
-      projectId: input.project_id,
-      entity: { type: 'session', id: sessionId },
-    })
-    if (resolvedStatus === 'closed') {
-      notifyAutomationEvent('session.closed', {
-        projectId: input.project_id,
-        entity: { type: 'session', id: sessionId },
-      })
-    }
+    notifySessionLifecycle(input.project_id, sessionId, resolvedStatus)
 
     // Fetch the session with relations
     const result = await db.query.sessions.findFirst({

@@ -16,9 +16,7 @@ import { findSkill, listBundledSkills } from './skills'
 import {
   getCustomSkillDescriptor,
   listCustomSkillDescriptors,
-  readCustomSkillContent,
 } from './custom-skills'
-export { readCustomSkillContent }
 import { buildHarnessPrefix } from './harness'
 import { closeRunChannel, publishRunEvent, subscribeRunCancel } from './run-bus'
 import { buildWorkspaceForRun } from '@/mastra/workspace/build'

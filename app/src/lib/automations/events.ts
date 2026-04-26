@@ -56,27 +56,28 @@ export function notifyAutomationEvent(event: EventName, ctx: EventContext): void
       const project = await getProjectById(ctx.projectId)
       if (!project) return
 
-      for (const skill of matching) {
-        try {
-          if (!(await isAutomationEnabledForProject(skill.id, project.id))) continue
+      await Promise.allSettled(
+        matching.map(async (skill) => {
+          try {
+            if (!(await isAutomationEnabledForProject(skill.id, project.id))) return
 
-          await dispatchAutomationRun({
-            projectId: project.id,
-            projectName: project.name,
-            skillId: skill.id,
-            trigger: {
-              type: 'event',
-              entity: ctx.entity,
-            },
-          })
-        } catch (err) {
-          // One skill failing shouldn't stop the others; log and continue.
-          console.error(
-            `[automation-events] failed to dispatch ${skill.id} on ${event}`,
-            err,
-          )
-        }
-      }
+            await dispatchAutomationRun({
+              projectId: project.id,
+              projectName: project.name,
+              skillId: skill.id,
+              trigger: {
+                type: 'event',
+                entity: ctx.entity,
+              },
+            })
+          } catch (err) {
+            console.error(
+              `[automation-events] failed to dispatch ${skill.id} on ${event}`,
+              err,
+            )
+          }
+        }),
+      )
     } catch (err) {
       // Fire-and-forget — the originating write has already committed.
       console.error('[automation-events] dispatch error', err)
