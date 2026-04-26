@@ -365,22 +365,6 @@ export const issues = pgTable('issues', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
-export const issueAnalysisRuns = pgTable('issue_analysis_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  issue_id: uuid('issue_id')
-    .notNull()
-    .references(() => issues.id),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  run_id: text('run_id').notNull(),
-  status: text('status').notNull().default('pending'),
-  metadata: jsonb('metadata'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-})
-
 // Generic per-run record for skill-based automations. Replaces compilation_runs
 // and issue_analysis_runs once each is migrated to a SKILL.md-driven flow
 // (see plan: replace static workflows with skill.md-based automations).

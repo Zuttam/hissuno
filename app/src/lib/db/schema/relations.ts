@@ -18,7 +18,6 @@ import {
   sessionReviews,
   chatRuns,
   issues,
-  issueAnalysisRuns,
   sourceCodes,
   knowledgeSources,
   knowledgeEmbeddings,
@@ -169,14 +168,8 @@ export const chatRunsRelations = relations(chatRuns, ({ one }) => ({
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
   project: one(projects, { fields: [issues.project_id], references: [projects.id] }),
-  analysisRuns: many(issueAnalysisRuns),
   embedding: one(embeddings, { fields: [issues.id], references: [embeddings.entity_id] }),
   entityRelationships: many(entityRelationships),
-}))
-
-export const issueAnalysisRunsRelations = relations(issueAnalysisRuns, ({ one }) => ({
-  issue: one(issues, { fields: [issueAnalysisRuns.issue_id], references: [issues.id] }),
-  project: one(projects, { fields: [issueAnalysisRuns.project_id], references: [projects.id] }),
 }))
 
 // ---------------------------------------------------------------------------

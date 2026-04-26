@@ -15,6 +15,13 @@
       "when": 1777195253385,
       "tag": "0001_outgoing_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777198629428,
+      "tag": "0002_overjoyed_pretty_boy",
+      "breakpoints": true
     }
   ]
 }

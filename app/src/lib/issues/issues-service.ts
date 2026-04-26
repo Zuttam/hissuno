@@ -35,7 +35,7 @@ import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { linkEntities } from '@/lib/db/queries/entity-relationships'
 import { buildProgrammaticContext } from '@/lib/db/queries/relationship-metadata'
 import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings'
-import { triggerIssueAnalysis } from './analysis-service'
+import { dispatchAutomationRun } from '@/lib/automations/dispatch'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -74,9 +74,9 @@ function maybeFireIssueEmbedding(
 }
 
 /**
- * Fire-and-forget: check the project's issue_analysis_enabled setting
- * and kick off issue analysis via the analysis service (creates a run record).
- * The workflow itself marks the run as completed/failed in its final step.
+ * Fire-and-forget: when the project has issue analysis enabled, dispatch
+ * the `hissuno-issue-analysis` automation run in the background. Runs the
+ * agent against the new automation_runs lifecycle.
  */
 function maybeFireIssueAnalysis(issueId: string, projectId: string): void {
   void (async () => {
@@ -84,17 +84,20 @@ function maybeFireIssueAnalysis(issueId: string, projectId: string): void {
       const settings = await getPmAgentSettingsAdmin(projectId)
       if (!settings.issue_analysis_enabled) return
 
-      const result = await triggerIssueAnalysis({ projectId, issueId })
-      if (!result.success) return
+      const project = await getProjectById(projectId)
+      if (!project) return
 
-      const { mastra } = await import('@/mastra')
-      const workflow = mastra.getWorkflow('issueAnalysisWorkflow')
-      if (!workflow) return
-
-      const run = await workflow.createRun({ runId: result.runId })
-      void run.start({ inputData: { issueId, projectId, runId: result.runId } })
+      await dispatchAutomationRun({
+        projectId,
+        projectName: project.name,
+        skillId: 'hissuno-issue-analysis',
+        trigger: {
+          type: 'event',
+          entity: { type: 'issue', id: issueId },
+        },
+      })
     } catch {
-      // Non-blocking
+      // Non-blocking — agent will surface its own failures via the run row.
     }
   })()
 }
