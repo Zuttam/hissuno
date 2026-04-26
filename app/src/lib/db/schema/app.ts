@@ -115,20 +115,6 @@ export const projectApiKeys = pgTable('project_api_keys', {
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
 })
 
-export const compilationRuns = pgTable('compilation_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  run_id: text('run_id').notNull(),
-  status: text('status').notNull().default('pending'),
-  metadata: jsonb('metadata'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-})
-
 // ---------------------------------------------------------------------------
 // User Profiles
 // ---------------------------------------------------------------------------

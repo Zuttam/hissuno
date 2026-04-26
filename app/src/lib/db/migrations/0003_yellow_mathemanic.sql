@@ -1,0 +1,1 @@
+DROP TABLE "compilation_runs" CASCADE;

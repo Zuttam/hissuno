@@ -1,13 +1,18 @@
 import { fetchApi, fetchApiRaw, buildUrl } from './fetch'
 import type { KnowledgeSourceWithCodebase, SupportPackageWithSources } from '@/lib/knowledge/types'
 
+const SUPPORT_WIKI_SKILL_ID = 'hissuno-support-wiki'
+
 const paths = {
   sources: '/api/knowledge/sources',
   source: (s: string) => `/api/knowledge/sources/${s}`,
   sourceReanalyze: (s: string) => `/api/knowledge/sources/${s}/reanalyze`,
-  packageAnalyze: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze`,
-  packageAnalyzeCancel: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze/cancel`,
-  packageAnalyzeStream: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze/stream`,
+  // Automation runner — replaces the package-compilation workflow's
+  // dedicated /api/settings/agents/support-agent/packages/<id>/analyze*
+  // endpoints.
+  automationRun: (skillId: string) => `/api/automations/${skillId}/run`,
+  automationStream: (runId: string) => `/api/automations/runs/${runId}/stream`,
+  automationCancel: (runId: string) => `/api/automations/runs/${runId}/cancel`,
 }
 
 // ---------------------------------------------------------------------------
@@ -66,23 +71,40 @@ export async function deleteKnowledgeSource(
 // Package Analysis
 // ---------------------------------------------------------------------------
 
-export async function getPackageAnalysisStatus(projectId: string, packageId: string) {
-  return fetchApiRaw(buildUrl(paths.packageAnalyze(packageId), { projectId }))
+/**
+ * Status query (legacy: usePackageAnalysis(checkOnMount=true) used this to
+ * reconnect to a running workflow). The automation runner has no per-entity
+ * "is running" lookup yet, so this returns "not running" — reconnect on
+ * mount becomes a no-op until we want it to query automation_runs.
+ */
+export async function getPackageAnalysisStatus(_projectId: string, _packageId: string) {
+  return new Response(JSON.stringify({ isRunning: false }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  }) as Response & { ok: boolean }
 }
 
+/**
+ * Trigger a support-wiki compile via the automation runner. The hook
+ * extracts `runId` from the response body to open the SSE stream.
+ */
 export async function triggerPackageAnalysis(projectId: string, packageId: string) {
-  return fetchApiRaw(buildUrl(paths.packageAnalyze(packageId), { projectId }), { method: 'POST' })
+  return fetchApiRaw(buildUrl(paths.automationRun(SUPPORT_WIKI_SKILL_ID), { projectId }), {
+    method: 'POST',
+    body: { entity: { type: 'package', id: packageId } },
+  })
 }
 
-export async function cancelPackageAnalysis(projectId: string, packageId: string) {
+export async function cancelPackageAnalysis(projectId: string, _packageId: string, runId?: string) {
+  if (!runId) return { ok: false, error: 'Missing runId' } as const
   return fetchApi<Record<string, unknown>>(
-    buildUrl(paths.packageAnalyzeCancel(packageId), { projectId }),
+    buildUrl(paths.automationCancel(runId), { projectId }),
     { method: 'POST', errorMessage: 'Failed to cancel analysis' },
   )
 }
 
-export function packageAnalyzeStreamUrl(projectId: string, packageId: string): string {
-  return buildUrl(paths.packageAnalyzeStream(packageId), { projectId })
+export function packageAnalyzeStreamUrl(projectId: string, runId: string): string {
+  return buildUrl(paths.automationStream(runId), { projectId })
 }
 
 // ---------------------------------------------------------------------------

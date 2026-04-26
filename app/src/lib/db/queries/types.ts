@@ -8,7 +8,6 @@ import type {
   projectSettings,
   projectMembers,
   projectApiKeys,
-  compilationRuns,
   userProfiles,
   productScopes,
   companies,
@@ -50,9 +49,6 @@ export type ProjectMemberInsert = typeof projectMembers.$inferInsert
 
 export type ProjectApiKeyRow = typeof projectApiKeys.$inferSelect
 export type ProjectApiKeyInsert = typeof projectApiKeys.$inferInsert
-
-export type CompilationRunRow = typeof compilationRuns.$inferSelect
-export type CompilationRunInsert = typeof compilationRuns.$inferInsert
 
 // ---------------------------------------------------------------------------
 // User Profiles

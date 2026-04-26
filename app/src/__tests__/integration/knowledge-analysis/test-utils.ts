@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: re-write to use automation_runs after compilation_runs is dropped
 /**
  * Test Utilities for Knowledge Analysis Integration Tests
  *

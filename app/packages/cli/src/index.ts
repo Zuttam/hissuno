@@ -18,6 +18,7 @@ import { statusCommand } from './commands/status.js'
 import { membersCommand } from './commands/members.js'
 import { loginCommand } from './commands/login.js'
 import { logoutCommand } from './commands/logout.js'
+import { compileCommand } from './commands/compile.js'
 
 const program = new Command()
   .name('hissuno')
@@ -40,5 +41,6 @@ program.addCommand(addCommand)
 program.addCommand(updateCommand)
 program.addCommand(integrationsCommand)
 program.addCommand(membersCommand)
+program.addCommand(compileCommand)
 
 program.parseAsync(process.argv)
