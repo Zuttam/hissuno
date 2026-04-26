@@ -11,6 +11,7 @@
 
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { getPlugin } from '@/lib/integrations/registry'
 import {
@@ -19,8 +20,12 @@ import {
 } from '@/lib/integrations/shared/oauth'
 import {
   createConnection,
+  getConnection,
   updateConnection,
 } from '@/lib/integrations/shared/connections'
+import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
+import { UnauthorizedError } from '@/lib/auth/server'
+import type { RequestIdentity } from '@/lib/auth/identity'
 
 export const runtime = 'nodejs'
 
@@ -73,6 +78,64 @@ export async function GET(
       projectId: statePayload?.projectId ?? null,
       error: 'missing_code',
     })
+  }
+
+  // Bind the state to the active browser session: the user completing the
+  // callback must be the same user who initiated the connect flow. Without
+  // this check, an attacker could phish a victim into completing an OAuth
+  // flow whose state was issued to the attacker, causing the victim's
+  // tokens to be written into the attacker's project.
+  let sessionUserId: string | null = null
+  try {
+    const jwt = await getToken({ req: request, secret: process.env.AUTH_SECRET! })
+    sessionUserId = (jwt?.id as string | undefined) ?? null
+  } catch (err) {
+    console.error(`[oauth.${pluginId}.callback] getToken failed`, err)
+  }
+  if (!sessionUserId || sessionUserId !== statePayload.userId) {
+    return redirectBack({
+      request,
+      projectId: statePayload.projectId,
+      pluginId: plugin.id,
+      error: 'session_mismatch',
+    })
+  }
+
+  const identity: RequestIdentity = {
+    type: 'user',
+    userId: sessionUserId,
+    email: null,
+    name: null,
+  }
+
+  try {
+    await assertProjectAccess(identity, statePayload.projectId)
+  } catch (err) {
+    const errorCode =
+      err instanceof ForbiddenError || err instanceof UnauthorizedError
+        ? 'forbidden'
+        : 'access_check_failed'
+    if (errorCode === 'access_check_failed') {
+      console.error(`[oauth.${pluginId}.callback] access check failed`, err)
+    }
+    return redirectBack({
+      request,
+      projectId: statePayload.projectId,
+      pluginId: plugin.id,
+      error: errorCode,
+    })
+  }
+
+  if (statePayload.connectionId) {
+    const existing = await getConnection(statePayload.connectionId)
+    if (!existing || existing.projectId !== statePayload.projectId) {
+      return redirectBack({
+        request,
+        projectId: statePayload.projectId,
+        pluginId: plugin.id,
+        error: 'connection_mismatch',
+      })
+    }
   }
 
   try {
