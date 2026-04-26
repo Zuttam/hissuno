@@ -381,6 +381,40 @@ export const issueAnalysisRuns = pgTable('issue_analysis_runs', {
   completed_at: timestamp('completed_at', { mode: 'date' }),
 })
 
+// Generic per-run record for skill-based automations. Replaces compilation_runs
+// and issue_analysis_runs once each is migrated to a SKILL.md-driven flow
+// (see plan: replace static workflows with skill.md-based automations).
+export const automationRuns = pgTable(
+  'automation_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    project_id: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    skill_id: text('skill_id').notNull(),
+    skill_version: text('skill_version'),
+    skill_source: text('skill_source').notNull().default('bundled'), // 'bundled' | 'custom'
+    trigger_type: text('trigger_type').notNull(), // 'manual' | 'scheduled' | 'event'
+    trigger_entity_type: text('trigger_entity_type'), // 'issue' | 'customer' | 'scope' | ...
+    trigger_entity_id: text('trigger_entity_id'),
+    status: text('status').notNull().default('queued'), // queued | running | succeeded | failed | cancelled
+    input: jsonb('input').notNull().default({}),
+    output: jsonb('output'),
+    error: jsonb('error'),
+    progress_events: jsonb('progress_events').notNull().default([]),
+    started_at: timestamp('started_at', { mode: 'date' }),
+    completed_at: timestamp('completed_at', { mode: 'date' }),
+    duration_ms: integer('duration_ms'),
+    created_at: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('automation_runs_project_skill_idx').on(t.project_id, t.skill_id, t.created_at),
+    index('automation_runs_status_idx').on(t.status),
+    index('automation_runs_entity_idx').on(t.trigger_entity_type, t.trigger_entity_id),
+  ],
+)
+
 // ---------------------------------------------------------------------------
 // Knowledge
 // ---------------------------------------------------------------------------

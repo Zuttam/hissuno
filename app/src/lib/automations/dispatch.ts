@@ -1,0 +1,208 @@
+/**
+ * Automation dispatch orchestrator.
+ *
+ * Single entry point for all three trigger types (manual, scheduled, event).
+ * Creates the run row, builds the per-run workspace + agent, runs the agent,
+ * captures output (or error), and persists status.
+ *
+ * The agent runs asynchronously — `dispatchAutomationRun` returns the run id
+ * once the row is created and the agent is started, without waiting for it
+ * to finish. Callers stream progress via the SSE route or poll the row.
+ */
+
+import { Mastra } from '@mastra/core/mastra'
+import { RequestContext } from '@mastra/core/request-context'
+import { findSkill, listBundledSkills } from './skills'
+import { buildHarnessPrefix } from './harness'
+import { closeRunChannel, publishRunEvent } from './run-bus'
+import { buildWorkspaceForRun } from '@/mastra/workspace/build'
+import { createSkillRunner } from '@/mastra/agents/skill-runner-agent'
+import {
+  appendProgressEvent,
+  createAutomationRun,
+  markAutomationRunFailed,
+  markAutomationRunStarted,
+  markAutomationRunSucceeded,
+  type AutomationRunRow,
+  type ProgressEvent,
+} from '@/lib/db/queries/automation-runs'
+import type { TriggerContext } from './types'
+
+const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
+
+export type DispatchInput = {
+  projectId: string
+  projectName: string
+  skillId: string
+  trigger: TriggerContext
+}
+
+export async function dispatchAutomationRun(
+  input: DispatchInput,
+): Promise<{ run: AutomationRunRow }> {
+  const skill = findSkill(input.skillId)
+  if (!skill) {
+    throw new Error(`Skill not found: ${input.skillId}`)
+  }
+
+  // Validate trigger compatibility with the skill's frontmatter declarations.
+  validateTrigger(skill.id, skill.frontmatter.triggers, input.trigger)
+
+  const run = await createAutomationRun({
+    projectId: input.projectId,
+    skillId: skill.id,
+    skillVersion: skill.frontmatter.version ?? null,
+    skillSource: skill.source,
+    triggerType: input.trigger.type,
+    triggerEntityType: input.trigger.entity?.type ?? null,
+    triggerEntityId: input.trigger.entity?.id ?? null,
+    input: input.trigger.input ?? {},
+  })
+
+  // Fire-and-forget. The route returns immediately; the agent runs in the
+  // background. Errors are captured in the row, not thrown.
+  void executeRun({
+    run,
+    skill,
+    project: { id: input.projectId, name: input.projectName },
+    trigger: input.trigger,
+  })
+
+  return { run }
+}
+
+type ExecuteRunInput = {
+  run: AutomationRunRow
+  skill: ReturnType<typeof findSkill>
+  project: { id: string; name: string }
+  trigger: TriggerContext
+}
+
+async function executeRun(input: ExecuteRunInput): Promise<void> {
+  const { run, skill, project, trigger } = input
+  if (!skill) return
+
+  const startedEvent: ProgressEvent = {
+    ts: new Date().toISOString(),
+    type: 'run-start',
+    message: `Starting ${skill.id}`,
+  }
+
+  await markAutomationRunStarted(run.id)
+  await appendProgressEvent(run.id, startedEvent)
+  publishRunEvent(run.id, startedEvent)
+
+  const timeoutMs = skill.frontmatter.timeoutMs ?? DEFAULT_TIMEOUT_MS
+
+  try {
+    const workspace = await buildWorkspaceForRun({ runId: run.id, skill })
+    const harnessPrefix = buildHarnessPrefix({ skill, trigger, project })
+    const agent = createSkillRunner({
+      runId: run.id,
+      skillId: skill.id,
+      harnessPrefix,
+      workspace,
+    })
+
+    // Register the agent on a one-off Mastra so its workspace lifecycle
+    // (skill discovery, sandbox warm-up) initializes properly.
+    new Mastra({ agents: { runner: agent } })
+
+    const requestContext = new RequestContext()
+    requestContext.set('runId', run.id)
+    requestContext.set('projectId', project.id)
+    requestContext.set('skillId', skill.id)
+
+    const userPrompt = [
+      `Run the skill end-to-end. Load instructions, execute the work, and write your output.`,
+      trigger.entity ? `Entity: ${trigger.entity.type}/${trigger.entity.id}.` : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+    const response = await Promise.race([
+      agent.generate(userPrompt, {
+        requestContext,
+        maxSteps: 25,
+      }),
+      new Promise<never>((_resolve, reject) =>
+        setTimeout(() => reject(new Error(`Run timed out after ${timeoutMs}ms`)), timeoutMs),
+      ),
+    ])
+
+    // Try to read output.json from the workspace filesystem; fall back to
+    // the agent's text output.
+    let output: Record<string, unknown> = {}
+    try {
+      const fs = workspace.filesystem
+      if (fs) {
+        const outputJson = await fs.readFile('output.json')
+        const text =
+          typeof outputJson === 'string'
+            ? outputJson
+            : Buffer.isBuffer(outputJson)
+              ? outputJson.toString('utf8')
+              : ''
+        output = text ? (JSON.parse(text) as Record<string, unknown>) : { text: response.text }
+      } else {
+        output = { text: response.text ?? '' }
+      }
+    } catch {
+      output = { text: response.text ?? '' }
+    }
+
+    const finishEvent: ProgressEvent = {
+      ts: new Date().toISOString(),
+      type: 'run-finish',
+      message: `Finished ${skill.id}`,
+    }
+    await appendProgressEvent(run.id, finishEvent)
+    publishRunEvent(run.id, finishEvent)
+
+    await markAutomationRunSucceeded(run.id, output)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    const stack = err instanceof Error ? err.stack : undefined
+
+    const errorEvent: ProgressEvent = {
+      ts: new Date().toISOString(),
+      type: 'error',
+      message,
+    }
+    await appendProgressEvent(run.id, errorEvent).catch(() => {})
+    publishRunEvent(run.id, errorEvent)
+
+    await markAutomationRunFailed(run.id, { message, stack })
+  } finally {
+    closeRunChannel(run.id)
+  }
+}
+
+function validateTrigger(
+  skillId: string,
+  declared: NonNullable<ReturnType<typeof findSkill>>['frontmatter']['triggers'] | undefined,
+  trigger: TriggerContext,
+): void {
+  if (!declared) {
+    // No declarations means any trigger is allowed (lenient default).
+    return
+  }
+  if (trigger.type === 'manual' && !declared.manual) {
+    throw new Error(`Skill ${skillId} does not support manual triggers.`)
+  }
+  if (trigger.type === 'scheduled' && !declared.scheduled) {
+    throw new Error(`Skill ${skillId} does not support scheduled triggers.`)
+  }
+  if (trigger.type === 'event') {
+    const events = declared.events ?? []
+    if (events.length === 0) {
+      throw new Error(`Skill ${skillId} does not support event triggers.`)
+    }
+  }
+  if (declared.manual?.entity && trigger.type === 'manual' && !trigger.entity) {
+    throw new Error(`Skill ${skillId} requires a ${declared.manual.entity} entity for manual runs.`)
+  }
+}
+
+/** Re-export so consumers don't have to import from skills.ts directly. */
+export { listBundledSkills }
