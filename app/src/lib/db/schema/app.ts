@@ -50,6 +50,11 @@ export const projectSettings = pgTable('project_settings', {
   // AI model configuration (per-project override)
   ai_model: text('ai_model'),
   ai_model_small: text('ai_model_small'),
+  // Automation runner — long-lived project-scoped API key used by skill-runner
+  // sandboxes. One per project, encrypted at rest with AUTOMATION_KEY_ENC_SECRET.
+  // Created on demand by getOrCreateAutomationApiKey.
+  automation_key_id: uuid('automation_key_id'),
+  automation_key_ciphertext: text('automation_key_ciphertext'),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })

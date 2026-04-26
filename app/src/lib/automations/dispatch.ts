@@ -23,7 +23,7 @@ import { buildHarnessPrefix } from './harness'
 import { closeRunChannel, publishRunEvent, subscribeRunCancel } from './run-bus'
 import { buildWorkspaceForRun } from '@/mastra/workspace/build'
 import { createSkillRunner } from '@/mastra/agents/skill-runner-agent'
-import { mintAutomationApiKey, revokeApiKey } from '@/lib/auth/api-keys'
+import { getOrCreateAutomationApiKey } from './api-key'
 import {
   appendProgressEvent,
   createAutomationRun,
@@ -103,22 +103,17 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
 
   const timeoutMs = skill.frontmatter.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
-  // Mint a short-TTL, project-scoped API key so the `hissuno` CLI inside the
-  // sandbox is pre-authenticated. Revoked in the finally block.
-  let apiKeyId: string | null = null
+  // Resolve the project's long-lived automation API key (created on first
+  // use, stored encrypted). Reused across all runs — no per-run mint/revoke
+  // churn. Rotation is a separate admin action.
   try {
-    const minted = await mintAutomationApiKey({
-      projectId: project.id,
-      runId: run.id,
-      ttlMs: Math.min(timeoutMs * 2, 24 * 60 * 60 * 1000),
-    })
-    apiKeyId = minted.keyId
+    const automationKey = await getOrCreateAutomationApiKey(project.id)
 
     const workspace = await buildWorkspaceForRun({
       runId: run.id,
       skill,
       projectId: project.id,
-      apiKey: minted.fullKey,
+      apiKey: automationKey.fullKey,
       entity: trigger.entity ? { type: trigger.entity.type, id: trigger.entity.id } : undefined,
       input: trigger.input,
     })
@@ -227,13 +222,6 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
 
     await markAutomationRunFailed(run.id, { message, stack })
   } finally {
-    if (apiKeyId) {
-      // Best-effort revoke. If the revoke itself fails (e.g., DB hiccup),
-      // the key still naturally expires via its expires_at TTL.
-      revokeApiKey(apiKeyId, project.id).catch((err) => {
-        console.error(`[automation:${run.id}] failed to revoke api key`, err)
-      })
-    }
     closeRunChannel(run.id)
   }
 }
