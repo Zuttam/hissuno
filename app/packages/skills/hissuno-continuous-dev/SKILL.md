@@ -7,10 +7,17 @@ description: >
   Triggers on: next issue, continuous development, dev loop, what to build next,
   pick next task, implement next issue, development queue.
   Requires the hissuno CLI to be configured.
+version: "1.1"
 license: MIT
 metadata:
   author: hissuno
-  version: "1.1"
+triggers:
+  manual: {}
+  scheduled: { cron: '0 9 * * *' }
+capabilities:
+  sandbox: true
+  webSearch: false
+timeoutMs: 5400000
 ---
 
 # Continuous Development
