@@ -8,7 +8,7 @@
  * the final agent output (`output`) and any structured error.
  */
 
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { automationRuns } from '@/lib/db/schema/app'
 
@@ -160,6 +160,30 @@ export async function markAutomationRunCancelled(runId: string): Promise<void> {
       updated_at: now,
     })
     .where(eq(automationRuns.id, runId))
+}
+
+/**
+ * Counts automation_runs for (project, skill) created in the last `windowMs`
+ * milliseconds. Used by the dispatcher to enforce the per-skill daily run
+ * cap (default 50; overridable per skill via frontmatter).
+ */
+export async function countRecentRuns(opts: {
+  projectId: string
+  skillId: string
+  windowMs: number
+}): Promise<number> {
+  const since = new Date(Date.now() - opts.windowMs)
+  const rows = await db
+    .select({ id: automationRuns.id })
+    .from(automationRuns)
+    .where(
+      and(
+        eq(automationRuns.project_id, opts.projectId),
+        eq(automationRuns.skill_id, opts.skillId),
+        gte(automationRuns.created_at, since),
+      ),
+    )
+  return rows.length
 }
 
 /**

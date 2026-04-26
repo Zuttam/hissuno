@@ -27,6 +27,7 @@ import { getOrCreateAutomationApiKey } from './api-key'
 import { isSkillEnabledForProject } from '@/lib/db/queries/project-skill-settings'
 import {
   appendProgressEvent,
+  countRecentRuns,
   createAutomationRun,
   markAutomationRunCancelled,
   markAutomationRunFailed,
@@ -38,6 +39,8 @@ import {
 import type { TriggerContext } from './types'
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
+const DEFAULT_DAILY_RUN_CAP = 50
+const RUN_CAP_WINDOW_MS = 24 * 60 * 60 * 1000
 
 export type DispatchInput = {
   projectId: string
@@ -58,6 +61,21 @@ export async function dispatchAutomationRun(
   // Per-project on/off applies to all trigger types.
   if (!(await isSkillEnabledForProject(input.projectId, skill.id))) {
     throw new Error(`Skill ${skill.id} is disabled for this project.`)
+  }
+
+  // Cost guard: cap the number of runs per (project, skill) in the rolling
+  // 24h window. Defaults to 50; opt in via skill frontmatter for higher
+  // limits on event-driven skills.
+  const cap = skill.frontmatter.dailyRunCap ?? DEFAULT_DAILY_RUN_CAP
+  const recent = await countRecentRuns({
+    projectId: input.projectId,
+    skillId: skill.id,
+    windowMs: RUN_CAP_WINDOW_MS,
+  })
+  if (recent >= cap) {
+    throw new Error(
+      `Skill ${skill.id} hit its daily run cap (${cap}). Wait or raise dailyRunCap in the skill frontmatter.`,
+    )
   }
 
   // Validate trigger compatibility with the skill's frontmatter declarations.
