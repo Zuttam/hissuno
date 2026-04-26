@@ -11,10 +11,9 @@ import { MembersSection } from '@/components/access/members-section'
 import { ApiKeysSection } from '@/components/access/api-keys-section'
 import { TestAgentDialog } from '@/components/projects/test-agent-dialog'
 import { buildSupportChannels } from '@/components/projects/agents/agent-card'
-import { SettingRow, StatusPill, ChannelsMeta } from '@/components/projects/agents/setting-row'
+import { SettingRow, ChannelsMeta } from '@/components/projects/agents/setting-row'
 import { SupportAgentDialog } from '@/components/projects/agents/support-agent-dialog'
 import { ProductCopilotDialog } from '@/components/projects/agents/product-copilot-dialog'
-import { IssueAnalysisDialog } from '@/components/projects/workflows/issue-analysis-dialog'
 import { GraphEvaluationPanel } from '@/components/projects/workflows/graph-evaluation-panel'
 import { DEFAULT_GRAPH_EVAL_CONFIG, type GraphEvaluationConfig } from '@/mastra/workflows/graph-evaluation/config'
 import { ProjectInfoSection } from '@/components/projects/project-info-section'
@@ -27,7 +26,6 @@ import { updateProject } from '@/lib/api/projects'
 import { listPackages } from '@/lib/api/support-packages'
 import {
   getSupportAgentSettings,
-  getIssueAnalysisSettings,
   getGraphEvaluationSettingsClient,
   getAIModelSettingsClient,
   updateAIModelSettingsClient,
@@ -39,8 +37,12 @@ const ONTOLOGY_SECTION_LABELS: Record<(typeof ONTOLOGY_SECTIONS)[number], string
   customers: 'Customers', issues: 'Issues', feedback: 'Feedback', knowledge: 'Knowledge', products: 'Scopes',
 }
 
-const VALID_TABS = ['general', 'access', 'ontology', 'agents-workflows', 'graph-evaluation'] as const
-const LEGACY_TAB_REDIRECTS: Record<string, string> = { customers: 'ontology', feedback: 'ontology' }
+const VALID_TABS = ['general', 'access', 'ontology', 'agents', 'graph-evaluation'] as const
+const LEGACY_TAB_REDIRECTS: Record<string, string> = {
+  customers: 'ontology',
+  feedback: 'ontology',
+  'agents-workflows': 'agents',
+}
 type SettingsTab = (typeof VALID_TABS)[number]
 
 const COMPANY_BUILT_IN_FIELDS: BuiltInField[] = [
@@ -107,11 +109,6 @@ interface AgentSettings {
     sessionGoodbyeDelaySeconds: number
     sessionIdleResponseTimeoutSeconds: number
   }
-  issueAnalysis: {
-    analysisGuidelines: string
-    briefGuidelines: string
-    issueAnalysisEnabled: boolean
-  }
   graphEvaluation: GraphEvaluationConfig
 }
 
@@ -123,11 +120,6 @@ const DEFAULT_SETTINGS: AgentSettings = {
     sessionIdleTimeoutMinutes: 5,
     sessionGoodbyeDelaySeconds: 90,
     sessionIdleResponseTimeoutSeconds: 60,
-  },
-  issueAnalysis: {
-    analysisGuidelines: '',
-    briefGuidelines: '',
-    issueAnalysisEnabled: true,
   },
   graphEvaluation: DEFAULT_GRAPH_EVAL_CONFIG,
 }
@@ -160,7 +152,6 @@ export default function AgentsSettingsPage() {
   const [showSupportDialog, setShowSupportDialog] = useState(false)
   const [showProductCopilotDialog, setShowProductCopilotDialog] = useState(false)
   const [showTestAgent, setShowTestAgent] = useState(false)
-  const [showIssueAnalysisDialog, setShowIssueAnalysisDialog] = useState(false)
 
 
   // --- Agent data ---
@@ -201,9 +192,8 @@ export default function AgentsSettingsPage() {
   const fetchSettings = useCallback(async () => {
     if (!projectId) return
     try {
-      const [supportAgentData, issueAnalysisData, graphEvalData] = await Promise.all([
+      const [supportAgentData, graphEvalData] = await Promise.all([
         getSupportAgentSettings(projectId).catch(() => null),
-        getIssueAnalysisSettings(projectId).catch(() => null),
         getGraphEvaluationSettingsClient(projectId).catch(() => null),
       ])
 
@@ -219,14 +209,6 @@ export default function AgentsSettingsPage() {
             sessionIdleTimeoutMinutes: (s.session_idle_timeout_minutes as number) ?? 5,
             sessionGoodbyeDelaySeconds: (s.session_goodbye_delay_seconds as number) ?? 90,
             sessionIdleResponseTimeoutSeconds: (s.session_idle_response_timeout_seconds as number) ?? 60,
-          }
-        }
-        if (issueAnalysisData?.settings) {
-          const s = issueAnalysisData.settings
-          next.issueAnalysis = {
-            analysisGuidelines: (s.analysis_guidelines as string) ?? '',
-            briefGuidelines: (s.brief_guidelines as string) ?? '',
-            issueAnalysisEnabled: (s.issue_analysis_enabled as boolean) ?? true,
           }
         }
         if (graphEvalData?.config) {
@@ -386,7 +368,7 @@ export default function AgentsSettingsPage() {
           <Tab value="general">General</Tab>
           <Tab value="access">Access</Tab>
           <Tab value="ontology">Ontology</Tab>
-          <Tab value="agents-workflows">Agents & Automations</Tab>
+          <Tab value="agents">Agents</Tab>
           <Tab value="graph-evaluation">Graph Evaluation</Tab>
         </TabsList>
 
@@ -494,8 +476,8 @@ export default function AgentsSettingsPage() {
           </div>
         </TabsPanel>
 
-        {/* Agents & Automations Tab */}
-        <TabsPanel value="agents-workflows">
+        {/* Agents Tab */}
+        <TabsPanel value="agents">
           {/* AI Model Configuration */}
           <div className="mb-8 max-w-2xl">
             <h3 className="mb-4 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
@@ -633,22 +615,6 @@ export default function AgentsSettingsPage() {
                 />
               </div>
             </div>
-
-            <div>
-              <h3 className="mb-3 font-mono text-sm uppercase tracking-wide text-[color:var(--text-secondary)]">
-                Automations
-              </h3>
-              <div className="rounded-md border border-[color:var(--border-subtle)] overflow-hidden">
-                <SettingRow
-                  icon="🎯"
-                  title="Issue Analysis"
-                  description="Scores reach, impact, confidence, effort and generates a brief"
-                  rightMeta={<StatusPill enabled={settings.issueAnalysis.issueAnalysisEnabled} />}
-                  onClick={() => setShowIssueAnalysisDialog(true)}
-                  disabled={!settings.issueAnalysis.issueAnalysisEnabled}
-                />
-              </div>
-            </div>
           </div>
         </TabsPanel>
 
@@ -690,15 +656,6 @@ export default function AgentsSettingsPage() {
         integrationStatuses={integrationStatuses}
       />
 
-      <IssueAnalysisDialog
-        open={showIssueAnalysisDialog}
-        onClose={() => setShowIssueAnalysisDialog(false)}
-        projectId={projectId}
-        analysisGuidelines={settings.issueAnalysis.analysisGuidelines}
-        briefGuidelines={settings.issueAnalysis.briefGuidelines}
-        issueAnalysisEnabled={settings.issueAnalysis.issueAnalysisEnabled}
-        onSaved={handleSettingsSaved}
-      />
       {showTestAgent && (
         <TestAgentDialog
           project={project}
