@@ -76,7 +76,7 @@ export async function GET(
 
         // Live subscription on the in-memory bus, with a fallback poll for the
         // terminal state (so we always eventually close even if no event was
-        // published - e.g., another node ran the dispatch).
+        // published — e.g., another node ran the dispatch).
         const unsubscribe = subscribeRunEvents(runId, (event) => {
           emit(toSSE(event))
         })

@@ -5,15 +5,15 @@
  * local directories during analysis and cleaned up afterward.
  */
 
-import { sourceCodes } from '@/lib/db/schema/app'
+import { codebases } from '@/lib/db/schema/app'
 
-/** Database row type for source_codes table */
-export type CodebaseRecord = typeof sourceCodes.$inferSelect
+/** Database row type for codebases table */
+export type CodebaseRecord = typeof codebases.$inferSelect
 
-/** Insert type for source_codes table */
-export type CodebaseInsert = typeof sourceCodes.$inferInsert
+/** Insert type for codebases table */
+export type CodebaseInsert = typeof codebases.$inferInsert
 
-/** Update type for source_codes table */
+/** Update type for codebases table */
 export type CodebaseUpdate = Partial<CodebaseInsert>
 
 /** Parameters for creating a GitHub codebase reference */

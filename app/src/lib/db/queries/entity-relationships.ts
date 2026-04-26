@@ -30,6 +30,7 @@ export const ENTITY_COLUMNS = {
   issue: entityRelationships.issue_id,
   session: entityRelationships.session_id,
   knowledge_source: entityRelationships.knowledge_source_id,
+  codebase: entityRelationships.codebase_id,
   product_scope: entityRelationships.product_scope_id,
 } as const
 
@@ -156,7 +157,7 @@ export interface RelatedEntitiesResult {
   productScopes: Array<{ id: string; name: string; color: string } & RelationshipInfo>
 }
 
-const RELATED_TYPES: EntityType[] = ['company', 'contact', 'issue', 'session', 'knowledge_source', 'product_scope']
+const RELATED_TYPES: EntityType[] = ['company', 'contact', 'issue', 'session', 'knowledge_source', 'codebase', 'product_scope']
 
 /**
  * Get all relationships for an entity, grouped by type with display-friendly data.
@@ -184,6 +185,7 @@ export async function getRelatedEntitiesWithDetails(
     issue: [],
     session: [],
     knowledge_source: [],
+    codebase: [],
     product_scope: [],
   }
 
@@ -643,6 +645,7 @@ export function columnName(type: EntityType): string {
     issue: 'issue_id',
     session: 'session_id',
     knowledge_source: 'knowledge_source_id',
+    codebase: 'codebase_id',
     product_scope: 'product_scope_id',
   }
   return map[type]

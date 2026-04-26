@@ -1,6 +1,6 @@
 /**
- * GET    /api/automations/custom/[skillId]?projectId=...  - fetch SKILL.md content
- * DELETE /api/automations/custom/[skillId]?projectId=...  - remove the skill
+ * GET    /api/automations/custom/[skillId]?projectId=...  — fetch SKILL.md content
+ * DELETE /api/automations/custom/[skillId]?projectId=...  — remove the skill
  */
 
 import { NextRequest, NextResponse } from 'next/server'

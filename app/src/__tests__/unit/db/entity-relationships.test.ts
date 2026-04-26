@@ -14,6 +14,7 @@ describe('columnName', () => {
     issue: 'issue_id',
     session: 'session_id',
     knowledge_source: 'knowledge_source_id',
+    codebase: 'codebase_id',
     product_scope: 'product_scope_id',
   }
 
@@ -25,15 +26,15 @@ describe('columnName', () => {
 })
 
 describe('ENTITY_COLUMNS', () => {
-  it('has entries for all 6 entity types', () => {
-    const types: EntityType[] = ['company', 'contact', 'issue', 'session', 'knowledge_source', 'product_scope']
+  it('has entries for all 7 entity types', () => {
+    const types: EntityType[] = ['company', 'contact', 'issue', 'session', 'knowledge_source', 'codebase', 'product_scope']
     for (const type of types) {
       expect(ENTITY_COLUMNS).toHaveProperty(type)
       expect(ENTITY_COLUMNS[type]).toBeDefined()
     }
   })
 
-  it('has exactly 6 entries', () => {
-    expect(Object.keys(ENTITY_COLUMNS)).toHaveLength(6)
+  it('has exactly 7 entries', () => {
+    expect(Object.keys(ENTITY_COLUMNS)).toHaveLength(7)
   })
 })

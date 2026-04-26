@@ -6,12 +6,6 @@ import { Command } from 'commander'
 import { formatResourceTypes, renderJson } from '../lib/output.js'
 
 const RESOURCE_TYPE_DEFINITIONS = {
-  knowledge: {
-    description: 'Knowledge sources (codebases, documents, URLs, Notion pages).',
-    filters: [],
-    search: 'Semantic vector search across all knowledge chunks',
-    add: null,
-  },
   feedback: {
     description: 'Customer feedback sessions (conversations from widget, Slack, Intercom, etc.).',
     filters: ['source', 'status', 'tags', 'contact_id', 'search'],
@@ -34,11 +28,23 @@ const RESOURCE_TYPE_DEFINITIONS = {
     },
   },
   scopes: {
-    description: 'Product scopes (product areas, initiatives, and experiments) with goals and hierarchical nesting.',
+    description: 'Product scopes (product areas, initiatives, and experiments) with goals and hierarchical nesting. Reference docs are scope-attached; see `knowledge`.',
     filters: ['type'],
     search: 'Semantic vector search with text fallback',
     add: { required: ['name'], optional: ['slug', 'description', 'type', 'color', 'goals', 'parent_id', 'content'] },
     update: { optional: ['name', 'type', 'description', 'goals', 'parent_id', 'content'] },
+  },
+  knowledge: {
+    description: 'Reference docs (websites, docs portals, Notion pages, uploaded files, raw text) attached to a product scope. Always namespaced by `--scope`.',
+    filters: ['scope'],
+    search: 'Semantic vector search across analyzed content',
+    add: { required: ['scope', 'type'], optional: ['url', 'content', 'name', 'description'] },
+  },
+  codebase: {
+    description: 'Project codebases (GitHub repositories). Cloned and analyzed on demand. Optionally linked to one or more product scopes.',
+    filters: [],
+    search: 'Code-aware retrieval (file listing and content reads via agent tools)',
+    add: { required: ['repo'], optional: ['branch', 'name', 'description', 'analysis_scope', 'scope'] },
   },
 }
 

@@ -21,6 +21,7 @@ const TYPE_LABELS: Record<EntityType, string> = {
   issue: 'Issues',
   session: 'Feedback',
   knowledge_source: 'Knowledge',
+  codebase: 'Codebases',
   product_scope: 'Scopes',
 }
 
@@ -359,6 +360,8 @@ function getGroupItems(
       return relationships.knowledgeSources.map((k) => ({ id: k.id, label: k.name || 'Unnamed', sublabel: k.type, ...extractRelInfo(k) }))
     case 'product_scope':
       return relationships.productScopes.map((p) => ({ id: p.id, label: p.name, ...extractRelInfo(p) }))
+    case 'codebase':
+      return []
   }
 }
 
@@ -373,7 +376,9 @@ function entityLink(projectId: string, type: EntityType, id: string): string {
     case 'session':
       return `/projects/${projectId}/sessions?session=${id}`
     case 'knowledge_source':
-      return `/projects/${projectId}/settings/knowledge`
+      return `/projects/${projectId}/products`
+    case 'codebase':
+      return `/projects/${projectId}/codebases?codebase=${id}`
     case 'product_scope':
       return `/projects/${projectId}/products?scope=${id}`
   }
@@ -520,6 +525,7 @@ const ENTITY_TO_SEARCH_TYPE: Record<EntityType, string> = {
   issue: 'issues',
   session: 'feedback',
   knowledge_source: 'knowledge',
+  codebase: 'codebases',
   product_scope: 'scopes',
 }
 

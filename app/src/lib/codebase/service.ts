@@ -6,8 +6,8 @@
  */
 
 import { db } from '@/lib/db'
-import { sourceCodes } from '@/lib/db/schema/app'
-import { eq, and } from 'drizzle-orm'
+import { codebases } from '@/lib/db/schema/app'
+import { eq } from 'drizzle-orm'
 import { getGitHubInstallationToken, getLatestCommitSha, parseGitHubRepoUrl } from '@/lib/integrations/github'
 import { cloneRepository, pullRepository, cleanupRepository, repositoryExists, getLocalPath, getCurrentCommitSha, GitOperationError } from './git-operations'
 import type { CodebaseRecord } from './types'
@@ -17,19 +17,27 @@ import type { CodebaseRecord } from './types'
  * No file upload needed - just stores the repository URL and branch.
  */
 export async function createGitHubCodebase(params: {
+  projectId: string
   repositoryUrl: string
   repositoryBranch: string
   userId: string
+  name?: string | null
+  description?: string | null
+  analysisScope?: string | null
 }): Promise<{ codebase: CodebaseRecord }> {
-  const { repositoryUrl, repositoryBranch, userId } = params
+  const { projectId, repositoryUrl, repositoryBranch, userId, name, description, analysisScope } = params
 
   const [codebase] = await db
-    .insert(sourceCodes)
+    .insert(codebases)
     .values({
+      project_id: projectId,
       kind: 'github',
       repository_url: repositoryUrl,
       repository_branch: repositoryBranch,
       user_id: userId,
+      name: name ?? null,
+      description: description ?? null,
+      analysis_scope: analysisScope ?? null,
     })
     .returning()
 
@@ -42,50 +50,26 @@ export async function createGitHubCodebase(params: {
 }
 
 /**
- * Deletes a codebase record and cleans up any local clones.
+ * Deletes a codebase record and cleans up any local clones. Authorization
+ * (project access) is enforced by the calling route handler — this function
+ * is the data-layer service.
  */
 export async function deleteCodebase(
   codebaseId: string,
-  userId: string,
   projectId?: string
 ): Promise<void> {
-  // Retrieve the codebase record
-  const [codebase] = await db
-    .select()
-    .from(sourceCodes)
-    .where(
-      and(
-        eq(sourceCodes.id, codebaseId),
-        eq(sourceCodes.user_id, userId)
-      )
-    )
-    .limit(1)
+  const deleted = await db
+    .delete(codebases)
+    .where(eq(codebases.id, codebaseId))
+    .returning({ branch: codebases.repository_branch })
 
-  if (!codebase) {
-    console.error('[codebase.service] Failed to fetch codebase:', codebaseId)
+  if (deleted.length === 0) {
     throw new Error('Codebase not found.')
   }
 
-  // Delete the database record first
-  const deleted = await db
-    .delete(sourceCodes)
-    .where(
-      and(
-        eq(sourceCodes.id, codebaseId),
-        eq(sourceCodes.user_id, userId)
-      )
-    )
-    .returning({ id: sourceCodes.id })
-
-  if (deleted.length === 0) {
-    console.error('[codebase.service] Failed to delete codebase record:', codebaseId)
-    throw new Error('Failed to delete codebase.')
-  }
-
-  // Clean up local clone if exists (best-effort)
-  if (projectId && codebase.repository_branch) {
+  if (projectId && deleted[0].branch) {
     try {
-      await cleanupRepository(projectId, codebase.repository_branch)
+      await cleanupRepository(projectId, deleted[0].branch)
     } catch (error) {
       console.warn('[codebase.service] Failed to cleanup local clone:', error)
     }
@@ -93,21 +77,13 @@ export async function deleteCodebase(
 }
 
 /**
- * Gets a codebase record by ID, ensuring user ownership.
+ * Gets a codebase record by ID. Authorization is enforced by the caller.
  */
-export async function getCodebaseById(
-  codebaseId: string,
-  userId: string
-): Promise<CodebaseRecord | null> {
+export async function getCodebaseById(codebaseId: string): Promise<CodebaseRecord | null> {
   const [data] = await db
     .select()
-    .from(sourceCodes)
-    .where(
-      and(
-        eq(sourceCodes.id, codebaseId),
-        eq(sourceCodes.user_id, userId)
-      )
-    )
+    .from(codebases)
+    .where(eq(codebases.id, codebaseId))
     .limit(1)
 
   return data ?? null
@@ -115,23 +91,17 @@ export async function getCodebaseById(
 
 /**
  * Updates a GitHub codebase record with new repository URL and/or branch.
+ * Authorization is enforced by the caller.
  */
 export async function updateGitHubCodebase(
   codebaseId: string,
-  userId: string,
   updates: { repositoryUrl?: string; repositoryBranch?: string },
   projectId?: string
 ): Promise<CodebaseRecord> {
-  // Get current record to check for branch change
   const [current] = await db
-    .select({ repository_branch: sourceCodes.repository_branch })
-    .from(sourceCodes)
-    .where(
-      and(
-        eq(sourceCodes.id, codebaseId),
-        eq(sourceCodes.user_id, userId)
-      )
-    )
+    .select({ repository_branch: codebases.repository_branch })
+    .from(codebases)
+    .where(eq(codebases.id, codebaseId))
     .limit(1)
 
   const updateData: Record<string, string> = {}
@@ -148,18 +118,12 @@ export async function updateGitHubCodebase(
   }
 
   const [data] = await db
-    .update(sourceCodes)
+    .update(codebases)
     .set(updateData)
-    .where(
-      and(
-        eq(sourceCodes.id, codebaseId),
-        eq(sourceCodes.user_id, userId)
-      )
-    )
+    .where(eq(codebases.id, codebaseId))
     .returning()
 
   if (!data) {
-    console.error('[codebase.service] Failed to update GitHub codebase:', codebaseId)
     throw new Error('Failed to update GitHub codebase.')
   }
 
@@ -184,24 +148,20 @@ export type SyncGitHubCodebaseResult = {
 
 /**
  * Syncs a GitHub codebase by cloning or pulling the repository.
- * Uses native git operations instead of tarball download.
  */
 export async function syncGitHubCodebase(params: {
   codebaseId: string
-  userId: string
   projectId: string
 }): Promise<SyncGitHubCodebaseResult> {
-  const { codebaseId, userId, projectId } = params
+  const { codebaseId, projectId } = params
 
-  // 1. Fetch the source_code record
   const [codebase] = await db
     .select()
-    .from(sourceCodes)
-    .where(eq(sourceCodes.id, codebaseId))
+    .from(codebases)
+    .where(eq(codebases.id, codebaseId))
     .limit(1)
 
   if (!codebase) {
-    console.error('[codebase.sync] Failed to fetch codebase:', codebaseId)
     return { status: 'error', error: 'Codebase not found.' }
   }
 
@@ -213,14 +173,12 @@ export async function syncGitHubCodebase(params: {
     return { status: 'error', error: 'Missing repository URL or branch.' }
   }
 
-  // 2. Get the project's GitHub installation token
   const ghResult = await getGitHubInstallationToken(projectId)
   if (!ghResult) {
     return { status: 'error', error: 'GitHub integration not connected for this project.' }
   }
   const token = ghResult.token
 
-  // 3. Parse repository URL
   const parsed = parseGitHubRepoUrl(codebase.repository_url)
   if (!parsed) {
     return { status: 'error', error: 'Invalid repository URL.' }
@@ -230,17 +188,13 @@ export async function syncGitHubCodebase(params: {
   const branch = codebase.repository_branch
 
   try {
-    // 4. Get the latest commit SHA from remote
     const latestSha = await getLatestCommitSha(token, owner, repo, branch)
-
-    // 5. Check if already cloned and up-to-date
     const exists = await repositoryExists(projectId, branch)
 
     if (exists) {
       const currentSha = await getCurrentCommitSha(projectId, branch)
 
       if (currentSha === latestSha) {
-        console.log('[codebase.sync] Already up to date:', latestSha)
         return {
           status: 'already_up_to_date',
           commitSha: latestSha,
@@ -248,8 +202,6 @@ export async function syncGitHubCodebase(params: {
         }
       }
 
-      // Pull latest changes
-      console.log('[codebase.sync] Pulling latest changes for', owner, repo, branch)
       const pullResult = await pullRepository({
         projectId,
         branch,
@@ -257,14 +209,10 @@ export async function syncGitHubCodebase(params: {
         token,
       })
 
-      // Update database record
       await db
-        .update(sourceCodes)
-        .set({
-          commit_sha: pullResult.commitSha,
-          synced_at: new Date(),
-        })
-        .where(eq(sourceCodes.id, codebaseId))
+        .update(codebases)
+        .set({ commit_sha: pullResult.commitSha, synced_at: new Date() })
+        .where(eq(codebases.id, codebaseId))
 
       return {
         status: 'synced',
@@ -273,8 +221,6 @@ export async function syncGitHubCodebase(params: {
       }
     }
 
-    // 6. Fresh clone
-    console.log('[codebase.sync] Cloning repository', owner, repo, branch)
     const cloneResult = await cloneRepository({
       repositoryUrl: codebase.repository_url,
       branch,
@@ -282,16 +228,11 @@ export async function syncGitHubCodebase(params: {
       token,
     })
 
-    // 7. Update the database record
     await db
-      .update(sourceCodes)
-      .set({
-        commit_sha: cloneResult.commitSha,
-        synced_at: new Date(),
-      })
-      .where(eq(sourceCodes.id, codebaseId))
+      .update(codebases)
+      .set({ commit_sha: cloneResult.commitSha, synced_at: new Date() })
+      .where(eq(codebases.id, codebaseId))
 
-    console.log('[codebase.sync] Cloned successfully:', cloneResult.commitSha)
     return {
       status: 'synced',
       commitSha: cloneResult.commitSha,

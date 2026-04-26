@@ -149,12 +149,16 @@ hissuno list issues --status open --priority high
 hissuno list customers --search "john" --limit 5
 hissuno list customers --customer-type companies --stage active
 hissuno list scopes
+hissuno list knowledge --scope auth
+hissuno list codebases
 ```
 
 **Arguments:**
 | Argument | Description |
 |----------|-------------|
-| `type` | `knowledge`, `feedback`, `issues`, `customers`, `scopes` |
+| `type` | `feedback`, `issues`, `customers`, `scopes`, `knowledge`, `codebases` |
+
+> **Note:** `knowledge` is namespaced under a product scope. `--scope <slug>` is required when listing knowledge.
 
 **Options (feedback):**
 | Option | Description |
@@ -186,6 +190,14 @@ hissuno list scopes
 **Options (scopes):**
 No type-specific filters. Use `--limit` to control result count.
 
+**Options (knowledge):**
+| Option | Description |
+|--------|-------------|
+| `--scope <slug-or-id>` | **Required.** Lists knowledge entries attached to this product scope. |
+
+**Options (codebases):**
+No type-specific filters.
+
 **Common options:**
 | Option | Description |
 |--------|-------------|
@@ -203,12 +215,13 @@ hissuno get feedback def-456 --json
 hissuno get customers ghi-789
 hissuno get customers xyz-456 --customer-type companies
 hissuno get scopes jkl-012
+hissuno get codebase mno-345
 ```
 
 **Arguments:**
 | Argument | Description |
 |----------|-------------|
-| `type` | `knowledge`, `feedback`, `issues`, `customers`, `scopes` |
+| `type` | `feedback`, `issues`, `customers`, `scopes`, `codebase` |
 | `id` | Resource UUID |
 
 **Options:**
@@ -216,7 +229,9 @@ hissuno get scopes jkl-012
 |--------|-------------|
 | `--customer-type <type>` | For `customers` type: `contacts` (default) or `companies` |
 
-The `get` command also fetches and displays all related entities (companies, contacts, issues, feedback sessions, knowledge sources, product scopes) for the requested resource.
+The `get` command also fetches and displays all related entities (companies, contacts, issues, feedback sessions, source documents, codebases, product scopes) for the requested resource.
+
+> **Note:** Individual knowledge entries are accessed through their owning scope - run `hissuno get scopes <id>` to see linked knowledge, or `hissuno list knowledge --scope <slug>`.
 
 ---
 
@@ -238,10 +253,10 @@ hissuno search "payment" --type customers --limit 5 --json
 **Options:**
 | Option | Description |
 |--------|-------------|
-| `--type <type>` | Limit to one type: `knowledge`, `feedback`, `issues`, `customers` |
+| `--type <type>` | Limit to one type: `feedback`, `issues`, `customers`, `scopes`, `knowledge`, `codebase` |
 | `--limit <n>` | Max results (default: 10) |
 
-Note: `scopes` is not searchable via this command. `customers` search covers contacts only (companies don't have semantic search).
+Note: `customers` search covers contacts only (companies don't have semantic search). Pass `--type knowledge` to search the body of scope-attached knowledge content.
 
 ---
 
@@ -255,11 +270,13 @@ hissuno add customers   # Create a contact or company (prompts for sub-type)
 hissuno add customers --customer-type companies  # Create a company directly
 hissuno add feedback    # Log a feedback session
 hissuno add scopes      # Create a product scope with optional goals
+hissuno add knowledge --scope <slug> --type <type>  # Attach a knowledge entry to a scope
+hissuno add codebase --repo <url> --branch <name> [--scope <slug>]  # Connect a GitHub repo
 ```
 
-**Supported types:** `issues`, `customers`, `feedback`, `scopes`
+**Supported types:** `issues`, `customers`, `feedback`, `scopes`, `knowledge`, `codebase`
 
-Knowledge sources cannot be added via CLI (use the Hissuno dashboard).
+> **Note:** `knowledge` is scope-namespaced - `--scope` is required.
 
 **Interactive prompts by type:**
 
@@ -299,6 +316,17 @@ Knowledge sources cannot be added via CLI (use the Hissuno dashboard).
 - Type (product_area / initiative)
 - Description (optional)
 - Goals (optional, loop: enter goal text, empty to finish, max 10)
+
+**knowledge:**
+- Scope (slug or id, required via `--scope`)
+- Type (`website` / `docs_portal` / `uploaded_doc` / `raw_text` / `notion`)
+- Type-specific field (`--url` for website/docs_portal, `--content` for raw_text)
+
+**codebase:**
+- Repository URL (required via `--repo`)
+- Branch (default `main`, override with `--branch`)
+- Optional scope linkage via `--scope <slug>`
+- Optional `--name`, `--description`, `--analysis-scope` (path prefix for monorepos)
 
 ---
 

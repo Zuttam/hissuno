@@ -1,36 +1,39 @@
 ---
 name: hissuno
 description: >
-  Use when working with product intelligence data: searching knowledge, browsing feedback,
-  tracking issues, managing customers (contacts and companies), organizing product scopes,
-  traversing the knowledge graph, or connecting data sources via integrations.
-  Works via the hissuno CLI.
+  Use when working with product intelligence data: browsing feedback, tracking issues,
+  managing customers (contacts and companies), organizing product scopes and their
+  attached source documents, connecting GitHub codebases, traversing the relationship
+  graph, or connecting data sources via integrations. Works via the hissuno CLI.
 license: MIT
 compatibility: Requires network access to Hissuno API endpoint
 metadata:
   author: hissuno
-  version: "2.0"
+  version: "2.1"
 ---
 
 # Hissuno Agent Skill
 
-Hissuno is a unified context layer for product agents. It ingests codebases, docs, and customer signals (from chat widgets, Slack, Intercom, Gong, etc.) into an interconnected knowledge graph - knowledge sources, feedback sessions, product issues, customers (contacts and companies), and product scopes - all linked and traversable.
+Hissuno is a unified context layer for product agents. It ingests customer signals (from chat widgets, Slack, Intercom, Gong, etc.) and reference content into an interconnected graph - feedback sessions, product issues, customers (contacts and companies), product scopes, and codebases - all linked and traversable.
 
 ## Available Data
 
-Hissuno exposes **5 resource types**:
+Hissuno exposes **5 top-level resource types**:
 
 | Type | CLI Type | What It Contains |
 |------|----------|-----------------|
-| **Knowledge** | `knowledge` | Analyzed knowledge sources (codebases, docs, URLs) - searchable via semantic vector search |
 | **Feedback** | `feedback` | Customer feedback sessions - conversations with metadata, tags, and contact links |
 | **Issues** | `issues` | Product issues - bugs, feature requests, and change requests with priority, status, and RICE scores |
 | **Customers** | `customers` | Contacts (people) and companies (organizations) - use `--customer-type` to select |
-| **Product Scopes** | `scopes` | Product areas and initiatives with measurable goals |
+| **Product Scopes** | `scopes` | Product areas and initiatives with measurable goals. |
+| **Knowledge** | `knowledge` | Reference docs (URLs, docs portals, Notion pages, uploaded files, raw text) attached to a product scope. Always namespaced by `--scope`. |
+| **Codebase** | `codebase` | GitHub repositories. First-class entity, optionally linked to one or more scopes. |
+
+Knowledge is **not a top-level resource** - every entry is namespaced by its owning scope. The CLI surface always requires `--scope` (e.g., `hissuno list knowledge --scope auth`); the API path mirrors this as `/api/product-scopes/[scopeId]/knowledge`.
 
 See individual reference files in `references/` for detailed filters, fields, and examples per type.
 
-## The Knowledge Graph
+## The Relationship Graph
 
 All entity types are connected via universal edges. Any entity can link to any other entity. Run `hissuno get <type> <id>` to see all relationships for a resource in a single call. See `references/GRAPH-TRAVERSAL.md` for traversal patterns and multi-step query examples.
 
@@ -81,8 +84,9 @@ Use `search` for semantic (meaning-based) matching. Use `list` when you want to 
 
 ### Investigate a Feature Area
 1. `hissuno list scopes` to find the relevant product scope
-2. `hissuno get scopes <id>` to see related issues, feedback, and knowledge
-3. `hissuno get issues <id>` on specific issues for full details and RICE scores
+2. `hissuno get scopes <id>` to see related issues, feedback, sources, and codebases
+3. `hissuno list knowledge --scope <slug>` to enumerate the scope's reference docs
+4. `hissuno get issues <id>` on specific issues for full details and RICE scores
 
 ### Find Customer Pain Points
 1. `hissuno list feedback --source intercom --status closed` to see recent conversations
@@ -126,11 +130,15 @@ hissuno list issues --status open --priority high # Browse open high-priority is
 hissuno list customers                           # List contacts (default)
 hissuno list customers --customer-type companies # List companies
 hissuno list scopes                              # List product areas and initiatives
+hissuno list knowledge --scope auth              # List knowledge docs attached to a scope
+hissuno list codebases                           # List connected GitHub repositories
 hissuno search "checkout flow"                   # Semantic search across all types
 hissuno get feedback <id>                        # Full session detail + relationships
 hissuno get customers <id>                       # Contact details + company relationship
 hissuno add issues                               # Interactive issue creation
 hissuno add scopes                               # Create a product scope with goals
+hissuno add knowledge --scope auth --type docs_portal --url https://...   # Attach a doc to a scope
+hissuno add codebase --repo git@github.com:org/repo --branch main --scope auth
 hissuno update scopes <id>                       # Modify scope name, type, or goals
 hissuno integrations list                         # List all integration statuses
 hissuno integrations sync intercom               # Sync Intercom conversations

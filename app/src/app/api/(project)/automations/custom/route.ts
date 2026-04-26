@@ -1,6 +1,6 @@
 /**
- * GET  /api/automations/custom?projectId=...   - list project's custom skills
- * POST /api/automations/custom?projectId=...   - upload a new custom skill
+ * GET  /api/automations/custom?projectId=...   — list project's custom skills
+ * POST /api/automations/custom?projectId=...   — upload a new custom skill
  *                                                 (or replace an existing one)
  *
  * The POST body is a JSON object with:
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         name: r.name,
         description: r.description,
         version: r.version,
+        enabled: r.enabled,
         frontmatter: r.frontmatter,
         files: r.files,
         createdAt: r.created_at.toISOString(),

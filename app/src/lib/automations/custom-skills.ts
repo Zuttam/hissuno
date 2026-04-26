@@ -7,7 +7,7 @@
  * - Metadata row in `custom_skills` (Postgres): id, frontmatter snapshot,
  *   blob_path. Used for fast catalog rendering and trigger validation
  *   without round-tripping the blob on every list.
- * - The SKILL.md content itself in blob storage (FileStorageProvider -
+ * - The SKILL.md content itself in blob storage (FileStorageProvider —
  *   `local`, `vercel-blob`, or `s3` per STORAGE_PROVIDER), under
  *   `automations/<projectId>/<skillId>/SKILL.md`.
  *
@@ -159,6 +159,7 @@ export async function saveCustomSkill(input: CustomSkillSaveInput): Promise<Cust
     blob_path: skillPath,
     frontmatter: frontmatter as unknown as Record<string, unknown>,
     files: fileManifest as unknown as Record<string, unknown>,
+    enabled: true,
     created_by_user_id: input.createdByUserId ?? null,
   })
 }

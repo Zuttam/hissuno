@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
-import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/knowledge/codebase'
+import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/codebase'
 import { fireSourceAnalysis } from '@/lib/utils/source-processing'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { ForbiddenError } from '@/lib/auth/authorization'
@@ -10,7 +10,7 @@ import { createProjectSetupNotifications } from '@/lib/notifications/setup-notif
 import type { KnowledgeSourceType, KnowledgeSourceInsert } from '@/lib/knowledge/types'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
-import { projects, projectMembers, knowledgeSources, productScopes } from '@/lib/db/schema/app'
+import { projects, projectMembers, knowledgeSources, productScopes, entityRelationships } from '@/lib/db/schema/app'
 import { eq, and, desc, inArray, ilike } from 'drizzle-orm'
 
 export const runtime = 'nodejs'
@@ -131,31 +131,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `You already have a project named "${name}". Please choose a different name.` }, { status: 409 })
     }
 
-    let codebaseId: string | null = null
-
-    // Create GitHub codebase if provided
-    if (hasGitHubSource) {
-      const { codebase } = await createGitHubCodebase({
-        repositoryUrl,
-        repositoryBranch,
-        userId: identity.userId,
-      })
-      codebaseId = codebase.id
-
-      // Sync (clone) GitHub codebase immediately
-      const syncResult = await syncGitHubCodebase({
-        codebaseId: codebase.id,
-        userId: identity.userId,
-        projectId: id,
-      })
-
-      if (syncResult.status === 'error') {
-        console.warn('[projects.post] GitHub clone failed, but project will still be created:', syncResult.error)
-      } else {
-        console.log('[projects.post] GitHub clone completed:', syncResult.status, syncResult.commitSha)
-      }
-    }
-
     const [createdProject] = await db
       .insert(projects)
       .values({
@@ -179,22 +154,43 @@ export async function POST(request: Request) {
       status: 'active',
     })
 
-    // Create knowledge sources
-    const knowledgeSourcesToInsert: KnowledgeSourceInsert[] = []
-
-    // Auto-create codebase knowledge_source if project has a codebase
-    if (codebaseId) {
-      knowledgeSourcesToInsert.push({
+    // Create default product scope synchronously - knowledge sources need it
+    const [defaultScope] = await db
+      .insert(productScopes)
+      .values({
         project_id: id,
-        type: 'codebase',
-        source_code_id: codebaseId,
-        status: 'pending',
-        analysis_scope: analysisScope,
-        enabled: true,
+        name: 'Default',
+        slug: 'default',
+        description: 'Unclassified knowledge, feedback, and issues',
+        color: 'default',
+        position: 0,
+        is_default: true,
+        type: 'product_area',
       })
+      .returning()
+
+    // Create GitHub codebase if provided (now its own resource, not a knowledge_source)
+    if (hasGitHubSource) {
+      try {
+        const { codebase } = await createGitHubCodebase({
+          projectId: id,
+          repositoryUrl,
+          repositoryBranch,
+          userId: identity.userId,
+          analysisScope,
+        })
+
+        // Clone runs in the background so project creation can return immediately.
+        void syncGitHubCodebase({ codebaseId: codebase.id, projectId: id }).catch((err) =>
+          console.warn('[projects.post] background sync failed:', err),
+        )
+      } catch (codebaseError) {
+        console.warn('[projects.post] Failed to create codebase:', codebaseError)
+      }
     }
 
-    // Add additional knowledge sources (websites, docs, raw_text)
+    // Create additional knowledge sources (websites, docs, raw_text), all linked to default scope
+    const knowledgeSourcesToInsert: KnowledgeSourceInsert[] = []
     for (const source of additionalSources) {
       if (source.type === 'website' || source.type === 'docs_portal') {
         if (source.url) {
@@ -217,19 +213,32 @@ export async function POST(request: Request) {
           })
         }
       }
-      // Note: uploaded_doc type is handled separately via file uploads
     }
 
+    let createdKnowledgeSourceIds: string[] = []
     if (knowledgeSourcesToInsert.length > 0) {
       try {
-        await db
+        const inserted = await db
           .insert(knowledgeSources)
           .values(knowledgeSourcesToInsert)
+          .returning({ id: knowledgeSources.id })
 
-        console.log('[projects.post] Created', knowledgeSourcesToInsert.length, 'knowledge source(s) for project:', id)
+        createdKnowledgeSourceIds = inserted.map((r) => r.id)
+
+        // Link each new source to the default scope via entity_relationships
+        if (defaultScope && createdKnowledgeSourceIds.length > 0) {
+          await db.insert(entityRelationships).values(
+            createdKnowledgeSourceIds.map((sourceId) => ({
+              project_id: id,
+              knowledge_source_id: sourceId,
+              product_scope_id: defaultScope.id,
+            })),
+          )
+        }
+
+        console.log('[projects.post] Created', createdKnowledgeSourceIds.length, 'knowledge source(s) for project:', id)
       } catch (sourcesError) {
         console.warn('[projects.post] Failed to create knowledge sources:', sourcesError)
-        // Don't fail project creation if knowledge source creation fails
       }
     }
 
@@ -237,44 +246,20 @@ export async function POST(request: Request) {
     // compilation now lives behind the `hissuno-support-wiki` automation
     // skill — invoked from the support agent's package settings, not on
     // project create.
-    const hasKnowledgeSources = knowledgeSourcesToInsert.length > 0
-    if (!skipAnalysis && hasKnowledgeSources) {
+    if (!skipAnalysis && createdKnowledgeSourceIds.length > 0) {
       try {
-        const insertedSources = await db
-          .select({ id: knowledgeSources.id })
-          .from(knowledgeSources)
-          .where(eq(knowledgeSources.project_id, id))
-        for (const source of insertedSources) {
-          fireSourceAnalysis(source.id, id)
+        for (const sourceId of createdKnowledgeSourceIds) {
+          fireSourceAnalysis(sourceId, id)
         }
-        console.log('[projects.post] Fired per-source analysis for project:', id, 'count:', insertedSources.length)
+        console.log('[projects.post] Fired per-source analysis for project:', id, 'count:', createdKnowledgeSourceIds.length)
       } catch (analyzeError) {
-        // Don't fail project creation if analysis trigger fails
         console.warn('[projects.post] Error triggering analysis:', analyzeError)
       }
     }
 
-    // Create default product scope (fire-and-forget)
-    void db
-      .insert(productScopes)
-      .values({
-        project_id: id,
-        name: 'Default',
-        slug: 'default',
-        description: 'Unclassified knowledge, feedback, and issues',
-        color: 'default',
-        position: 0,
-        is_default: true,
-        type: 'product_area',
-      })
-      .then(() => {})
-      .catch((scopeError) => {
-        console.warn('[projects.post] Failed to create default product scope:', scopeError)
-      })
-
     // Create setup notifications (fire-and-forget)
     void createProjectSetupNotifications(identity.userId, id, {
-      hasKnowledgeSources: knowledgeSourcesToInsert.length > 0,
+      hasKnowledgeSources: createdKnowledgeSourceIds.length > 0,
     }).catch((err) => console.error('[projects.post] setup notifications error:', err))
 
     return NextResponse.json({ project: createdProject })

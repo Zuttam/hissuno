@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
-import { updateGitHubCodebase, cleanupRepository } from '@/lib/knowledge/codebase'
+import { updateGitHubCodebase, cleanupRepository } from '@/lib/codebase'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
-import { projects, projectMembers, knowledgeSources } from '@/lib/db/schema/app'
+import { projects, projectMembers, codebases } from '@/lib/db/schema/app'
 import { eq, and, ilike, ne } from 'drizzle-orm'
 
 export const runtime = 'nodejs'
@@ -87,8 +87,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (typeof payload.repositoryBranch === 'string') {
     sourceCodeUpdates.repositoryBranch = payload.repositoryBranch.trim()
   }
-  // Note: analysis_scope is now managed via knowledge_sources table, not source_codes
-
   const hasProjectUpdates = Object.keys(projectUpdates).length > 0
   const hasSourceCodeUpdates = Object.keys(sourceCodeUpdates).length > 0
 
@@ -104,7 +102,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, id, { requiredRole: 'owner' })
-    const actingUserId = identity.type === 'user' ? identity.userId : identity.createdByUserId
 
     // Get the current project
     const currentProject = await db.query.projects.findFirst({
@@ -137,29 +134,18 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
     }
 
-    // Update source code if needed - get source_code through codebase knowledge_source
     if (hasSourceCodeUpdates) {
-      const codebaseSource = await db.query.knowledgeSources.findFirst({
-        where: and(
-          eq(knowledgeSources.project_id, id),
-          eq(knowledgeSources.type, 'codebase')
-        ),
-        with: {
-          sourceCode: true,
-        },
-      })
+      const [sourceCode] = await db
+        .select()
+        .from(codebases)
+        .where(eq(codebases.project_id, id))
+        .limit(1)
 
-      const sourceCode = codebaseSource?.sourceCode
       if (sourceCode) {
         const { repositoryUrl, repositoryBranch } = sourceCodeUpdates
 
-        // GitHub-specific updates (url and branch)
         if ((repositoryUrl || repositoryBranch) && sourceCode.kind === 'github') {
-          await updateGitHubCodebase(
-            sourceCode.id,
-            actingUserId,
-            { repositoryUrl, repositoryBranch }
-          )
+          await updateGitHubCodebase(sourceCode.id, { repositoryUrl, repositoryBranch })
         }
       }
     }
@@ -208,28 +194,18 @@ export async function DELETE(_request: Request, context: RouteContext) {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, id, { requiredRole: 'owner' })
 
-    // Get the codebase knowledge_source with source_code to clean up storage
-    const codebaseSource = await db.query.knowledgeSources.findFirst({
-      where: and(
-        eq(knowledgeSources.project_id, id),
-        eq(knowledgeSources.type, 'codebase')
-      ),
-      with: {
-        sourceCode: true,
-      },
-    })
+    const codebaseRows = await db
+      .select({ branch: codebases.repository_branch })
+      .from(codebases)
+      .where(eq(codebases.project_id, id))
 
-    const sourceCode = codebaseSource?.sourceCode
+    await db.delete(projects).where(eq(projects.id, id))
 
-    // Delete the project (cascades to knowledge_sources, source_codes due to FK constraints)
-    await db
-      .delete(projects)
-      .where(eq(projects.id, id))
-
-    // Clean up local clone if exists (best-effort)
-    if (sourceCode?.repository_branch) {
-      await cleanupRepository(id, sourceCode.repository_branch).catch(() => {})
-    }
+    await Promise.all(
+      codebaseRows
+        .filter((row) => row.branch)
+        .map((row) => cleanupRepository(id, row.branch!).catch(() => {})),
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

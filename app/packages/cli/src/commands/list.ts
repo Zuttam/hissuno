@@ -8,17 +8,23 @@ import { apiCall, resolveProjectId, buildPath } from '../lib/api.js'
 import { formatResourceList, formatScopeTree, renderJson, error } from '../lib/output.js'
 import { resolveCustomerType } from '../lib/customer-type.js'
 
+// Resource types where the endpoint is known up-front. `knowledge` is missing
+// here because its endpoint depends on the runtime --scope value; the dispatch
+// in listCommand resolves it explicitly.
 const TYPE_ENDPOINTS: Record<string, { path: string; key: string }> = {
-  knowledge: { path: '/api/knowledge/sources', key: 'sources' },
   feedback: { path: '/api/sessions', key: 'sessions' },
   issues: { path: '/api/issues', key: 'issues' },
   customers: { path: '/api/contacts', key: 'contacts' },
   scopes: { path: '/api/product-scopes', key: 'scopes' },
+  codebases: { path: '/api/codebases', key: 'codebases' },
 }
+
+const SUPPORTED_TYPES = [...Object.keys(TYPE_ENDPOINTS), 'knowledge']
 
 export const listCommand = new Command('list')
   .description('List resources of a given type')
-  .argument('<type>', 'Resource type: knowledge, feedback, issues, customers, scopes')
+  .argument('<type>', 'Resource type: feedback, issues, customers, scopes, codebases, knowledge')
+  .option('--scope <id>', 'Scope ID or slug (required for knowledge)')
   .option('--source <source>', 'Filter feedback by source (widget|slack|intercom|gong|api|manual)')
   .option('--status <status>', 'Filter by status')
   .option('--tags <tags>', 'Filter feedback by tags (comma-separated)')
@@ -36,9 +42,8 @@ export const listCommand = new Command('list')
     const config = requireConfig()
     const jsonMode = cmd.parent?.opts().json
 
-    const validTypes = Object.keys(TYPE_ENDPOINTS)
-    if (!validTypes.includes(type)) {
-      error(`Invalid type "${type}". Must be one of: ${validTypes.join(', ')}`)
+    if (!SUPPORTED_TYPES.includes(type)) {
+      error(`Invalid type "${type}". Must be one of: ${SUPPORTED_TYPES.join(', ')}`)
       process.exit(1)
     }
 
@@ -51,6 +56,12 @@ export const listCommand = new Command('list')
       const customerType = resolveCustomerType(opts.customerType)
       endpoint = { path: `/api/${customerType}`, key: customerType }
       displayType = customerType
+    } else if (type === 'knowledge') {
+      if (!opts.scope) {
+        error('--scope is required when listing knowledge. Knowledge is scoped under a product-scope.')
+        process.exit(1)
+      }
+      endpoint = { path: `/api/product-scopes/${opts.scope}/knowledge`, key: 'sources' }
     } else {
       endpoint = TYPE_ENDPOINTS[type]
     }

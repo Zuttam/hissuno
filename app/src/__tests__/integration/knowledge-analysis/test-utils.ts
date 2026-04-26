@@ -13,8 +13,8 @@ import { mkdir, writeFile, rm } from 'fs/promises'
 import { join } from 'path'
 import { db } from '@/lib/db'
 import { eq, inArray, and, or, ilike, isNotNull, sql, desc, asc, count } from 'drizzle-orm'
-import { projects, knowledgeSources, knowledgeEmbeddings, sourceCodes, compilationRuns } from '@/lib/db/schema/app'
-import { getLocalPath } from '@/lib/knowledge/codebase/git-operations'
+import { projects, knowledgeSources, knowledgeEmbeddings, codebases, compilationRuns } from '@/lib/db/schema/app'
+import { getLocalPath } from '@/lib/codebase/git-operations'
 import type { KnowledgeSourceType } from '@/lib/knowledge/types'
 
 // ============================================================================
@@ -110,17 +110,18 @@ export async function setupTestProject(options: {
 
   let sourceCodeId: string | null = null
 
-  // Create source code entry if requested (GitHub only)
+  // Create codebase entity directly (no longer a knowledge_source)
   if (withSourceCode) {
     const [sourceCode] = await db
-      .insert(sourceCodes)
+      .insert(codebases)
       .values({
+        project_id: project.id,
         user_id: userId,
         kind: 'github',
         repository_url: repositoryUrl,
         repository_branch: repositoryBranch,
       })
-      .returning({ id: sourceCodes.id })
+      .returning({ id: codebases.id })
 
     if (!sourceCode) {
       throw new Error('Failed to create source code entry')
@@ -128,24 +129,6 @@ export async function setupTestProject(options: {
 
     sourceCodeId = sourceCode.id
     testSourceCodeIds.push(sourceCode.id)
-
-    // Create codebase knowledge_source with source_code_id
-    const [codebaseSource] = await db
-      .insert(knowledgeSources)
-      .values({
-        project_id: project.id,
-        type: 'codebase',
-        source_code_id: sourceCode.id,
-        status: 'pending',
-        enabled: true,
-      })
-      .returning({ id: knowledgeSources.id })
-
-    if (!codebaseSource) {
-      throw new Error('Failed to create codebase knowledge source')
-    }
-
-    testSourceIds.push(codebaseSource.id)
   }
 
   return { projectId: project.id, userId, sourceCodeId }
@@ -201,19 +184,11 @@ export async function createKnowledgeSource(
 }
 
 /**
- * Create a codebase knowledge source for a project
+ * @deprecated Codebase is now a first-class entity (source_codes), not a knowledge source.
+ * Tests should create codebases directly via the codebases table.
  */
-export async function createCodebaseSource(
-  projectId: string,
-  options: {
-    analysisScope?: string | null
-    enabled?: boolean
-  } = {}
-): Promise<TestKnowledgeSource> {
-  return createKnowledgeSource(projectId, 'codebase', {
-    analysisScope: options.analysisScope,
-    enabled: options.enabled ?? true,
-  })
+export async function createCodebaseSource(): Promise<never> {
+  throw new Error('createCodebaseSource is removed. Codebase is now a first-class entity in source_codes.')
 }
 
 /**
@@ -433,7 +408,7 @@ export async function cleanupTestData(): Promise<void> {
 
   // Delete source codes
   if (sourceCodeIds.length > 0) {
-    await db.delete(sourceCodes).where(inArray(sourceCodes.id, sourceCodeIds))
+    await db.delete(codebases).where(inArray(codebases.id, sourceCodeIds))
   }
 
   // Delete test projects
@@ -474,30 +449,11 @@ export async function cleanupOrphanedTestData(): Promise<void> {
 
   const projectIds = testProjects.map((p) => p.id)
 
-  // Get source_code_ids from codebase knowledge_sources before deletion
-  const codebaseSources = await db
-    .select({ source_code_id: knowledgeSources.source_code_id })
-    .from(knowledgeSources)
-    .where(
-      and(
-        inArray(knowledgeSources.project_id, projectIds),
-        eq(knowledgeSources.type, 'codebase'),
-        isNotNull(knowledgeSources.source_code_id)
-      )
-    )
-
-  const sourceCodeIds = codebaseSources
-    .map((s) => s.source_code_id)
-    .filter(Boolean) as string[]
-
   // Delete in order respecting foreign keys
   await db.delete(knowledgeSources).where(inArray(knowledgeSources.project_id, projectIds))
   await db.delete(compilationRuns).where(inArray(compilationRuns.project_id, projectIds))
+  await db.delete(codebases).where(inArray(codebases.project_id, projectIds))
   await db.delete(projects).where(inArray(projects.id, projectIds))
-
-  if (sourceCodeIds.length > 0) {
-    await db.delete(sourceCodes).where(inArray(sourceCodes.id, sourceCodeIds))
-  }
 }
 
 /**

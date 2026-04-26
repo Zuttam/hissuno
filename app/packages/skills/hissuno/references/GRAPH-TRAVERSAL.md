@@ -1,6 +1,6 @@
-# Knowledge Graph Traversal
+# Relationship Graph Traversal
 
-Hissuno stores all data in an interconnected knowledge graph. Every entity can link to any other entity via universal edges, enabling rich cross-entity queries.
+Hissuno stores all data in an interconnected relationship graph. Every entity can link to any other entity via universal edges, enabling rich cross-entity queries.
 
 ## Entity Types
 
@@ -10,7 +10,8 @@ Hissuno stores all data in an interconnected knowledge graph. Every entity can l
 | `contact` | `customers` (default) | Individual people |
 | `issue` | `issues` | Bugs, features, change requests |
 | `session` | `feedback` | Feedback conversations |
-| `knowledge_source` | `knowledge` | Codebases, docs, URLs |
+| `knowledge_source` | `knowledge` (scope-namespaced) | Reference docs (URLs, Notion, files, raw text) |
+| `codebase` | `codebase` | GitHub repositories |
 | `product_scope` | `scopes` | Product areas and initiatives |
 
 ## Reading Relationships

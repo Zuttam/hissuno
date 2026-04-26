@@ -21,8 +21,6 @@ import { fireSourceAnalysis } from '@/lib/utils/source-processing'
 import { embedKnowledgeSource } from '@/lib/knowledge/embedding-service'
 import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import { setEntityProductScope } from '@/lib/db/queries/entity-relationships'
-import { prepareCodebaseForWorkflow } from '@/mastra/workflows/common/prepare-codebase'
-import { cleanupCodebaseForWorkflow } from '@/mastra/workflows/common/cleanup-codebase'
 import { generateSourceDescription } from '@/mastra/workflows/common/generate-description'
 import { evaluateEntityRelationships } from '@/mastra/workflows/graph-evaluation'
 
@@ -33,7 +31,7 @@ import { evaluateEntityRelationships } from '@/mastra/workflows/graph-evaluation
 export interface AnalyzeSourceInput {
   projectId: string
   sourceId: string
-  sourceType: 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'codebase' | 'notion'
+  sourceType: 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'notion'
   url: string | null
   storagePath: string | null
   content: string | null
@@ -115,9 +113,6 @@ function countRedactions(content: string): number {
 interface FetchedContent {
   fetchedContent: string
   hasContent: boolean
-  localCodePath: string | null
-  codebaseLeaseId: string | null
-  codebaseCommitSha: string | null
 }
 
 /**
@@ -127,94 +122,13 @@ async function fetchSourceContent(
   input: AnalyzeSourceInput,
   onProgress?: (step: string, message: string) => void
 ): Promise<FetchedContent> {
-  const { projectId, sourceId, sourceType, url, storagePath, content, analysisScope } = input
-  const codebaseDefaults = { localCodePath: null, codebaseLeaseId: null, codebaseCommitSha: null } as const
-  const noContent: FetchedContent = { fetchedContent: '', hasContent: false, ...codebaseDefaults }
+  const { projectId, sourceType, url, content } = input
+  const noContent: FetchedContent = { fetchedContent: '', hasContent: false }
 
   onProgress?.('fetch-content', `Fetching content for ${sourceType} source...`)
 
   try {
     switch (sourceType) {
-      case 'codebase': {
-        const leaseId = `analyze-${sourceId}-${Date.now()}`
-        const codebaseResult = await prepareCodebaseForWorkflow({
-          projectId,
-          runId: leaseId,
-          writer: onProgress
-            ? { write: async (data) => { onProgress('fetch-content', data.message) } }
-            : undefined,
-        })
-
-        if (!codebaseResult.localCodePath) {
-          return {
-            fetchedContent: '',
-            hasContent: false,
-            localCodePath: null,
-            codebaseLeaseId: codebaseResult.codebaseLeaseId,
-            codebaseCommitSha: null,
-          }
-        }
-
-        // Import codebase analyzer agent directly
-        const { codebaseAnalyzerAgent: codebaseAgent = null } = await import('@/mastra/agents/codebase-analyzer-agent').catch(() => ({ codebaseAnalyzerAgent: null as null }))
-
-        if (!codebaseAgent) {
-          return {
-            fetchedContent: '[Codebase analysis skipped: Agent not configured]',
-            hasContent: true,
-            localCodePath: codebaseResult.localCodePath,
-            codebaseLeaseId: codebaseResult.codebaseLeaseId,
-            codebaseCommitSha: codebaseResult.codebaseCommitSha,
-          }
-        }
-
-        const scopeInstruction = analysisScope
-          ? `\n\nIMPORTANT: This is a SCOPED analysis. Focus ONLY on path: "${analysisScope}"`
-          : ''
-
-        const startPath = analysisScope
-          ? `Use prefix "${analysisScope}" when listing files.`
-          : '1. First, list files at the root level to understand project structure'
-
-        const prompt = `Analyze the codebase at local path: ${codebaseResult.localCodePath}${scopeInstruction}
-
-Use your tools to explore and understand this codebase:
-
-${startPath}
-2. Read key configuration files (package.json, README.md, tsconfig.json)
-3. Explore the main source directories (src/, app/, pages/, etc.)
-4. Search for important patterns like API routes, components, and data models
-
-Provide a comprehensive analysis covering:
-- Product Overview: What does this product do?
-- Key Features: Main features and capabilities
-- Technical Architecture: Tech stack and structure
-- API Reference: Any API endpoints found
-- Data Models: Key data structures
-- Common Use Cases: How the product is typically used
-
-Be efficient - focus on the most important files that reveal purpose and architecture.`
-
-        onProgress?.('fetch-content', 'Analyzing codebase with AI agent...')
-
-        const response = await codebaseAgent.generate([{ role: 'user', content: prompt }], {
-          maxSteps: 15,
-          onStepFinish: async ({ toolCalls }) => {
-            if (toolCalls && toolCalls.length > 0) {
-              onProgress?.('fetch-content', `Using ${toolCalls.length} tool(s)...`)
-            }
-          },
-        })
-
-        return {
-          fetchedContent: stripLLMPreamble(response.text) || '[No analysis generated]',
-          hasContent: true,
-          localCodePath: codebaseResult.localCodePath,
-          codebaseLeaseId: codebaseResult.codebaseLeaseId,
-          codebaseCommitSha: codebaseResult.codebaseCommitSha,
-        }
-      }
-
       case 'website': {
         if (!url) return noContent
 
@@ -249,13 +163,12 @@ Please extract:
 
           const agentResponse = await webAgent.generate([{ role: 'user', content: prompt }])
           return {
-            ...codebaseDefaults,
             fetchedContent: stripLLMPreamble(agentResponse.text) || textContent,
             hasContent: true,
           }
         }
 
-        return { ...codebaseDefaults, fetchedContent: textContent, hasContent: true }
+        return { fetchedContent: textContent, hasContent: true }
       }
 
       case 'docs_portal': {
@@ -290,18 +203,16 @@ Please extract and organize:
 
           const agentResponse = await webAgent.generate([{ role: 'user', content: prompt }])
           return {
-            ...codebaseDefaults,
             fetchedContent: stripLLMPreamble(agentResponse.text) || combinedContent,
             hasContent: true,
           }
         }
 
-        return { ...codebaseDefaults, fetchedContent: combinedContent, hasContent: true }
+        return { fetchedContent: combinedContent, hasContent: true }
       }
 
       case 'raw_text': {
         return {
-          ...codebaseDefaults,
           fetchedContent: content || '',
           hasContent: Boolean(content),
         }
@@ -326,16 +237,14 @@ Please extract and organize:
           const markdown = blocksToMarkdown(blocks)
 
           return {
-            ...codebaseDefaults,
             fetchedContent: markdown || '[Empty Notion page]',
             hasContent: Boolean(markdown),
           }
         }
 
         return {
-          ...codebaseDefaults,
-          fetchedContent: `[Uploaded document: ${storagePath}]`,
-          hasContent: Boolean(storagePath),
+          fetchedContent: `[Uploaded document: ${input.storagePath}]`,
+          hasContent: Boolean(input.storagePath),
         }
       }
 
@@ -344,13 +253,12 @@ Please extract and organize:
         const [existingSource] = await db
           .select({ analyzed_content: knowledgeSources.analyzed_content })
           .from(knowledgeSources)
-          .where(eq(knowledgeSources.id, sourceId))
+          .where(eq(knowledgeSources.id, input.sourceId))
           .limit(1)
 
         if (existingSource?.analyzed_content) {
           onProgress?.('fetch-content', 'Using pre-fetched Notion content')
           return {
-            ...codebaseDefaults,
             fetchedContent: existingSource.analyzed_content,
             hasContent: true,
           }
@@ -376,7 +284,6 @@ Please extract and organize:
         const markdown = blocksToMarkdown(blocks)
 
         return {
-          ...codebaseDefaults,
           fetchedContent: markdown || '[Empty Notion page]',
           hasContent: Boolean(markdown),
         }
@@ -387,7 +294,7 @@ Please extract and organize:
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error(`[analyzeSource] Fetch error for source ${sourceId}:`, message)
+    console.error(`[analyzeSource] Fetch error for source ${input.sourceId}:`, message)
     return noContent
   }
 }
@@ -480,11 +387,6 @@ export async function analyzeSource(
         .set({ status: 'failed', error_message: 'No content extracted from source' })
         .where(eq(knowledgeSources.id, sourceId))
 
-      // Cleanup codebase lease if applicable
-      if (fetched.codebaseLeaseId) {
-        await cleanupCodebaseForWorkflow({ codebaseLeaseId: fetched.codebaseLeaseId })
-      }
-
       return { saved: false, chunksEmbedded: 0, relationshipsCreated: 0, errors: ['No content extracted'] }
     }
 
@@ -567,11 +469,6 @@ export async function analyzeSource(
     }
   }
 
-  // Cleanup codebase lease if applicable
-  if (fetched.codebaseLeaseId) {
-    await cleanupCodebaseForWorkflow({ codebaseLeaseId: fetched.codebaseLeaseId })
-  }
-
   // Phase 4: Graph evaluation
   try {
     onProgress?.('trigger-graph-eval', 'Discovering relationships...')
@@ -641,12 +538,16 @@ export interface CreateKnowledgeSourceAdminInput {
   storagePath?: string | null
   notionPageId?: string | null
   analyzedContent?: string | null
-  sourceCodeId?: string | null
   analysisScope?: string | null
   origin?: string | null
   enabled?: boolean
   customFields?: Record<string, unknown> | null
-  productScopeId?: string | null
+  /**
+   * Required: every knowledge source lives under a product scope. The caller
+   * is responsible for resolving which scope (route param, plugin setting,
+   * or project default lookup).
+   */
+  productScopeId: string
   parentId?: string | null
   /** When true, stores content as pending and skips inline embedding/graph-eval.
    *  Use when the source will go through the analysis workflow separately. */
@@ -691,7 +592,6 @@ export async function createKnowledgeSourceAdmin(
       storage_path: input.storagePath ?? null,
       notion_page_id: input.notionPageId ?? null,
       analyzed_content: input.analyzedContent ?? null,
-      source_code_id: input.sourceCodeId ?? null,
       analysis_scope: input.analysisScope ?? null,
       origin: input.origin ?? null,
       custom_fields: input.customFields ?? null,
@@ -702,9 +602,7 @@ export async function createKnowledgeSourceAdmin(
     })
     .returning()
 
-  if (input.productScopeId) {
-    await setEntityProductScope(input.projectId, 'knowledge_source', source.id, input.productScopeId)
-  }
+  await setEntityProductScope(input.projectId, 'knowledge_source', source.id, input.productScopeId)
 
   // Generate embeddings inline when content is available and not skipping
   if (hasContent && !skipProcessing) {
@@ -759,7 +657,6 @@ export async function createKnowledgeSourceBulkAdmin(
         storage_path: s.storagePath ?? null,
         notion_page_id: s.notionPageId ?? null,
         analyzed_content: s.analyzedContent ?? null,
-        source_code_id: s.sourceCodeId ?? null,
         analysis_scope: s.analysisScope ?? null,
         origin: s.origin ?? null,
         status: 'pending' as const,

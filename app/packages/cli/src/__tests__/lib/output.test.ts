@@ -218,10 +218,18 @@ describe('formatSearchResults', () => {
 describe('formatResourceTypes', () => {
   it('includes all resource types', () => {
     const result = formatResourceTypes()
-    expect(result).toContain('knowledge')
     expect(result).toContain('feedback')
     expect(result).toContain('issues')
     expect(result).toContain('customers')
+    expect(result).toContain('scopes')
+    expect(result).toContain('knowledge')
+    expect(result).toContain('codebase')
+  })
+
+  it('marks knowledge as scope-namespaced (not top-level)', () => {
+    const result = formatResourceTypes()
+    expect(result).toContain('--scope')
+    expect(result).toMatch(/list knowledge --scope/)
   })
 
   it('includes filter information', () => {

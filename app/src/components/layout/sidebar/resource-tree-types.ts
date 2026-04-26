@@ -1,4 +1,4 @@
-export type ResourceGroupType = 'issues' | 'feedback' | 'customers' | 'knowledge' | 'scopes'
+export type ResourceGroupType = 'issues' | 'feedback' | 'customers' | 'scopes'
 
 export interface ResourceGroupItem {
   id: string
@@ -20,6 +20,5 @@ export const RESOURCE_GROUPS: { type: ResourceGroupType; label: string; pageHref
   { type: 'issues', label: 'Issues', pageHref: '/projects/[id]/issues' },
   { type: 'feedback', label: 'Feedback', pageHref: '/projects/[id]/sessions' },
   { type: 'customers', label: 'Customers', pageHref: '/projects/[id]/customers' },
-  { type: 'knowledge', label: 'Knowledge', pageHref: '/projects/[id]/knowledge' },
   { type: 'scopes', label: 'Scopes', pageHref: '/projects/[id]/products' },
 ]

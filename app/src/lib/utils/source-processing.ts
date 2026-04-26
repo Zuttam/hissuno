@@ -32,7 +32,7 @@ export function fireSourceAnalysis(sourceId: string, projectId: string) {
       await analyzeSource({
         projectId,
         sourceId,
-        sourceType: src.type as 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'codebase' | 'notion',
+        sourceType: src.type as 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'notion',
         url: src.url,
         storagePath: src.storage_path,
         content: src.content,

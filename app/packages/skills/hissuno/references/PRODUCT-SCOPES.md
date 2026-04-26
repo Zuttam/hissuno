@@ -22,7 +22,7 @@ No filters available. `hissuno list scopes` returns all scopes ordered by positi
 - Name, type (product_area or initiative), description
 - Color, position, is_default flag
 - Goals array: `[{id, text}]`
-- **Relationships** - linked issues, feedback sessions, contacts, companies, knowledge sources
+- **Relationships** - linked issues, feedback sessions, contacts, companies, knowledge, codebases
 
 ## Search
 

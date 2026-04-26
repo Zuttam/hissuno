@@ -22,7 +22,8 @@ function cliTypeToEntityType(type: string, customerType?: string): string {
     companies: 'company',
     contact: 'contact',
     contacts: 'contact',
-    knowledge: 'knowledge_source',
+    codebase: 'codebase',
+    codebases: 'codebase',
     scopes: 'product_scope',
     scope: 'product_scope',
   }
@@ -30,16 +31,16 @@ function cliTypeToEntityType(type: string, customerType?: string): string {
 }
 
 const TYPE_ENDPOINTS: Record<string, { path: (id: string) => string; key: string }> = {
-  knowledge: { path: (id) => `/api/knowledge/sources/${id}`, key: 'source' },
   feedback: { path: (id) => `/api/sessions/${id}`, key: 'session' },
   issues: { path: (id) => `/api/issues/${id}`, key: 'issue' },
   customers: { path: (id) => `/api/contacts/${id}`, key: 'contact' },
   scopes: { path: (id) => `/api/product-scopes/${id}`, key: 'scope' },
+  codebase: { path: (id) => `/api/codebases/${id}`, key: 'codebase' },
 }
 
 export const getCommand = new Command('get')
   .description('Get full details of a specific resource')
-  .argument('<type>', 'Resource type: knowledge, feedback, issues, customers, scopes')
+  .argument('<type>', 'Resource type: feedback, issues, customers, scopes, codebase')
   .argument('<id>', 'Resource ID')
   .option('--customer-type <type>', 'Customer sub-type: contacts (default) or companies')
   .action(async (type, id, opts, cmd) => {
@@ -48,7 +49,11 @@ export const getCommand = new Command('get')
 
     const validTypes = Object.keys(TYPE_ENDPOINTS)
     if (!validTypes.includes(type)) {
-      error(`Invalid type "${type}". Must be one of: ${validTypes.join(', ')}`)
+      if (type === 'knowledge') {
+        error('Knowledge entries are scope-attached and don\'t have a top-level get. Use `hissuno list knowledge --scope <slug>` to find them, or `hissuno get scopes <id>` for the parent scope.')
+      } else {
+        error(`Invalid type "${type}". Must be one of: ${validTypes.join(', ')}`)
+      }
       process.exit(1)
     }
 

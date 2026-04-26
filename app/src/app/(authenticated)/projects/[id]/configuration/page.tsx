@@ -24,7 +24,7 @@ import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
 import { Button, Heading, Spinner, PageHeader } from '@/components/ui'
 import { formatRelativeTime } from '@/lib/utils/format-time'
 import { updateProject } from '@/lib/api/projects'
-import { listPackages } from '@/lib/api/knowledge'
+import { listPackages } from '@/lib/api/support-packages'
 import {
   getSupportAgentSettings,
   getIssueAnalysisSettings,
@@ -110,6 +110,7 @@ interface AgentSettings {
   issueAnalysis: {
     analysisGuidelines: string
     briefGuidelines: string
+    issueAnalysisEnabled: boolean
   }
   graphEvaluation: GraphEvaluationConfig
 }
@@ -126,6 +127,7 @@ const DEFAULT_SETTINGS: AgentSettings = {
   issueAnalysis: {
     analysisGuidelines: '',
     briefGuidelines: '',
+    issueAnalysisEnabled: true,
   },
   graphEvaluation: DEFAULT_GRAPH_EVAL_CONFIG,
 }
@@ -224,6 +226,7 @@ export default function AgentsSettingsPage() {
           next.issueAnalysis = {
             analysisGuidelines: (s.analysis_guidelines as string) ?? '',
             briefGuidelines: (s.brief_guidelines as string) ?? '',
+            issueAnalysisEnabled: (s.issue_analysis_enabled as boolean) ?? true,
           }
         }
         if (graphEvalData?.config) {
@@ -639,8 +642,10 @@ export default function AgentsSettingsPage() {
                 <SettingRow
                   icon="🎯"
                   title="Issue Analysis"
-                  description="Customise the prompts. Toggle the skill on/off in Automations."
+                  description="Scores reach, impact, confidence, effort and generates a brief"
+                  rightMeta={<StatusPill enabled={settings.issueAnalysis.issueAnalysisEnabled} />}
                   onClick={() => setShowIssueAnalysisDialog(true)}
+                  disabled={!settings.issueAnalysis.issueAnalysisEnabled}
                 />
               </div>
             </div>
@@ -691,6 +696,7 @@ export default function AgentsSettingsPage() {
         projectId={projectId}
         analysisGuidelines={settings.issueAnalysis.analysisGuidelines}
         briefGuidelines={settings.issueAnalysis.briefGuidelines}
+        issueAnalysisEnabled={settings.issueAnalysis.issueAnalysisEnabled}
         onSaved={handleSettingsSaved}
       />
       {showTestAgent && (

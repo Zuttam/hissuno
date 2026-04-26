@@ -72,6 +72,7 @@ export async function getBulkGraphData(
     issue: new Set(),
     session: new Set(),
     knowledge_source: new Set(),
+    codebase: new Set(),
     product_scope: new Set(),
   }
 

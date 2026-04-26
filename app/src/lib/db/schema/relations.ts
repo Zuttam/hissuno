@@ -17,7 +17,7 @@ import {
   sessionReviews,
   chatRuns,
   issues,
-  sourceCodes,
+  codebases,
   knowledgeSources,
   knowledgeEmbeddings,
   supportPackages,
@@ -59,6 +59,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   sessions: many(sessions),
   issues: many(issues),
   knowledgeSources: many(knowledgeSources),
+  codebases: many(codebases),
   supportPackages: many(supportPackages),
   widgetIntegration: one(widgetIntegrations, { fields: [projects.id], references: [widgetIntegrations.project_id] }),
   slackWorkspaceToken: one(slackWorkspaceTokens, { fields: [projects.id], references: [slackWorkspaceTokens.project_id] }),
@@ -170,13 +171,13 @@ export const issuesRelations = relations(issues, ({ one, many }) => ({
 // Knowledge
 // ---------------------------------------------------------------------------
 
-export const sourceCodesRelations = relations(sourceCodes, ({ many }) => ({
-  knowledgeSources: many(knowledgeSources),
+export const codebasesRelations = relations(codebases, ({ one, many }) => ({
+  project: one(projects, { fields: [codebases.project_id], references: [projects.id] }),
+  entityRelationships: many(entityRelationships),
 }))
 
 export const knowledgeSourcesRelations = relations(knowledgeSources, ({ one, many }) => ({
   project: one(projects, { fields: [knowledgeSources.project_id], references: [projects.id] }),
-  sourceCode: one(sourceCodes, { fields: [knowledgeSources.source_code_id], references: [sourceCodes.id] }),
   parent: one(knowledgeSources, { fields: [knowledgeSources.parent_id], references: [knowledgeSources.id], relationName: 'parentChild' }),
   children: many(knowledgeSources, { relationName: 'parentChild' }),
   embeddings: many(knowledgeEmbeddings),
@@ -210,6 +211,7 @@ export const entityRelationshipsRelations = relations(entityRelationships, ({ on
   issue: one(issues, { fields: [entityRelationships.issue_id], references: [issues.id] }),
   session: one(sessions, { fields: [entityRelationships.session_id], references: [sessions.id] }),
   knowledgeSource: one(knowledgeSources, { fields: [entityRelationships.knowledge_source_id], references: [knowledgeSources.id] }),
+  codebase: one(codebases, { fields: [entityRelationships.codebase_id], references: [codebases.id] }),
   productScope: one(productScopes, { fields: [entityRelationships.product_scope_id], references: [productScopes.id] }),
 }))
 

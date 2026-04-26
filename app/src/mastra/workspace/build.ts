@@ -36,7 +36,7 @@ export type WorkspaceForRunOptions = {
   /**
    * Per-run, project-scoped API key for the `hissuno` CLI inside the sandbox.
    * Minted by the dispatcher before this factory runs and revoked when the
-   * run completes. Required - the runner does not fall back to global env
+   * run completes. Required — the runner does not fall back to global env
    * (that was the v1 alpha shortcut and got removed).
    */
   apiKey: string

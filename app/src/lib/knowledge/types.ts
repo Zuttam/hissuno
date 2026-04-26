@@ -4,7 +4,6 @@
 
 /** Types of knowledge sources that can be analyzed */
 export type KnowledgeSourceType =
-  | 'codebase'
   | 'website'
   | 'docs_portal'
   | 'uploaded_doc'
@@ -33,12 +32,9 @@ export interface KnowledgeSourceRecord {
   analyzed_at: Date | null
   created_at: Date | null
   updated_at: Date | null
-  /** Optional path prefix to scope codebase analysis (only for codebase type) */
   analysis_scope: string | null
   /** Whether this source is enabled for analysis */
   enabled: boolean
-  /** FK to source_codes - required for type='codebase', null for other types */
-  source_code_id: string | null
   /** Parent source ID for tree nesting (null = root level) */
   parent_id: string | null
   /** User-defined display name for this source */
@@ -74,8 +70,6 @@ export interface KnowledgeSourceInsert {
   updated_at?: Date
   analysis_scope?: string | null
   enabled?: boolean
-  /** FK to source_codes - required for type='codebase', null for other types */
-  source_code_id?: string | null
   parent_id?: string | null
   name?: string | null
   description?: string | null
@@ -103,8 +97,6 @@ export interface KnowledgeSourceUpdate {
   updated_at?: Date
   analysis_scope?: string | null
   enabled?: boolean
-  /** FK to source_codes - required for type='codebase', null for other types */
-  source_code_id?: string | null
   parent_id?: string | null
   name?: string | null
   description?: string | null
@@ -116,22 +108,15 @@ export interface KnowledgeSourceUpdate {
 }
 
 /**
- * Knowledge source with joined source_code data (for codebase type)
+ * Knowledge source with scope linkage (for display)
  */
-export interface KnowledgeSourceWithCodebase extends KnowledgeSourceRecord {
+export interface KnowledgeSourceWithScope extends KnowledgeSourceRecord {
   /** Product scope ID resolved via entity_relationships */
   product_scope_id?: string | null
-  source_code: {
-    id: string
-    kind: string
-    repository_url: string | null
-    repository_branch: string | null
-    commit_sha: string | null
-    synced_at: Date | null
-    created_at: Date | null
-    updated_at: Date | null
-  } | null
 }
+
+/** @deprecated Use KnowledgeSourceWithScope. Codebase is now its own entity. */
+export type KnowledgeSourceWithCodebase = KnowledgeSourceWithScope
 
 // ============================================================================
 // SUPPORT PACKAGES
@@ -204,7 +189,6 @@ export interface CreateKnowledgeSourceInput {
   type: KnowledgeSourceType
   url?: string
   content?: string
-  // For uploaded_doc, file is handled separately via FormData
 }
 
 /**
@@ -240,7 +224,6 @@ export interface PackageCompilationInput {
  */
 export function getSourceTypeLabel(type: KnowledgeSourceType): string {
   const labels: Record<KnowledgeSourceType, string> = {
-    codebase: 'Codebase',
     website: 'Website',
     docs_portal: 'Documentation Portal',
     uploaded_doc: 'Uploaded Document',
@@ -256,10 +239,6 @@ export function getSourceTypeLabel(type: KnowledgeSourceType): string {
  */
 export function getSourceDisplayValue(source: KnowledgeSourceRecord): string {
   switch (source.type) {
-    case 'codebase':
-      return source.analysis_scope
-        ? `Project source code (scope: ${source.analysis_scope})`
-        : 'Project source code'
     case 'website':
     case 'docs_portal':
       return source.url ?? 'No URL'

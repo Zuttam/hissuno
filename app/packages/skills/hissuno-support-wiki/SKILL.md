@@ -75,5 +75,5 @@ EOF
 ## Progress
 
 Call `report_progress` before and after `hissuno compile package`. Suggested
-labels: `inspect`, `compile`, `done`. Keep messages short - one short
+labels: `inspect`, `compile`, `done`. Keep messages short — one short
 sentence each.
