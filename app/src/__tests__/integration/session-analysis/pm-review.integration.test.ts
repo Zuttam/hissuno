@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
-import { RuntimeContext } from '@mastra/core/runtime-context'
+import { RequestContext } from '@mastra/core/request-context'
 
 vi.mock('@/mastra', async (importOriginal) => {
   if (process.env.RUN_INTEGRATION_TESTS === 'true') {
@@ -227,8 +227,8 @@ async function runPMReview(
     throw new Error('Feedback Decision agent not found')
   }
 
-  const runtimeContext = new RuntimeContext()
-  runtimeContext.set('projectId', projectId)
+  const requestContext = new RequestContext()
+  requestContext.set('projectId', projectId)
 
   const prompt = `Analyze session ${sessionId} for actionable feedback.
 
@@ -247,7 +247,7 @@ IMPORTANT:
 - Actually use the tools to perform the actions
 - Report the actions taken and their results`
 
-  const response = await pmAgent.generate(prompt, { runtimeContext })
+  const response = await pmAgent.generate(prompt, { requestContext })
   const text = typeof response.text === 'string' ? response.text : ''
   const parsed = parsePMReviewResponse(text)
 

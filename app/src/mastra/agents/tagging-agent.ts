@@ -23,6 +23,7 @@ export const TAGGING_MODEL: ModelConfig = {
  * - change_request: User requests modification to existing functionality
  */
 export const taggingAgent = new Agent({
+  id: 'tagging-agent',
   name: 'Session Tagging Agent',
   instructions: `
 You analyze support conversations to categorize them with appropriate classification tags.
@@ -95,8 +96,8 @@ Return a JSON object:
 }
 \`\`\`
 `,
-  model: ({ runtimeContext }) => resolveModel(TAGGING_MODEL, runtimeContext),
+  model: ({ requestContext }) => resolveModel(TAGGING_MODEL, requestContext),
   tools: {
     'get-session-context': getSessionContextTool,
   },
-})
+});

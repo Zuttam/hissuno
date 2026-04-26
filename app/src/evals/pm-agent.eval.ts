@@ -10,7 +10,7 @@
  *   npx tsx src/evals/pm-agent.eval.ts --filter=duplicate
  */
 
-import { RuntimeContext } from '@mastra/core/runtime-context'
+import { RequestContext } from '@mastra/core/request-context'
 import { mastra } from '@/mastra'
 import {
   pmEvalDataset,
@@ -173,8 +173,8 @@ async function evaluateTestCase(
 
   try {
     // Create runtime context with project ID
-    const runtimeContext = new RuntimeContext()
-    runtimeContext.set('projectId', projectId)
+    const requestContext = new RequestContext()
+    requestContext.set('projectId', projectId)
 
     // Format the session as a prompt
     const prompt = formatSessionAsPrompt(testCase)
@@ -184,7 +184,7 @@ async function evaluateTestCase(
     }
 
     // Run the PM agent
-    const response = await pmAgent.generate(prompt, { runtimeContext })
+    const response = await pmAgent.generate(prompt, { requestContext })
     const responseText = typeof response.text === 'string' ? response.text : ''
 
     if (verbose) {

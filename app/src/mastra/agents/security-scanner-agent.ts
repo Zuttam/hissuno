@@ -14,6 +14,7 @@ export const SECURITY_SCANNER_MODEL: ModelConfig = {
  * knowledge packages before they are saved and exposed to support agents.
  */
 export const securityScannerAgent = new Agent({
+  id: 'security-scanner-agent',
   name: 'Security Scanner',
   instructions: `
 You are a security specialist responsible for detecting and redacting sensitive information from documentation and knowledge content.
@@ -103,5 +104,5 @@ Return the content in the same structure, with:
 - Preserve code examples by replacing only the sensitive values
 - Keep descriptions and explanations intact
 `,
-  model: ({ runtimeContext }) => resolveModel(SECURITY_SCANNER_MODEL, runtimeContext),
-})
+  model: ({ requestContext }) => resolveModel(SECURITY_SCANNER_MODEL, requestContext),
+});

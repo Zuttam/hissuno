@@ -170,7 +170,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           console.log(`${LOG_PREFIX} Found workflow input with ${(workflowInput.sources ?? []).length} source(s), creating run...`)
 
           // Create a new run and execute the workflow
-          const run = await workflow.createRunAsync({ runId })
+          const run = await workflow.createRun({ runId })
           console.log(`${LOG_PREFIX} Run created, starting stream...`)
 
           // Execute the workflow with stream

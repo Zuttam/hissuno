@@ -64,6 +64,7 @@ export async function generateSessionNameFromMessages(
 
   try {
     const nameAgent = new Agent({
+      id: 'session-name-generator',
       name: 'Session Name Generator',
       instructions: `You generate concise, descriptive titles for support conversations.
 Rules:
@@ -74,7 +75,7 @@ Rules:
 - No quotes, no punctuation at the end
 - If the conversation is unclear, output a generic title like "General inquiry"`,
       model: resolveModel({ name: 'session-name', tier: 'small', fallback: 'openai/gpt-5.4-mini' }),
-    })
+    });
     const response = await nameAgent.generate(
       `Generate a short title for this customer conversation:\n\n${truncatedText}`,
     )

@@ -47,8 +47,8 @@ Returns a summary of each issue including name, type, priority, status, and link
     total: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId } = getDataContext(requestContext)
     if (!projectId) {
       return { issues: [], total: 0, error: NO_PROJECT_ERROR }
     }
@@ -157,8 +157,8 @@ Use this after list-issues to drill into a specific issue.`,
     found: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId } = getDataContext(requestContext)
     if (!projectId) {
       return { issue: null, found: false, error: NO_PROJECT_ERROR }
     }
@@ -274,8 +274,8 @@ Use this to browse customer conversations with optional filters.`,
     total: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId } = getDataContext(requestContext)
     if (!projectId) {
       return { sessions: [], total: 0, error: NO_PROJECT_ERROR }
     }
@@ -382,8 +382,8 @@ Use this after list-feedback to read the conversation.`,
     found: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId } = getDataContext(requestContext)
     if (!projectId) {
       return { session: null, found: false, error: NO_PROJECT_ERROR }
     }
@@ -479,8 +479,8 @@ Use this to find customers, understand who is reporting issues, or identify cham
     total: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId } = getDataContext(requestContext)
     if (!projectId) {
       return { contacts: [], total: 0, error: NO_PROJECT_ERROR }
     }
@@ -594,8 +594,8 @@ Use this after list-contacts to drill into a specific contact.`,
     found: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId } = getDataContext(requestContext)
     if (!projectId) {
       return { contact: null, found: false, error: NO_PROJECT_ERROR }
     }

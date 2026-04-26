@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: re-enable after migrating tool execute signature/scorer typing to Mastra v1
 /**
  * Duplicate Detection Scorer
  *
@@ -34,6 +35,7 @@ export interface DuplicateScorerOutput {
  * - Returns 1.0 if correctly found/not found existing issue
  * - Returns 0.0 if missed duplicate or false positive
  */
+/* FIXME(mastra): Add a unique `id` parameter. See: https://mastra.ai/guides/migrations/upgrade-to-v1/mastra#required-id-parameter-for-all-mastra-primitives */
 export const duplicateDetectionScorer = createScorer<
   DuplicateScorerInput,
   DuplicateScorerOutput
@@ -121,7 +123,7 @@ export const duplicateDetectionScorer = createScorer<
       default:
         return `[${testCaseId}] ${testCaseName}: Unknown outcome`
     }
-  })
+  });
 
 /**
  * Helper function to run duplicate scorer on a single test case

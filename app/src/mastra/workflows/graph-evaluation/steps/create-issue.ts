@@ -248,13 +248,14 @@ For CREATE (one or more issues):
 
   const aiSettings = await getAIModelSettingsAdmin(input.projectId)
   const issuePolicyAgent = new Agent({
+    id: 'issue-creation-policy',
     name: 'Issue Creation Policy',
     instructions: 'You decide whether to create new issues, link to existing ones, or skip, based on customer feedback analysis.',
     model: resolveModel(
       { name: 'issue-policy', tier: 'default', fallback: 'openai/gpt-5' },
       aiSettings,
     ),
-  })
+  });
   const response = await issuePolicyAgent.generate(prompt)
 
   // Parse the response

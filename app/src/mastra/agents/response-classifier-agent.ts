@@ -17,6 +17,7 @@ export const RESPONSE_CLASSIFIER_MODEL: ModelConfig = {
  * should respond to a message in a subscribed thread.
  */
 export const responseClassifierAgent = new Agent({
+  id: 'response-classifier-agent',
   name: 'Response Classifier Agent',
   instructions: `
 You analyze messages in support threads to determine if they are directed at the support bot and expect a response.
@@ -68,6 +69,6 @@ Message: "I'll take it from here, thanks Hissuno"
 Response: SKIP
 Human is taking over the conversation.
 `,
-  model: ({ runtimeContext }) => resolveModel(RESPONSE_CLASSIFIER_MODEL, runtimeContext),
+  model: ({ requestContext }) => resolveModel(RESPONSE_CLASSIFIER_MODEL, requestContext),
   tools: {},
-})
+});

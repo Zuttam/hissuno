@@ -25,6 +25,7 @@ const briefWriterTools = [
 ]
 
 export const briefWriterAgent = new Agent({
+  id: 'brief-writer-agent',
   name: 'Brief Writer Agent',
   instructions: `
 You are a Technical Product Manager specializing in writing product briefs.
@@ -120,6 +121,6 @@ Use \`save-brief\` to store the completed brief.
 - Action-oriented
 - Evidence-based
 `,
-  model: ({ runtimeContext }) => resolveModel(BRIEF_WRITER_MODEL, runtimeContext),
+  model: ({ requestContext }) => resolveModel(BRIEF_WRITER_MODEL, requestContext),
   tools: Object.fromEntries(briefWriterTools.map((tool) => [tool.id, tool])),
-})
+});

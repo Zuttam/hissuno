@@ -11,14 +11,14 @@ export interface DataContext {
 }
 
 /**
- * Extract projectId and contactId from runtimeContext with validation.
+ * Extract projectId and contactId from requestContext with validation.
  * Same pattern as getContextFromRuntime() in analysis-knowledge-tools.ts.
  */
-export function getDataContext(runtimeContext: unknown): DataContext {
-  if (!runtimeContext || typeof runtimeContext !== 'object') {
+export function getDataContext(requestContext: unknown): DataContext {
+  if (!requestContext || typeof requestContext !== 'object') {
     return { projectId: null, contactId: null }
   }
-  const ctx = runtimeContext as { get?: (key: string) => unknown }
+  const ctx = requestContext as { get?: (key: string) => unknown }
   if (typeof ctx.get !== 'function') {
     return { projectId: null, contactId: null }
   }

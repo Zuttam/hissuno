@@ -52,7 +52,7 @@ Use this to retrieve the conversation history before analyzing a session.`,
     found: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { sessionId } = context
 
     try {
@@ -178,7 +178,7 @@ Returns ranked list with similarity scores (0.7+ is a definitive match).`,
     hasSimilar: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { projectId, name, description, type, includeClosed = false } = context
 
     try {

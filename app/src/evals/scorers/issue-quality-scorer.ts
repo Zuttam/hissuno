@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: re-enable after migrating tool execute signature/scorer typing to Mastra v1
 /**
  * Issue Quality Scorer
  *
@@ -42,6 +43,7 @@ export interface IssueQualityScorerOutput {
  * - User quote inclusion
  * - Priority appropriateness
  */
+/* FIXME(mastra): Add a unique `id` parameter. See: https://mastra.ai/guides/migrations/upgrade-to-v1/mastra#required-id-parameter-for-all-mastra-primitives */
 export const issueQualityScorer = createScorer<
   IssueQualityScorerInput,
   IssueQualityScorerOutput
@@ -198,7 +200,7 @@ Return your evaluation as JSON.`
     const status = score >= 0.7 ? 'GOOD' : score >= 0.4 ? 'FAIR' : 'POOR'
 
     return `[${testCaseId}] ${testCaseName}: ${status} (${score.toFixed(2)}) - ${analysis.feedback}`
-  })
+  });
 
 /**
  * Helper function to run issue quality scorer on a single test case

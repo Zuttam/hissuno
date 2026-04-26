@@ -82,13 +82,14 @@ export async function enrichRelationshipContext(
   try {
     const aiSettings = projectId ? await getAIModelSettingsAdmin(projectId) : null
     const enrichAgent = new Agent({
+      id: 'graph-context-enricher',
       name: 'Graph Context Enricher',
       instructions: 'You write concise, substantive context summaries for entity relationships in a product knowledge graph.',
       model: resolveModel(
         { name: 'graph-context-enricher', tier: 'small', fallback: 'openai/gpt-5.4-mini' },
         aiSettings,
       ),
-    })
+    });
 
     const { object } = await enrichAgent.generate(
       `You are analyzing a product knowledge graph for a B2B SaaS product team. A ${ENTITY_TYPE_LABELS[sourceEntityType] ?? sourceEntityType} was connected to the entities below during automatic relationship discovery.
@@ -106,7 +107,7 @@ ${sourceContentSnippet.slice(0, 2000)}
 
 Connected entities:
 ${matchDescriptions}`,
-      { output: ENRICH_SCHEMA },
+      { structuredOutput: { schema: ENRICH_SCHEMA } },
     )
 
     for (const item of object.contexts) {

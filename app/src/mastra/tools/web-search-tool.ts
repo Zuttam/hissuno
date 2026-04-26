@@ -42,7 +42,7 @@ Returns search results with titles, URLs, content snippets, and relevance scores
     searchQuery: z.string(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { query, searchDepth = 'basic', maxResults = 5 } = context
 
     const tavilyApiKey = process.env.TAVILY_API_KEY

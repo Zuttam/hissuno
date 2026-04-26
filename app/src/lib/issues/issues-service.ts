@@ -91,7 +91,7 @@ function maybeFireIssueAnalysis(issueId: string, projectId: string): void {
       const workflow = mastra.getWorkflow('issueAnalysisWorkflow')
       if (!workflow) return
 
-      const run = await workflow.createRunAsync({ runId: result.runId })
+      const run = await workflow.createRun({ runId: result.runId })
       void run.start({ inputData: { issueId, projectId, runId: result.runId } })
     } catch {
       // Non-blocking

@@ -14,6 +14,7 @@ export const WEB_SCRAPER_MODEL: ModelConfig = {
  * Navigates pages, extracts content, and summarizes it for the support agent.
  */
 export const webScraperAgent = new Agent({
+  id: 'web-scraper-agent',
   name: 'Web Scraper',
   instructions: `
 You are a web content analyst specialized in extracting product and company information from websites.
@@ -105,5 +106,5 @@ Bullet points of essential links and resources.
 - Be thorough but concise
 - If pages are inaccessible, note which ones
 `,
-  model: ({ runtimeContext }) => resolveModel(WEB_SCRAPER_MODEL, runtimeContext),
-})
+  model: ({ requestContext }) => resolveModel(WEB_SCRAPER_MODEL, requestContext),
+});

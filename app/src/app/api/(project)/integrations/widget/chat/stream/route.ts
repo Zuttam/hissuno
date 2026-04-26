@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type { ModelMessage } from 'ai'
-import { RuntimeContext } from '@mastra/core/runtime-context'
+import { RequestContext } from '@mastra/core/request-context'
 import { getProjectById } from '@/lib/projects/keys'
 import { db } from '@/lib/db'
 import { chatRuns as chatRunsTable, sessions as sessionsTable, projectSettings } from '@/lib/db/schema/app'
@@ -138,13 +138,13 @@ export async function GET(request: NextRequest) {
         })
 
         // Build runtime context
-        const runtimeContext = new RuntimeContext<SupportAgentContext>()
-        runtimeContext.set('projectId', projectId)
-        runtimeContext.set('userId', (metadata?.userId as string) || null)
-        runtimeContext.set('userMetadata', (metadata?.userMetadata as Record<string, string>) || null)
-        runtimeContext.set('sessionId', sessionId)
-        runtimeContext.set('supportPackageId', supportPackageId)
-        runtimeContext.set('contactId', widgetContactId)
+        const requestContext = new RequestContext<SupportAgentContext>()
+        requestContext.set('projectId', projectId)
+        requestContext.set('userId', (metadata?.userId as string) || null)
+        requestContext.set('userMetadata', (metadata?.userMetadata as Record<string, string>) || null)
+        requestContext.set('sessionId', sessionId)
+        requestContext.set('supportPackageId', supportPackageId)
+        requestContext.set('contactId', widgetContactId)
 
         // Convert messages to ModelMessage format, with knowledge injected as system messages
         const mastraMessages: ModelMessage[] = [
@@ -170,7 +170,7 @@ export async function GET(request: NextRequest) {
 
         // Stream the response — tools are baked into the agent
         const agentStream = await agent.stream(mastraMessages, {
-          runtimeContext,
+          requestContext,
           memory: {
             thread: sessionId,
             resource: (metadata?.userId as string) || 'anonymous',
@@ -298,7 +298,7 @@ export async function GET(request: NextRequest) {
         close()
       }
     },
-  })
+  });
 }
 
 // Handle OPTIONS for CORS preflight

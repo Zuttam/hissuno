@@ -143,7 +143,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         try {
           // Create a new workflow run
           console.log(`${LOG_PREFIX} Creating workflow run with runId:`, runId)
-          const run = await workflow.createRunAsync({ runId })
+          const run = await workflow.createRun({ runId })
 
           // Load PM agent settings for analysis guidelines
           const pmSettings = await getPmAgentSettingsAdmin(projectId)

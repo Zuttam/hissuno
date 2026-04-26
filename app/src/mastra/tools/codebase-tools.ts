@@ -99,7 +99,7 @@ Returns file paths, sizes, and whether each item is a file or directory.`,
     totalCount: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { localPath, prefix = '', recursive = false } = context
 
     try {
@@ -139,7 +139,7 @@ Returns the file content as text. Only works with text-based files.`,
     size: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { localPath, filePath } = context
 
     try {
@@ -193,7 +193,7 @@ Optionally filter by file extensions. Returns matching files with context snippe
     filesSearched: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { localPath, pattern, fileExtensions, maxResults = 20 } = context
 
     try {

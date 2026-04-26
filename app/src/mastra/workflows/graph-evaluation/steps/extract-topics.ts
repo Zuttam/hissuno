@@ -44,17 +44,18 @@ export async function extractTopics(
 
     const aiSettings = projectId ? await getAIModelSettingsAdmin(projectId) : null
     const topicAgent = new Agent({
+      id: 'graph-topic-extractor',
       name: 'Graph Topic Extractor',
       instructions: 'You extract key topics/keywords from entity content for graph relationship discovery.',
       model: resolveModel(
         { name: 'graph-topic-extractor', tier: 'small', fallback: 'openai/gpt-5.4-mini' },
         aiSettings,
       ),
-    })
+    });
 
     const { object } = await topicAgent.generate(
       `Extract 3-5 key topics or keywords from this ${entityLabel} content that would help find related customer conversations, issues, and product areas.${guidelinesPrompt}\n\nContent (first 3000 chars):\n${contentForSearch}`,
-      { output: TOPICS_SCHEMA },
+      { structuredOutput: { schema: TOPICS_SCHEMA } },
     )
 
     topics = object.topics.slice(0, 5)

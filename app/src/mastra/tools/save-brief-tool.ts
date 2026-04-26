@@ -23,7 +23,7 @@ Call this after generating the brief content.`,
     success: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
+  execute: async (context) => {
     const { issueId, brief } = context
 
     try {

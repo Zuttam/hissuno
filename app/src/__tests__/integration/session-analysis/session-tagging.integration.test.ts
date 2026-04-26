@@ -14,7 +14,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
-import { RuntimeContext } from '@mastra/core/runtime-context'
+import { RequestContext } from '@mastra/core/request-context'
 
 vi.mock('@/mastra', async (importOriginal) => {
   if (process.env.RUN_INTEGRATION_TESTS === 'true') {
@@ -83,8 +83,8 @@ async function runTaggingAgentOnTestCase(
     throw new Error('Tagging agent not found')
   }
 
-  const runtimeContext = new RuntimeContext()
-  runtimeContext.set('projectId', testProjectId)
+  const requestContext = new RequestContext()
+  requestContext.set('projectId', testProjectId)
 
   // Format session as prompt
   const messages = testCase.session.messages
@@ -120,7 +120,7 @@ Return a JSON object with:
   "reasoning": "Brief explanation of why each tag was applied"
 }`
 
-  const response = await taggingAgent.generate(prompt, { runtimeContext })
+  const response = await taggingAgent.generate(prompt, { requestContext })
   const responseText = typeof response.text === 'string' ? response.text : ''
   const parsed = parseSessionTaggingResponse(responseText)
 

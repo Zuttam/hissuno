@@ -288,8 +288,8 @@ export async function processSession(
   // ---- Step 1: Classify ----
   try {
     const { taggingAgent } = await import('@/mastra/agents/tagging-agent')
-    const { RuntimeContext } = await import('@mastra/core/runtime-context')
-    const ctx = new RuntimeContext()
+    const { RequestContext } = await import('@mastra/core/request-context')
+    const ctx = new RequestContext()
     ctx.set('projectId', projectId)
 
     const prompt = `Analyze session ${sessionId} and classify it with appropriate tags.
@@ -322,7 +322,7 @@ Return a JSON object with:
   "reasoning": "Brief explanation of why each tag was applied"
 }`
 
-    const response = await taggingAgent.generate(prompt, { runtimeContext: ctx })
+    const response = await taggingAgent.generate(prompt, { requestContext: ctx })
 
     const text = typeof response.text === 'string' ? response.text : ''
     const validTags = new Set<string>(SESSION_TAGS)
@@ -391,13 +391,14 @@ Return a JSON object with:
 
       const aiSettings = await getAIModelSettingsAdmin(projectId)
       const summarizerAgent = new Agent({
+        id: 'session-summarizer',
         name: 'Session Summarizer',
         instructions: 'You summarize customer feedback conversations into concise structured output.',
         model: resolveModel(
           { name: 'session-summarizer', tier: 'small', fallback: 'openai/gpt-5.4-mini' },
           aiSettings,
         ),
-      })
+      });
       const { object } = await summarizerAgent.generate(
         `You are summarizing a customer feedback conversation tagged as [${tagsStr}].
 
@@ -406,10 +407,12 @@ ${conversationText}
 
 Generate a concise title (max 8 words) and a 2-3 sentence description summarizing this feedback. Focus on what the customer reported or requested, include key context, and note severity/impact if apparent.`,
         {
-          output: z.object({
-            title: z.string().describe('Concise title, max 8 words, capturing the core feedback topic'),
-            description: z.string().describe('2-3 sentence summary: what was reported/requested, key context, severity if apparent'),
-          }),
+          structuredOutput: {
+            schema: z.object({
+              title: z.string().describe('Concise title, max 8 words, capturing the core feedback topic'),
+              description: z.string().describe('2-3 sentence summary: what was reported/requested, key context, severity if apparent'),
+            }),
+          },
         }
       )
 

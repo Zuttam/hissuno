@@ -14,9 +14,9 @@ import { eq, and, desc, isNotNull, inArray } from 'drizzle-orm'
 import { knowledgeSources, productScopes, entityRelationships } from '@/lib/db/schema/app'
 import { searchKnowledgeBySourceIds } from '@/lib/knowledge/embedding-service'
 
-function getProjectId(runtimeContext: unknown): string | null {
-  if (!runtimeContext || typeof runtimeContext !== 'object') return null
-  const ctx = runtimeContext as { get?: (key: string) => unknown }
+function getProjectId(requestContext: unknown): string | null {
+  if (!requestContext || typeof requestContext !== 'object') return null
+  const ctx = requestContext as { get?: (key: string) => unknown }
   if (typeof ctx.get !== 'function') return null
   const projectId = ctx.get('projectId')
   return typeof projectId === 'string' ? projectId : null
@@ -48,8 +48,8 @@ The project is automatically determined from context.`,
     ),
     error: z.string().optional(),
   }),
-  execute: async ({ runtimeContext }) => {
-    const projectId = getProjectId(runtimeContext)
+  execute: async (_, { requestContext }) => {
+    const projectId = getProjectId(requestContext)
     if (!projectId) {
       return { items: [], error: 'Project context not available.' }
     }
@@ -178,8 +178,8 @@ Returns the complete analyzed markdown content.`,
     found: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const projectId = getProjectId(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const projectId = getProjectId(requestContext)
     if (!projectId) {
       return { content: '', found: false, error: 'Project context not available.' }
     }
@@ -243,8 +243,8 @@ Use this when you need source metadata rather than analyzed content.`,
     found: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const projectId = getProjectId(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const projectId = getProjectId(requestContext)
     if (!projectId) {
       return { source: null, found: false, error: 'Project context not available.' }
     }
@@ -353,9 +353,9 @@ The project is automatically determined from context.`,
     totalResults: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
+  execute: async (context, { requestContext }) => {
     const { query, limit = 5 } = context
-    const projectId = getProjectId(runtimeContext)
+    const projectId = getProjectId(requestContext)
 
     if (!projectId) {
       return { results: [], totalResults: 0, error: 'Project context not available.' }

@@ -4,7 +4,7 @@
  */
 
 import type { ModelMessage } from 'ai'
-import { RuntimeContext } from '@mastra/core/runtime-context'
+import { RequestContext } from '@mastra/core/request-context'
 import { db } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { slackThreadSessions, projectSettings } from '@/lib/db/schema/app'
@@ -461,14 +461,14 @@ async function executeAgentSync(params: {
     })
 
     // Build runtime context
-    const runtimeContext = new RuntimeContext<SupportAgentContext>()
-    runtimeContext.set('projectId', projectId)
-    runtimeContext.set('userId', userId)
-    runtimeContext.set('userMetadata', userMetadata)
-    runtimeContext.set('sessionId', sessionId)
-    runtimeContext.set('supportPackageId', supportPackageId)
+    const requestContext = new RequestContext<SupportAgentContext>()
+    requestContext.set('projectId', projectId)
+    requestContext.set('userId', userId)
+    requestContext.set('userMetadata', userMetadata)
+    requestContext.set('sessionId', sessionId)
+    requestContext.set('supportPackageId', supportPackageId)
 
-    runtimeContext.set('contactId', contactId)
+    requestContext.set('contactId', contactId)
 
     // Convert messages to ModelMessage format, with knowledge prepended
     const mastraMessages: ModelMessage[] = [
@@ -481,7 +481,7 @@ async function executeAgentSync(params: {
 
     // Generate response -- tools are baked into the agent
     const result = await agent.generate(mastraMessages, {
-      runtimeContext,
+      requestContext,
       memory: {
         thread: sessionId,
         resource: userId || 'anonymous',

@@ -103,10 +103,11 @@ export async function compilePackageContent(
     : ''
 
   const compilerAgent = new Agent({
+    id: 'package-compiler',
     name: 'Package Compiler',
     instructions: 'You are a technical writer organizing product knowledge into structured support package sections (FAQ, how-to, feature docs, troubleshooting).',
     model: resolveModel({ name: 'package-compiler', tier: 'default', fallback: 'openai/gpt-5' }),
-  })
+  });
 
   const { object: categorized } = await compilerAgent.generate(
     `You are a technical writer organizing product knowledge into a structured support package.
@@ -124,7 +125,7 @@ Preserve technical accuracy. Do not invent information not present in the source
 --- SOURCE CONTENT ---
 
 ${combinedContent}`,
-    { output: compilationSchema },
+    { structuredOutput: { schema: compilationSchema } },
   )
 
   // Build source snapshot

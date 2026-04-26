@@ -33,6 +33,7 @@ export async function generateSourceDescription(
   try {
     const aiSettings = projectId ? await getAIModelSettingsAdmin(projectId) : null
     const descriptionAgent = new Agent({
+      id: 'knowledge-source-description',
       name: 'Knowledge Source Description',
       instructions: `You generate concise descriptions of knowledge documents for an AI agent.
 The description helps the agent decide if this document is relevant to a task.
@@ -48,7 +49,7 @@ Rules:
         { name: 'source-description', tier: 'small', fallback: 'openai/gpt-5.4-mini' },
         aiSettings,
       ),
-    })
+    });
 
     const response = await descriptionAgent.generate(
       `Generate a description for this knowledge source:${nameContext}\n\n${truncated}`,
