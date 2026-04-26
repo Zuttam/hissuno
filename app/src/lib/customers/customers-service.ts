@@ -18,6 +18,7 @@ import { eq, and, ilike, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { companies, contacts } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
+import { notifyAutomationEvent } from '@/lib/automations/events'
 import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import {
   insertCompany,
@@ -228,6 +229,7 @@ export async function upsertCompanyAdmin(
   const record = await insertCompany(insertData)
   fireCompanyEmbedding(record.id, projectId, record)
   fireGraphEval(projectId, 'company', record.id)
+  notifyAutomationEvent('company.created', { projectId, entity: { type: 'customer', id: record.id } })
   return { record, action: 'created' }
 }
 
@@ -320,6 +322,7 @@ export async function upsertContactAdmin(
   })
 
   fireGraphEval(projectId, 'contact', contact.id)
+  notifyAutomationEvent('contact.created', { projectId, entity: { type: 'customer', id: contact.id } })
   return { record: contact, action: 'created' }
 }
 
@@ -331,6 +334,10 @@ export async function createCompanyAdmin(input: InsertCompanyData): Promise<Comp
   const record = await insertCompany(input)
   fireCompanyEmbedding(record.id, input.projectId, record)
   fireGraphEval(input.projectId, 'company', record.id)
+  notifyAutomationEvent('company.created', {
+    projectId: input.projectId,
+    entity: { type: 'customer', id: record.id },
+  })
   return record
 }
 
@@ -349,6 +356,10 @@ export async function createContactAdmin(input: InsertContactData): Promise<Cont
     notes: input.notes ?? null,
   })
   fireGraphEval(input.projectId, 'contact', record.id)
+  notifyAutomationEvent('contact.created', {
+    projectId: input.projectId,
+    entity: { type: 'customer', id: record.id },
+  })
   return record
 }
 

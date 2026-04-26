@@ -34,8 +34,7 @@ import { issues } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { linkEntities } from '@/lib/db/queries/entity-relationships'
 import { buildProgrammaticContext } from '@/lib/db/queries/relationship-metadata'
-import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings'
-import { dispatchAutomationRun } from '@/lib/automations/dispatch'
+import { notifyAutomationEvent } from '@/lib/automations/events'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -74,32 +73,15 @@ function maybeFireIssueEmbedding(
 }
 
 /**
- * Fire-and-forget: when the project has issue analysis enabled, dispatch
- * the `hissuno-issue-analysis` automation run in the background. Runs the
- * agent against the new automation_runs lifecycle.
+ * Fire the `issue.created` event so any skill subscribed to it (currently
+ * `hissuno-issue-analysis` when enabled per project) dispatches a run.
+ * Fire-and-forget — agents surface their own failures via the run row.
  */
 function maybeFireIssueAnalysis(issueId: string, projectId: string): void {
-  void (async () => {
-    try {
-      const settings = await getPmAgentSettingsAdmin(projectId)
-      if (!settings.issue_analysis_enabled) return
-
-      const project = await getProjectById(projectId)
-      if (!project) return
-
-      await dispatchAutomationRun({
-        projectId,
-        projectName: project.name,
-        skillId: 'hissuno-issue-analysis',
-        trigger: {
-          type: 'event',
-          entity: { type: 'issue', id: issueId },
-        },
-      })
-    } catch {
-      // Non-blocking — agent will surface its own failures via the run row.
-    }
-  })()
+  notifyAutomationEvent('issue.created', {
+    projectId,
+    entity: { type: 'issue', id: issueId },
+  })
 }
 
 // ============================================================================

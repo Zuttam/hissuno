@@ -23,7 +23,9 @@ export type EntityType =
 export type EventName =
   | 'issue.created'
   | 'feedback.created'
-  | 'customer.created'
+  | 'contact.created'
+  | 'company.created'
+  | 'session.created'
   | 'session.closed'
   | 'knowledge.created'
 
