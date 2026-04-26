@@ -47,6 +47,7 @@ import type {
   EffortEstimate,
   MetricLevel,
 } from '@/types/issue'
+import { calculateRICEScore, riceScoreToPriority } from '@/lib/issues/rice'
 
 // ---------------------------------------------------------------------------
 // Serialization helpers
@@ -170,11 +171,45 @@ export async function updateIssueById(issueId: string, data: UpdateIssueInput): 
     updates.priority_manual_override = data.priority_manual_override
   }
   if (data.reach_score !== undefined) updates.reach_score = data.reach_score
+  if (data.reach_reasoning !== undefined) updates.reach_reasoning = data.reach_reasoning
   if (data.impact_score !== undefined) updates.impact_score = data.impact_score
+  if (data.impact_analysis !== undefined) updates.impact_analysis = data.impact_analysis
   if (data.confidence_score !== undefined) updates.confidence_score = data.confidence_score
+  if (data.confidence_reasoning !== undefined) updates.confidence_reasoning = data.confidence_reasoning
   if (data.effort_score !== undefined) updates.effort_score = data.effort_score
+  if (data.effort_estimate !== undefined) updates.effort_estimate = data.effort_estimate
+  if (data.effort_reasoning !== undefined) updates.effort_reasoning = data.effort_reasoning
+  if (data.brief !== undefined) {
+    updates.brief = data.brief
+    updates.brief_generated_at = data.brief !== null ? new Date() : null
+  }
   if (data.custom_fields !== undefined) updates.custom_fields = data.custom_fields
   if (data.pr_url !== undefined) updates.pr_url = data.pr_url
+
+  // When the agent submits all four analysis scores, compute RICE + priority
+  // server-side using the same math the legacy workflow used. This keeps
+  // ranking deterministic even though the agent drives the rest of the run.
+  const allScoresProvided =
+    data.reach_score !== undefined &&
+    data.impact_score !== undefined &&
+    data.confidence_score !== undefined &&
+    data.effort_score !== undefined
+  if (allScoresProvided) {
+    updates.analysis_computed_at = new Date()
+    const riceScore = calculateRICEScore(
+      data.reach_score!,
+      data.impact_score!,
+      data.confidence_score!,
+      data.effort_score!,
+    )
+    if (
+      data.priority === undefined &&
+      data.priority_manual_override === undefined
+    ) {
+      updates.priority = riceScoreToPriority(riceScore)
+      updates.priority_manual_override = false
+    }
+  }
 
   const [issue] = await db
     .update(issues)

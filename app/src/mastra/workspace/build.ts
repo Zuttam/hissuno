@@ -23,7 +23,13 @@ import type { SkillDescriptor } from '@/lib/automations/types'
 export type WorkspaceForRunOptions = {
   runId: string
   skill: SkillDescriptor
-  /** Whether to attach a sandbox. Defaults to skill.frontmatter.capabilities.sandbox ?? false. */
+  /** Project the run is scoped to. Used for sandbox env. */
+  projectId: string
+  /** Optional triggering entity surfaced to the sandbox via env vars. */
+  entity?: { type: string; id: string }
+  /** Optional structured input surfaced as JSON env var. */
+  input?: Record<string, unknown>
+  /** Whether to attach a sandbox. Defaults to true (the design says always-on). */
   enableSandbox?: boolean
 }
 
@@ -46,7 +52,30 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
   const workDir = join(tmpdir(), 'hissuno-automation', opts.runId)
   await mkdir(workDir, { recursive: true })
 
-  const enableSandbox = opts.enableSandbox ?? opts.skill.frontmatter.capabilities?.sandbox ?? false
+  const enableSandbox = opts.enableSandbox ?? true
+
+  // Build the per-run env. Pre-authenticates `hissuno` using whatever API key
+  // is available on the host (HISSUNO_API_KEY in prod, falls back to
+  // HISSUNO_RUN_API_KEY for local dev). Also surfaces trigger context so the
+  // skill body can read `$ISSUE_ID`, `$ENTITY_TYPE`, etc.
+  const sandboxEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    HISSUNO_API_KEY: process.env.HISSUNO_API_KEY ?? process.env.HISSUNO_RUN_API_KEY ?? '',
+    HISSUNO_PROJECT_ID: opts.projectId,
+    HISSUNO_RUN_ID: opts.runId,
+    HISSUNO_SKILL_ID: opts.skill.id,
+  }
+  if (opts.entity) {
+    sandboxEnv.ENTITY_TYPE = opts.entity.type
+    sandboxEnv.ENTITY_ID = opts.entity.id
+    if (opts.entity.type === 'issue') sandboxEnv.ISSUE_ID = opts.entity.id
+    if (opts.entity.type === 'customer') sandboxEnv.CUSTOMER_ID = opts.entity.id
+    if (opts.entity.type === 'scope') sandboxEnv.SCOPE_ID = opts.entity.id
+    if (opts.entity.type === 'package') sandboxEnv.PACKAGE_ID = opts.entity.id
+  }
+  if (opts.input && Object.keys(opts.input).length > 0) {
+    sandboxEnv.HISSUNO_RUN_INPUT = JSON.stringify(opts.input)
+  }
 
   return new Workspace({
     id: `automation-run-${opts.runId}`,
@@ -56,14 +85,7 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
     sandbox: enableSandbox
       ? new LocalSandbox({
           workingDirectory: workDir,
-          // Pass the run's project key into the sandbox so `hissuno` calls
-          // are pre-authenticated. The dispatch fn is responsible for
-          // minting the key before this factory runs.
-          env: {
-            ...process.env,
-            HISSUNO_API_KEY: process.env.HISSUNO_RUN_API_KEY ?? '',
-            HISSUNO_PROJECT_ID: process.env.HISSUNO_RUN_PROJECT_ID ?? '',
-          },
+          env: sandboxEnv,
         })
       : undefined,
   })

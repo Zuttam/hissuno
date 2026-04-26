@@ -95,7 +95,13 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
   const timeoutMs = skill.frontmatter.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   try {
-    const workspace = await buildWorkspaceForRun({ runId: run.id, skill })
+    const workspace = await buildWorkspaceForRun({
+      runId: run.id,
+      skill,
+      projectId: project.id,
+      entity: trigger.entity ? { type: trigger.entity.type, id: trigger.entity.id } : undefined,
+      input: trigger.input,
+    })
     const harnessPrefix = buildHarnessPrefix({ skill, trigger, project })
     const agent = createSkillRunner({
       runId: run.id,

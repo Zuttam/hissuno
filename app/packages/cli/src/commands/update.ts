@@ -23,6 +23,22 @@ interface UpdateIssueOpts {
   description?: string
   issueType?: string
   prUrl?: string
+  brief?: string
+  briefFile?: string
+  analysisFile?: string
+}
+
+interface IssueAnalysisPayload {
+  brief?: string | null
+  reach_score?: number
+  reach_reasoning?: string
+  impact_score?: number
+  impact_analysis?: { impactScore: number; reasoning: string; goalAlignments?: Array<{ goalId: string; reasoning?: string }> } | null
+  confidence_score?: number
+  confidence_reasoning?: string
+  effort_score?: number
+  effort_estimate?: 'trivial' | 'small' | 'medium' | 'large' | 'xlarge'
+  effort_reasoning?: string
 }
 
 export const VALID_ISSUE_STATUSES = ['open', 'ready', 'in_progress', 'resolved', 'closed']
@@ -64,7 +80,30 @@ export async function updateIssue(
     data.pr_url = opts.prUrl || null
   }
 
+  // Brief content can come either inline (--brief "...") or from a file
+  // (--brief-file path). Empty string clears it.
+  if (opts.briefFile !== undefined) {
+    data.brief = opts.briefFile === '' ? null : await readJsonOrText(opts.briefFile, 'text')
+  } else if (opts.brief !== undefined) {
+    data.brief = opts.brief === '' ? null : opts.brief
+  }
+
+  // Analysis payload: a single JSON file produced by an automation skill
+  // containing scores + reasoning. Server computes RICE + priority when all
+  // four scores are provided.
+  if (opts.analysisFile !== undefined) {
+    const payload = (await readJsonOrText(opts.analysisFile, 'json')) as IssueAnalysisPayload
+    Object.assign(data, payload)
+  }
+
   return data
+}
+
+async function readJsonOrText(path: string, mode: 'json' | 'text'): Promise<unknown> {
+  const fs = await import('node:fs/promises')
+  const content = await fs.readFile(path, 'utf8')
+  if (mode === 'json') return JSON.parse(content)
+  return content
 }
 
 // ─── Feedback (sessions) ─────────────────────────────────
@@ -370,6 +409,9 @@ export const updateCommand = new Command('update')
   .option('--priority <priority>', 'Issue priority: low, medium, high')
   .option('--issue-type <type>', 'Issue type: bug, feature_request, change_request')
   .option('--pr-url <url>', 'Issue PR URL (empty string to clear)')
+  .option('--brief <text>', 'Issue brief markdown content (empty string to clear)')
+  .option('--brief-file <path>', 'Read issue brief from a file (empty string to clear)')
+  .option('--analysis-file <path>', 'JSON file with issue analysis fields (scores + reasoning + brief)')
   // Customer options
   .option('--customer-type <type>', 'Customer sub-type: contacts (default) or companies')
   .option('--email <email>', 'Contact email')
