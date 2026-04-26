@@ -88,6 +88,13 @@ function translateAutomationEvent(raw: {
         timestamp: raw.timestamp,
       }
     }
+    case 'cancelled':
+      return {
+        type: 'error',
+        message: raw.message ?? 'Run cancelled',
+        data: raw.data,
+        timestamp: raw.timestamp,
+      }
     case 'error':
       return {
         type: 'error',
@@ -116,6 +123,7 @@ export function useIssueAnalysis({
   const [completedSteps, setCompletedSteps] = useState(0)
   const eventSourceRef = useRef<EventSource | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const currentRunIdRef = useRef<string | null>(null)
 
   const clearConnectionTimeout = useCallback(() => {
     if (timeoutRef.current) {
@@ -229,6 +237,7 @@ export function useIssueAnalysis({
         throw new Error('No runId returned from analysis start')
       }
 
+      currentRunIdRef.current = runId
       connectToStream(runId)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start analysis'
@@ -239,13 +248,15 @@ export function useIssueAnalysis({
 
   const cancelAnalysisFn = useCallback(async () => {
     setError(null)
+    const runId = currentRunIdRef.current
 
     try {
-      await apiCancelAnalysis(projectId, issueId)
+      await apiCancelAnalysis(projectId, issueId, runId ?? undefined)
 
       cleanup()
       setIsAnalyzing(false)
       setEvents([])
+      currentRunIdRef.current = null
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to cancel'
       setError(message)

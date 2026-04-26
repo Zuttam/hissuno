@@ -42,4 +42,44 @@ export function publishRunEvent(runId: string, event: ProgressEvent): void {
 /** Used by the dispatcher to signal the run is finished and the channel can close. */
 export function closeRunChannel(runId: string): void {
   subscribers.delete(runId)
+  cancelListeners.delete(runId)
+}
+
+// ---------------------------------------------------------------------------
+// Cancel signaling
+// ---------------------------------------------------------------------------
+
+const cancelListeners = new Map<string, Set<() => void>>()
+
+/**
+ * Subscribe to a cancel request for a specific run. The dispatcher sets this
+ * up at run start; an external cancel API call fires it. Returns an
+ * unsubscribe function the caller is expected to invoke when the run ends
+ * naturally.
+ */
+export function subscribeRunCancel(runId: string, listener: () => void): () => void {
+  let set = cancelListeners.get(runId)
+  if (!set) {
+    set = new Set()
+    cancelListeners.set(runId, set)
+  }
+  set.add(listener)
+  return () => {
+    set?.delete(listener)
+    if (set && set.size === 0) cancelListeners.delete(runId)
+  }
+}
+
+/** Trigger cancellation of a running run. Returns true if any listener was notified. */
+export function requestRunCancel(runId: string): boolean {
+  const set = cancelListeners.get(runId)
+  if (!set || set.size === 0) return false
+  for (const listener of set) {
+    try {
+      listener()
+    } catch (err) {
+      console.error('[run-bus] cancel listener threw', err)
+    }
+  }
+  return true
 }

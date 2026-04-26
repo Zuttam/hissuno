@@ -14,12 +14,14 @@ import { Mastra } from '@mastra/core/mastra'
 import { RequestContext } from '@mastra/core/request-context'
 import { findSkill, listBundledSkills } from './skills'
 import { buildHarnessPrefix } from './harness'
-import { closeRunChannel, publishRunEvent } from './run-bus'
+import { closeRunChannel, publishRunEvent, subscribeRunCancel } from './run-bus'
 import { buildWorkspaceForRun } from '@/mastra/workspace/build'
 import { createSkillRunner } from '@/mastra/agents/skill-runner-agent'
+import { mintAutomationApiKey, revokeApiKey } from '@/lib/auth/api-keys'
 import {
   appendProgressEvent,
   createAutomationRun,
+  markAutomationRunCancelled,
   markAutomationRunFailed,
   markAutomationRunStarted,
   markAutomationRunSucceeded,
@@ -94,11 +96,22 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
 
   const timeoutMs = skill.frontmatter.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
+  // Mint a short-TTL, project-scoped API key so the `hissuno` CLI inside the
+  // sandbox is pre-authenticated. Revoked in the finally block.
+  let apiKeyId: string | null = null
   try {
+    const minted = await mintAutomationApiKey({
+      projectId: project.id,
+      runId: run.id,
+      ttlMs: Math.min(timeoutMs * 2, 24 * 60 * 60 * 1000),
+    })
+    apiKeyId = minted.keyId
+
     const workspace = await buildWorkspaceForRun({
       runId: run.id,
       skill,
       projectId: project.id,
+      apiKey: minted.fullKey,
       entity: trigger.entity ? { type: trigger.entity.type, id: trigger.entity.id } : undefined,
       input: trigger.input,
     })
@@ -126,15 +139,42 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
       .filter(Boolean)
       .join(' ')
 
-    const response = await Promise.race([
-      agent.generate(userPrompt, {
-        requestContext,
-        maxSteps: 25,
-      }),
-      new Promise<never>((_resolve, reject) =>
-        setTimeout(() => reject(new Error(`Run timed out after ${timeoutMs}ms`)), timeoutMs),
-      ),
-    ])
+    // Wire cancellation: a cancel API call publishes via run-bus, which trips
+    // the AbortController. Mastra propagates the abort signal into in-flight
+    // tool calls + streaming so the agent terminates promptly.
+    const abortController = new AbortController()
+    const unsubscribeCancel = subscribeRunCancel(run.id, () => {
+      abortController.abort(new Error('Run cancelled by user'))
+    })
+
+    let response: Awaited<ReturnType<typeof agent.generate>>
+    try {
+      response = await Promise.race([
+        agent.generate(userPrompt, {
+          requestContext,
+          maxSteps: 25,
+          abortSignal: abortController.signal,
+        }),
+        new Promise<never>((_resolve, reject) =>
+          setTimeout(() => reject(new Error(`Run timed out after ${timeoutMs}ms`)), timeoutMs),
+        ),
+      ])
+    } catch (err) {
+      if (abortController.signal.aborted) {
+        const cancelEvent: ProgressEvent = {
+          ts: new Date().toISOString(),
+          type: 'cancelled',
+          message: 'Run cancelled',
+        }
+        await appendProgressEvent(run.id, cancelEvent).catch(() => {})
+        publishRunEvent(run.id, cancelEvent)
+        await markAutomationRunCancelled(run.id)
+        return
+      }
+      throw err
+    } finally {
+      unsubscribeCancel()
+    }
 
     // Try to read output.json from the workspace filesystem; fall back to
     // the agent's text output.
@@ -180,6 +220,13 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
 
     await markAutomationRunFailed(run.id, { message, stack })
   } finally {
+    if (apiKeyId) {
+      // Best-effort revoke. If the revoke itself fails (e.g., DB hiccup),
+      // the key still naturally expires via its expires_at TTL.
+      revokeApiKey(apiKeyId, project.id).catch((err) => {
+        console.error(`[automation:${run.id}] failed to revoke api key`, err)
+      })
+    }
     closeRunChannel(run.id)
   }
 }

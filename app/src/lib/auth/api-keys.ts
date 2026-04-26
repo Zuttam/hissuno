@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'crypto'
 import { db } from '@/lib/db'
-import { projectApiKeys } from '@/lib/db/schema/app'
-import { eq, and, isNull, desc, count as drizzleCount } from 'drizzle-orm'
+import { projectApiKeys, projectMembers } from '@/lib/db/schema/app'
+import { eq, and, isNull, desc, count as drizzleCount, asc } from 'drizzle-orm'
 import type { ApiKeyRecord, ApiKeyCreateResult } from '@/types/project-members'
 
 const LOG_PREFIX = '[api-keys]'
@@ -84,6 +84,53 @@ export async function createApiKey(options: {
     } as ApiKeyRecord,
     fullKey,
   }
+}
+
+/**
+ * Mint a short-TTL, project-scoped API key for an automation run.
+ *
+ * Used by the dispatcher to pre-authenticate the `hissuno` CLI inside the
+ * agent sandbox. The plaintext only lives in the run's process memory;
+ * once the run finishes the dispatcher revokes the key.
+ *
+ * The audit `created_by_user_id` defaults to the project's earliest admin
+ * member — automations are implicitly authorized by whoever enabled them
+ * for the project, and event-triggered runs have no current user.
+ */
+export async function mintAutomationApiKey(options: {
+  projectId: string
+  runId: string
+  ttlMs?: number
+}): Promise<{ keyId: string; fullKey: string }> {
+  const ttlMs = options.ttlMs ?? 60 * 60 * 1000
+
+  const adminRow = await db
+    .select({ user_id: projectMembers.user_id })
+    .from(projectMembers)
+    .where(
+      and(
+        eq(projectMembers.project_id, options.projectId),
+        eq(projectMembers.role, 'admin'),
+        eq(projectMembers.status, 'active'),
+      ),
+    )
+    .orderBy(asc(projectMembers.created_at))
+    .limit(1)
+  const createdByUserId = adminRow[0]?.user_id
+  if (!createdByUserId) {
+    throw new Error(
+      `No active admin found for project ${options.projectId}; cannot mint automation API key.`,
+    )
+  }
+
+  const result = await createApiKey({
+    projectId: options.projectId,
+    createdByUserId,
+    name: `automation:${options.runId}`,
+    expiresAt: new Date(Date.now() + ttlMs).toISOString(),
+  })
+
+  return { keyId: result.key.id, fullKey: result.fullKey }
 }
 
 /**

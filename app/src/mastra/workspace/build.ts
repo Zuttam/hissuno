@@ -25,6 +25,13 @@ export type WorkspaceForRunOptions = {
   skill: SkillDescriptor
   /** Project the run is scoped to. Used for sandbox env. */
   projectId: string
+  /**
+   * Per-run, project-scoped API key for the `hissuno` CLI inside the sandbox.
+   * Minted by the dispatcher before this factory runs and revoked when the
+   * run completes. Required — the runner does not fall back to global env
+   * (that was the v1 alpha shortcut and got removed).
+   */
+  apiKey: string
   /** Optional triggering entity surfaced to the sandbox via env vars. */
   entity?: { type: string; id: string }
   /** Optional structured input surfaced as JSON env var. */
@@ -54,13 +61,16 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
 
   const enableSandbox = opts.enableSandbox ?? true
 
-  // Build the per-run env. Pre-authenticates `hissuno` using whatever API key
-  // is available on the host (HISSUNO_API_KEY in prod, falls back to
-  // HISSUNO_RUN_API_KEY for local dev). Also surfaces trigger context so the
-  // skill body can read `$ISSUE_ID`, `$ENTITY_TYPE`, etc.
+  // Build the per-run env. The CLI inside the sandbox is pre-authenticated
+  // using a project-scoped API key minted by the dispatcher specifically for
+  // this run. Trigger context surfaces as `$ISSUE_ID`, `$ENTITY_TYPE`, etc.
+  // We deliberately drop process.env passthrough so global admin secrets
+  // (like the host's HISSUNO_API_KEY) don't leak into the sandbox.
   const sandboxEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    HISSUNO_API_KEY: process.env.HISSUNO_API_KEY ?? process.env.HISSUNO_RUN_API_KEY ?? '',
+    PATH: process.env.PATH,
+    HOME: process.env.HOME,
+    NODE_ENV: process.env.NODE_ENV,
+    HISSUNO_API_KEY: opts.apiKey,
     HISSUNO_PROJECT_ID: opts.projectId,
     HISSUNO_RUN_ID: opts.runId,
     HISSUNO_SKILL_ID: opts.skill.id,

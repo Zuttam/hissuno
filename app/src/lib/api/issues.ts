@@ -14,6 +14,7 @@ const paths = {
   // Automation runner — replaces /api/issues/<id>/analyze* endpoints.
   automationRun: (skillId: string) => `/api/automations/${skillId}/run`,
   automationStream: (runId: string) => `/api/automations/runs/${runId}/stream`,
+  automationCancel: (runId: string) => `/api/automations/runs/${runId}/cancel`,
 }
 
 export interface IssueListParams {
@@ -109,14 +110,19 @@ export async function startAnalysis(projectId: string, issueId: string, opts?: {
 }
 
 /**
- * Run cancellation. Server marks the row cancelled; the in-process agent
- * continues to its next checkpoint and observes the status, but the SSE
- * client closes immediately.
+ * Cancel a running analysis. Sends a cancel signal to the dispatcher (same
+ * node), or marks the row cancelled directly when the dispatcher is on a
+ * different replica.
  */
-export async function cancelAnalysis(_projectId: string, _issueId: string) {
-  // Cancellation isn't wired through the new automation_runs lifecycle yet.
-  // Returning a no-op keeps callers compiling; UI hides the cancel affordance.
-  return { ok: true } as const
+export async function cancelAnalysis(projectId: string, _issueId: string, runId?: string) {
+  if (!runId) {
+    // Without a runId we can't target a specific run. Caller should pass it.
+    return { ok: false, error: 'Missing runId' } as const
+  }
+  return fetchApi<{ ok: boolean; notifiedRunner?: boolean; alreadyTerminal?: boolean }>(
+    buildUrl(paths.automationCancel(runId), { projectId }),
+    { method: 'POST', errorMessage: 'Failed to cancel analysis' },
+  )
 }
 
 export function issueAnalyzeStreamUrl(projectId: string, _issueId: string, runId: string): string {
