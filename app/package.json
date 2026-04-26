@@ -37,7 +37,7 @@
     "eval:pm-agent:verbose": "npx tsx src/evals/pm-agent.eval.ts --verbose",
     "dev:mastra": "npx mastra dev --dir src/mastra",
     "seed": "npx tsx --tsconfig tsconfig.json src/scripts/seed.ts",
-    "db:push": "ENV_FILE=${ENV_FILE:-.env.local} sh -c 'tsx --env-file $ENV_FILE ../node_modules/drizzle-kit/bin.cjs push'",
+    "db:push": "ENV_FILE=${ENV_FILE:-.env.local} sh -c 'tsx --env-file $ENV_FILE ../node_modules/drizzle-kit/bin.cjs push --force'",
     "db:generate": "ENV_FILE=${ENV_FILE:-.env.local} sh -c 'tsx --env-file $ENV_FILE ../node_modules/drizzle-kit/bin.cjs generate'",
     "db:migrate": "ENV_FILE=${ENV_FILE:-.env.local} sh -c 'tsx --env-file $ENV_FILE ../node_modules/drizzle-kit/bin.cjs migrate'"
   },
