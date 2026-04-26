@@ -12,7 +12,12 @@
  * Phase 2+ flips the default to always-on once we have a real base image.
  */
 
-import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace'
+import {
+  LocalFilesystem,
+  LocalSandbox,
+  Workspace,
+  type WorkspaceSandbox,
+} from '@mastra/core/workspace'
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -124,10 +129,42 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
     filesystem: new LocalFilesystem({ basePath: workDir }),
     skills: skillDirs,
     sandbox: enableSandbox
-      ? new LocalSandbox({
-          workingDirectory: workDir,
-          env: sandboxEnv,
-        })
+      ? await createSandbox({ runId: opts.runId, workDir, env: sandboxEnv })
       : undefined,
+  })
+}
+
+/**
+ * Pick a sandbox provider based on `SANDBOX_PROVIDER`. Defaults to
+ * `LocalSandbox` (works without external services) for dev. Set to `e2b`
+ * in prod with `E2B_API_KEY` + `E2B_SANDBOX_TEMPLATE` to run inside a
+ * pre-built E2B template image (see infra/sandbox/README.md for the spec).
+ *
+ * Adding a provider is two lines: a new case here and a corresponding
+ * env-var doc.
+ */
+async function createSandbox(opts: {
+  runId: string
+  workDir: string
+  env: NodeJS.ProcessEnv
+}): Promise<WorkspaceSandbox> {
+  const provider = (process.env.SANDBOX_PROVIDER ?? 'local').toLowerCase()
+  if (provider === 'e2b') {
+    const { E2BSandbox } = await import('@mastra/e2b')
+    const apiKey = process.env.E2B_API_KEY
+    const template = process.env.E2B_SANDBOX_TEMPLATE
+    if (!apiKey) throw new Error('SANDBOX_PROVIDER=e2b requires E2B_API_KEY.')
+    if (!template) throw new Error('SANDBOX_PROVIDER=e2b requires E2B_SANDBOX_TEMPLATE.')
+    return new E2BSandbox({
+      id: `automation-${opts.runId}`,
+      apiKey,
+      template,
+      env: opts.env as Record<string, string>,
+      timeout: 30 * 60 * 1000,
+    })
+  }
+  return new LocalSandbox({
+    workingDirectory: opts.workDir,
+    env: opts.env,
   })
 }
