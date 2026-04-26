@@ -12,6 +12,7 @@ metadata:
   author: hissuno
 triggers:
   manual: { entity: customer }
+  scheduled: { cron: '0 8 * * 1' }
 input:
   customerId:
     type: string
@@ -31,21 +32,41 @@ Guides you through a structured health assessment for a customer account. Maps t
 - `hissuno` CLI configured and connected (`hissuno config show` to verify)
 - Web search access for external context phases
 
+## How this run is scoped
+
+Two ways this skill is invoked:
+
+1. **Per-customer** (manual button or `customer.created` event). The harness sets `$CUSTOMER_ID`. Run the workflow once for that customer.
+2. **No entity given** (weekly scheduled sweep). `$CUSTOMER_ID` is empty. Enumerate active companies for the project and run the workflow for each in turn:
+
+```bash
+if [ -z "$CUSTOMER_ID" ]; then
+  hissuno list customers --customer-type companies --status active --json > companies.json
+  for COMPANY_ID in $(jq -r '.[].id' companies.json); do
+    echo "--- analyzing $COMPANY_ID ---"
+    CUSTOMER_ID="$COMPANY_ID" /usr/bin/env -- bash -c '...phases below...'
+  done
+  exit 0
+fi
+```
+
+For sequential per-customer runs, cap yourself at the top 20 highest-ARR active accounts to stay under the daily run cap. (Raise `dailyRunCap` in this skill's frontmatter if a project consistently has more.)
+
 ## Workflow
 
 ### Phase 1: Account Mapping
 
 **Step 1 - Identify the customer.**
-Ask which company to analyze. If they're unsure, browse:
+Use `$CUSTOMER_ID` from the harness, or for ad-hoc runs:
 
 ```bash
 hissuno list customers --customer-type companies
 ```
 
-Once identified, pull full details including stage, metadata, and relationships:
+Pull full details including stage, metadata, and relationships:
 
 ```bash
-hissuno get customers <company-id> --customer-type companies
+hissuno get customers "$CUSTOMER_ID" --customer-type companies
 ```
 
 **Step 2 - Map contacts.**

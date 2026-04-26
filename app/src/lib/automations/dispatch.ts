@@ -29,6 +29,7 @@ import {
   appendProgressEvent,
   countRecentRuns,
   createAutomationRun,
+  getAutomationRun,
   markAutomationRunCancelled,
   markAutomationRunFailed,
   markAutomationRunStarted,
@@ -41,6 +42,9 @@ import type { TriggerContext } from './types'
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
 const DEFAULT_DAILY_RUN_CAP = 50
 const RUN_CAP_WINDOW_MS = 24 * 60 * 60 * 1000
+// How often we poll automation_runs.status to detect cross-replica cancels.
+// Same-node cancels still trip immediately via the in-memory bus.
+const CANCEL_POLL_INTERVAL_MS = 5_000
 
 export type DispatchInput = {
   projectId: string
@@ -165,13 +169,26 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
       .filter(Boolean)
       .join(' ')
 
-    // Wire cancellation: a cancel API call publishes via run-bus, which trips
-    // the AbortController. Mastra propagates the abort signal into in-flight
-    // tool calls + streaming so the agent terminates promptly.
+    // Wire cancellation. Two paths feed the same AbortController:
+    // 1. In-memory bus (fast path, same-node cancel API request).
+    // 2. DB poll on automation_runs.status every 5s (catches cross-replica
+    //    cancels - the cancel API marks the row regardless of which node
+    //    the runner is on, so eventually the runner observes the change).
     const abortController = new AbortController()
     const unsubscribeCancel = subscribeRunCancel(run.id, () => {
       abortController.abort(new Error('Run cancelled by user'))
     })
+    const cancelPoll = setInterval(async () => {
+      if (abortController.signal.aborted) return
+      try {
+        const fresh = await getAutomationRun(run.id, project.id)
+        if (fresh?.status === 'cancelled') {
+          abortController.abort(new Error('Run cancelled by user'))
+        }
+      } catch {
+        // Polling failures are best-effort; skip and try again.
+      }
+    }, CANCEL_POLL_INTERVAL_MS)
 
     let response: Awaited<ReturnType<typeof agent.generate>>
     try {
@@ -200,6 +217,7 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
       throw err
     } finally {
       unsubscribeCancel()
+      clearInterval(cancelPoll)
     }
 
     // Try to read output.json from the workspace filesystem; fall back to
@@ -274,6 +292,10 @@ function validateTrigger(
   if (declared.manual?.entity && trigger.type === 'manual' && !trigger.entity) {
     throw new Error(`Skill ${skillId} requires a ${declared.manual.entity} entity for manual runs.`)
   }
+  // Scheduled runs MAY arrive without an entity even if the skill declares
+  // an entity-required manual trigger - that's the "no entity, fan out
+  // yourself" pattern. The skill body decides what to do (e.g., enumerate
+  // active customers and analyze each in turn).
 }
 
 /** Re-export so consumers don't have to import from skills.ts directly. */

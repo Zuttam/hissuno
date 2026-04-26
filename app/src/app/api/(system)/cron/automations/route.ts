@@ -48,15 +48,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, fired: 0, message: 'No scheduled skills.' })
   }
 
-  // Skills with a manual.entity requirement need fan-out (one run per
-  // qualifying entity in the project). Phase 5 ships the simple "no entity
-  // required" path only - gate the rest off so we don't dispatch broken runs.
-  const dispatchable = scheduled.filter(
-    (s) => !s.frontmatter.triggers?.manual?.entity,
-  )
-  const skippedForFanOut = scheduled
-    .filter((s) => s.frontmatter.triggers?.manual?.entity)
-    .map((s) => s.id)
+  // Scheduled runs without a specific entity are valid even for skills that
+  // require an entity on manual triggers - the skill body decides whether
+  // to enumerate the population (e.g., "for each active customer, do the
+  // analysis") or no-op when no entity is provided.
+  const dispatchable = scheduled
 
   const projectRows = await db.select({ id: projects.id, name: projects.name }).from(projects)
   if (projectRows.length === 0) {
@@ -128,7 +124,6 @@ export async function GET(request: Request) {
   return NextResponse.json({
     success: true,
     fired,
-    skippedForFanOut,
     outcomes,
   })
 }
