@@ -24,6 +24,7 @@ import { closeRunChannel, publishRunEvent, subscribeRunCancel } from './run-bus'
 import { buildWorkspaceForRun } from '@/mastra/workspace/build'
 import { createSkillRunner } from '@/mastra/agents/skill-runner-agent'
 import { getOrCreateAutomationApiKey } from './api-key'
+import { isSkillEnabledForProject } from '@/lib/db/queries/project-skill-settings'
 import {
   appendProgressEvent,
   createAutomationRun,
@@ -52,6 +53,11 @@ export async function dispatchAutomationRun(
     findSkill(input.skillId) ?? (await getCustomSkillDescriptor(input.projectId, input.skillId))
   if (!skill) {
     throw new Error(`Skill not found: ${input.skillId}`)
+  }
+
+  // Per-project on/off applies to all trigger types.
+  if (!(await isSkillEnabledForProject(input.projectId, skill.id))) {
+    throw new Error(`Skill ${skill.id} is disabled for this project.`)
   }
 
   // Validate trigger compatibility with the skill's frontmatter declarations.

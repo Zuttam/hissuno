@@ -40,7 +40,6 @@ export const projectSettings = pgTable('project_settings', {
   classification_guidelines: text('classification_guidelines'),
   brief_guidelines: text('brief_guidelines'),
   analysis_guidelines: text('analysis_guidelines'),
-  issue_analysis_enabled: boolean('issue_analysis_enabled'),
   // Support agent
   support_agent_package_id: uuid('support_agent_package_id'),
   support_agent_tone: text('support_agent_tone'),
@@ -356,6 +355,27 @@ export const issues = pgTable('issues', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
+// Per-project skill enable/disable. One row per (project, skill) where the
+// project has explicitly turned a skill off. No row = enabled (default).
+// Replaces the legacy project_settings.issue_analysis_enabled column and
+// the custom_skills.enabled column (both removed in the same migration).
+export const projectSkillSettings = pgTable(
+  'project_skill_settings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    project_id: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    skill_id: text('skill_id').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    created_at: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('project_skill_settings_project_skill_idx').on(t.project_id, t.skill_id),
+  ],
+)
+
 // Per-project custom automation skills. The SKILL.md body lives in blob
 // storage (FileStorageProvider) at the path stored in `blob_path`; this row
 // is the metadata + frontmatter snapshot needed for catalog rendering and
@@ -372,9 +392,8 @@ export const customSkills = pgTable(
     description: text('description').notNull(),
     version: text('version'),
     blob_path: text('blob_path').notNull(),
-    /** Frontmatter snapshot — duplicated from SKILL.md for fast catalog reads. */
+    /** Frontmatter snapshot - duplicated from SKILL.md for fast catalog reads. */
     frontmatter: jsonb('frontmatter').notNull().default({}),
-    enabled: boolean('enabled').notNull().default(true),
     created_by_user_id: uuid('created_by_user_id').references(() => users.id),
     created_at: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updated_at: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),

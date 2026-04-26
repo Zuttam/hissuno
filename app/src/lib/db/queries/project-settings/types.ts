@@ -59,7 +59,6 @@ export interface PmAgentSettings {
   classification_guidelines: string | null
   brief_guidelines: string | null
   analysis_guidelines: string | null
-  issue_analysis_enabled: boolean
 }
 
 /**
@@ -86,7 +85,6 @@ export const DEFAULT_PM_AGENT_SETTINGS: PmAgentSettings = {
   classification_guidelines: null,
   brief_guidelines: null,
   analysis_guidelines: null,
-  issue_analysis_enabled: true,
 }
 
 /**

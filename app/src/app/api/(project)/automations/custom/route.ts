@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
         name: r.name,
         description: r.description,
         version: r.version,
-        enabled: r.enabled,
         frontmatter: r.frontmatter,
         createdAt: r.created_at.toISOString(),
         updatedAt: r.updated_at.toISOString(),

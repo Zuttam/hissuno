@@ -47,7 +47,6 @@ export async function upsertCustomSkill(
         version: data.version ?? null,
         blob_path: data.blob_path,
         frontmatter: data.frontmatter ?? {},
-        enabled: data.enabled ?? existing.enabled,
         updated_at: new Date(),
       })
       .where(eq(customSkills.id, existing.id))

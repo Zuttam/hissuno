@@ -103,7 +103,6 @@ export async function saveCustomSkill(input: CustomSkillSaveInput): Promise<Cust
     version: frontmatter.version ?? null,
     blob_path: path,
     frontmatter: frontmatter as unknown as Record<string, unknown>,
-    enabled: true,
     created_by_user_id: input.createdByUserId ?? null,
   })
 }
