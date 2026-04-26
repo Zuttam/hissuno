@@ -1,6 +1,6 @@
 /**
- * GET  /api/automations/custom?projectId=...   — list project's custom skills
- * POST /api/automations/custom?projectId=...   — upload a new custom skill
+ * GET  /api/automations/custom?projectId=...   - list project's custom skills
+ * POST /api/automations/custom?projectId=...   - upload a new custom skill
  *                                                 (or replace an existing one)
  *
  * The POST body is a JSON object with:

@@ -163,7 +163,7 @@ export async function markAutomationRunCancelled(runId: string): Promise<void> {
 }
 
 /**
- * Returns the most recent run of (project, skill, triggerType) — used by the
+ * Returns the most recent run of (project, skill, triggerType) - used by the
  * cron worker to dedup scheduled fires. Returns null if there's no prior run.
  */
 export async function getLatestRunByTrigger(opts: {

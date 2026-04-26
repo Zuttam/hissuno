@@ -50,7 +50,7 @@ export async function GET(request: Request) {
 
   // Skills with a manual.entity requirement need fan-out (one run per
   // qualifying entity in the project). Phase 5 ships the simple "no entity
-  // required" path only — gate the rest off so we don't dispatch broken runs.
+  // required" path only - gate the rest off so we don't dispatch broken runs.
   const dispatchable = scheduled.filter(
     (s) => !s.frontmatter.triggers?.manual?.entity,
   )

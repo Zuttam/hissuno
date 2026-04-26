@@ -36,7 +36,7 @@ hissuno get issues "$ISSUE_ID" --json > issue.json
 
 `issue.json` has the issue record plus `relationships` (linked sessions, contacts, companies, scope). Parse with `jq`.
 
-If the issue has more than ~30 linked sessions, you don't need to read them all individually — work from aggregate counts and a sample.
+If the issue has more than ~30 linked sessions, you don't need to read them all individually - work from aggregate counts and a sample.
 
 Optional, only if you need richer context for impact analysis:
 ```bash
@@ -49,32 +49,32 @@ SCOPE_ID=$(jq -r '.relationships.product_scope[0].id // empty' issue.json)
 Use the issue type, description, linked customer signal (ARR, account stage, count of customers affected), and any goal alignment from the scope.
 
 Scoring rubric:
-- **5** — multi-customer pain, blocking material workflows, hits champions or strategic accounts
-- **4** — significant friction for a notable group of customers, OR strong signal from a high-ARR account
-- **3** — meaningful friction but localized; a few customers
-- **2** — minor friction OR single account
-- **1** — cosmetic or one-off
+- **5** - multi-customer pain, blocking material workflows, hits champions or strategic accounts
+- **4** - significant friction for a notable group of customers, OR strong signal from a high-ARR account
+- **3** - meaningful friction but localized; a few customers
+- **2** - minor friction OR single account
+- **1** - cosmetic or one-off
 
 Write `impact_analysis` as `{ impactScore, reasoning, goalAlignments? }`.
 
 ### 3. Estimate effort (1-5)
 From the description and your sense of code complexity. Map to effort estimate:
-- `trivial` (1) — config tweak / one-line / docs
-- `small` (2) — single file, no migrations
-- `medium` (3) — handful of files, no schema changes
-- `large` (4) — schema or API change, multi-system touch
-- `xlarge` (5) — significant architectural work or multi-team
+- `trivial` (1) - config tweak / one-line / docs
+- `small` (2) - single file, no migrations
+- `medium` (3) - handful of files, no schema changes
+- `large` (4) - schema or API change, multi-system touch
+- `xlarge` (5) - significant architectural work or multi-team
 
 `effort_estimate` is the string. `effort_score` is 1-5 (matching the rank above).
 
 ### 4. Estimate confidence (1-5)
 How confident are you in the impact and effort scores given the available signal?
 
-- **5** — strong, consistent feedback from multiple customers; clear scope
-- **3** — reasonable signal; some ambiguity
-- **1** — single user, vague description, ambiguous scope
+- **5** - strong, consistent feedback from multiple customers; clear scope
+- **3** - reasonable signal; some ambiguity
+- **1** - single user, vague description, ambiguous scope
 
-### 5. Compute reach (1-5) — deterministic
+### 5. Compute reach (1-5) - deterministic
 Reach is a function of how many sessions are linked and how recently. Use this exact formula (it mirrors `app/src/lib/issues/reach.ts`):
 
 - Take session timestamps from `issue.json` (`relationships.session[].created_at`).

@@ -7,7 +7,7 @@
  * frontmatter (`triggers.events`) and dispatches one automation run per
  * matching skill.
  *
- * Fires fire-and-forget — failures don't block the originating write.
+ * Fires fire-and-forget - failures don't block the originating write.
  *
  * Per-project enable/disable lives behind `isAutomationEnabledForProject`,
  * which today only special-cases the legacy `issue_analysis_enabled` flag.
@@ -78,7 +78,7 @@ export function notifyAutomationEvent(event: EventName, ctx: EventContext): void
         }
       }
     } catch (err) {
-      // Fire-and-forget — the originating write has already committed.
+      // Fire-and-forget - the originating write has already committed.
       console.error('[automation-events] dispatch error', err)
     }
   })()

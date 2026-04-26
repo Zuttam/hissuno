@@ -5,7 +5,7 @@
  * Creates the run row, builds the per-run workspace + agent, runs the agent,
  * captures output (or error), and persists status.
  *
- * The agent runs asynchronously — `dispatchAutomationRun` returns the run id
+ * The agent runs asynchronously - `dispatchAutomationRun` returns the run id
  * once the row is created and the agent is started, without waiting for it
  * to finish. Callers stream progress via the SSE route or poll the row.
  */
@@ -104,7 +104,7 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
   const timeoutMs = skill.frontmatter.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   // Resolve the project's long-lived automation API key (created on first
-  // use, stored encrypted). Reused across all runs — no per-run mint/revoke
+  // use, stored encrypted). Reused across all runs - no per-run mint/revoke
   // churn. Rotation is a separate admin action.
   try {
     const automationKey = await getOrCreateAutomationApiKey(project.id)
