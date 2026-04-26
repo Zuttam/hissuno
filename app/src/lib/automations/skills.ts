@@ -84,8 +84,8 @@ export function listBundledSkills(): SkillDescriptor[] {
 }
 
 /**
- * Look up a single skill by id. Bundled-only for v1; custom skills are wired
- * in Phase 7 once blob storage upload exists.
+ * Look up a bundled skill by id. Custom skills are project-scoped and
+ * resolved separately via `findSkillForProject` in `dispatch.ts`.
  */
 export function findSkill(skillId: string): SkillDescriptor | null {
   return listBundledSkills().find((s) => s.id === skillId) ?? null

@@ -11,7 +11,7 @@ import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
-import { listBundledSkills } from '@/lib/automations/skills'
+import { listSkillsForProject } from '@/lib/automations/dispatch'
 
 export const runtime = 'nodejs'
 
@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
 
-    const skills = listBundledSkills().map((s) => ({
+    const all = await listSkillsForProject(projectId)
+    const skills = all.map((s) => ({
       id: s.id,
       source: s.source,
       name: s.frontmatter.name,

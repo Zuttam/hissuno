@@ -351,6 +351,34 @@ export const issues = pgTable('issues', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
+// Per-project custom automation skills. The SKILL.md body lives in blob
+// storage (FileStorageProvider) at the path stored in `blob_path`; this row
+// is the metadata + frontmatter snapshot needed for catalog rendering and
+// trigger validation without round-tripping the blob on every list.
+export const customSkills = pgTable(
+  'custom_skills',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    project_id: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    skill_id: text('skill_id').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    version: text('version'),
+    blob_path: text('blob_path').notNull(),
+    /** Frontmatter snapshot — duplicated from SKILL.md for fast catalog reads. */
+    frontmatter: jsonb('frontmatter').notNull().default({}),
+    enabled: boolean('enabled').notNull().default(true),
+    created_by_user_id: uuid('created_by_user_id').references(() => users.id),
+    created_at: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('custom_skills_project_skill_idx').on(t.project_id, t.skill_id),
+  ],
+)
+
 // Generic per-run record for skill-based automations. Replaces compilation_runs
 // and issue_analysis_runs once each is migrated to a SKILL.md-driven flow
 // (see plan: replace static workflows with skill.md-based automations).

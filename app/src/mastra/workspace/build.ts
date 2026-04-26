@@ -14,10 +14,11 @@
 
 import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace'
 import { existsSync } from 'node:fs'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readCustomSkillContent } from '@/lib/automations/dispatch'
 import type { SkillDescriptor } from '@/lib/automations/types'
 
 export type WorkspaceForRunOptions = {
@@ -51,13 +52,30 @@ function resolveBundledSkillsDir(): string | null {
 }
 
 export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promise<Workspace> {
-  const skillsDir = resolveBundledSkillsDir()
-  if (!skillsDir) throw new Error('Bundled skills directory not found')
+  const bundledSkillsDir = resolveBundledSkillsDir()
+  if (!bundledSkillsDir) throw new Error('Bundled skills directory not found')
 
   // Per-run scratch directory. Lives under the OS temp dir so it cleans up
   // naturally and never leaks into the repo working tree.
   const workDir = join(tmpdir(), 'hissuno-automation', opts.runId)
   await mkdir(workDir, { recursive: true })
+
+  // For custom skills, materialize the SKILL.md from blob storage into a
+  // per-run skills directory and add it to the Workspace skills array. This
+  // lets Mastra's skill loader treat custom skills the same as bundled ones
+  // without us having to implement a custom SkillSource adapter.
+  const skillDirs: string[] = [bundledSkillsDir]
+  if (opts.skill.source === 'custom') {
+    const content = await readCustomSkillContent(opts.projectId, opts.skill.id)
+    if (!content) {
+      throw new Error(`Custom skill content missing for ${opts.skill.id}`)
+    }
+    const customSkillsRoot = join(workDir, '.skills')
+    const customSkillDir = join(customSkillsRoot, opts.skill.id)
+    await mkdir(customSkillDir, { recursive: true })
+    await writeFile(join(customSkillDir, 'SKILL.md'), content, 'utf8')
+    skillDirs.push(customSkillsRoot)
+  }
 
   const enableSandbox = opts.enableSandbox ?? true
 
@@ -91,7 +109,7 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
     id: `automation-run-${opts.runId}`,
     name: `Run ${opts.runId} (${opts.skill.id})`,
     filesystem: new LocalFilesystem({ basePath: workDir }),
-    skills: [skillsDir],
+    skills: skillDirs,
     sandbox: enableSandbox
       ? new LocalSandbox({
           workingDirectory: workDir,

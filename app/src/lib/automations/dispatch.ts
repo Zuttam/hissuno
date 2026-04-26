@@ -13,6 +13,12 @@
 import { Mastra } from '@mastra/core/mastra'
 import { RequestContext } from '@mastra/core/request-context'
 import { findSkill, listBundledSkills } from './skills'
+import {
+  getCustomSkillDescriptor,
+  listCustomSkillDescriptors,
+  readCustomSkillContent,
+} from './custom-skills'
+export { readCustomSkillContent }
 import { buildHarnessPrefix } from './harness'
 import { closeRunChannel, publishRunEvent, subscribeRunCancel } from './run-bus'
 import { buildWorkspaceForRun } from '@/mastra/workspace/build'
@@ -42,7 +48,8 @@ export type DispatchInput = {
 export async function dispatchAutomationRun(
   input: DispatchInput,
 ): Promise<{ run: AutomationRunRow }> {
-  const skill = findSkill(input.skillId)
+  const skill =
+    findSkill(input.skillId) ?? (await getCustomSkillDescriptor(input.projectId, input.skillId))
   if (!skill) {
     throw new Error(`Skill not found: ${input.skillId}`)
   }
@@ -259,3 +266,15 @@ function validateTrigger(
 
 /** Re-export so consumers don't have to import from skills.ts directly. */
 export { listBundledSkills }
+
+/**
+ * Returns the merged catalog (bundled + custom) for a project. Custom
+ * skills are loaded from the project-scoped blob storage; bundled skills
+ * come from the repo's packages/skills/.
+ */
+export async function listSkillsForProject(projectId: string) {
+  const [custom] = await Promise.all([listCustomSkillDescriptors(projectId)])
+  const customIds = new Set(custom.map((s) => s.id))
+  const bundled = listBundledSkills().filter((s) => !customIds.has(s.id))
+  return [...bundled, ...custom]
+}
