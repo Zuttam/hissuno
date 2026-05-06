@@ -7,7 +7,6 @@ import {
   widgetIntegrations,
   projectMembers,
   projectApiKeys,
-  compilationRuns,
   userProfiles,
   productScopes,
   companies,
@@ -18,7 +17,6 @@ import {
   sessionReviews,
   chatRuns,
   issues,
-  issueAnalysisRuns,
   sourceCodes,
   knowledgeSources,
   knowledgeEmbeddings,
@@ -55,7 +53,6 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   graphEvaluationSettings: one(graphEvaluationSettings, { fields: [projects.id], references: [graphEvaluationSettings.project_id] }),
   members: many(projectMembers),
   apiKeys: many(projectApiKeys),
-  compilationRuns: many(compilationRuns),
   productScopes: many(productScopes),
   companies: many(companies),
   contacts: many(contacts),
@@ -89,10 +86,6 @@ export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
 export const projectApiKeysRelations = relations(projectApiKeys, ({ one }) => ({
   project: one(projects, { fields: [projectApiKeys.project_id], references: [projects.id] }),
   createdBy: one(users, { fields: [projectApiKeys.created_by_user_id], references: [users.id] }),
-}))
-
-export const compilationRunsRelations = relations(compilationRuns, ({ one }) => ({
-  project: one(projects, { fields: [compilationRuns.project_id], references: [projects.id] }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -169,14 +162,8 @@ export const chatRunsRelations = relations(chatRuns, ({ one }) => ({
 
 export const issuesRelations = relations(issues, ({ one, many }) => ({
   project: one(projects, { fields: [issues.project_id], references: [projects.id] }),
-  analysisRuns: many(issueAnalysisRuns),
   embedding: one(embeddings, { fields: [issues.id], references: [embeddings.entity_id] }),
   entityRelationships: many(entityRelationships),
-}))
-
-export const issueAnalysisRunsRelations = relations(issueAnalysisRuns, ({ one }) => ({
-  issue: one(issues, { fields: [issueAnalysisRuns.issue_id], references: [issues.id] }),
-  project: one(projects, { fields: [issueAnalysisRuns.project_id], references: [projects.id] }),
 }))
 
 // ---------------------------------------------------------------------------

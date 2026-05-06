@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
@@ -7,6 +8,48 @@ import { getIssueById } from '@/lib/db/queries/issues'
 import { updateIssue, deleteIssue } from '@/lib/issues/issues-service'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import type { UpdateIssueInput } from '@/types/issue'
+
+// Validation for PATCH bodies. Tightened in particular for the analysis fields
+// because the automation runner now writes them via `hissuno update issues
+// --analysis-file`, and a misbehaving agent could otherwise persist garbage.
+const SCORE_RANGE = z.number().int().min(1).max(5)
+const EFFORT_ESTIMATE = z.enum(['trivial', 'small', 'medium', 'large', 'xlarge'])
+const ISSUE_TYPE = z.enum(['bug', 'feature_request', 'change_request'])
+const ISSUE_PRIORITY = z.enum(['low', 'medium', 'high'])
+const ISSUE_STATUS = z.enum(['open', 'ready', 'in_progress', 'resolved', 'closed'])
+
+const updateIssueSchema = z
+  .object({
+    name: z.string().min(1).max(500).optional(),
+    description: z.string().max(20_000).optional(),
+    type: ISSUE_TYPE.optional(),
+    priority: ISSUE_PRIORITY.optional(),
+    priority_manual_override: z.boolean().optional(),
+    status: ISSUE_STATUS.optional(),
+    reach_score: SCORE_RANGE.optional(),
+    reach_reasoning: z.string().max(2_000).optional(),
+    impact_score: SCORE_RANGE.optional(),
+    impact_analysis: z
+      .object({
+        impactScore: z.number().int().min(1).max(5),
+        reasoning: z.string().max(2_000),
+        goalAlignments: z
+          .array(z.object({ goalId: z.string(), reasoning: z.string().max(1_000).optional() }))
+          .optional(),
+      })
+      .nullable()
+      .optional(),
+    confidence_score: SCORE_RANGE.optional(),
+    confidence_reasoning: z.string().max(2_000).optional(),
+    effort_score: SCORE_RANGE.optional(),
+    effort_estimate: EFFORT_ESTIMATE.nullable().optional(),
+    effort_reasoning: z.string().max(2_000).optional(),
+    brief: z.string().max(20_000).nullable().optional(),
+    product_scope_id: z.string().nullable().optional(),
+    custom_fields: z.record(z.string(), z.unknown()).optional(),
+    pr_url: z.string().nullable().optional(),
+  })
+  .strict()
 
 export const runtime = 'nodejs'
 
@@ -84,7 +127,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Issue not found.' }, { status: 404 })
     }
 
-    const body = (await request.json()) as UpdateIssueInput
+    const rawBody = (await request.json().catch(() => null)) as unknown
+    const parsed = updateIssueSchema.safeParse(rawBody)
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid update payload.', issues: parsed.error.issues },
+        { status: 400 },
+      )
+    }
+    const body = parsed.data as UpdateIssueInput
 
     const issue = await updateIssue(issueId, body)
 

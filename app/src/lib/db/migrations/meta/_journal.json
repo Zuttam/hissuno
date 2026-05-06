@@ -8,6 +8,41 @@
       "when": 1776604290326,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1777195253385,
+      "tag": "0001_outgoing_reavers",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777198629428,
+      "tag": "0002_overjoyed_pretty_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777201298217,
+      "tag": "0003_yellow_mathemanic",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777202176697,
+      "tag": "0004_premium_sway",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777203256949,
+      "tag": "0005_absurd_quasar",
+      "breakpoints": true
     }
   ]
 }

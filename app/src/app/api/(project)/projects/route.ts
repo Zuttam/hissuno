@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import { NextResponse } from 'next/server'
 import { createGitHubCodebase, syncGitHubCodebase } from '@/lib/knowledge/codebase'
-import { triggerPackageCompilation } from '@/lib/knowledge/analysis-service'
+import { fireSourceAnalysis } from '@/lib/utils/source-processing'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { ForbiddenError } from '@/lib/auth/authorization'
 import { requireRequestIdentity } from '@/lib/auth/identity'
@@ -233,20 +233,21 @@ export async function POST(request: Request) {
       }
     }
 
-    // Auto-trigger analysis if not skipped and there are any knowledge sources
+    // Auto-trigger per-source analysis on project creation. Package
+    // compilation now lives behind the `hissuno-support-wiki` automation
+    // skill — invoked from the support agent's package settings, not on
+    // project create.
     const hasKnowledgeSources = knowledgeSourcesToInsert.length > 0
     if (!skipAnalysis && hasKnowledgeSources) {
       try {
-        const analysisResult = await triggerPackageCompilation({
-          projectId: id,
-          userId: identity.userId,
-        })
-
-        if (analysisResult.success) {
-          console.log('[projects.post] Analysis triggered for project:', id, 'analysisId:', analysisResult.analysisId)
-        } else {
-          console.warn('[projects.post] Failed to trigger analysis:', analysisResult.error)
+        const insertedSources = await db
+          .select({ id: knowledgeSources.id })
+          .from(knowledgeSources)
+          .where(eq(knowledgeSources.project_id, id))
+        for (const source of insertedSources) {
+          fireSourceAnalysis(source.id, id)
         }
+        console.log('[projects.post] Fired per-source analysis for project:', id, 'count:', insertedSources.length)
       } catch (analyzeError) {
         // Don't fail project creation if analysis trigger fails
         console.warn('[projects.post] Error triggering analysis:', analyzeError)

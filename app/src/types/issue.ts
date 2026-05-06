@@ -195,9 +195,15 @@ export interface UpdateIssueInput {
   priority_manual_override?: boolean
   status?: IssueStatus
   reach_score?: number
+  reach_reasoning?: string
   impact_score?: number
+  impact_analysis?: IssueImpactAnalysis | null
   confidence_score?: number
+  confidence_reasoning?: string
   effort_score?: number
+  effort_estimate?: EffortEstimate | null
+  effort_reasoning?: string
+  brief?: string | null
   product_scope_id?: string | null
   custom_fields?: Record<string, unknown>
   pr_url?: string | null

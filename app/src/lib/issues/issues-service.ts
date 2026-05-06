@@ -34,8 +34,7 @@ import { issues } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { linkEntities } from '@/lib/db/queries/entity-relationships'
 import { buildProgrammaticContext } from '@/lib/db/queries/relationship-metadata'
-import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings'
-import { triggerIssueAnalysis } from './analysis-service'
+import { notifyAutomationEvent } from '@/lib/automations/events'
 import type {
   IssueRecord,
   IssueWithProject,
@@ -74,29 +73,15 @@ function maybeFireIssueEmbedding(
 }
 
 /**
- * Fire-and-forget: check the project's issue_analysis_enabled setting
- * and kick off issue analysis via the analysis service (creates a run record).
- * The workflow itself marks the run as completed/failed in its final step.
+ * Fire the `issue.created` event so any skill subscribed to it (currently
+ * `hissuno-issue-analysis` when enabled per project) dispatches a run.
+ * Fire-and-forget — agents surface their own failures via the run row.
  */
 function maybeFireIssueAnalysis(issueId: string, projectId: string): void {
-  void (async () => {
-    try {
-      const settings = await getPmAgentSettingsAdmin(projectId)
-      if (!settings.issue_analysis_enabled) return
-
-      const result = await triggerIssueAnalysis({ projectId, issueId })
-      if (!result.success) return
-
-      const { mastra } = await import('@/mastra')
-      const workflow = mastra.getWorkflow('issueAnalysisWorkflow')
-      if (!workflow) return
-
-      const run = await workflow.createRun({ runId: result.runId })
-      void run.start({ inputData: { issueId, projectId, runId: result.runId } })
-    } catch {
-      // Non-blocking
-    }
-  })()
+  notifyAutomationEvent('issue.created', {
+    projectId,
+    entity: { type: 'issue', id: issueId },
+  })
 }
 
 // ============================================================================

@@ -37,7 +37,7 @@
     "eval:pm-agent:verbose": "npx tsx src/evals/pm-agent.eval.ts --verbose",
     "dev:mastra": "npx mastra dev --dir src/mastra",
     "seed": "npx tsx --tsconfig tsconfig.json src/scripts/seed.ts",
-    "db:push": "ENV_FILE=${ENV_FILE:-.env.local} sh -c 'tsx --env-file $ENV_FILE ../node_modules/drizzle-kit/bin.cjs push'",
+    "db:push": "ENV_FILE=${ENV_FILE:-.env.local} sh -c 'tsx --env-file $ENV_FILE ../node_modules/drizzle-kit/bin.cjs push --force'",
     "db:generate": "ENV_FILE=${ENV_FILE:-.env.local} sh -c 'tsx --env-file $ENV_FILE ../node_modules/drizzle-kit/bin.cjs generate'",
     "db:migrate": "ENV_FILE=${ENV_FILE:-.env.local} sh -c 'tsx --env-file $ENV_FILE ../node_modules/drizzle-kit/bin.cjs migrate'"
   },
@@ -64,6 +64,7 @@
     "@vercel/blob": "^2.3.1",
     "ai": "^5.0.87",
     "bcryptjs": "^3.0.3",
+    "cron-parser": "^4.9.0",
     "d3-drag": "^3.0.0",
     "d3-force": "^3.0.0",
     "d3-quadtree": "^3.0.1",
@@ -92,6 +93,7 @@
     "resend": "^6.7.0",
     "svix": "^1.84.1",
     "tailwind-merge": "^3.4.0",
+    "yaml": "^2.8.3",
     "zod": "^3.23.8"
   },
   "devDependencies": {

@@ -8,7 +8,6 @@ import type {
   projectSettings,
   projectMembers,
   projectApiKeys,
-  compilationRuns,
   userProfiles,
   productScopes,
   companies,
@@ -19,7 +18,6 @@ import type {
   sessionReviews,
   chatRuns,
   issues,
-  issueAnalysisRuns,
   knowledgeSources,
   knowledgeEmbeddings,
   supportPackages,
@@ -51,9 +49,6 @@ export type ProjectMemberInsert = typeof projectMembers.$inferInsert
 
 export type ProjectApiKeyRow = typeof projectApiKeys.$inferSelect
 export type ProjectApiKeyInsert = typeof projectApiKeys.$inferInsert
-
-export type CompilationRunRow = typeof compilationRuns.$inferSelect
-export type CompilationRunInsert = typeof compilationRuns.$inferInsert
 
 // ---------------------------------------------------------------------------
 // User Profiles
@@ -103,9 +98,6 @@ export type ChatRunInsert = typeof chatRuns.$inferInsert
 // ---------------------------------------------------------------------------
 export type IssueRow = typeof issues.$inferSelect
 export type IssueInsert = typeof issues.$inferInsert
-
-export type IssueAnalysisRunRow = typeof issueAnalysisRuns.$inferSelect
-export type IssueAnalysisRunInsert = typeof issueAnalysisRuns.$inferInsert
 
 // ---------------------------------------------------------------------------
 // Knowledge

@@ -6,10 +6,20 @@ description: >
   Triggers on: customer health, account review, customer deep dive, account analysis,
   churn risk, customer assessment, renewal prep, account health check.
   Requires the hissuno CLI to be configured.
+version: "1.0"
 license: MIT
 metadata:
   author: hissuno
-  version: "1.0"
+triggers:
+  manual: { entity: customer }
+input:
+  customerId:
+    type: string
+    required: true
+    description: ID of the customer (contact or company) to analyze.
+capabilities:
+  sandbox: true
+  webSearch: true
 ---
 
 # Customer Health Deep Dive

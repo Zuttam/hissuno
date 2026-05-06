@@ -1,4 +1,3 @@
-// @ts-nocheck -- TODO: re-enable after migrating tool execute signature/scorer typing to Mastra v1
 /**
  * Duplicate Detection Scorer
  *
@@ -6,7 +5,12 @@
  * when analyzing sessions that are duplicates of known issues.
  */
 
-import { createScorer } from '@mastra/core/scores'
+import { createScorer } from '@mastra/core/evals'
+
+type ScorerRun = {
+  input?: DuplicateScorerInput
+  output: DuplicateScorerOutput
+}
 
 /**
  * Input type for duplicate detection scorer
@@ -35,15 +39,15 @@ export interface DuplicateScorerOutput {
  * - Returns 1.0 if correctly found/not found existing issue
  * - Returns 0.0 if missed duplicate or false positive
  */
-/* FIXME(mastra): Add a unique `id` parameter. See: https://mastra.ai/guides/migrations/upgrade-to-v1/mastra#required-id-parameter-for-all-mastra-primitives */
 export const duplicateDetectionScorer = createScorer<
   DuplicateScorerInput,
   DuplicateScorerOutput
 >({
+  id: 'duplicate-detection',
   name: 'Duplicate Detection',
   description: 'Evaluates whether the PM agent correctly identified duplicate issues',
 })
-  .preprocess(({ run }) => {
+  .preprocess(({ run }: { run: ScorerRun }) => {
     const { action, foundExistingIssue, foundIssueId, rawResponse } = run.output
 
     // For upvoted actions, the agent found an existing issue
@@ -56,7 +60,7 @@ export const duplicateDetectionScorer = createScorer<
       rawResponse,
     }
   })
-  .analyze(({ run, results }) => {
+  .analyze(({ run, results }: { run: ScorerRun; results: { preprocessStepResult: { detectedDuplicate: boolean; foundIssueId?: string } } }) => {
     const shouldFindExisting = run.input?.shouldFindExisting ?? false
     const existingIssueId = run.input?.existingIssueId
     const { detectedDuplicate, foundIssueId } = results.preprocessStepResult
@@ -94,11 +98,11 @@ export const duplicateDetectionScorer = createScorer<
       isCorrect,
     }
   })
-  .generateScore(({ results }) => {
+  .generateScore(({ results }: { results: { analyzeStepResult: { isCorrect: boolean } } }) => {
     // Return 1.0 for correct detection, 0.0 for incorrect
     return results.analyzeStepResult.isCorrect ? 1.0 : 0.0
   })
-  .generateReason(({ run, results }) => {
+  .generateReason(({ run, results }: { run: ScorerRun; results: { analyzeStepResult: Record<string, unknown> } }) => {
     const { outcome, shouldFindExisting, existingIssueId, foundIssueId } =
       results.analyzeStepResult
     const testCaseName = run.input?.testCaseName ?? 'Unknown'

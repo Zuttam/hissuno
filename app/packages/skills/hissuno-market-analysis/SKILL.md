@@ -6,10 +6,20 @@ description: >
   Triggers on: market analysis, initiative analysis, competitive analysis, demand validation,
   scope analysis, market research, TAM, competitor research.
   Requires the hissuno CLI to be configured.
+version: "1.0"
 license: MIT
 metadata:
   author: hissuno
-  version: "1.0"
+triggers:
+  manual: { entity: scope }
+input:
+  scopeId:
+    type: string
+    required: true
+    description: ID of the product scope to analyze.
+capabilities:
+  sandbox: true
+  webSearch: true
 ---
 
 # Market Analysis

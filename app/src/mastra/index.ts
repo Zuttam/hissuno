@@ -2,16 +2,12 @@
 import { Mastra } from '@mastra/core/mastra';
 import { PinoLogger } from '@mastra/loggers';
 import { PostgresStore } from '@mastra/pg';
-import { packageCompilationWorkflow } from './workflows/package-compilation';
-import { issueAnalysisWorkflow } from './workflows/issue-analysis';
 import { supportAgent } from './agents/support-agent';
 import { codebaseAnalyzerAgent } from './agents/codebase-analyzer-agent';
 import { webScraperAgent } from './agents/web-scraper-agent';
 import { productManagerAgent } from './agents/product-manager-agent';
-import { briefWriterAgent } from './agents/brief-writer-agent';
 import { securityScannerAgent } from './agents/security-scanner-agent';
 import { taggingAgent } from './agents/tagging-agent';
-import { technicalAnalystAgent } from './agents/technical-analyst-agent';
 import { responseClassifierAgent } from './agents/response-classifier-agent';
 
 // Cache only the PostgresStore to prevent duplicate DB connections during Next.js HMR
@@ -38,16 +34,13 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export const mastra = new Mastra({
-  workflows: { packageCompilationWorkflow, issueAnalysisWorkflow },
   agents: {
     supportAgent,
     codebaseAnalyzerAgent,
     webScraperAgent,
     productManagerAgent,
-    briefWriterAgent,
     securityScannerAgent,
     taggingAgent,
-    technicalAnalystAgent,
     responseClassifierAgent,
   },
   storage,

@@ -50,6 +50,11 @@ export const projectSettings = pgTable('project_settings', {
   // AI model configuration (per-project override)
   ai_model: text('ai_model'),
   ai_model_small: text('ai_model_small'),
+  // Automation runner — long-lived project-scoped API key used by skill-runner
+  // sandboxes. One per project, encrypted at rest with AUTOMATION_KEY_ENC_SECRET.
+  // Created on demand by getOrCreateAutomationApiKey.
+  automation_key_id: uuid('automation_key_id'),
+  automation_key_ciphertext: text('automation_key_ciphertext'),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
@@ -112,20 +117,6 @@ export const projectApiKeys = pgTable('project_api_keys', {
   last_used_at: timestamp('last_used_at', { mode: 'date' }),
   expires_at: timestamp('expires_at', { mode: 'date' }),
   revoked_at: timestamp('revoked_at', { mode: 'date' }),
-  created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-})
-
-export const compilationRuns = pgTable('compilation_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  run_id: text('run_id').notNull(),
-  status: text('status').notNull().default('pending'),
-  metadata: jsonb('metadata'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
 })
 
@@ -365,21 +356,67 @@ export const issues = pgTable('issues', {
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
 })
 
-export const issueAnalysisRuns = pgTable('issue_analysis_runs', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  issue_id: uuid('issue_id')
-    .notNull()
-    .references(() => issues.id),
-  project_id: uuid('project_id')
-    .notNull()
-    .references(() => projects.id),
-  run_id: text('run_id').notNull(),
-  status: text('status').notNull().default('pending'),
-  metadata: jsonb('metadata'),
-  error_message: text('error_message'),
-  started_at: timestamp('started_at', { mode: 'date' }),
-  completed_at: timestamp('completed_at', { mode: 'date' }),
-})
+// Per-project custom automation skills. The SKILL.md body lives in blob
+// storage (FileStorageProvider) at the path stored in `blob_path`; this row
+// is the metadata + frontmatter snapshot needed for catalog rendering and
+// trigger validation without round-tripping the blob on every list.
+export const customSkills = pgTable(
+  'custom_skills',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    project_id: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    skill_id: text('skill_id').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull(),
+    version: text('version'),
+    blob_path: text('blob_path').notNull(),
+    /** Frontmatter snapshot — duplicated from SKILL.md for fast catalog reads. */
+    frontmatter: jsonb('frontmatter').notNull().default({}),
+    enabled: boolean('enabled').notNull().default(true),
+    created_by_user_id: uuid('created_by_user_id').references(() => users.id),
+    created_at: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique('custom_skills_project_skill_idx').on(t.project_id, t.skill_id),
+  ],
+)
+
+// Generic per-run record for skill-based automations. Replaces compilation_runs
+// and issue_analysis_runs once each is migrated to a SKILL.md-driven flow
+// (see plan: replace static workflows with skill.md-based automations).
+export const automationRuns = pgTable(
+  'automation_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    project_id: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    skill_id: text('skill_id').notNull(),
+    skill_version: text('skill_version'),
+    skill_source: text('skill_source').notNull().default('bundled'), // 'bundled' | 'custom'
+    trigger_type: text('trigger_type').notNull(), // 'manual' | 'scheduled' | 'event'
+    trigger_entity_type: text('trigger_entity_type'), // 'issue' | 'customer' | 'scope' | ...
+    trigger_entity_id: text('trigger_entity_id'),
+    status: text('status').notNull().default('queued'), // queued | running | succeeded | failed | cancelled
+    input: jsonb('input').notNull().default({}),
+    output: jsonb('output'),
+    error: jsonb('error'),
+    progress_events: jsonb('progress_events').notNull().default([]),
+    started_at: timestamp('started_at', { mode: 'date' }),
+    completed_at: timestamp('completed_at', { mode: 'date' }),
+    duration_ms: integer('duration_ms'),
+    created_at: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    index('automation_runs_project_skill_idx').on(t.project_id, t.skill_id, t.created_at),
+    index('automation_runs_status_idx').on(t.status),
+    index('automation_runs_entity_idx').on(t.trigger_entity_type, t.trigger_entity_id),
+  ],
+)
 
 // ---------------------------------------------------------------------------
 // Knowledge

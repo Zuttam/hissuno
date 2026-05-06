@@ -38,6 +38,79 @@ interface UseIssueAnalysisReturn {
 
 const CONNECTION_TIMEOUT_MS = 60_000
 
+/**
+ * Map the new automation-runner SSE shape onto the legacy event types this
+ * UI was built around. Returns `null` for events the UI doesn't render
+ * (snapshots, raw output payloads).
+ */
+function translateAutomationEvent(raw: {
+  type: string
+  message?: string
+  data?: Record<string, unknown>
+  timestamp: string
+}): AnalysisEvent | null {
+  switch (raw.type) {
+    case 'run-start':
+      return {
+        type: 'workflow-start',
+        message: raw.message,
+        data: raw.data,
+        timestamp: raw.timestamp,
+      }
+    case 'progress':
+      return {
+        type: 'step-progress',
+        message: raw.message,
+        data: raw.data,
+        timestamp: raw.timestamp,
+      }
+    case 'run-finish':
+      return {
+        type: 'workflow-finish',
+        message: raw.message,
+        data: raw.data,
+        timestamp: raw.timestamp,
+      }
+    case 'final': {
+      const status = (raw.data?.status as string | undefined) ?? 'succeeded'
+      if (status === 'succeeded') {
+        return {
+          type: 'workflow-finish',
+          message: raw.message,
+          data: raw.data,
+          timestamp: raw.timestamp,
+        }
+      }
+      return {
+        type: 'error',
+        message: raw.message ?? `Analysis ${status}`,
+        data: raw.data,
+        timestamp: raw.timestamp,
+      }
+    }
+    case 'cancelled':
+      return {
+        type: 'error',
+        message: raw.message ?? 'Run cancelled',
+        data: raw.data,
+        timestamp: raw.timestamp,
+      }
+    case 'error':
+      return {
+        type: 'error',
+        message: raw.message ?? 'Analysis failed',
+        data: raw.data,
+        timestamp: raw.timestamp,
+      }
+    case 'snapshot':
+    case 'output':
+      // Useful telemetry but not a UI step. Drop silently.
+      return null
+    default:
+      return null
+  }
+}
+
 export function useIssueAnalysis({
   projectId,
   issueId,
@@ -50,6 +123,7 @@ export function useIssueAnalysis({
   const [completedSteps, setCompletedSteps] = useState(0)
   const eventSourceRef = useRef<EventSource | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const currentRunIdRef = useRef<string | null>(null)
 
   const clearConnectionTimeout = useCallback(() => {
     if (timeoutRef.current) {
@@ -92,29 +166,40 @@ export function useIssueAnalysis({
 
       eventSource.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data) as AnalysisEvent
+          const raw = JSON.parse(event.data) as { type: string; message?: string; data?: Record<string, unknown>; timestamp: string }
           resetConnectionTimeout()
 
-          if (data.type === 'heartbeat') return
+          if (raw.type === 'heartbeat') return
 
-          setEvents((prev) => [...prev, data])
+          // Translate the new automation-runner event shape into the legacy
+          // step-based UI shape so the existing progress UI keeps working.
+          // New types: run-start, progress, run-finish, snapshot, output,
+          // final, error. Old types this UI expects: workflow-start,
+          // step-start, step-progress, step-finish, workflow-finish, error.
+          const translated = translateAutomationEvent(raw)
+          if (!translated) return
 
-          if (data.type === 'workflow-start' && data.data?.totalSteps) {
-            setTotalSteps(data.data.totalSteps as number)
+          setEvents((prev) => [...prev, translated])
+
+          if (translated.type === 'workflow-start' && translated.data?.totalSteps) {
+            setTotalSteps(translated.data.totalSteps as number)
           }
 
-          if (data.type === 'step-finish') {
+          if (translated.type === 'step-progress') {
+            // Treat each progress message as a fresh step boundary so the
+            // existing UI advances. The new model is phase-based, not
+            // step-based — matching exact step counts isn't meaningful.
             setCompletedSteps((prev) => prev + 1)
           }
 
-          if (data.type === 'workflow-finish' || data.type === 'error') {
+          if (translated.type === 'workflow-finish' || translated.type === 'error') {
             cleanup()
             setTimeout(() => {
               setIsAnalyzing(false)
-              if (data.type === 'workflow-finish') {
+              if (translated.type === 'workflow-finish') {
                 onComplete?.()
-              } else if (data.type === 'error') {
-                setError(data.message ?? 'Analysis failed')
+              } else if (translated.type === 'error') {
+                setError(translated.message ?? 'Analysis failed')
               }
             }, 500)
           }
@@ -152,6 +237,7 @@ export function useIssueAnalysis({
         throw new Error('No runId returned from analysis start')
       }
 
+      currentRunIdRef.current = runId
       connectToStream(runId)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to start analysis'
@@ -162,13 +248,15 @@ export function useIssueAnalysis({
 
   const cancelAnalysisFn = useCallback(async () => {
     setError(null)
+    const runId = currentRunIdRef.current
 
     try {
-      await apiCancelAnalysis(projectId, issueId)
+      await apiCancelAnalysis(projectId, issueId, runId ?? undefined)
 
       cleanup()
       setIsAnalyzing(false)
       setEvents([])
+      currentRunIdRef.current = null
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to cancel'
       setError(message)

@@ -1,0 +1,1 @@
+DROP TABLE "issue_analysis_runs" CASCADE;
