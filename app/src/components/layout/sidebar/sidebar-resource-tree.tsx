@@ -68,8 +68,7 @@ export function SidebarResourceTree({ isCollapsed, onNavigate }: SidebarResource
       case 'issues': router.push(`${base}/issues/${item.id}`); break
       case 'feedback': router.push(`${base}/sessions/${item.id}`); break
       case 'customers': router.push(`${base}/customers/${item.subtype === 'contact' ? 'contacts' : 'companies'}/${item.id}`); break
-      case 'knowledge': router.push(`${base}/knowledge`); break
-      case 'scopes': router.push(`${base}/products`); break
+      case 'scopes': router.push(`${base}/products?area=${item.id}`); break
     }
     onNavigate?.()
   }, [projectId, router, onNavigate])

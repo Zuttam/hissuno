@@ -4,6 +4,10 @@
  * Per-project user-uploaded automation skills. The metadata row lives here;
  * the SKILL.md body lives in blob storage at `blob_path`. Reading the body
  * is a separate concern handled in `lib/automations/custom-skills.ts`.
+ *
+ * Per-project enabled / trigger overrides live in `project_skill_settings`
+ * — see `lib/db/queries/project-skill-settings.ts`. That table covers both
+ * bundled and custom skills uniformly.
  */
 
 import { and, asc, eq } from 'drizzle-orm'

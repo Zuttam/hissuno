@@ -218,10 +218,18 @@ describe('formatSearchResults', () => {
 describe('formatResourceTypes', () => {
   it('includes all resource types', () => {
     const result = formatResourceTypes()
-    expect(result).toContain('knowledge')
     expect(result).toContain('feedback')
     expect(result).toContain('issues')
     expect(result).toContain('customers')
+    expect(result).toContain('scopes')
+    expect(result).toContain('knowledge')
+    expect(result).toContain('codebase')
+  })
+
+  it('documents knowledge defaults to the project root scope', () => {
+    const result = formatResourceTypes()
+    expect(result).toContain('--scope')
+    expect(result).toMatch(/Defaults to the project root scope/)
   })
 
   it('includes filter information', () => {

@@ -11,7 +11,6 @@ const TYPE_MAP: Record<string, ResourceGroupType> = {
   issues: 'issues',
   feedback: 'feedback',
   customers: 'customers',
-  knowledge: 'knowledge',
   scopes: 'scopes',
 }
 
@@ -20,7 +19,6 @@ function groupResults(results: SearchResult[]): Record<ResourceGroupType, Resour
     issues: [],
     feedback: [],
     customers: [],
-    knowledge: [],
     scopes: [],
   }
 

@@ -1,50 +1,57 @@
 /**
- * PATCH /api/automations/[skillId]?projectId=...
+ * GET /api/automations/[skillId]?projectId=...
  *
- * Toggle a skill's enabled state for the current project. Body:
- *   { enabled: boolean }
- *
- * Affects all triggers (manual, scheduled, event). Default behaviour for
- * any skill not in project_skill_settings is enabled - so PATCHing a row
- * with `enabled: true` is only meaningful as an explicit re-enable after
- * a previous disable.
+ * Returns the SKILL.md content plus frontmatter for either a bundled or
+ * custom skill, used by the in-app skill viewer / download action.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
-import { requireUserIdentity } from '@/lib/auth/identity'
+import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
 import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
-import { setSkillEnabled } from '@/lib/db/queries/project-skill-settings'
+import { findSkill, readSkillBody } from '@/lib/automations/skills'
+import {
+  getCustomSkillDescriptor,
+  readCustomSkillContent,
+} from '@/lib/automations/custom-skills'
 
 export const runtime = 'nodejs'
 
-const bodySchema = z.object({ enabled: z.boolean() }).strict()
-
-export async function PATCH(
+export async function GET(
   request: NextRequest,
   context: { params: Promise<{ skillId: string }> },
 ) {
   try {
     const projectId = requireProjectId(request)
-    const identity = await requireUserIdentity()
+    const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
 
     const { skillId } = await context.params
 
-    const rawBody = (await request.json().catch(() => null)) as unknown
-    const parsed = bodySchema.safeParse(rawBody)
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid body', issues: parsed.error.issues },
-        { status: 400 },
-      )
+    const custom = await getCustomSkillDescriptor(projectId, skillId)
+    if (custom) {
+      const content = await readCustomSkillContent(projectId, skillId)
+      return NextResponse.json({
+        skillId: custom.id,
+        source: 'custom' as const,
+        frontmatter: custom.frontmatter,
+        content: content ?? '',
+      })
     }
 
-    await setSkillEnabled(projectId, skillId, parsed.data.enabled)
+    const bundled = findSkill(skillId)
+    if (bundled) {
+      const content = readSkillBody(bundled)
+      return NextResponse.json({
+        skillId: bundled.id,
+        source: 'bundled' as const,
+        frontmatter: bundled.frontmatter,
+        content,
+      })
+    }
 
-    return NextResponse.json({ ok: true, skillId, enabled: parsed.data.enabled })
+    return NextResponse.json({ error: 'Skill not found' }, { status: 404 })
   } catch (error) {
     if (error instanceof MissingProjectIdError) {
       return NextResponse.json({ error: error.message }, { status: 400 })
@@ -55,7 +62,7 @@ export async function PATCH(
     if (error instanceof ForbiddenError) {
       return NextResponse.json({ error: error.message }, { status: 403 })
     }
-    console.error('[automations.toggle] error', error)
+    console.error('[automations.detail] error', error)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

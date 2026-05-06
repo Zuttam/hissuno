@@ -1,110 +1,112 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Button, Dialog, Spinner, Text } from '@/components/ui'
+import { Badge, Button, Dialog, Spinner, Text } from '@/components/ui'
+import { formatRelativeTime } from '@/lib/utils/format-time'
 
-type RunRow = {
+interface RunRow {
   runId: string
-  skillId: string
-  skillVersion: string | null
-  triggerType: string
-  triggerEntityType: string | null
-  triggerEntityId: string | null
   status: string
-  startedAt: string | null
+  triggerType: string
+  ranAt: string
   completedAt: string | null
   durationMs: number | null
-  createdAt: string
   error: { message?: string } | null
 }
 
-type Props = {
+interface Props {
   open: boolean
-  skillId: string
-  skillName: string
   projectId: string
-  onClose: () => void
-  onOpenRun: (runId: string) => void
+  skillId: string
+  onCloseAction: () => void
+  onOpenRunAction: (runId: string) => void
 }
 
-export function RunHistoryDialog({ open, skillId, skillName, projectId, onClose, onOpenRun }: Props) {
+export function RunHistoryDialog({ open, projectId, skillId, onCloseAction, onOpenRunAction }: Props) {
   const [runs, setRuns] = useState<RunRow[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
+    let cancelled = false
     void (async () => {
-      setIsLoading(true)
       try {
-        const url = `/api/automations/runs?projectId=${projectId}&skillId=${encodeURIComponent(skillId)}&limit=50`
-        const res = await fetch(url)
-        if (!res.ok) {
-          console.error('[run-history] fetch failed', res.status)
-          return
-        }
+        const res = await fetch(`/api/automations/${skillId}/runs?projectId=${projectId}&limit=20`)
+        if (!res.ok) throw new Error(`Failed to load runs (${res.status})`)
         const data = (await res.json()) as { runs: RunRow[] }
+        if (cancelled) return
         setRuns(data.runs)
+        setError(null)
       } catch (err) {
-        console.error('[run-history] error', err)
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : 'Failed to load runs')
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setLoading(false)
       }
     })()
-  }, [open, skillId, projectId])
+    return () => {
+      cancelled = true
+    }
+  }, [open, projectId, skillId])
 
   return (
-    <Dialog open={open} onClose={onClose} title={`Run history · ${skillName}`} size="lg">
-      <div className="flex flex-col gap-3">
-        {isLoading ? (
-          <div className="flex justify-center py-8"><Spinner /></div>
+    <Dialog open={open} onClose={onCloseAction} title={`Run history · ${skillId}`} size="lg">
+      <div className="flex flex-col gap-2">
+        {loading ? (
+          <div className="flex justify-center py-6">
+            <Spinner size="md" />
+          </div>
+        ) : error ? (
+          <Text variant="muted">{error}</Text>
         ) : runs.length === 0 ? (
           <Text variant="muted">No runs yet.</Text>
         ) : (
-          <div className="flex flex-col gap-1 max-h-[60vh] overflow-y-auto">
+          <ul className="flex flex-col gap-1">
             {runs.map((run) => (
-              <button
+              <li
                 key={run.runId}
-                type="button"
-                onClick={() => onOpenRun(run.runId)}
-                className="text-left rounded-md border border-[color:var(--border-subtle)] hover:bg-[color:var(--surface-hover)] p-2 flex items-center gap-2"
+                className="flex items-center justify-between rounded-[4px] bg-[color:var(--bg-muted)] px-3 py-2 text-xs"
               >
-                <StatusPill status={run.status} />
-                <span className="text-xs text-[color:var(--fg-muted)] shrink-0">
-                  {run.triggerType}
-                  {run.triggerEntityType ? ` · ${run.triggerEntityType}/${run.triggerEntityId?.slice(0, 8)}` : ''}
-                </span>
-                <span className="text-xs text-[color:var(--fg-muted)] ml-auto shrink-0">
-                  {formatTime(run.createdAt)}
-                  {run.durationMs ? ` · ${(run.durationMs / 1000).toFixed(1)}s` : ''}
-                </span>
-              </button>
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={statusVariant(run.status)}>{run.status}</Badge>
+                    <span className="text-[color:var(--text-tertiary)]">{run.triggerType}</span>
+                    <span className="text-[color:var(--text-tertiary)]">
+                      {formatRelativeTime(run.ranAt)}
+                    </span>
+                    {typeof run.durationMs === 'number' && (
+                      <span className="text-[color:var(--text-tertiary)]">
+                        {Math.round(run.durationMs)}ms
+                      </span>
+                    )}
+                  </div>
+                  {run.error?.message && (
+                    <span className="text-[color:var(--accent-danger)] truncate">
+                      {run.error.message}
+                    </span>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => onOpenRunAction(run.runId)}>
+                  Open
+                </Button>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-        <div className="flex justify-end">
-          <Button variant="secondary" onClick={onClose}>Close</Button>
+        <div className="flex justify-end pt-2">
+          <Button variant="secondary" size="sm" onClick={onCloseAction}>
+            Close
+          </Button>
         </div>
       </div>
     </Dialog>
   )
 }
 
-function StatusPill({ status }: { status: string }) {
-  const color =
-    status === 'succeeded' ? 'var(--accent-success)' :
-    status === 'failed' || status === 'cancelled' ? 'var(--accent-danger)' :
-    status === 'running' ? 'var(--accent-info)' :
-    'var(--fg-muted)'
-  return (
-    <span
-      className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-      style={{ backgroundColor: 'var(--bg-muted)', color }}
-    >
-      {status}
-    </span>
-  )
-}
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleString()
+function statusVariant(status: string): 'default' | 'success' | 'danger' | 'warning' {
+  if (status === 'succeeded') return 'success'
+  if (status === 'failed') return 'danger'
+  if (status === 'running' || status === 'queued') return 'warning'
+  return 'default'
 }

@@ -1,6 +1,10 @@
 /**
- * GET    /api/automations/custom/[skillId]?projectId=...  - fetch SKILL.md content
- * DELETE /api/automations/custom/[skillId]?projectId=...  - remove the skill
+ * GET    /api/automations/custom/[skillId]?projectId=...  — fetch SKILL.md content
+ * DELETE /api/automations/custom/[skillId]?projectId=...  — remove the skill
+ *
+ * Per-project enable/disable + trigger overrides have moved to
+ * `/api/automations/[skillId]/settings` (covers both bundled and custom
+ * skills uniformly).
  */
 
 import { NextRequest, NextResponse } from 'next/server'

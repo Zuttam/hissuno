@@ -5,18 +5,18 @@
  *
  * Uses the unified /api/plugins/[pluginId] routes to:
  *   - list connections
- *   - create a connection (api_key: in-dialog; oauth2: redirect)
+ *   - create a connection (api_key: in-dialog; oauth2 + custom: redirect)
  *   - enable/configure streams with per-stream frequency
  *   - trigger manual sync (SSE)
  *   - disconnect
  *
- * For api_key + oauth2 plugins this replaces the 8 hand-written dialogs.
- * Custom-auth plugins (slack, notion, github) keep their legacy dialogs.
+ * Custom-auth plugins (slack, notion, github) use the same redirect flow as
+ * oauth2 — their auth.connect handler returns an authorizeUrl.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Plug, RefreshCw, Unplug, X } from 'lucide-react'
-import { Badge, Button, Dialog, FormField, InlineAlert, Input, Select, Spinner } from '@/components/ui'
+import { Check, GitBranch, Plug, Plus, RefreshCw, Unplug, X } from 'lucide-react'
+import { Badge, Button, Dialog, FormField, InlineAlert, Input, Select, Spinner, Text } from '@/components/ui'
 import {
   fetchPluginConnections,
   connectPlugin,
@@ -27,6 +27,8 @@ import {
   type PluginConnectionStream,
   type PluginSseEvent,
 } from '@/lib/api/plugins'
+import { listCodebases, type CodebaseRecord } from '@/lib/api/codebases'
+import { CodebaseCreateDialog } from '@/components/projects/codebases/codebase-create-dialog'
 import type { CatalogPlugin } from '@/app/api/plugins/catalog/route'
 import { formatRelativeTime } from '@/lib/utils/format-time'
 
@@ -139,14 +141,8 @@ function ConnectSection({
   if (plugin.auth.type === 'api_key') {
     return <ApiKeyConnectForm plugin={plugin} projectId={projectId} onConnected={onConnected} submitLabel={label} />
   }
-  if (plugin.auth.type === 'oauth2') {
-    return <OAuth2ConnectButton plugin={plugin} projectId={projectId} label={label} />
-  }
-  return (
-    <InlineAlert variant="attention">
-      This integration uses a custom connect flow. Open the legacy dialog to finish setup.
-    </InlineAlert>
-  )
+  // oauth2 and custom-auth plugins both return an authorizeUrl from connectPlugin().
+  return <RedirectConnectButton plugin={plugin} projectId={projectId} label={label} />
 }
 
 function ApiKeyConnectForm({
@@ -203,7 +199,7 @@ function ApiKeyConnectForm({
   )
 }
 
-function OAuth2ConnectButton({
+function RedirectConnectButton({
   plugin,
   projectId,
   label,
@@ -302,6 +298,10 @@ function ConnectionCard({
         <div className="mt-3">
           <InlineAlert variant="danger">{error}</InlineAlert>
         </div>
+      )}
+
+      {plugin.id === 'github' && (
+        <GitHubCodebasesSection projectId={projectId} />
       )}
 
       <div className="mt-4 flex flex-col gap-3">
@@ -499,5 +499,81 @@ function SyncButton({
       <RefreshCw size={14} />
       Sync
     </Button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// GitHub-specific: list and create codebases
+// ---------------------------------------------------------------------------
+
+function GitHubCodebasesSection({ projectId }: { projectId: string }) {
+  const [codebases, setCodebases] = useState<CodebaseRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      const list = await listCodebases(projectId)
+      setCodebases(list.filter((c) => c.kind === 'github'))
+    } catch (err) {
+      console.error('[github-codebases] failed to load', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  return (
+    <div className="mt-4 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-tertiary)]">
+          Codebases
+        </h4>
+        <Button variant="secondary" size="sm" onClick={() => setShowCreate(true)}>
+          <Plus size={14} />
+          Add a codebase
+        </Button>
+      </div>
+      {loading ? (
+        <Spinner size="sm" />
+      ) : codebases.length === 0 ? (
+        <Text variant="muted" size="sm">
+          No codebases yet. Add one to make the repo available across this project.
+        </Text>
+      ) : (
+        <div className="flex flex-col gap-1">
+          {codebases.map((cb) => (
+            <div
+              key={cb.id}
+              className="flex items-center justify-between rounded-[4px] bg-[color:var(--surface-muted)] px-3 py-2"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <GitBranch size={14} className="text-[color:var(--text-tertiary)] shrink-0" />
+                <span className="text-sm text-[color:var(--foreground)] truncate">
+                  {cb.name ?? cb.repository_url ?? 'Untitled codebase'}
+                </span>
+                {cb.repository_branch && (
+                  <span className="text-xs text-[color:var(--text-tertiary)] shrink-0">
+                    {cb.repository_branch}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {showCreate && (
+        <CodebaseCreateDialog
+          open
+          projectId={projectId}
+          onCloseAction={() => setShowCreate(false)}
+          onCreatedAction={() => void refresh()}
+        />
+      )}
+    </div>
   )
 }

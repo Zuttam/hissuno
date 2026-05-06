@@ -57,6 +57,20 @@
       "when": 1777206082243,
       "tag": "0007_organic_war_machine",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777300000000,
+      "tag": "0008_codebase_first_class",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777400000000,
+      "tag": "0009_project_skill_settings",
+      "breakpoints": true
     }
   ]
 }

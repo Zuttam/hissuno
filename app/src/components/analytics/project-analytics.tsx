@@ -104,7 +104,7 @@ export function ProjectAnalytics({ projectId, velocityData }: ProjectAnalyticsPr
           size="sm"
         />
         <StatCard
-          label="Knowledge Added"
+          label="Knowledge Added Across Scopes"
           value={data.knowledgeAdded.value}
           change={data.knowledgeAdded.change}
           size="sm"

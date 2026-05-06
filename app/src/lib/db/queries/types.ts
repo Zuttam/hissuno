@@ -23,7 +23,7 @@ import type {
   supportPackages,
   supportPackageSources,
   entityRelationships,
-  sourceCodes,
+  codebases,
   embeddings,
   slackWorkspaceTokens,
   slackChannels,
@@ -102,8 +102,8 @@ export type IssueInsert = typeof issues.$inferInsert
 // ---------------------------------------------------------------------------
 // Knowledge
 // ---------------------------------------------------------------------------
-export type SourceCodeRow = typeof sourceCodes.$inferSelect
-export type SourceCodeInsert = typeof sourceCodes.$inferInsert
+export type CodebaseRow = typeof codebases.$inferSelect
+export type CodebaseInsert = typeof codebases.$inferInsert
 
 export type KnowledgeSourceRow = typeof knowledgeSources.$inferSelect
 export type KnowledgeSourceInsert = typeof knowledgeSources.$inferInsert

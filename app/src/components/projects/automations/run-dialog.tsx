@@ -15,10 +15,10 @@ type Props = {
   runId: string
   skillId: string
   projectId: string
-  onClose: () => void
+  onCloseAction: () => void
 }
 
-export function AutomationRunDialog({ open, runId, skillId, projectId, onClose }: Props) {
+export function AutomationRunDialog({ open, runId, skillId, projectId, onCloseAction }: Props) {
   const [events, setEvents] = useState<StreamEvent[]>([])
   const [status, setStatus] = useState<string>('queued')
   const [output, setOutput] = useState<Record<string, unknown> | null>(null)
@@ -63,7 +63,7 @@ export function AutomationRunDialog({ open, runId, skillId, projectId, onClose }
   }, [open, runId, projectId, status])
 
   return (
-    <Dialog open={open} onClose={onClose} title={`Run · ${skillId}`} size="lg">
+    <Dialog open={open} onClose={onCloseAction} title={`Run · ${skillId}`} size="lg">
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Text variant="muted" size="sm">Status:</Text>
@@ -105,7 +105,7 @@ export function AutomationRunDialog({ open, runId, skillId, projectId, onClose }
         )}
 
         <div className="flex justify-end">
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={onCloseAction}>
             Close
           </Button>
         </div>

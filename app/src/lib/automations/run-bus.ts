@@ -1,7 +1,7 @@
 /**
  * In-memory pubsub for real-time progress streaming.
  *
- * Source of truth for run state is `automation_runs` in Postgres - events are
+ * Source of truth for run state is `automation_runs` in Postgres — events are
  * appended there durably. This bus is a fast-path so SSE clients don't have
  * to poll while the run happens on the same node. SSE handlers fall back to
  * polling progress_events from the DB if no in-memory subscriber is present

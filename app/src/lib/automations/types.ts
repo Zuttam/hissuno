@@ -61,14 +61,6 @@ export type SkillFrontmatter = {
   }
   /** Per-run wall-clock cap in ms. Defaults to 30 * 60_000. */
   timeoutMs?: number
-  /**
-   * Maximum dispatches per project in the rolling 24-hour window. Defaults
-   * to 50. The dispatcher checks the count of automation_runs for
-   * (project, skill) created in the last 24h before starting a new run.
-   * A skill can opt into a higher cap if it's expected to fire often
-   * (e.g. event-triggered skills on busy projects).
-   */
-  dailyRunCap?: number
 }
 
 /**

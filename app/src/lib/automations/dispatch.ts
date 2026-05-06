@@ -5,7 +5,7 @@
  * Creates the run row, builds the per-run workspace + agent, runs the agent,
  * captures output (or error), and persists status.
  *
- * The agent runs asynchronously - `dispatchAutomationRun` returns the run id
+ * The agent runs asynchronously — `dispatchAutomationRun` returns the run id
  * once the row is created and the agent is started, without waiting for it
  * to finish. Callers stream progress via the SSE route or poll the row.
  */
@@ -16,20 +16,15 @@ import { findSkill, listBundledSkills } from './skills'
 import {
   getCustomSkillDescriptor,
   listCustomSkillDescriptors,
-  readCustomSkillContent,
 } from './custom-skills'
-export { readCustomSkillContent }
 import { buildHarnessPrefix } from './harness'
 import { closeRunChannel, publishRunEvent, subscribeRunCancel } from './run-bus'
 import { buildWorkspaceForRun } from '@/mastra/workspace/build'
 import { createSkillRunner } from '@/mastra/agents/skill-runner-agent'
 import { getOrCreateAutomationApiKey } from './api-key'
-import { isSkillEnabledForProject } from '@/lib/db/queries/project-skill-settings'
 import {
   appendProgressEvent,
-  countRecentRuns,
   createAutomationRun,
-  getAutomationRun,
   markAutomationRunCancelled,
   markAutomationRunFailed,
   markAutomationRunStarted,
@@ -37,14 +32,10 @@ import {
   type AutomationRunRow,
   type ProgressEvent,
 } from '@/lib/db/queries/automation-runs'
-import type { TriggerContext } from './types'
+import { getProjectSkillSetting } from '@/lib/db/queries/project-skill-settings'
+import type { SkillFrontmatter, TriggerContext } from './types'
 
 const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000
-const DEFAULT_DAILY_RUN_CAP = 50
-const RUN_CAP_WINDOW_MS = 24 * 60 * 60 * 1000
-// How often we poll automation_runs.status to detect cross-replica cancels.
-// Same-node cancels still trip immediately via the in-memory bus.
-const CANCEL_POLL_INTERVAL_MS = 5_000
 
 export type DispatchInput = {
   projectId: string
@@ -62,28 +53,18 @@ export async function dispatchAutomationRun(
     throw new Error(`Skill not found: ${input.skillId}`)
   }
 
-  // Per-project on/off applies to all trigger types.
-  if (!(await isSkillEnabledForProject(input.projectId, skill.id))) {
+  // Per-project gating: if the skill is disabled for this project, refuse to
+  // dispatch regardless of trigger source.
+  const settings = await getProjectSkillSetting(input.projectId, skill.id)
+  if (settings && !settings.enabled) {
     throw new Error(`Skill ${skill.id} is disabled for this project.`)
   }
 
-  // Cost guard: cap the number of runs per (project, skill) in the rolling
-  // 24h window. Defaults to 50; opt in via skill frontmatter for higher
-  // limits on event-driven skills.
-  const cap = skill.frontmatter.dailyRunCap ?? DEFAULT_DAILY_RUN_CAP
-  const recent = await countRecentRuns({
-    projectId: input.projectId,
-    skillId: skill.id,
-    windowMs: RUN_CAP_WINDOW_MS,
-  })
-  if (recent >= cap) {
-    throw new Error(
-      `Skill ${skill.id} hit its daily run cap (${cap}). Wait or raise dailyRunCap in the skill frontmatter.`,
-    )
-  }
-
-  // Validate trigger compatibility with the skill's frontmatter declarations.
-  validateTrigger(skill.id, skill.frontmatter.triggers, input.trigger)
+  // Validate against the effective triggers (project override if any, else
+  // the SKILL.md frontmatter declarations).
+  const effectiveTriggers = (settings?.triggers as SkillFrontmatter['triggers'] | null | undefined)
+    ?? skill.frontmatter.triggers
+  validateTrigger(skill.id, effectiveTriggers ?? undefined, input.trigger)
 
   const run = await createAutomationRun({
     projectId: input.projectId,
@@ -132,7 +113,7 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
   const timeoutMs = skill.frontmatter.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   // Resolve the project's long-lived automation API key (created on first
-  // use, stored encrypted). Reused across all runs - no per-run mint/revoke
+  // use, stored encrypted). Reused across all runs — no per-run mint/revoke
   // churn. Rotation is a separate admin action.
   try {
     const automationKey = await getOrCreateAutomationApiKey(project.id)
@@ -169,26 +150,13 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
       .filter(Boolean)
       .join(' ')
 
-    // Wire cancellation. Two paths feed the same AbortController:
-    // 1. In-memory bus (fast path, same-node cancel API request).
-    // 2. DB poll on automation_runs.status every 5s (catches cross-replica
-    //    cancels - the cancel API marks the row regardless of which node
-    //    the runner is on, so eventually the runner observes the change).
+    // Wire cancellation: a cancel API call publishes via run-bus, which trips
+    // the AbortController. Mastra propagates the abort signal into in-flight
+    // tool calls + streaming so the agent terminates promptly.
     const abortController = new AbortController()
     const unsubscribeCancel = subscribeRunCancel(run.id, () => {
       abortController.abort(new Error('Run cancelled by user'))
     })
-    const cancelPoll = setInterval(async () => {
-      if (abortController.signal.aborted) return
-      try {
-        const fresh = await getAutomationRun(run.id, project.id)
-        if (fresh?.status === 'cancelled') {
-          abortController.abort(new Error('Run cancelled by user'))
-        }
-      } catch {
-        // Polling failures are best-effort; skip and try again.
-      }
-    }, CANCEL_POLL_INTERVAL_MS)
 
     let response: Awaited<ReturnType<typeof agent.generate>>
     try {
@@ -217,7 +185,6 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
       throw err
     } finally {
       unsubscribeCancel()
-      clearInterval(cancelPoll)
     }
 
     // Try to read output.json from the workspace filesystem; fall back to
@@ -292,10 +259,6 @@ function validateTrigger(
   if (declared.manual?.entity && trigger.type === 'manual' && !trigger.entity) {
     throw new Error(`Skill ${skillId} requires a ${declared.manual.entity} entity for manual runs.`)
   }
-  // Scheduled runs MAY arrive without an entity even if the skill declares
-  // an entity-required manual trigger - that's the "no entity, fan out
-  // yourself" pattern. The skill body decides what to do (e.g., enumerate
-  // active customers and analyze each in turn).
 }
 
 /** Re-export so consumers don't have to import from skills.ts directly. */

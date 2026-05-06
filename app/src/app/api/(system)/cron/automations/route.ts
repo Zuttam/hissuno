@@ -2,9 +2,9 @@
  * GET /api/cron/automations
  *
  * Sweeper that fires scheduled automation runs. For each project × bundled
- * skill where the skill declares `triggers.scheduled.cron`, computes the
- * cron's most recent fire time and dispatches a run if we haven't already
- * fired for that window.
+ * skill, resolves the effective triggers (project override if any, else
+ * SKILL.md frontmatter), and dispatches a run if the skill is enabled, has a
+ * scheduled cron, and we haven't already fired for the most recent window.
  *
  * Protected by CRON_SECRET (same scheme as the rest of /api/cron/*).
  */
@@ -17,6 +17,7 @@ import { projects } from '@/lib/db/schema/app'
 import { listBundledSkills } from '@/lib/automations/skills'
 import { dispatchAutomationRun } from '@/lib/automations/dispatch'
 import { getLatestRunByTrigger } from '@/lib/db/queries/automation-runs'
+import { getEffectiveSkillSettings } from '@/lib/db/queries/project-skill-settings'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -40,19 +41,10 @@ export async function GET(request: Request) {
   }
 
   const now = new Date()
-
-  const scheduled = listBundledSkills().filter(
-    (s) => typeof s.frontmatter.triggers?.scheduled?.cron === 'string',
-  )
-  if (scheduled.length === 0) {
-    return NextResponse.json({ success: true, fired: 0, message: 'No scheduled skills.' })
+  const allBundled = listBundledSkills()
+  if (allBundled.length === 0) {
+    return NextResponse.json({ success: true, fired: 0, message: 'No bundled skills.' })
   }
-
-  // Scheduled runs without a specific entity are valid even for skills that
-  // require an entity on manual triggers - the skill body decides whether
-  // to enumerate the population (e.g., "for each active customer, do the
-  // analysis") or no-op when no entity is provided.
-  const dispatchable = scheduled
 
   const projectRows = await db.select({ id: projects.id, name: projects.name }).from(projects)
   if (projectRows.length === 0) {
@@ -60,10 +52,38 @@ export async function GET(request: Request) {
   }
 
   const outcomes: DispatchOutcome[] = []
+  const skippedForFanOut: string[] = []
 
   for (const project of projectRows) {
-    for (const skill of dispatchable) {
-      const cron = skill.frontmatter.triggers!.scheduled!.cron
+    const settingsMap = await getEffectiveSkillSettings(
+      project.id,
+      allBundled.map((s) => ({ id: s.id, declaredTriggers: s.frontmatter.triggers ?? null })),
+    )
+
+    for (const skill of allBundled) {
+      const settings = settingsMap.get(skill.id)
+      if (settings && !settings.enabled) {
+        outcomes.push({
+          project: project.id,
+          skill: skill.id,
+          status: 'skipped',
+          reason: 'Skill disabled for project',
+        })
+        continue
+      }
+
+      const triggers = settings?.triggers ?? skill.frontmatter.triggers ?? null
+      const cron = triggers?.scheduled?.cron
+      if (!cron) continue
+
+      // Skills with a manual.entity requirement need fan-out (one run per
+      // qualifying entity in the project). Phase 5 ships the simple "no
+      // entity required" path only — gate the rest off so we don't dispatch
+      // broken runs.
+      if (triggers?.manual?.entity) {
+        if (!skippedForFanOut.includes(skill.id)) skippedForFanOut.push(skill.id)
+        continue
+      }
 
       let prevFireAt: Date
       try {
@@ -124,6 +144,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     success: true,
     fired,
+    skippedForFanOut,
     outcomes,
   })
 }

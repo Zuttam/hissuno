@@ -15,17 +15,20 @@ const WORKFLOW_COLUMNS = {
   classification_guidelines: true,
   brief_guidelines: true,
   analysis_guidelines: true,
+  issue_analysis_enabled: true,
 } as const
 
 function rowToSettings(row: {
   classification_guidelines: string | null
   brief_guidelines: string | null
   analysis_guidelines: string | null
+  issue_analysis_enabled: boolean | null
 }): PmAgentSettings {
   return {
     classification_guidelines: row.classification_guidelines ?? null,
     brief_guidelines: row.brief_guidelines ?? null,
     analysis_guidelines: row.analysis_guidelines ?? null,
+    issue_analysis_enabled: row.issue_analysis_enabled ?? true,
   }
 }
 
@@ -86,6 +89,9 @@ export async function updatePmAgentSettings(
     if (settings.analysis_guidelines !== undefined) {
       updatePayload.analysis_guidelines = settings.analysis_guidelines || null
     }
+    if (settings.issue_analysis_enabled !== undefined) {
+      updatePayload.issue_analysis_enabled = settings.issue_analysis_enabled
+    }
 
     const [row] = await db
       .insert(projectSettings)
@@ -101,6 +107,7 @@ export async function updatePmAgentSettings(
         classification_guidelines: projectSettings.classification_guidelines,
         brief_guidelines: projectSettings.brief_guidelines,
         analysis_guidelines: projectSettings.analysis_guidelines,
+        issue_analysis_enabled: projectSettings.issue_analysis_enabled,
       })
 
     if (!row) {

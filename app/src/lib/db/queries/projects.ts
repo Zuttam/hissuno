@@ -4,13 +4,13 @@
 
 import { eq, desc, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { projects, sourceCodes } from '@/lib/db/schema/app'
+import { projects, codebases } from '@/lib/db/schema/app'
 import { getUserProjectIds } from '@/lib/db/server'
 
 export type ProjectRow = typeof projects.$inferSelect
 export type ProjectInsert = typeof projects.$inferInsert
 
-export type CodebaseRow = typeof sourceCodes.$inferSelect
+export type CodebaseRow = typeof codebases.$inferSelect
 
 export async function listProjects(userId: string): Promise<ProjectRow[]> {
   try {

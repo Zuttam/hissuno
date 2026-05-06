@@ -1,39 +1,83 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Plus, Search } from 'lucide-react'
 import { useProject } from '@/components/providers/project-provider'
 import { useProductScopes } from '@/hooks/use-product-scopes'
 import { ProductScopeList } from '@/components/projects/products/product-scope-list'
 import { ProductScopeSidebar } from '@/components/projects/products/product-scope-sidebar'
+import { KnowledgeList } from '@/components/projects/products/knowledge-list'
+import { KnowledgeSidebar } from '@/components/projects/products/knowledge-sidebar'
 import { PageHeader, Spinner, Input } from '@/components/ui'
 import { createProductScope, updateProductScope, saveProductScopes } from '@/lib/api/settings'
 import type { ProductScopeType, ProductScopeGoal } from '@/types/product-scope'
 import type { TagColorVariant } from '@/types/session'
 
 export default function ProductsPage() {
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const { projectId, isLoading: isLoadingProject } = useProject()
   const { scopes, isLoading, refresh } = useProductScopes({ projectId: projectId ?? undefined })
 
   const [searchQuery, setSearchQuery] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
+  const [isCreatingScope, setIsCreatingScope] = useState(false)
+  const [isEditingScope, setIsEditingScope] = useState(false)
+  const [isCreatingKnowledge, setIsCreatingKnowledge] = useState(false)
   const [selectedScopeId, setSelectedScopeId] = useState<string | null>(
-    searchParams.get('area')
+    searchParams.get('scope') ?? searchParams.get('area')
   )
+  const [selectedKnowledgeId, setSelectedKnowledgeId] = useState<string | null>(
+    searchParams.get('knowledge')
+  )
+
+  const knowledgeRefreshRef = useRef<() => Promise<void>>(async () => {})
+  const registerKnowledgeRefresh = useCallback((fn: () => Promise<void>) => {
+    knowledgeRefreshRef.current = fn
+  }, [])
 
   const selectedScope = useMemo(
     () => scopes.find((s) => s.id === selectedScopeId) ?? null,
     [scopes, selectedScopeId]
   )
 
-  const handleSelect = useCallback((scopeId: string) => {
-    setIsCreating(false)
+  // Auto-select the first (default) scope once scopes load and nothing is selected.
+  useEffect(() => {
+    if (selectedScopeId || scopes.length === 0) return
+    const defaultScope = scopes.find((s) => s.is_default) ?? scopes[0]
+    if (defaultScope) setSelectedScopeId(defaultScope.id)
+  }, [scopes, selectedScopeId])
+
+  // Sync URL with selection (replace, no history pollution).
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('area')
+    if (selectedScopeId) params.set('scope', selectedScopeId)
+    else params.delete('scope')
+    if (selectedKnowledgeId) params.set('knowledge', selectedKnowledgeId)
+    else params.delete('knowledge')
+    const next = params.toString()
+    const currentTrimmed = searchParams.toString().replace(/(^|&)area=[^&]*/g, '').replace(/^&/, '')
+    if (next !== currentTrimmed) {
+      router.replace(`${pathname}${next ? `?${next}` : ''}`, { scroll: false })
+    }
+  }, [selectedScopeId, selectedKnowledgeId, pathname, router, searchParams])
+
+  const handleSelectScope = useCallback((scopeId: string) => {
     setSelectedScopeId(scopeId)
+    setSelectedKnowledgeId(null)
+    setIsCreatingKnowledge(false)
+    setIsEditingScope(false)
   }, [])
 
-  const handleCreate = useCallback(async (newScope: {
+  const handleSelectKnowledge = useCallback((sourceId: string) => {
+    setSelectedKnowledgeId(sourceId)
+    setIsCreatingKnowledge(false)
+    setIsEditingScope(false)
+  }, [])
+
+  const handleCreateScope = useCallback(async (newScope: {
     name: string
     slug: string
     description: string
@@ -56,11 +100,11 @@ export default function ProductsPage() {
       content: newScope.content,
       custom_fields: newScope.custom_fields,
     })
-    setIsCreating(false)
+    setIsCreatingScope(false)
     await refresh()
   }, [projectId, refresh])
 
-  const handleUpdate = useCallback(async (updates: Record<string, unknown>): Promise<boolean> => {
+  const handleUpdateScope = useCallback(async (updates: Record<string, unknown>): Promise<boolean> => {
     if (!projectId || !selectedScopeId) return false
     try {
       await updateProductScope(projectId, selectedScopeId, updates)
@@ -72,13 +116,14 @@ export default function ProductsPage() {
     }
   }, [projectId, selectedScopeId, refresh])
 
-  const handleDelete = useCallback(async (scopeId: string) => {
+  const handleDeleteScope = useCallback(async (scopeId: string) => {
     if (!projectId) return
     const updated = scopes
       .filter((s) => s.id !== scopeId)
       .map((s, i) => ({ ...s, position: i }))
     await saveProductScopes(projectId, updated)
     setSelectedScopeId(null)
+    setIsEditingScope(false)
     await refresh()
   }, [projectId, scopes, refresh])
 
@@ -86,7 +131,7 @@ export default function ProductsPage() {
     return (
       <>
         <PageHeader title="Scopes" />
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex flex-1 items-center justify-center">
           <Spinner size="lg" />
         </div>
       </>
@@ -100,9 +145,9 @@ export default function ProductsPage() {
         actions={
           <button
             type="button"
-            onClick={() => { setSelectedScopeId(null); setIsCreating(true) }}
+            onClick={() => { setIsCreatingScope(true); setIsEditingScope(false) }}
             disabled={scopes.length >= 50}
-            className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 rounded-[4px] border border-[color:var(--border-subtle)] px-2.5 py-1.5 text-xs font-medium text-[color:var(--text-secondary)] transition hover:bg-[color:var(--surface-hover)] hover:text-[color:var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={14} />
             Add Scope
@@ -110,55 +155,106 @@ export default function ProductsPage() {
         }
       />
 
-      <div className="flex flex-1 flex-col gap-4">
-        {/* Search */}
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-1 gap-6 overflow-hidden">
+        {/* Left: scope nav */}
+        <aside className="flex w-72 shrink-0 flex-col gap-3 overflow-y-auto pr-3">
           <div className="relative flex items-center">
             <Search size={10} className="pointer-events-none absolute left-2 text-[color:var(--text-tertiary)]" />
             <Input
               type="text"
-              placeholder="Search product scopes..."
+              placeholder="Search scopes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-6 w-64 rounded-full border border-[color:var(--border-subtle)] bg-transparent py-0 pl-6 pr-2 text-[10px]"
+              className="h-7 w-full rounded-full border border-[color:var(--border-subtle)] bg-transparent py-0 pl-6 pr-2 text-[10px]"
             />
           </div>
-        </div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Spinner size="md" />
+            </div>
+          ) : (
+            <ProductScopeList
+              scopes={scopes}
+              selectedScopeId={selectedScopeId}
+              onSelect={handleSelectScope}
+              searchQuery={searchQuery}
+              variant="nav"
+            />
+          )}
+        </aside>
 
-        {/* List */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner size="md" />
-          </div>
-        ) : (
-          <ProductScopeList
-            scopes={scopes}
-            selectedScopeId={selectedScopeId}
-            onSelect={handleSelect}
-            searchQuery={searchQuery}
-          />
-        )}
+        {/* Main: knowledge for selected scope */}
+        <div className="flex flex-1 flex-col overflow-y-auto">
+          {selectedScope ? (
+            <KnowledgeList
+              key={selectedScope.id}
+              projectId={projectId}
+              scope={selectedScope}
+              selectedKnowledgeId={selectedKnowledgeId}
+              onSelect={handleSelectKnowledge}
+              onCreate={() => { setIsCreatingKnowledge(true); setSelectedKnowledgeId(null) }}
+              onEditScope={() => { setIsEditingScope(true); setSelectedKnowledgeId(null); setIsCreatingKnowledge(false) }}
+              registerRefresh={registerKnowledgeRefresh}
+            />
+          ) : (
+            <div className="flex flex-1 items-center justify-center text-sm text-[color:var(--text-tertiary)]">
+              {scopes.length === 0
+                ? 'No scopes yet. Click "Add Scope" to get started.'
+                : 'Select a scope on the left to see its knowledge.'}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Detail sidebar */}
-      {selectedScope && (
+      {/* Knowledge detail/create sidebar */}
+      {selectedScope && selectedKnowledgeId && !isCreatingKnowledge && (
+        <KnowledgeSidebar
+          mode="edit"
+          projectId={projectId}
+          scopeId={selectedScope.id}
+          sourceId={selectedKnowledgeId}
+          onClose={() => setSelectedKnowledgeId(null)}
+          onChange={() => { void knowledgeRefreshRef.current() }}
+          onDeleted={() => {
+            setSelectedKnowledgeId(null)
+            void knowledgeRefreshRef.current()
+          }}
+        />
+      )}
+
+      {selectedScope && isCreatingKnowledge && (
+        <KnowledgeSidebar
+          mode="create"
+          projectId={projectId}
+          scopeId={selectedScope.id}
+          onClose={() => setIsCreatingKnowledge(false)}
+          onCreated={(newId) => {
+            setIsCreatingKnowledge(false)
+            setSelectedKnowledgeId(newId)
+            void knowledgeRefreshRef.current()
+          }}
+        />
+      )}
+
+      {/* Scope edit drawer (opened via "Edit scope" button) */}
+      {selectedScope && isEditingScope && !isCreatingScope && (
         <ProductScopeSidebar
           scope={selectedScope}
           projectId={projectId}
           allScopes={scopes}
-          onClose={() => setSelectedScopeId(null)}
-          onUpdate={handleUpdate}
-          onDelete={(id) => void handleDelete(id)}
+          onClose={() => setIsEditingScope(false)}
+          onUpdate={handleUpdateScope}
+          onDelete={(id) => void handleDeleteScope(id)}
         />
       )}
 
-      {/* Create sidebar */}
-      {isCreating && (
+      {/* Scope create drawer */}
+      {isCreatingScope && (
         <ProductScopeSidebar
           projectId={projectId}
           allScopes={scopes}
-          onClose={() => setIsCreating(false)}
-          onCreate={(newScope) => void handleCreate(newScope)}
+          onClose={() => setIsCreatingScope(false)}
+          onCreate={(newScope) => void handleCreateScope(newScope)}
           existingSlugs={scopes.map((s) => s.slug)}
         />
       )}

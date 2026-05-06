@@ -8,7 +8,7 @@
 import { Command } from 'commander'
 import { input, select, confirm } from '@inquirer/prompts'
 import { requireConfig } from '../lib/config.js'
-import { apiCall, resolveProjectId, buildPath } from '../lib/api.js'
+import { apiCall, resolveProjectId, resolveKnowledgeScope, buildPath } from '../lib/api.js'
 import { renderJson, success, error } from '../lib/output.js'
 import { resolveCustomerType } from '../lib/customer-type.js'
 
@@ -436,16 +436,88 @@ async function addFeedback(opts: AddOpts): Promise<Record<string, unknown>> {
   return data
 }
 
+// Resource types where the endpoint is known up-front. `knowledge` is missing
+// here because its endpoint depends on the runtime --scope value; the dispatch
+// in addCommand handles it explicitly.
 const TYPE_ENDPOINTS: Record<string, string> = {
   feedback: '/api/sessions',
   issues: '/api/issues',
   customers: '/api/contacts',
   scopes: '/api/product-scopes',
+  codebase: '/api/codebases',
+}
+
+const SUPPORTED_TYPES = [...Object.keys(TYPE_ENDPOINTS), 'knowledge']
+
+async function addCodebase(opts: AddOpts): Promise<Record<string, unknown>> {
+  const repositoryUrl =
+    (opts.repo as string) ||
+    (await input({ message: 'Repository URL:', validate: (v) => v.length > 0 || 'Required' }))
+  if (!repositoryUrl) {
+    error('Repository URL is required.')
+    process.exit(1)
+  }
+
+  const repositoryBranch =
+    (opts.branch as string) ||
+    (await input({ message: 'Repository branch:', default: 'main' }))
+
+  const data: Record<string, unknown> = {
+    repository_url: repositoryUrl,
+    repository_branch: repositoryBranch,
+  }
+
+  const name = opts.name as string | undefined
+  if (name) data.name = name
+  const description = opts.description as string | undefined
+  if (description) data.description = description
+  const analysisScope = opts.analysisScope as string | undefined
+  if (analysisScope) data.analysis_scope = analysisScope
+
+  if (opts.scope) {
+    data.scope_ids = [opts.scope]
+  }
+
+  return data
+}
+
+async function addKnowledge(opts: AddOpts): Promise<Record<string, unknown>> {
+  const KNOWLEDGE_TYPES = ['website', 'docs_portal', 'uploaded_doc', 'raw_text', 'notion'] as const
+  let type: string
+  if (opts.type) {
+    if (!KNOWLEDGE_TYPES.includes(opts.type as (typeof KNOWLEDGE_TYPES)[number])) {
+      error(`Invalid knowledge type "${opts.type}". Must be one of: ${KNOWLEDGE_TYPES.join(', ')}`)
+      process.exit(1)
+    }
+    type = opts.type as string
+  } else {
+    type = await select({
+      message: 'Knowledge type:',
+      choices: KNOWLEDGE_TYPES.map((t) => ({ value: t, name: t })),
+    })
+  }
+
+  const data: Record<string, unknown> = { type }
+
+  if (type === 'website' || type === 'docs_portal') {
+    data.url =
+      (opts.url as string) ||
+      (await input({ message: 'URL:', validate: (v) => v.length > 0 || 'Required' }))
+  } else if (type === 'raw_text') {
+    data.content =
+      (opts.content as string) ||
+      (await input({ message: 'Content:', validate: (v) => v.length > 0 || 'Required' }))
+  }
+
+  if (opts.name) data.name = opts.name
+  if (opts.description) data.description = opts.description
+
+  return data
 }
 
 export const addCommand = new Command('add')
   .description('Create a new resource interactively')
-  .argument('<type>', 'Resource type: feedback, issues, customers, scopes')
+  .argument('<type>', 'Resource type: feedback, issues, customers, scopes, codebase, knowledge')
   .option('--customer-type <type>', 'Customer sub-type: contacts (default) or companies')
   .option('--type <type>', 'Issue type (bug, feature_request, change_request) or scope type (product_area, initiative, experiment)')
   .option('--title <text>', 'Title for issues')
@@ -470,24 +542,24 @@ export const addCommand = new Command('add')
   .option('--tags <tags>', 'Comma-separated tags for feedback')
   .option('--contact-email <email>', 'Contact email for feedback (resolves or creates a contact)')
   .option('--parent-id <id>', 'Parent scope ID for hierarchical scopes')
-  .option('--content <text>', 'Markdown content for scopes')
+  .option('--content <text>', 'Markdown content for scopes / raw_text knowledge')
   .option('--goals <goals>', 'Comma-separated goals for scopes')
+  .option('--repo <url>', 'Repository URL for codebase')
+  .option('--branch <name>', 'Repository branch for codebase', 'main')
+  .option('--analysis-scope <path>', 'Path prefix for codebase analysis (monorepos)')
+  .option('--scope <id>', 'Scope ID to attach the resource to (codebase, knowledge). Knowledge defaults to the project root scope when omitted.')
+  .option('--url <url>', 'URL for website / docs_portal knowledge')
   .action(async (type, opts, cmd) => {
     const config = requireConfig()
     const jsonMode = cmd.parent?.opts().json
 
-    const supportedTypes = Object.keys(TYPE_ENDPOINTS)
-    if (!supportedTypes.includes(type)) {
-      if (type === 'knowledge') {
-        error('Knowledge sources cannot be added via CLI. Use the Hissuno dashboard.')
-      } else {
-        error(`Invalid type "${type}". Must be one of: ${supportedTypes.join(', ')}`)
-      }
+    if (!SUPPORTED_TYPES.includes(type)) {
+      error(`Invalid type "${type}". Must be one of: ${SUPPORTED_TYPES.join(', ')}`)
       process.exit(1)
     }
 
     let data: Record<string, unknown>
-    let apiEndpoint = TYPE_ENDPOINTS[type]
+    let apiEndpoint = TYPE_ENDPOINTS[type] ?? ''
 
     switch (type) {
       case 'issues':
@@ -515,12 +587,23 @@ export const addCommand = new Command('add')
       case 'scopes':
         data = await addScope(opts)
         break
+      case 'codebase':
+        data = await addCodebase(opts)
+        break
+      case 'knowledge':
+        data = await addKnowledge(opts)
+        break
       default:
         error(`Unsupported type: ${type}`)
         process.exit(1)
     }
 
     const projectId = await resolveProjectId(config)
+
+    if (type === 'knowledge') {
+      const scopeId = await resolveKnowledgeScope(config, projectId, opts.scope as string | undefined)
+      apiEndpoint = `/api/product-scopes/${scopeId}/knowledge`
+    }
 
     try {
       const result = await apiCall<Record<string, unknown>>(

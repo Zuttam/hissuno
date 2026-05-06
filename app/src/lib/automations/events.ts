@@ -4,20 +4,16 @@
  * Write sites (e.g., issues-service.createIssue, customers-service.upsertContact)
  * call `notifyAutomationEvent(event, ctx)` after a successful insert. The
  * dispatcher looks up which bundled skills declared that event in their
- * frontmatter (`triggers.events`) and dispatches one automation run per
- * matching skill.
+ * effective triggers (project override if any, else SKILL.md frontmatter)
+ * and dispatches one automation run per matching enabled skill.
  *
- * Fires fire-and-forget - failures don't block the originating write.
- *
- * Per-project enable/disable lives behind `isAutomationEnabledForProject`,
- * which today only special-cases the legacy `issue_analysis_enabled` flag.
- * Phase 7's per-project skill catalog widens this to a real allowlist.
+ * Fires fire-and-forget — failures don't block the originating write.
  */
 
 import { dispatchAutomationRun } from './dispatch'
 import { listBundledSkills } from './skills'
 import { getProjectById } from '@/lib/db/queries/projects'
-import { isSkillEnabledForProject } from '@/lib/db/queries/project-skill-settings'
+import { getEffectiveSkillSettings } from '@/lib/db/queries/project-skill-settings'
 import type { EntityType, EventName } from './types'
 
 export type EventContext = {
@@ -28,37 +24,47 @@ export type EventContext = {
 export function notifyAutomationEvent(event: EventName, ctx: EventContext): void {
   void (async () => {
     try {
-      const matching = listBundledSkills().filter((skill) =>
-        (skill.frontmatter.triggers?.events ?? []).includes(event),
-      )
-      if (matching.length === 0) return
+      const allBundled = listBundledSkills()
+      if (allBundled.length === 0) return
 
       const project = await getProjectById(ctx.projectId)
       if (!project) return
 
-      for (const skill of matching) {
-        try {
-          if (!(await isSkillEnabledForProject(project.id, skill.id))) continue
+      const settingsMap = await getEffectiveSkillSettings(
+        project.id,
+        allBundled.map((s) => ({ id: s.id, declaredTriggers: s.frontmatter.triggers ?? null })),
+      )
 
-          await dispatchAutomationRun({
-            projectId: project.id,
-            projectName: project.name,
-            skillId: skill.id,
-            trigger: {
-              type: 'event',
-              entity: ctx.entity,
-            },
-          })
-        } catch (err) {
-          // One skill failing shouldn't stop the others; log and continue.
-          console.error(
-            `[automation-events] failed to dispatch ${skill.id} on ${event}`,
-            err,
-          )
-        }
-      }
+      const matching = allBundled.filter((skill) => {
+        const settings = settingsMap.get(skill.id)
+        if (settings && !settings.enabled) return false
+        const events = settings?.triggers?.events ?? []
+        return events.includes(event)
+      })
+      if (matching.length === 0) return
+
+      await Promise.allSettled(
+        matching.map(async (skill) => {
+          try {
+            await dispatchAutomationRun({
+              projectId: project.id,
+              projectName: project.name,
+              skillId: skill.id,
+              trigger: {
+                type: 'event',
+                entity: ctx.entity,
+              },
+            })
+          } catch (err) {
+            console.error(
+              `[automation-events] failed to dispatch ${skill.id} on ${event}`,
+              err,
+            )
+          }
+        }),
+      )
     } catch (err) {
-      // Fire-and-forget - the originating write has already committed.
+      // Fire-and-forget — the originating write has already committed.
       console.error('[automation-events] dispatch error', err)
     }
   })()

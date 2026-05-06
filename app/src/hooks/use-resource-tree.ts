@@ -5,7 +5,6 @@ import type { ResourceGroupType, ResourceGroupItem, ResourceGroupData } from '@/
 import { listIssues } from '@/lib/api/issues'
 import { listSessions } from '@/lib/api/sessions'
 import { listCompanies } from '@/lib/api/companies'
-import { listKnowledgeSources } from '@/lib/api/knowledge'
 import { listProductScopes } from '@/lib/api/settings'
 
 type GroupsState = Record<ResourceGroupType, ResourceGroupData>
@@ -16,7 +15,6 @@ const INITIAL_STATE: GroupsState = {
   issues: { ...EMPTY_GROUP },
   feedback: { ...EMPTY_GROUP },
   customers: { ...EMPTY_GROUP },
-  knowledge: { ...EMPTY_GROUP },
   scopes: { ...EMPTY_GROUP },
 }
 
@@ -76,18 +74,6 @@ async function fetchGroup(
         }
       }
       return { total, items }
-    }
-    case 'knowledge': {
-      const { sources } = await listKnowledgeSources(projectId)
-      return {
-        total: sources.length,
-        items: sources.slice(0, LIMIT).map((s) => ({
-          id: s.id,
-          name: s.name || s.url || s.type,
-          subtitle: s.status ?? undefined,
-          type: 'knowledge',
-        })),
-      }
     }
     case 'scopes': {
       const scopes = await listProductScopes(projectId)

@@ -14,6 +14,23 @@ const MAX_NAME_LENGTH = 50
 const MAX_DESCRIPTION_LENGTH = 500
 const MAX_GOAL_LENGTH = 200
 
+function useSidebarDismiss(onClose: () => void) {
+  useEffect(() => {
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+    function handlePop() {
+      onClose()
+    }
+    document.addEventListener('keydown', handleKey)
+    window.addEventListener('popstate', handlePop)
+    return () => {
+      document.removeEventListener('keydown', handleKey)
+      window.removeEventListener('popstate', handlePop)
+    }
+  }, [onClose])
+}
+
 const COLOR_OPTIONS: { value: TagColorVariant; label: string; colorClass: string }[] = [
   { value: 'info', label: 'Blue', colorClass: 'bg-blue-500' },
   { value: 'success', label: 'Green', colorClass: 'bg-green-500' },
@@ -103,6 +120,8 @@ function EditModeSidebar({
   const [openDropdown, setOpenDropdown] = useState<'type' | 'color' | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const dropdownContainerRef = useRef<HTMLDivElement>(null)
+
+  useSidebarDismiss(onClose)
 
   const { fields: customFields } = useCustomFields({
     projectId,
@@ -371,12 +390,12 @@ function EditModeSidebar({
             </div>
           )}
 
-          {/* Related entities */}
+          {/* Related entities (sessions, contacts, companies, issues) */}
           <RelatedEntitiesSection
             projectId={projectId}
             entityType="product_scope"
             entityId={scope.id}
-            allowedTypes={['session', 'company', 'contact', 'issue', 'knowledge_source']}
+            allowedTypes={['session', 'company', 'contact', 'issue']}
           />
         </div>
       </aside>
@@ -837,6 +856,8 @@ function CreateModeSidebar({
   const [content, setContent] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
+
+  useSidebarDismiss(onClose)
 
   const { fields: customFields } = useCustomFields({
     projectId,

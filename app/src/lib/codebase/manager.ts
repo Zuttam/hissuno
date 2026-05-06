@@ -13,7 +13,7 @@
  */
 
 import { db } from '@/lib/db'
-import { knowledgeSources, sourceCodes } from '@/lib/db/schema/app'
+import { codebases } from '@/lib/db/schema/app'
 import { eq, and } from 'drizzle-orm'
 import { getGitHubInstallationToken, getLatestCommitSha, parseGitHubRepoUrl } from '@/lib/integrations/github'
 import {
@@ -157,43 +157,26 @@ async function cleanupExpiredLeases(): Promise<void> {
 
 /**
  * Get codebase configuration for a project without acquiring a lease.
- * Returns null if no GitHub codebase is configured.
+ * Returns the first enabled GitHub codebase, or null if none configured.
  */
 export async function getCodebaseInfo(projectId: string): Promise<CodebaseInfo | null> {
-  // Get the codebase source for this project with joined source_code
-  const sources = await db
+  const [sourceCode] = await db
     .select({
-      source_code_id: knowledgeSources.source_code_id,
+      id: codebases.id,
+      kind: codebases.kind,
+      repository_url: codebases.repository_url,
+      repository_branch: codebases.repository_branch,
+      user_id: codebases.user_id,
     })
-    .from(knowledgeSources)
+    .from(codebases)
     .where(
       and(
-        eq(knowledgeSources.project_id, projectId),
-        eq(knowledgeSources.type, 'codebase'),
-        eq(knowledgeSources.enabled, true)
-      )
+        eq(codebases.project_id, projectId),
+        eq(codebases.enabled, true),
+      ),
     )
     .limit(1)
 
-  const source = sources[0]
-  if (!source?.source_code_id) {
-    return null
-  }
-
-  // Fetch the source_code record
-  const [sourceCode] = await db
-    .select({
-      id: sourceCodes.id,
-      kind: sourceCodes.kind,
-      repository_url: sourceCodes.repository_url,
-      repository_branch: sourceCodes.repository_branch,
-      user_id: sourceCodes.user_id,
-    })
-    .from(sourceCodes)
-    .where(eq(sourceCodes.id, source.source_code_id))
-    .limit(1)
-
-  // Verify it's a GitHub source with required fields
   if (
     !sourceCode ||
     sourceCode.kind !== 'github' ||
@@ -313,12 +296,12 @@ export async function acquireCodebase(params: {
 
         // Update database
         await db
-          .update(sourceCodes)
+          .update(codebases)
           .set({
             commit_sha: pullResult.commitSha,
             synced_at: new Date(),
           })
-          .where(eq(sourceCodes.id, codebaseId))
+          .where(eq(codebases.id, codebaseId))
 
         return {
           localPath,
@@ -359,12 +342,12 @@ export async function acquireCodebase(params: {
 
         // Update database
         await db
-          .update(sourceCodes)
+          .update(codebases)
           .set({
             commit_sha: pullResult.commitSha,
             synced_at: new Date(),
           })
-          .where(eq(sourceCodes.id, codebaseId))
+          .where(eq(codebases.id, codebaseId))
       }
 
       // Create state with new lease
@@ -408,12 +391,12 @@ export async function acquireCodebase(params: {
 
     // Update database
     await db
-      .update(sourceCodes)
+      .update(codebases)
       .set({
         commit_sha: cloneResult.commitSha,
         synced_at: new Date(),
       })
-      .where(eq(sourceCodes.id, codebaseId))
+      .where(eq(codebases.id, codebaseId))
 
     // Create state with new lease
     const lease: LeaseRecord = {

@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: re-enable after migrating tool execute signature/scorer typing to Mastra v1
 /**
  * Tests for user-mode data tools
  *
@@ -102,12 +103,9 @@ describe('user-mode data tools', () => {
       expect(result.issues).toEqual([])
     })
 
-    // Mastra v1 validates the tool's outputSchema and returns ValidationError
-    // when the mocked DB row doesn't match it. The mocks need a richer fixture
-    // to exercise the success path. Skipped pending mock cleanup.
-    it.skip('queries issues table filtered by projectId', async () => {
+    it('queries issues table filtered by projectId', async () => {
       mockLimit.mockResolvedValue([
-        { id: 'i-1', title: 'Bug 1', type: 'bug', priority: 'high', status: 'open', session_count: 3, updated_at: new Date('2026-01-01') },
+        { id: 'i-1', name: 'Bug 1', type: 'bug', priority: 'high', status: 'open', session_count: 3, updated_at: new Date('2026-01-01') },
       ])
 
       const result = (await listIssuesTool.execute!({ limit: 20 } as any, { requestContext: makeRuntimeContext('proj-1') } as any)) as any
@@ -132,13 +130,12 @@ describe('user-mode data tools', () => {
       expect(result.found).toBe(false)
     })
 
-    // Same v1 outputSchema validation issue as the list-issues test above.
-    it.skip('queries issue by id and project_id', async () => {
+    it('queries issue by id and project_id', async () => {
       // First call: get issue (via where() which is terminal here since no orderBy/limit)
       mockWhere.mockResolvedValueOnce([
         {
           id: 'i-1',
-          title: 'Bug 1',
+          name: 'Bug 1',
           description: 'Desc',
           type: 'bug',
           priority: 'high',

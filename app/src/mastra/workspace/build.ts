@@ -23,9 +23,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readCustomSkillContent } from '@/lib/automations/dispatch'
-import { getCustomSkill } from '@/lib/db/queries/custom-skills'
-import { readCustomSkillFile } from '@/lib/automations/custom-skills'
+import { getCustomSkillBundle } from '@/lib/automations/custom-skills'
 import type { SkillDescriptor } from '@/lib/automations/types'
 
 export type WorkspaceForRunOptions = {
@@ -36,7 +34,7 @@ export type WorkspaceForRunOptions = {
   /**
    * Per-run, project-scoped API key for the `hissuno` CLI inside the sandbox.
    * Minted by the dispatcher before this factory runs and revoked when the
-   * run completes. Required - the runner does not fall back to global env
+   * run completes. Required — the runner does not fall back to global env
    * (that was the v1 alpha shortcut and got removed).
    */
   apiKey: string
@@ -73,25 +71,21 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
   // skill loader then treats custom skills the same as bundled ones.
   const skillDirs: string[] = [bundledSkillsDir]
   if (opts.skill.source === 'custom') {
-    const content = await readCustomSkillContent(opts.projectId, opts.skill.id)
-    if (!content) {
+    const bundle = await getCustomSkillBundle(opts.projectId, opts.skill.id)
+    if (!bundle) {
       throw new Error(`Custom skill content missing for ${opts.skill.id}`)
     }
     const customSkillsRoot = join(workDir, '.skills')
     const customSkillDir = join(customSkillsRoot, opts.skill.id)
     await mkdir(customSkillDir, { recursive: true })
-    await writeFile(join(customSkillDir, 'SKILL.md'), content, 'utf8')
-
-    const row = await getCustomSkill(opts.projectId, opts.skill.id)
-    const files = ((row?.files as unknown as { path: string }[] | null) ?? [])
-    for (const f of files) {
-      const fileContent = await readCustomSkillFile(opts.projectId, opts.skill.id, f.path)
-      if (fileContent === null) continue
-      const target = join(customSkillDir, f.path)
-      await mkdir(dirname(target), { recursive: true })
-      await writeFile(target, fileContent, 'utf8')
-    }
-
+    await Promise.all([
+      writeFile(join(customSkillDir, 'SKILL.md'), bundle.skillMd, 'utf8'),
+      ...bundle.files.map(async (f) => {
+        const target = join(customSkillDir, f.path)
+        await mkdir(dirname(target), { recursive: true })
+        await writeFile(target, f.content, 'utf8')
+      }),
+    ])
     skillDirs.push(customSkillsRoot)
   }
 

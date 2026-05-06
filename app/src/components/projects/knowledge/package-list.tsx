@@ -5,7 +5,7 @@ import { Button, Spinner, Heading } from '@/components/ui'
 import { PackageDialog } from './package-dialog'
 import { PackageListItem } from './package-list-item'
 import { usePackageAnalysis } from '@/hooks/use-package-analysis'
-import { listPackages, getPackageAnalysisStatus } from '@/lib/api/knowledge'
+import { listPackages, getPackageAnalysisStatus } from '@/lib/api/support-packages'
 import type { SupportPackageWithSources } from '@/lib/knowledge/types'
 
 interface PackageListProps {

@@ -9,13 +9,14 @@ import { searchIssues } from '@/lib/issues/issues-service'
 import { searchCustomers } from '@/lib/customers/customers-service'
 import { searchKnowledge } from '@/lib/knowledge/knowledge-service'
 import { searchScopes } from '@/lib/product-scopes/product-scopes-service'
+import { searchCodebases } from '@/lib/codebase'
 import type { SearchMode } from '@/lib/search/search-by-mode'
 
 export const runtime = 'nodejs'
 
 const VALID_MODES = new Set<string>(['semantic', 'keyword', 'both'])
 
-const RESOURCE_TYPES = ['knowledge', 'feedback', 'issues', 'customers', 'scopes'] as const
+const RESOURCE_TYPES = ['knowledge', 'feedback', 'issues', 'customers', 'scopes', 'codebases'] as const
 type ResourceType = (typeof RESOURCE_TYPES)[number]
 
 const VALID_TYPES = new Set<string>(RESOURCE_TYPES)
@@ -56,6 +57,10 @@ async function searchByType(
     case 'scopes': {
       const results = await searchScopes(projectId, query, limit, options)
       return results.map((r) => ({ ...r, type: 'scopes' as const }))
+    }
+    case 'codebases': {
+      const results = await searchCodebases(projectId, query, limit)
+      return results.map((r) => ({ ...r, type: 'codebases' as const }))
     }
   }
 }

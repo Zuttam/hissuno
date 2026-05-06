@@ -16,7 +16,7 @@ export const reportProgressTool = createTool({
   id: 'report_progress',
   description: `Report progress to the user. Call this between phases of your work
 (e.g., "Gathering customer signals", "Writing health summary"). The user sees the
-message in real time. Keep messages short - one short sentence each.`,
+message in real time. Keep messages short — one short sentence each.`,
   inputSchema: z.object({
     message: z.string().describe('Short, user-facing progress message.'),
     phase: z.string().optional().describe('Optional phase label (e.g., "research", "synthesis").'),
@@ -27,7 +27,7 @@ message in real time. Keep messages short - one short sentence each.`,
   execute: async (input, { requestContext }) => {
     const runId = requestContext?.get?.('runId') as string | undefined
     if (!runId) {
-      // No run context - silently noop. Useful when the agent is invoked
+      // No run context — silently noop. Useful when the agent is invoked
       // outside the automation harness (e.g., unit tests).
       return { ok: true }
     }

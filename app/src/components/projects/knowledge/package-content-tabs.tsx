@@ -5,7 +5,7 @@ import { Tabs, TabsList, Tab, TabsPanel } from '@/components/ui/tabs'
 import { MarkdownContent } from '@/components/ui/markdown-content'
 import { Button } from '@/components/ui'
 import { Textarea } from '@/components/ui/textarea'
-import { updatePackage } from '@/lib/api/knowledge'
+import { updatePackage } from '@/lib/api/support-packages'
 
 const CONTENT_TABS = [
   { key: 'faq', label: 'FAQ', field: 'faq_content' },

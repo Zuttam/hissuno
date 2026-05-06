@@ -7,7 +7,7 @@ import {
   triggerPackageAnalysis,
   cancelPackageAnalysis,
   packageAnalyzeStreamUrl,
-} from '@/lib/api/knowledge'
+} from '@/lib/api/support-packages'
 
 /**
  * Map the new automation-runner SSE shape onto the legacy step-based

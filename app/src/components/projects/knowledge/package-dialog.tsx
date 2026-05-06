@@ -13,7 +13,12 @@ import {
   Badge,
   Heading,
 } from '@/components/ui'
-import { listKnowledgeSources, createPackage, updatePackage, deletePackage } from '@/lib/api/knowledge'
+import {
+  listProjectKnowledgeForPackages,
+  createPackage,
+  updatePackage,
+  deletePackage,
+} from '@/lib/api/support-packages'
 import type { SupportPackageWithSources, KnowledgeSourceRecord } from '@/lib/knowledge/types'
 
 interface PackageDialogProps {
@@ -60,7 +65,7 @@ export function PackageDialog({
   const fetchSources = useCallback(async () => {
     setIsLoadingSources(true)
     try {
-      const { sources } = await listKnowledgeSources(projectId)
+      const { sources } = await listProjectKnowledgeForPackages(projectId)
       setAvailableSources(sources ?? [])
     } catch (err) {
       console.error('[package-dialog] Failed to fetch sources:', err)
@@ -155,9 +160,6 @@ export function PackageDialog({
   }
 
   const getSourceLabel = (source: KnowledgeSourceRecord) => {
-    if (source.type === 'codebase') {
-      return source.analysis_scope ? `Codebase (${source.analysis_scope})` : 'Codebase'
-    }
     if (source.url) {
       return source.url
     }
@@ -218,7 +220,7 @@ export function PackageDialog({
                 label={
                   <div className="flex items-center gap-2">
                     <Badge variant="default" className="text-xs">
-                      {source.type === 'codebase' ? 'Codebase' : source.type}
+                      {source.type}
                     </Badge>
                     <span className="text-sm truncate max-w-[300px]">{getSourceLabel(source)}</span>
                   </div>

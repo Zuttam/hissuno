@@ -6,20 +6,20 @@ import { UnauthorizedError } from '@/lib/auth/server'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import { db } from '@/lib/db'
-import { knowledgeSources } from '@/lib/db/schema/app'
+import { knowledgeSources, entityRelationships } from '@/lib/db/schema/app'
 import { fireSourceAnalysis } from '@/lib/utils/source-processing'
 
 export const runtime = 'nodejs'
 
-type RouteContext = { params: Promise<{ sourceId: string }> }
+type RouteContext = { params: Promise<{ scopeId: string; sourceId: string }> }
 
 /**
- * POST /api/knowledge/sources/[sourceId]/reanalyze?projectId=...
+ * POST /api/product-scopes/[scopeId]/knowledge/[sourceId]/reanalyze?projectId=...
  * Re-runs analyzeSource in the background. Returns 202 immediately; clients
  * observe progress by polling the knowledge_sources.status column.
  */
 export async function POST(request: NextRequest, context: RouteContext) {
-  const { sourceId } = await context.params
+  const { scopeId, sourceId } = await context.params
 
   if (!isDatabaseConfigured()) {
     return NextResponse.json({ error: 'Database must be configured.' }, { status: 500 })
@@ -29,6 +29,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const projectId = requireProjectId(request)
     const identity = await requireRequestIdentity()
     await assertProjectAccess(identity, projectId)
+
+    // entity_relationships row implies the scope exists (FK), so a single lookup is enough.
+    const [link] = await db
+      .select({ id: entityRelationships.id })
+      .from(entityRelationships)
+      .where(
+        and(
+          eq(entityRelationships.project_id, projectId),
+          eq(entityRelationships.knowledge_source_id, sourceId),
+          eq(entityRelationships.product_scope_id, scopeId),
+        ),
+      )
+      .limit(1)
+    if (!link) {
+      return NextResponse.json({ error: 'Source not found in scope.' }, { status: 404 })
+    }
 
     const [source] = await db
       .select({ id: knowledgeSources.id, status: knowledgeSources.status })

@@ -15,6 +15,7 @@ import {
   type PluginRouteCtx,
   type CustomAuthCtx,
 } from '../plugin-kit'
+import { and, eq } from 'drizzle-orm'
 import { generateInstallationToken } from '../github/jwt'
 import {
   listInstallationRepos,
@@ -23,6 +24,9 @@ import {
   getIssueComments,
   type GitHubIssue,
 } from '../github/app-client'
+import { db } from '@/lib/db'
+import { codebases, projects } from '@/lib/db/schema/app'
+import { createGitHubCodebase } from '@/lib/codebase'
 
 const feedbackFilterSchema = z.object({
   labels: z.string().optional(),
@@ -285,13 +289,12 @@ async function runCodebaseSync(ctx: SyncCtx<z.infer<typeof codebaseSettingsSchem
   const creds = ctx.credentials as unknown as GitHubCredentials
   const token = await resolveToken(creds)
 
-  const branch = ctx.settings.branch ?? ctx.filters.branch
+  const branch = ctx.settings.branch ?? ctx.filters.branch ?? 'main'
   const [owner, repo] = repoFullName.split('/')
   if (!owner || !repo) throw new Error(`Invalid GitHub repo: ${repoFullName}`)
 
-  // Register the repo as a knowledge source. The existing codebase analyzer
-  // pipeline (triggered server-side for 'codebase' knowledge sources) handles
-  // cloning, chunking, and embedding. We just need to create the anchor row.
+  // Verify the repo (and branch, if specified) is reachable before creating
+  // the codebase row.
   const res = await fetch(
     `https://api.github.com/repos/${owner}/${repo}${branch ? `/branches/${branch}` : ''}`,
     {
@@ -307,18 +310,44 @@ async function runCodebaseSync(ctx: SyncCtx<z.infer<typeof codebaseSettingsSchem
     throw new Error(`GitHub API error (${res.status}): ${text.slice(0, 200)}`)
   }
 
+  const repositoryUrl = `https://github.com/${repoFullName}`
+
   try {
-    const { docId } = await ctx.ingest.knowledge({
-      externalId: repoFullName,
-      type: 'codebase',
-      name: repoFullName,
-      url: `https://github.com/${repoFullName}`,
-      analyzedContent: null,
-      origin: 'github_sync',
-      customFields: { repo_full_name: repoFullName, branch: branch ?? null },
-      skipInlineProcessing: true,
-    })
-    ctx.progress({ type: 'synced', externalId: repoFullName, hissunoId: docId, message: `Registered ${repoFullName}` })
+    const existing = await db
+      .select({ id: codebases.id })
+      .from(codebases)
+      .where(
+        and(
+          eq(codebases.project_id, ctx.projectId),
+          eq(codebases.repository_url, repositoryUrl),
+          eq(codebases.repository_branch, branch),
+        ),
+      )
+      .limit(1)
+
+    let codebaseId: string
+    if (existing[0]) {
+      codebaseId = existing[0].id
+    } else {
+      const [project] = await db
+        .select({ user_id: projects.user_id })
+        .from(projects)
+        .where(eq(projects.id, ctx.projectId))
+        .limit(1)
+      if (!project) throw new Error(`Project ${ctx.projectId} not found`)
+      const { codebase } = await createGitHubCodebase({
+        projectId: ctx.projectId,
+        repositoryUrl,
+        repositoryBranch: branch,
+        userId: project.user_id,
+        name: repoFullName,
+      })
+      codebaseId = codebase.id
+    }
+
+    await ctx.recordSynced({ externalId: repoFullName, hissunoId: codebaseId, kind: 'knowledge' })
+
+    ctx.progress({ type: 'synced', externalId: repoFullName, hissunoId: codebaseId, message: `Registered ${repoFullName}` })
   } catch (err) {
     ctx.logger.error('codebase ingest failed', {
       repo: repoFullName,

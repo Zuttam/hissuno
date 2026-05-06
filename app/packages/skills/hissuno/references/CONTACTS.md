@@ -26,7 +26,7 @@ hissuno list customers --company-id <uuid>
 - Champion status
 - Last contacted timestamp
 - Notes, custom fields
-- **Relationships** - linked feedback sessions, issues, companies, knowledge sources, product scopes
+- **Relationships** - linked feedback sessions, issues, companies, knowledge, product scopes
 
 ## Search
 

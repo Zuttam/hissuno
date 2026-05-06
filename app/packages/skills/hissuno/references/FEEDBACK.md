@@ -20,7 +20,7 @@ Customer feedback sessions - conversations from chat widgets, Slack, Intercom, G
 - Full conversation messages (role + content)
 - Page URL and title (for widget sessions)
 - Lifecycle timestamps (first message, last activity, close time)
-- **Relationships** - linked contacts, companies, issues, knowledge sources, product scopes
+- **Relationships** - linked contacts, companies, issues, knowledge, product scopes
 
 ## Search
 

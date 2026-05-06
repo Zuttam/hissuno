@@ -40,10 +40,8 @@ export type CustomSkillSaveInput = {
   /** Raw SKILL.md content (frontmatter + markdown body). */
   content: string
   /**
-   * Additional supporting files keyed by path relative to the skill root.
-   * Allowed prefixes: `references/` and `scripts/`. Each value is the file's
-   * UTF-8 content. The runner materializes these alongside SKILL.md in the
-   * sandbox so the agent can `skill_read` them or invoke the scripts.
+   * Optional supporting files keyed by path relative to the skill root.
+   * Allowed prefixes: `references/` and `scripts/`. UTF-8 only.
    */
   references?: Record<string, string>
   createdByUserId?: string | null
@@ -132,23 +130,24 @@ export async function saveCustomSkill(input: CustomSkillSaveInput): Promise<Cust
     throw new Error(`Failed to upload skill content: ${skillUpload.error.message}`)
   }
 
-  const fileManifest: CustomSkillFile[] = []
-  for (const [relPath, content] of fileEntries) {
-    const fullPath = `${input.projectId}/${input.skillId}/${relPath}`
-    const contentType = guessContentType(relPath)
-    const result = await storage.upload(AUTOMATIONS_BUCKET, fullPath, content, {
-      upsert: true,
-      contentType,
-    })
-    if (result.error) {
-      throw new Error(`Failed to upload "${relPath}": ${result.error.message}`)
-    }
-    fileManifest.push({
-      path: relPath,
-      size: Buffer.byteLength(content, 'utf8'),
-      contentType,
-    })
-  }
+  const fileManifest = await Promise.all(
+    fileEntries.map(async ([relPath, content]) => {
+      const fullPath = `${input.projectId}/${input.skillId}/${relPath}`
+      const contentType = guessContentType(relPath)
+      const result = await storage.upload(AUTOMATIONS_BUCKET, fullPath, content, {
+        upsert: true,
+        contentType,
+      })
+      if (result.error) {
+        throw new Error(`Failed to upload "${relPath}": ${result.error.message}`)
+      }
+      return {
+        path: relPath,
+        size: Buffer.byteLength(content, 'utf8'),
+        contentType,
+      } satisfies CustomSkillFile
+    }),
+  )
 
   return upsertCustomSkill({
     project_id: input.projectId,
@@ -221,6 +220,44 @@ export async function readCustomSkillContent(
   const result = await storage.downloadText(AUTOMATIONS_BUCKET, row.blob_path)
   if (result.error) return null
   return result.content ?? null
+}
+
+export type CustomSkillBundle = {
+  skillMd: string
+  files: Array<{ path: string; content: string }>
+}
+
+/**
+ * One-shot fetch of everything the runner needs to materialize a custom
+ * skill: the SKILL.md body plus every `references/` / `scripts/` file from
+ * the manifest, downloaded in parallel. Single DB row read, no extra trips.
+ */
+export async function getCustomSkillBundle(
+  projectId: string,
+  skillId: string,
+): Promise<CustomSkillBundle | null> {
+  const row = await getCustomSkillRow(projectId, skillId)
+  if (!row) return null
+  const storage = getStorageProvider()
+  const manifest = (row.files as unknown as CustomSkillFile[] | null) ?? []
+
+  const [skillResult, fileResults] = await Promise.all([
+    storage.downloadText(AUTOMATIONS_BUCKET, row.blob_path),
+    Promise.all(
+      manifest.map(async (f) => {
+        const fullPath = `${projectId}/${skillId}/${f.path}`
+        const r = await storage.downloadText(AUTOMATIONS_BUCKET, fullPath)
+        return { path: f.path, content: r.content ?? null }
+      }),
+    ),
+  ])
+  if (skillResult.error || !skillResult.content) return null
+
+  return {
+    skillMd: skillResult.content,
+    files: fileResults
+      .filter((f): f is { path: string; content: string } => f.content !== null),
+  }
 }
 
 export async function deleteCustomSkill(projectId: string, skillId: string): Promise<boolean> {

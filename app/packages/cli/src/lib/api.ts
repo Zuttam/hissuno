@@ -42,6 +42,36 @@ export async function resolveProjectId(config: HissunoConfig): Promise<string> {
 }
 
 /**
+ * Resolve a knowledge scope: if `scopeIdOrSlug` is given, return it as-is
+ * (the server validates against the project). Otherwise fetch the project's
+ * default product scope.
+ */
+export async function resolveKnowledgeScope(
+  config: HissunoConfig,
+  projectId: string,
+  scopeIdOrSlug?: string,
+): Promise<string> {
+  if (scopeIdOrSlug) return scopeIdOrSlug
+
+  const result = await apiCall<{ scopes: Array<{ id: string; is_default?: boolean }> }>(
+    config,
+    'GET',
+    buildPath('/api/product-scopes', { projectId }),
+  )
+  if (!result.ok) {
+    error(`Failed to load product scopes: HTTP ${result.status}`)
+    process.exit(1)
+  }
+  const scopes = result.data?.scopes ?? []
+  const defaultScope = scopes.find((s) => s.is_default)
+  if (!defaultScope) {
+    error('Project has no default product scope. Pass --scope <id> explicitly.')
+    process.exit(1)
+  }
+  return defaultScope.id
+}
+
+/**
  * Build an API path with query parameters.
  */
 export function buildPath(path: string, params: Record<string, string | number | undefined>): string {

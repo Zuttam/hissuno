@@ -86,7 +86,7 @@ export const INTEGRATION_TYPES: IntegrationType[] = [
   {
     id: 'github',
     name: 'GitHub',
-    description: 'Connect your repository for codebase knowledge analysis',
+    description: 'Connect a repository as a codebase you can attach to scopes',
     category: 'knowledge',
     iconSrc: '/logos/github.svg',
   },

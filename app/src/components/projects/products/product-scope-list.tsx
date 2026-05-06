@@ -8,11 +8,14 @@ import type { TagColorVariant } from '@/types/session'
 
 const MAX_SCOPES = 50
 
+type ProductScopeListVariant = 'cards' | 'nav'
+
 interface ProductScopeListProps {
   scopes: ProductScopeRecord[]
   selectedScopeId: string | null
   onSelect: (scopeId: string) => void
   searchQuery: string
+  variant?: ProductScopeListVariant
 }
 
 function ChevronIcon({ expanded }: { expanded: boolean }) {
@@ -38,6 +41,7 @@ function ScopeTreeNode({
   onSelect,
   onToggleExpand,
   depth,
+  variant,
 }: {
   scope: ProductScopeRecord
   childrenMap: Map<string | null, ProductScopeRecord[]>
@@ -47,22 +51,32 @@ function ScopeTreeNode({
   onSelect: (scopeId: string) => void
   onToggleExpand: (id: string) => void
   depth: number
+  variant: ProductScopeListVariant
 }) {
   const children = childrenMap.get(scope.id) ?? []
   const hasChildren = children.length > 0
   const isExpanded = expandedIds.has(scope.id)
   const count = descendantCounts.get(scope.id) ?? 0
+  const isNav = variant === 'nav'
 
   return (
     <div>
       <button
         type="button"
         onClick={() => onSelect(scope.id)}
-        style={{ paddingLeft: depth * 20 }}
-        className={`flex w-full items-center gap-2 rounded-lg p-3 text-left transition ${
-          selectedScopeId === scope.id
-            ? 'bg-[color:var(--surface-selected)] ring-1 ring-[color:var(--accent-selected)]'
-            : 'bg-[color:var(--background-secondary)] hover:bg-[color:var(--surface-hover)]'
+        style={{ paddingLeft: depth * (isNav ? 12 : 20) + (isNav ? 6 : 12) }}
+        className={`flex w-full items-center gap-2 text-left transition ${
+          isNav
+            ? `rounded-[4px] py-1.5 pr-2 ${
+                selectedScopeId === scope.id
+                  ? 'bg-[color:var(--surface-selected)] text-[color:var(--foreground)]'
+                  : 'text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-hover)]'
+              }`
+            : `rounded-lg p-3 ${
+                selectedScopeId === scope.id
+                  ? 'bg-[color:var(--surface-selected)] ring-1 ring-[color:var(--accent-selected)]'
+                  : 'bg-[color:var(--background-secondary)] hover:bg-[color:var(--surface-hover)]'
+              }`
         }`}
       >
         {hasChildren ? (
@@ -76,31 +90,40 @@ function ScopeTreeNode({
         ) : (
           <span className="w-3.5 shrink-0" />
         )}
-        <ScopeTypeIcon type={scope.type} size={16} />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Badge variant={scope.color as TagColorVariant}>{scope.name}</Badge>
-            {scope.is_default && (
-              <span className="text-xs text-[color:var(--text-tertiary)]">(default)</span>
-            )}
+        <ScopeTypeIcon type={scope.type} size={isNav ? 12 : 16} />
+        {isNav ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-sm">{scope.name}</span>
             {hasChildren && (
-              <span className="text-[10px] tabular-nums text-[color:var(--text-tertiary)]">{count}</span>
+              <span className="shrink-0 text-[10px] tabular-nums text-[color:var(--text-tertiary)]">{count}</span>
             )}
           </div>
-          {scope.description && (
-            <p className="line-clamp-2 text-xs text-[color:var(--text-secondary)]">
-              {scope.description}
-            </p>
-          )}
-          {scope.goals && scope.goals.length > 0 && (
-            <p className="text-xs text-[color:var(--text-tertiary)]">
-              {scope.goals.length} goal{scope.goals.length !== 1 ? 's' : ''}
-            </p>
-          )}
-        </div>
+        ) : (
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Badge variant={scope.color as TagColorVariant}>{scope.name}</Badge>
+              {scope.is_default && (
+                <span className="text-xs text-[color:var(--text-tertiary)]">(default)</span>
+              )}
+              {hasChildren && (
+                <span className="text-[10px] tabular-nums text-[color:var(--text-tertiary)]">{count}</span>
+              )}
+            </div>
+            {scope.description && (
+              <p className="line-clamp-2 text-xs text-[color:var(--text-secondary)]">
+                {scope.description}
+              </p>
+            )}
+            {scope.goals && scope.goals.length > 0 && (
+              <p className="text-xs text-[color:var(--text-tertiary)]">
+                {scope.goals.length} goal{scope.goals.length !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
       </button>
       {hasChildren && isExpanded && (
-        <div className="flex flex-col gap-2 mt-2">
+        <div className={`flex flex-col ${isNav ? 'gap-0.5 mt-0.5' : 'gap-2 mt-2'}`}>
           {children.map((child) => (
             <ScopeTreeNode
               key={child.id}
@@ -112,6 +135,7 @@ function ScopeTreeNode({
               onSelect={onSelect}
               onToggleExpand={onToggleExpand}
               depth={depth + 1}
+              variant={variant}
             />
           ))}
         </div>
@@ -125,6 +149,7 @@ export function ProductScopeList({
   selectedScopeId,
   onSelect,
   searchQuery,
+  variant = 'cards',
 }: ProductScopeListProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set(scopes.filter(s => s.parent_id === null).map(s => s.id))
@@ -175,8 +200,10 @@ export function ProductScopeList({
 
   const rootItems = childrenMap.get(null) ?? []
 
+  const isNav = variant === 'nav'
+
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`flex flex-col ${isNav ? 'gap-0.5' : 'gap-2'}`}>
       {filtered.length === 0 && (
         <p className="py-8 text-center text-sm text-[color:var(--text-tertiary)]">
           {isSearching
@@ -198,6 +225,7 @@ export function ProductScopeList({
             onSelect={onSelect}
             onToggleExpand={() => {}}
             depth={0}
+            variant={variant}
           />
         ))
       ) : (
@@ -213,13 +241,14 @@ export function ProductScopeList({
             onSelect={onSelect}
             onToggleExpand={toggleExpand}
             depth={0}
+            variant={variant}
           />
         ))
       )}
 
       {/* Scope count */}
       <div className="flex items-center justify-end pt-1">
-        <span className="text-xs text-[color:var(--text-tertiary)]">
+        <span className="text-[10px] text-[color:var(--text-tertiary)]">
           {scopes.length} / {MAX_SCOPES}
         </span>
       </div>

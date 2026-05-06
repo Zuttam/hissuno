@@ -98,7 +98,6 @@ export async function POST(
       'docs_portal',
       'uploaded_doc',
       'raw_text',
-      'codebase',
       'notion',
     ])
     const enabled = sourceRows.filter(
@@ -120,7 +119,6 @@ export async function POST(
               | 'docs_portal'
               | 'uploaded_doc'
               | 'raw_text'
-              | 'codebase'
               | 'notion',
             url: source.url ?? null,
             storagePath: source.storage_path ?? null,

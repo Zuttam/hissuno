@@ -23,6 +23,7 @@ import { exchangeNotionOAuthCode } from '../notion/oauth'
 import { extractStringByPropertyName, mapPropertyValue } from '../notion/sync-issue-helpers'
 import { blocksToMarkdown } from '../notion/blocks-to-markdown'
 import { extractPageTitle } from '../notion/sync-knowledge-helpers'
+import { resolveTargetScopeId } from '../shared/scope-helpers'
 
 const issuesFilterSchema = z.object({})
 const issuesSettingsSchema = z.object({
@@ -44,6 +45,8 @@ const knowledgeFilterSchema = z.object({})
 const knowledgeSettingsSchema = z.object({
   rootPageId: z.string(),
   includeChildren: z.boolean().optional(),
+  /** Target product scope for ingested pages. Defaults to the project's default scope. */
+  productScopeId: z.string().uuid().optional(),
 })
 
 type NotionIssuesSettings = z.infer<typeof issuesSettingsSchema>
@@ -301,6 +304,7 @@ async function runKnowledgeSync(ctx: SyncCtx) {
   const rootPageId = ctx.instanceId ?? settings.rootPageId
   if (!rootPageId) throw new Error('Notion knowledge sync requires a root page.')
   const includeChildren = settings.includeChildren ?? true
+  const productScopeId = await resolveTargetScopeId(ctx.projectId, settings.productScopeId)
 
   const client = new NotionClient(String(ctx.credentials.accessToken))
   const queue: string[] = [rootPageId]
@@ -334,6 +338,7 @@ async function runKnowledgeSync(ctx: SyncCtx) {
         url: page.url,
         analyzedContent: markdown,
         origin: 'notion_sync',
+        productScopeId,
         skipInlineProcessing: true,
       })
       processed++

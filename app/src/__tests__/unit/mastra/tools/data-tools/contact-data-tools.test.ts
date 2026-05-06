@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: re-enable after migrating tool execute signature/scorer typing to Mastra v1
 /**
  * Tests for contact-mode data tools
  *

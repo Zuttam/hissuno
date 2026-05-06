@@ -326,10 +326,14 @@ export interface KnowledgeIngestInput {
   origin?: string | null
   parentId?: string | null
   notionPageId?: string | null
-  sourceCodeId?: string | null
   customFields?: Record<string, unknown> | null
   enabled?: boolean
-  productScopeId?: string | null
+  /**
+   * Required: every knowledge entry lives under a product scope. Plugins
+   * should resolve this from a stream setting, falling back to the project's
+   * default scope (see `resolveTargetScopeId` in shared/scope-helpers.ts).
+   */
+  productScopeId: string
   skipInlineProcessing?: boolean
 }
 

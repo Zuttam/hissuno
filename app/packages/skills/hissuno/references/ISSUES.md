@@ -21,7 +21,7 @@ The API also accepts `productScopeIds` (comma-separated UUIDs) and `goalId` filt
 - RICE scores (reach, impact, confidence, effort) when computed
 - Impact analysis and brief (when generated)
 - Upvote count
-- **Relationships** - linked feedback sessions, contacts, companies, knowledge sources, product scopes
+- **Relationships** - linked feedback sessions, contacts, companies, knowledge, product scopes
 
 ## Search
 

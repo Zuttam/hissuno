@@ -34,7 +34,7 @@ function loadEncryptionKey(): Buffer {
     throw new MissingEncryptionSecret()
   }
   // Accept either hex (64 chars = 32 bytes) or base64 (44 chars padded). For
-  // any other length, hash it down to 32 bytes deterministically - this keeps
+  // any other length, hash it down to 32 bytes deterministically — this keeps
   // dev setups simple ("paste a passphrase") while production should still
   // use a real 32-byte secret.
   if (/^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, 'hex')

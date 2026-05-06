@@ -34,13 +34,14 @@ function makeSource(overrides: Partial<KnowledgeSourceRecord> = {}): KnowledgeSo
     updated_at: null,
     analysis_scope: null,
     enabled: true,
-    source_code_id: null,
+    parent_id: null,
     name: null,
     description: null,
     analyzed_content: null,
     notion_page_id: null,
     origin: null,
     custom_fields: null,
+    sort_order: 0,
     ...overrides,
   }
 }
@@ -50,10 +51,6 @@ function makeSource(overrides: Partial<KnowledgeSourceRecord> = {}): KnowledgeSo
 // ============================================================================
 
 describe('getSourceTypeLabel', () => {
-  it('returns "Codebase" for codebase type', () => {
-    expect(getSourceTypeLabel('codebase')).toBe('Codebase')
-  })
-
   it('returns "Website" for website type', () => {
     expect(getSourceTypeLabel('website')).toBe('Website')
   })
@@ -76,12 +73,12 @@ describe('getSourceTypeLabel', () => {
 
   it('covers all KnowledgeSourceType values', () => {
     const allTypes: KnowledgeSourceType[] = [
-      'codebase',
       'website',
       'docs_portal',
       'uploaded_doc',
       'raw_text',
       'notion',
+      'folder',
     ]
     for (const t of allTypes) {
       expect(getSourceTypeLabel(t)).toBeTruthy()
@@ -94,18 +91,6 @@ describe('getSourceTypeLabel', () => {
 // ============================================================================
 
 describe('getSourceDisplayValue', () => {
-  describe('codebase type', () => {
-    it('returns "Project source code" without scope', () => {
-      const source = makeSource({ type: 'codebase' })
-      expect(getSourceDisplayValue(source)).toBe('Project source code')
-    })
-
-    it('includes analysis scope when present', () => {
-      const source = makeSource({ type: 'codebase', analysis_scope: 'src/lib' })
-      expect(getSourceDisplayValue(source)).toBe('Project source code (scope: src/lib)')
-    })
-  })
-
   describe('website type', () => {
     it('returns the URL when present', () => {
       const source = makeSource({ type: 'website', url: 'https://docs.example.com' })
@@ -200,12 +185,12 @@ describe('toKnowledgeSourceWithMeta', () => {
 
   it('works for every source type', () => {
     const types: KnowledgeSourceType[] = [
-      'codebase',
       'website',
       'docs_portal',
       'uploaded_doc',
       'raw_text',
       'notion',
+      'folder',
     ]
     for (const t of types) {
       const source = makeSource({ type: t })

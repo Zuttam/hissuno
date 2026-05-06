@@ -37,7 +37,7 @@ export async function POST(
     }
 
     // Notify the in-process dispatcher (same node). If the dispatcher is on
-    // another replica we can't reach it via in-memory bus - mark the row
+    // another replica we can't reach it via in-memory bus — mark the row
     // cancelled anyway so the UI can move on; the runner will eventually
     // observe the row state on its next status read.
     const notified = requestRunCancel(runId)

@@ -33,6 +33,8 @@ interface RelatedEntitiesSectionProps {
   entityType: EntityType
   entityId: string
   allowedTypes: EntityType[]
+  title?: string
+  emptyText?: string
 }
 
 export function RelatedEntitiesSection({
@@ -40,6 +42,8 @@ export function RelatedEntitiesSection({
   entityType,
   entityId,
   allowedTypes,
+  title,
+  emptyText,
 }: RelatedEntitiesSectionProps) {
   const { relationships, isLoading, link, unlink } = useEntityRelationships({
     projectId,
@@ -61,10 +65,11 @@ export function RelatedEntitiesSection({
     return count
   }, [relationships, hasCustomers, nonCustomerTypes])
 
+  const headingBase = title ?? 'Related'
   return (
     <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
       <CollapsibleSection
-        title={`Related${!isLoading ? ` (${totalCount})` : ''}`}
+        title={`${headingBase}${!isLoading ? ` (${totalCount})` : ''}`}
         variant="flat"
         defaultExpanded={totalCount > 0}
       >
@@ -94,7 +99,7 @@ export function RelatedEntitiesSection({
               />
             ))}
             {totalCount === 0 && allowedTypes.length > 0 && (
-              <p className="text-sm text-[color:var(--text-secondary)]">No related entities yet</p>
+              <p className="text-sm text-[color:var(--text-secondary)]">{emptyText ?? 'No related entities yet'}</p>
             )}
           </div>
         )}
@@ -373,9 +378,9 @@ function entityLink(projectId: string, type: EntityType, id: string): string {
     case 'session':
       return `/projects/${projectId}/sessions?session=${id}`
     case 'knowledge_source':
-      return `/projects/${projectId}/settings/knowledge`
+      return `/projects/${projectId}/products`
     case 'product_scope':
-      return `/projects/${projectId}/products?scope=${id}`
+      return `/projects/${projectId}/products?area=${id}`
   }
 }
 

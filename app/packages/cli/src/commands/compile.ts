@@ -1,5 +1,5 @@
 /**
- * hissuno compile <type> <id> - Run a deterministic compilation operation
+ * hissuno compile <type> <id> — Run a deterministic compilation operation
  *
  * Currently supports `package`: re-analyzes each linked knowledge source then
  * organizes the embedded chunks into a structured support package

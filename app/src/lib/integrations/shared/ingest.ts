@@ -168,7 +168,6 @@ export function buildIngest(bindings: IngestBindings) {
         storagePath: input.storagePath,
         notionPageId: input.notionPageId,
         analyzedContent: input.analyzedContent,
-        sourceCodeId: input.sourceCodeId,
         analysisScope: input.analysisScope,
         origin: input.origin,
         customFields: input.customFields,
