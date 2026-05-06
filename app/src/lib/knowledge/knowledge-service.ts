@@ -17,6 +17,7 @@ import { eq, and, desc, ilike, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { knowledgeSources } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
+import { fireSourceAnalysis } from '@/lib/utils/source-processing'
 import { embedKnowledgeSource } from '@/lib/knowledge/embedding-service'
 import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import { setEntityProductScope } from '@/lib/db/queries/entity-relationships'
@@ -715,9 +716,15 @@ export async function createKnowledgeSourceAdmin(
     )
   }
 
-  // Non-blocking graph eval (skip if processing will be done by workflow)
   if (!skipProcessing) {
-    fireGraphEval(input.projectId, 'knowledge_source', source.id)
+    if (hasContent) {
+      // Content is already analyzed/provided; just run graph-eval to link it.
+      fireGraphEval(input.projectId, 'knowledge_source', source.id)
+    } else if (input.type !== 'folder' && input.type !== 'codebase') {
+      // Needs fetching + analysis in the background. Folders have no content;
+      // codebase sources are processed as part of package compilation.
+      fireSourceAnalysis(source.id, input.projectId)
+    }
   }
 
   return source
@@ -753,9 +760,14 @@ export async function createKnowledgeSourceBulkAdmin(
     )
     .returning()
 
-  // Non-blocking graph eval for each source
+  // Non-blocking: sources with inline analyzed content only need graph-eval;
+  // sources without it need full fetch + analyze in the background.
   for (const source of inserted) {
-    fireGraphEval(projectId, 'knowledge_source', source.id)
+    if (source.analyzed_content) {
+      fireGraphEval(projectId, 'knowledge_source', source.id)
+    } else if (source.type !== 'folder' && source.type !== 'codebase') {
+      fireSourceAnalysis(source.id, projectId)
+    }
   }
 
   return inserted

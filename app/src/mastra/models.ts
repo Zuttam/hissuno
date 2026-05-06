@@ -12,7 +12,7 @@
  *   4. Hardcoded fallback from the caller's ModelConfig
  */
 
-import type { RuntimeContext } from '@mastra/core/runtime-context'
+import type { RequestContext } from '@mastra/core/request-context'
 import type { AIModelSettings } from '@/lib/db/queries/project-settings/types'
 
 export type { AIModelSettings }
@@ -95,7 +95,7 @@ const AI_SETTINGS_CTX_KEY = 'aiModelSettings'
  */
 export function resolveModel(
   config: ModelConfig,
-  input?: RuntimeContext | AIModelSettings | null,
+  input?: RequestContext | AIModelSettings | null,
 ): string {
   const settings = extractSettings(input)
 
@@ -155,10 +155,10 @@ export function getAvailableProviders(): string[] {
 
 // ---------------------------------------------------------------------------
 
-function extractSettings(input?: RuntimeContext | AIModelSettings | null): AIModelSettings | null {
+function extractSettings(input?: RequestContext | AIModelSettings | null): AIModelSettings | null {
   if (!input) return null
-  if (typeof (input as RuntimeContext).get === 'function') {
-    return ((input as RuntimeContext).get(AI_SETTINGS_CTX_KEY) as AIModelSettings) ?? null
+  if (typeof (input as RequestContext).get === 'function') {
+    return ((input as RequestContext).get(AI_SETTINGS_CTX_KEY) as AIModelSettings) ?? null;
   }
   return input as AIModelSettings
 }

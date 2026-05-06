@@ -22,6 +22,7 @@ export const TECHNICAL_ANALYST_MODEL: ModelConfig = {
  * Used by the session-review workflow's analyze-technical-impact step.
  */
 export const technicalAnalystAgent = new Agent({
+  id: 'technical-analyst-agent',
   name: 'Technical Analyst',
   instructions: `You analyze customer feedback to assess technical impact and implementation effort.
 
@@ -116,10 +117,10 @@ Rate your overall confidence in the entire analysis (impact + effort + affected 
 - Always provide reasoning for your assessments
 - Return ONLY the JSON object, no additional text
 `,
-  model: ({ runtimeContext }) => resolveModel(TECHNICAL_ANALYST_MODEL, runtimeContext),
+  model: ({ requestContext }) => resolveModel(TECHNICAL_ANALYST_MODEL, requestContext),
   tools: {
     listCodebaseFiles: listCodebaseFilesTool,
     readCodebaseFile: readCodebaseFileTool,
     searchCodebaseFiles: searchCodebaseFilesTool,
   },
-})
+});

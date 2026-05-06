@@ -222,16 +222,11 @@ describe('public paths', () => {
     '/docs',
     '/docs/api',
     '/api/healthz',
-    '/api/webhooks/slack',
-    '/api/webhooks/jira',
-    '/api/webhooks/linear',
-    '/api/integrations/github/callback',
-    '/api/integrations/slack/callback',
-    '/api/integrations/intercom/callback',
-    '/api/integrations/linear/callback',
-    '/api/integrations/hubspot/callback',
-    '/api/integrations/notion/callback',
+    '/api/plugins/oauth/slack/callback',
+    '/api/plugins/webhook/slack',
+    '/api/plugins/webhook/github',
     '/api/integrations/widget/chat',
+    '/api/integrations/widget/embed',
   ]
 
   for (const path of publicPaths) {

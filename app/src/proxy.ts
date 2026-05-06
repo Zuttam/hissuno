@@ -80,17 +80,12 @@ const PUBLIC_PATHS = [
   '/auth/callback',
   '/api/auth',
 
-  '/api/integrations/github/callback',
-  '/api/integrations/slack/callback',
-  '/api/integrations/intercom/callback',
-  '/api/integrations/linear/callback',
-  '/api/integrations/hubspot/callback',
-  '/api/integrations/notion/callback',
+  // Widget — public runtime endpoints.
   '/api/integrations/widget/embed',
   '/api/integrations/widget/chat',
-  '/api/webhooks/slack',
-  '/api/webhooks/jira',
-  '/api/webhooks/linear',
+  // Plugin-kit OAuth callbacks + webhooks.
+  '/api/plugins/oauth',
+  '/api/plugins/webhook',
   '/api/healthz',
 ]
 

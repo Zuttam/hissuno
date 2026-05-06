@@ -4,10 +4,10 @@
  */
 
 import type { HubSpotCompany, HubSpotContact } from './client'
-import type { OverwritePolicy } from './index'
 import type { MergeStrategy } from '@/lib/customers/customers-service'
 
-export type { OverwritePolicy, MergeStrategy, HubSpotCompany, HubSpotContact }
+export type OverwritePolicy = 'fill_nulls' | 'hubspot_wins' | 'never_overwrite'
+export type { MergeStrategy, HubSpotCompany, HubSpotContact }
 
 /**
  * Map HubSpot OverwritePolicy to service MergeStrategy.

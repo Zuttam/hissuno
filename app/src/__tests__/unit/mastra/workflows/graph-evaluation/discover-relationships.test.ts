@@ -71,6 +71,7 @@ vi.mock('@/mastra/workflows/graph-evaluation/steps/enrich-relationship-context',
 }))
 
 import { discoverRelationships } from '@/mastra/workflows/graph-evaluation/steps/discover-relationships'
+import { DEFAULT_GRAPH_EVAL_CONFIG } from '@/mastra/workflows/graph-evaluation/config'
 import type { GraphEntityType } from '@/mastra/workflows/graph-evaluation/schemas'
 
 // ---------------------------------------------------------------------------
@@ -90,6 +91,7 @@ function makeInput(overrides: Record<string, unknown> = {}) {
     contentForTextMatch: 'Some content about billing and payments at Acme Corp',
     entityName: 'Test Session',
     contentForSearch: 'Some content about billing',
+    config: DEFAULT_GRAPH_EVAL_CONFIG,
     ...overrides,
   }
 }

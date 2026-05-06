@@ -155,15 +155,15 @@ Then use \`web-search\` to research best practices and competitor approaches.
 
 Finally, write a comprehensive brief and save it using the \`save-brief\` tool with issueId "${issueId}".`
 
-      // Create runtime context for the agent
-      const { RuntimeContext } = await import('@mastra/core/runtime-context')
-      const runtimeContext = new RuntimeContext()
-      runtimeContext.set('projectId', projectId)
+      // Create request context for the agent
+      const { RequestContext } = await import('@mastra/core/request-context')
+      const requestContext = new RequestContext()
+      requestContext.set('projectId', projectId)
 
       await writer?.write({ type: 'progress', message: 'Generating brief...' })
 
       const response = await briefWriterAgent.generate(prompt, {
-        runtimeContext,
+        requestContext,
         maxSteps: 15,
         onStepFinish: async ({ toolCalls }) => {
           if (toolCalls && toolCalls.length > 0) {

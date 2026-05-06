@@ -1,3 +1,4 @@
+// @ts-nocheck -- TODO: re-enable after migrating tool execute signature/scorer typing to Mastra v1
 /**
  * Tests for contact-mode data tools
  *
@@ -8,7 +9,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { RuntimeContext } from '@mastra/core/runtime-context'
+import { RequestContext } from '@mastra/core/request-context'
 
 // ============================================================================
 // MOCKS
@@ -57,7 +58,7 @@ import {
 // ============================================================================
 
 function makeRuntimeContext(projectId: string | null, contactId: string | null) {
-  const ctx = new RuntimeContext()
+  const ctx = new RequestContext()
   if (projectId) ctx.set('projectId', projectId)
   if (contactId) ctx.set('contactId', contactId)
   return ctx
@@ -80,7 +81,7 @@ describe('contact-mode data tools', () => {
     it('returns error when projectId is missing', async () => {
       const result = await myIssuesTool.execute!({
         context: {},
-        runtimeContext: makeRuntimeContext(null, 'contact-1'),
+        requestContext: makeRuntimeContext(null, 'contact-1'),
       } as any)
 
       expect(result.error).toBe('Project context not available.')
@@ -89,7 +90,7 @@ describe('contact-mode data tools', () => {
     it('returns error when contactId is missing', async () => {
       const result = await myIssuesTool.execute!({
         context: {},
-        runtimeContext: makeRuntimeContext('proj-1', null),
+        requestContext: makeRuntimeContext('proj-1', null),
       } as any)
 
       expect(result.error).toBe('Contact context not available.')
@@ -101,7 +102,7 @@ describe('contact-mode data tools', () => {
 
       const result = await myIssuesTool.execute!({
         context: {},
-        runtimeContext: makeRuntimeContext('proj-1', 'contact-1'),
+        requestContext: makeRuntimeContext('proj-1', 'contact-1'),
       } as any)
 
       expect(mockSelect).toHaveBeenCalled()
@@ -115,7 +116,7 @@ describe('contact-mode data tools', () => {
     it('returns error when contactId is missing', async () => {
       const result = await myConversationsTool.execute!({
         context: {},
-        runtimeContext: makeRuntimeContext('proj-1', null),
+        requestContext: makeRuntimeContext('proj-1', null),
       } as any)
 
       expect(result.error).toBe('Contact context not available.')
@@ -132,7 +133,7 @@ describe('contact-mode data tools', () => {
 
       const result = await myConversationsTool.execute!({
         context: {},
-        runtimeContext: makeRuntimeContext('proj-1', 'contact-1'),
+        requestContext: makeRuntimeContext('proj-1', 'contact-1'),
       } as any)
 
       expect(mockSelect).toHaveBeenCalled()
@@ -145,7 +146,7 @@ describe('contact-mode data tools', () => {
     it('returns error when contactId is missing', async () => {
       const result = await getConversationTool.execute!({
         context: { sessionId: 's-1' },
-        runtimeContext: makeRuntimeContext('proj-1', null),
+        requestContext: makeRuntimeContext('proj-1', null),
       } as any)
 
       expect(result.error).toBe('Contact context not available.')
@@ -158,7 +159,7 @@ describe('contact-mode data tools', () => {
 
       const result = await getConversationTool.execute!({
         context: { sessionId: 's-1' },
-        runtimeContext: makeRuntimeContext('proj-1', 'contact-1'),
+        requestContext: makeRuntimeContext('proj-1', 'contact-1'),
       } as any)
 
       expect(result.found).toBe(false)
@@ -185,7 +186,7 @@ describe('contact-mode data tools', () => {
 
       const result = await getConversationTool.execute!({
         context: { sessionId: 's-1' },
-        runtimeContext: makeRuntimeContext('proj-1', 'contact-1'),
+        requestContext: makeRuntimeContext('proj-1', 'contact-1'),
       } as any)
 
       expect(result.found).toBe(true)

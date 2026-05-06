@@ -28,11 +28,11 @@ interface FeedbackContext {
   userMetadata: Record<string, string> | null
 }
 
-function getFeedbackContext(runtimeContext: unknown): FeedbackContext {
-  if (!runtimeContext || typeof runtimeContext !== 'object') {
+function getFeedbackContext(requestContext: unknown): FeedbackContext {
+  if (!requestContext || typeof requestContext !== 'object') {
     return { projectId: null, sessionId: null, userId: null, userMetadata: null }
   }
-  const ctx = runtimeContext as { get?: (key: string) => unknown }
+  const ctx = requestContext as { get?: (key: string) => unknown }
   if (typeof ctx.get !== 'function') {
     return { projectId: null, sessionId: null, userId: null, userMetadata: null }
   }
@@ -73,8 +73,8 @@ Use when a team member says "record feedback from [person]" or similar.`,
     contactCreated: z.boolean().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId, sessionId, userId, userMetadata } = getFeedbackContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId, sessionId, userId, userMetadata } = getFeedbackContext(requestContext)
 
     if (!projectId) {
       return { success: false, error: 'Project context not available.' }

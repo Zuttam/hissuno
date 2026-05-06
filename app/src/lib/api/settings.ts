@@ -1,5 +1,8 @@
 import { fetchApi, buildUrl } from './fetch'
 import type { ProductScopeRecord } from '@/types/product-scope'
+import type { GraphEvaluationConfig } from '@/mastra/workflows/graph-evaluation/config'
+
+type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T
 
 const paths = {
   productScopes: '/api/product-scopes',
@@ -147,9 +150,24 @@ const knowledgeAnalysis = createSettingsAccessor('agents/knowledge-analysis', 'k
 export const getKnowledgeAnalysisSettings = knowledgeAnalysis.get
 export const updateKnowledgeAnalysisSettings = knowledgeAnalysis.update
 
-const graphEvaluation = createSettingsAccessor('graph-evaluation', 'graph evaluation')
-export const getGraphEvaluationSettingsClient = graphEvaluation.get
-export const updateGraphEvaluationSettingsClient = graphEvaluation.update
+export async function getGraphEvaluationSettingsClient(projectId: string): Promise<{ config: GraphEvaluationConfig }> {
+  const url = buildUrl('/api/settings/graph-evaluation', { projectId })
+  return fetchApi<{ config: GraphEvaluationConfig }>(url, {
+    errorMessage: 'Failed to load graph evaluation settings.',
+  })
+}
+
+export async function updateGraphEvaluationSettingsClient(
+  projectId: string,
+  patch: DeepPartial<GraphEvaluationConfig>,
+): Promise<{ config: GraphEvaluationConfig }> {
+  const url = buildUrl('/api/settings/graph-evaluation', { projectId })
+  return fetchApi<{ config: GraphEvaluationConfig }>(url, {
+    method: 'PATCH',
+    body: patch as Record<string, unknown>,
+    errorMessage: 'Failed to save graph evaluation settings.',
+  })
+}
 
 const aiModel = createSettingsAccessor('ai-model', 'AI model')
 export const getAIModelSettingsClient = aiModel.get

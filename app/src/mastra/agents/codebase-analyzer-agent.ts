@@ -21,6 +21,7 @@ export const CODEBASE_ANALYZER_MODEL: ModelConfig = {
  * and architecture overview.
  */
 export const codebaseAnalyzerAgent = new Agent({
+  id: 'codebase-analyzer-agent',
   name: 'Codebase Analyzer',
   instructions: `You are a product-focused software analyst with tools to explore codebases from the local filesystem. Your goal is to extract HIGH-LEVEL knowledge from source code that helps a support agent answer user questions.
 
@@ -120,10 +121,10 @@ Important domain terms or patterns a support agent should know.
 - Keep the entire output under 1000 words if possible
 - Be efficient with tool calls - you have limited iterations
 `,
-  model: ({ runtimeContext }) => resolveModel(CODEBASE_ANALYZER_MODEL, runtimeContext),
+  model: ({ requestContext }) => resolveModel(CODEBASE_ANALYZER_MODEL, requestContext),
   tools: {
     listCodebaseFiles: listCodebaseFilesTool,
     readCodebaseFile: readCodebaseFileTool,
     searchCodebaseFiles: searchCodebaseFilesTool,
   },
-})
+});

@@ -46,7 +46,7 @@ const Slider = forwardRef<HTMLInputElement, SliderProps>(
           max={max}
           step={step}
           value={value}
-          onChange={(e) => onChange(parseInt(e.target.value, 10))}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
           disabled={disabled}
           ref={ref}
           style={{

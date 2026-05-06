@@ -24,6 +24,7 @@ import { analysisKnowledgeTools } from '../tools/analysis-knowledge-tools'
  * No session lifecycle markers — team members don't trigger goodbye/escalation flows.
  */
 export const productManagerAgent = new Agent({
+  id: 'product-manager-agent',
   name: 'Product Manager Agent',
   instructions: `
 You are Hissuno's product intelligence assistant for team members (PMs, engineers, designers). You have a product manager mindset and access to the full project data and knowledge base.
@@ -127,11 +128,11 @@ You are embedded in Hissuno - an open-source unified context layer for product a
 - Proactively suggest related queries or insights
 - Use structured formatting for data-heavy responses
 `,
-  model: ({ runtimeContext }) => resolveModel(PRODUCT_MANAGER_MODEL, runtimeContext),
+  model: ({ requestContext }) => resolveModel(PRODUCT_MANAGER_MODEL, requestContext),
   tools: Object.fromEntries(
     [...userDataTools, ...feedbackTools, ...analysisKnowledgeTools].map((tool) => [tool.id, tool])
   ),
 
   // Memory uses storage from Mastra instance
   memory: new Memory(),
-})
+});

@@ -1,5 +1,11 @@
 {
   "name": "hissuno-monorepo",
   "private": true,
-  "workspaces": ["app", "website"]
+  "workspaces": [
+    "app",
+    "website"
+  ],
+  "devDependencies": {
+    "@mastra/codemod": "^1.0.3"
+  }
 }

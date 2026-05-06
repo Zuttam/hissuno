@@ -15,7 +15,7 @@ import {
   KeyField,
 } from '@/components/ui'
 import type { WidgetTrigger, WidgetDisplay, WidgetTheme } from '@/types/issue'
-import { fetchWidgetSettings, updateWidgetSettings } from '@/lib/api/integrations'
+import { fetchWidgetSettings, updateWidgetSettings } from '@/lib/api/widget'
 
 const TRIGGER_OPTIONS: { value: WidgetTrigger; label: string }[] = [
   { value: 'bubble', label: 'Bubble' },

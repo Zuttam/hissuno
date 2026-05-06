@@ -22,6 +22,7 @@ export const SUPPORT_MODEL: ModelConfig = {
  * Knowledge is injected as system messages via the router.
  */
 export const supportAgent = new Agent({
+  id: 'support-agent',
   name: 'Support Agent',
   instructions: `
 You are a friendly, knowledgeable support assistant for end-user customers. Your role is to help users get answers about the product, report issues, and request features.
@@ -142,9 +143,9 @@ This marker signals that the conversation has reached a natural conclusion. The 
 Example response when goodbye is detected:
 "You're welcome! I'm glad I could help. Feel free to come back anytime if you have more questions. Take care! [SESSION_GOODBYE]"
 `,
-  model: ({ runtimeContext }) => resolveModel(SUPPORT_MODEL, runtimeContext),
+  model: ({ requestContext }) => resolveModel(SUPPORT_MODEL, requestContext),
   tools: Object.fromEntries([...contactDataTools].map((tool) => [tool.id, tool])),
 
   // Memory uses storage from Mastra instance
   memory: new Memory(),
-})
+});

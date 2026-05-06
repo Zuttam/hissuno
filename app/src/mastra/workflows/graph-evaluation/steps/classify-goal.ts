@@ -58,13 +58,14 @@ export async function classifyGoal(input: ClassifyGoalInput): Promise<ClassifyGo
 
     const aiSettings = await getAIModelSettingsAdmin(input.projectId)
     const goalAgent = new Agent({
+      id: 'graph-goal-classifier',
       name: 'Graph Goal Classifier',
       instructions: 'You classify which product-scope goal an entity best contributes to.',
       model: resolveModel(
         { name: 'graph-goal-classifier', tier: 'small', fallback: 'openai/gpt-5.4-mini' },
         aiSettings,
       ),
-    })
+    });
 
     const { object } = await goalAgent.generate(
       `Given this entity and product scope with goals, which goal does this entity best contribute to? Pick one or none.
@@ -80,7 +81,7 @@ Goals:
 ${goalsText}
 
 Pick the single goal this entity most directly addresses. If none of the goals are relevant, return goalId as null.`,
-      { output: GOAL_SCHEMA },
+      { structuredOutput: { schema: GOAL_SCHEMA } },
     )
 
     // Validate the returned goalId actually exists

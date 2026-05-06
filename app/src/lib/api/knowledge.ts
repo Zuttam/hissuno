@@ -4,11 +4,10 @@ import type { KnowledgeSourceWithCodebase, SupportPackageWithSources } from '@/l
 const paths = {
   sources: '/api/knowledge/sources',
   source: (s: string) => `/api/knowledge/sources/${s}`,
+  sourceReanalyze: (s: string) => `/api/knowledge/sources/${s}/reanalyze`,
   packageAnalyze: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze`,
   packageAnalyzeCancel: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze/cancel`,
   packageAnalyzeStream: (pkg: string) => `/api/settings/agents/support-agent/packages/${pkg}/analyze/stream`,
-  sourceAnalyze: (s: string) => `/api/knowledge/sources/${s}/analyze`,
-  sourceAnalyzeStream: (s: string) => `/api/knowledge/sources/${s}/analyze/stream`,
 }
 
 // ---------------------------------------------------------------------------
@@ -87,15 +86,14 @@ export function packageAnalyzeStreamUrl(projectId: string, packageId: string): s
 }
 
 // ---------------------------------------------------------------------------
-// Source Analysis
+// Source Analysis (fire-and-forget; poll /api/knowledge/sources for status)
 // ---------------------------------------------------------------------------
 
-export async function triggerSourceAnalysis(projectId: string, sourceId: string) {
-  return fetchApiRaw(buildUrl(paths.sourceAnalyze(sourceId), { projectId }), { method: 'POST' })
-}
-
-export function sourceAnalyzeStreamUrl(projectId: string, sourceId: string): string {
-  return buildUrl(paths.sourceAnalyzeStream(sourceId), { projectId })
+export async function reanalyzeKnowledgeSource(projectId: string, sourceId: string) {
+  return fetchApi<{ sourceId: string; status: string }>(
+    buildUrl(paths.sourceReanalyze(sourceId), { projectId }),
+    { method: 'POST', errorMessage: 'Failed to start analysis' },
+  )
 }
 
 // ---------------------------------------------------------------------------

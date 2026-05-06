@@ -42,8 +42,8 @@ Shows issues that were created or upvoted from your feedback sessions.`,
     total: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId, contactId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId, contactId } = getDataContext(requestContext)
     if (!projectId) return { issues: [], total: 0, error: NO_PROJECT_ERROR }
     if (!contactId) return { issues: [], total: 0, error: NO_CONTACT_ERROR }
 
@@ -140,8 +140,8 @@ Shows your past interactions and their current status.`,
     total: z.number(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId, contactId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId, contactId } = getDataContext(requestContext)
     if (!projectId) return { conversations: [], total: 0, error: NO_PROJECT_ERROR }
     if (!contactId) return { conversations: [], total: 0, error: NO_CONTACT_ERROR }
 
@@ -230,8 +230,8 @@ Includes all messages. Only works for your own conversations.`,
     found: z.boolean(),
     error: z.string().optional(),
   }),
-  execute: async ({ context, runtimeContext }) => {
-    const { projectId, contactId } = getDataContext(runtimeContext)
+  execute: async (context, { requestContext }) => {
+    const { projectId, contactId } = getDataContext(requestContext)
     if (!projectId) return { conversation: null, found: false, error: NO_PROJECT_ERROR }
     if (!contactId) return { conversation: null, found: false, error: NO_CONTACT_ERROR }
 

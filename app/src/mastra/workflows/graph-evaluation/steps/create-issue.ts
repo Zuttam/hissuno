@@ -13,6 +13,7 @@ import { resolveModel } from '@/mastra/models'
 import { getAIModelSettingsAdmin } from '@/lib/db/queries/project-settings'
 
 import type { IssueMatch } from './discover-relationships'
+import type { GraphEvaluationConfig } from '../config'
 
 export interface IssueCreationInput {
   projectId: string
@@ -27,6 +28,7 @@ export interface IssueCreationInput {
     reasoning: string | null
   } | null
   issueMatches: IssueMatch[]
+  issueConfig: GraphEvaluationConfig['creation']['issues']
 }
 
 export interface IssueCreationResultEntry {
@@ -55,7 +57,7 @@ export function primaryAction(result: IssueCreationResult): 'created' | 'linked'
 export async function runIssueCreationPolicy(
   input: IssueCreationInput
 ): Promise<IssueCreationResult> {
-  const { projectId, sessionId, tags, messages, productScopeId, issueMatches } = input
+  const { projectId, sessionId, tags, messages, productScopeId, issueMatches, issueConfig } = input
   const skipResult = (reason: string): IssueCreationResult => ({
     results: [{ action: 'skipped', issueId: null, issueName: null, productScopeId: null, skipReason: reason }],
   })
@@ -65,16 +67,16 @@ export async function runIssueCreationPolicy(
   if (!hasUserMessage) return skipResult('No user messages to analyze')
 
   // Gate: no actionable tags
-  const actionableTags = ['bug', 'feature_request', 'change_request']
+  const actionableTags = issueConfig.actionableTags
   const hasActionableTag = tags.some(t => actionableTags.includes(t))
-  if (!hasActionableTag) return skipResult('No actionable tags (bug, feature_request, change_request)')
+  if (!hasActionableTag) return skipResult(`No actionable tags (${actionableTags.join(', ')})`)
 
   // Check for strong match - link to existing issue
   const bestMatch = issueMatches.length > 0
     ? issueMatches.reduce((best, m) => m.similarity > best.similarity ? m : best, issueMatches[0])
     : null
 
-  if (bestMatch && bestMatch.similarity >= 0.65) {
+  if (bestMatch && bestMatch.similarity >= issueConfig.linkThreshold) {
     try {
       const { linkSessionToIssueAdmin } = await import('@/lib/issues/issues-service')
       await linkSessionToIssueAdmin(bestMatch.issueId, sessionId, projectId)
@@ -93,7 +95,7 @@ export async function runIssueCreationPolicy(
     }
 
     // Safety net: if PM says "create" but there's a moderate match, override to link
-    if (decision.action === 'create' && bestMatch && bestMatch.similarity >= 0.55) {
+    if (decision.action === 'create' && bestMatch && bestMatch.similarity >= issueConfig.safetyNetThreshold) {
       try {
         const { linkSessionToIssueAdmin } = await import('@/lib/issues/issues-service')
         await linkSessionToIssueAdmin(bestMatch.issueId, sessionId, projectId)
@@ -173,7 +175,7 @@ interface PMDecision {
 async function makePMDecision(
   input: IssueCreationInput
 ): Promise<PMDecision> {
-  const { tags, messages, issueMatches, productScopeContext } = input
+  const { tags, messages, issueMatches, productScopeContext, issueConfig } = input
 
   // Build conversation summary
   const conversationSummary = messages
@@ -207,7 +209,7 @@ ${conversationSummary}
 ## Similar Existing Issues
 ${similarIssuesSummary}
 
-IMPORTANT: If ANY similar issue above has 55% or higher similarity, you must NOT create a new issue covering the same problem. Instead, return SKIP with a reason explaining the overlap.
+IMPORTANT: If ANY similar issue above has ${Math.round(issueConfig.safetyNetThreshold * 100)}% or higher similarity, you must NOT create a new issue covering the same problem. Instead, return SKIP with a reason explaining the overlap.
 ${scopeSection}
 ## Priority Guidelines
 - **HIGH**: Regressions (something that used to work is now broken), complete feature loss, data loss/corruption risk, security issues, blocking many users
@@ -230,7 +232,7 @@ Based on the above, decide one of:
    - Off-topic or spam
    - Tags include only "wins" without other actionable tags
 
-2. **CREATE** - If actionable feedback with no strong match (all similar issues below 65% similarity):
+2. **CREATE** - If actionable feedback with no strong match (all similar issues below ${Math.round(issueConfig.linkThreshold * 100)}% similarity):
    - A session may contain MULTIPLE distinct problems. Create a SEPARATE issue for each.
    - Do NOT combine unrelated problems into a single issue.
    - For each issue provide: type, name, description with user quotes, priority
@@ -246,13 +248,14 @@ For CREATE (one or more issues):
 
   const aiSettings = await getAIModelSettingsAdmin(input.projectId)
   const issuePolicyAgent = new Agent({
+    id: 'issue-creation-policy',
     name: 'Issue Creation Policy',
     instructions: 'You decide whether to create new issues, link to existing ones, or skip, based on customer feedback analysis.',
     model: resolveModel(
       { name: 'issue-policy', tier: 'default', fallback: 'openai/gpt-5' },
       aiSettings,
     ),
-  })
+  });
   const response = await issuePolicyAgent.generate(prompt)
 
   // Parse the response

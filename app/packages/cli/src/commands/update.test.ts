@@ -89,6 +89,16 @@ describe('updateIssue', () => {
       type: 'bug',
     })
   })
+
+  it('sets pr_url', async () => {
+    const result = await updateIssue(EMPTY, { prUrl: 'https://github.com/foo/bar/pull/1' })
+    expect(result).toEqual({ pr_url: 'https://github.com/foo/bar/pull/1' })
+  })
+
+  it('clears pr_url with empty string', async () => {
+    const result = await updateIssue(EMPTY, { prUrl: '' })
+    expect(result).toEqual({ pr_url: null })
+  })
 })
 
 // ─── updateFeedback ──────────────────────────────────────

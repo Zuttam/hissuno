@@ -23,9 +23,14 @@ const globalForMastra = globalThis as unknown as {
 const storage =
   globalForMastra.mastraStorage ??
   new PostgresStore({
+    id: 'mastra-pg',
     connectionString: process.env.DATABASE_URL!,
-    // optional but recommended: keep Mastra in its own schema
-    schemaName: 'mastra', // Mastra will create mastra_* tables in this schema
+    // keep Mastra in its own schema; mastra_* tables are created here
+    schemaName: 'mastra',
+    // Defer table creation to deploy-time/init scripts. Otherwise every
+    // build worker tries to create tables in parallel and exhausts pg pools.
+    disableInit: true,
+    max: 5,
   });
 
 if (process.env.NODE_ENV !== 'production') {
@@ -50,8 +55,4 @@ export const mastra = new Mastra({
     name: 'Mastra',
     level: 'info',
   }),
-  telemetry: { enabled: false },
-  observability: {
-    default: { enabled: false },
-  },
 });

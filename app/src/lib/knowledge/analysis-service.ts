@@ -1,8 +1,11 @@
 /**
  * Compilation Service
- * Shared logic for triggering and managing package compilation and source analysis workflows
+ * Shared logic for triggering and managing package compilation workflows
+ * (the support-agent package compile). Single-source analysis is fire-and-forget
+ * via `fireSourceAnalysis` (see `lib/utils/source-processing.ts`); it does not
+ * touch `compilation_runs`.
  *
- * Note: Codebase sync is now handled internally by the workflow via
+ * Note: Codebase sync is handled internally by the workflow via
  * prepare-codebase and cleanup-codebase steps. This service just validates
  * and triggers the workflow.
  */
@@ -11,97 +14,13 @@ import { db } from '@/lib/db'
 import { projects, knowledgeSources, sourceCodes, compilationRuns } from '@/lib/db/schema/app'
 import { eq, and, inArray, desc } from 'drizzle-orm'
 import { mastra } from '@/mastra'
+import { fireSourceAnalysis } from '@/lib/utils/source-processing'
 import type { KnowledgeSourceRecord } from './types'
-
-export type TriggerSourceAnalysisParams = {
-  projectId: string
-  sourceId: string
-  userId: string
-}
-
-export type TriggerSourceAnalysisResult = {
-  success: true
-  runId: string
-  analysisId: string
-} | {
-  success: false
-  error: string
-  statusCode: number
-}
-
-/**
- * Triggers analysis for a single knowledge source.
- */
-export async function triggerSourceAnalysis(
-  params: TriggerSourceAnalysisParams
-): Promise<TriggerSourceAnalysisResult> {
-  const { projectId, sourceId, userId } = params
-
-  // Fetch the source
-  const [source] = await db
-    .select()
-    .from(knowledgeSources)
-    .where(
-      and(
-        eq(knowledgeSources.id, sourceId),
-        eq(knowledgeSources.project_id, projectId)
-      )
-    )
-    .limit(1)
-
-  if (!source) {
-    return { success: false, error: 'Knowledge source not found.', statusCode: 404 }
-  }
-
-  // Check if already analyzing
-  if (source.status === 'analyzing') {
-    return { success: false, error: 'Source is already being analyzed.', statusCode: 409 }
-  }
-
-  // Set source status to analyzing
-  await db
-    .update(knowledgeSources)
-    .set({ status: 'analyzing', error_message: null })
-    .where(eq(knowledgeSources.id, sourceId))
-
-  // Generate a unique run ID
-  const runId = `source-${sourceId}-${Date.now()}`
-
-  // Create analysis record
-  const [analysisRecord] = await db
-    .insert(compilationRuns)
-    .values({
-      project_id: projectId,
-      run_id: runId,
-      status: 'running',
-      started_at: new Date(),
-      metadata: {
-        type: 'source_analysis',
-        sourceId,
-        sourceType: source.type,
-        userId,
-      },
-    })
-    .returning()
-
-  if (!analysisRecord) {
-    console.error('[compilation-service] Failed to create analysis record')
-    return { success: false, error: 'Failed to start analysis.', statusCode: 500 }
-  }
-
-  console.log('[compilation-service] Created source analysis record:', analysisRecord.id)
-
-  return {
-    success: true,
-    runId,
-    analysisId: analysisRecord.id,
-  }
-}
 
 /**
  * Triggers analysis for multiple sources in the background (fire-and-forget).
- * Used by Notion sync to process sources through the analysis workflow.
- * No user context required.
+ * Used by Notion sync. Returns immediately; each source's status transitions
+ * are owned by `analyzeSource`.
  */
 export async function triggerSourceAnalysisBatch(
   projectId: string,
@@ -109,69 +28,9 @@ export async function triggerSourceAnalysisBatch(
 ): Promise<void> {
   if (sourceIds.length === 0) return
 
-  // Fetch only the columns needed for analysis input
-  const sources = await db
-    .select({
-      id: knowledgeSources.id,
-      type: knowledgeSources.type,
-      url: knowledgeSources.url,
-      storage_path: knowledgeSources.storage_path,
-      content: knowledgeSources.content,
-      analysis_scope: knowledgeSources.analysis_scope,
-      notion_page_id: knowledgeSources.notion_page_id,
-      origin: knowledgeSources.origin,
-      name: knowledgeSources.name,
-    })
-    .from(knowledgeSources)
-    .where(
-      and(
-        eq(knowledgeSources.project_id, projectId),
-        inArray(knowledgeSources.id, sourceIds)
-      )
-    )
-
-  console.log(`[analysis-service] Triggering batch analysis for ${sources.length} sources`)
-
-  // Process each source sequentially (to avoid overwhelming the LLM)
-  for (const source of sources) {
-    try {
-      // Set status to analyzing
-      await db
-        .update(knowledgeSources)
-        .set({ status: 'analyzing', error_message: null })
-        .where(eq(knowledgeSources.id, source.id))
-
-      const { analyzeSource } = await import('@/lib/knowledge/knowledge-service')
-      await analyzeSource({
-        projectId,
-        sourceId: source.id,
-        sourceType: source.type as 'website' | 'docs_portal' | 'uploaded_doc' | 'raw_text' | 'codebase' | 'notion',
-        url: source.url,
-        storagePath: source.storage_path,
-        content: source.content,
-        analysisScope: source.analysis_scope ?? null,
-        notionPageId: source.notion_page_id ?? null,
-        origin: source.origin ?? null,
-        sourceName: source.name ?? null,
-      })
-
-      console.log(`[analysis-service] Completed analysis for source ${source.id}`)
-    } catch (error) {
-      console.error(`[analysis-service] Failed analysis for source ${source.id}:`, error instanceof Error ? error.stack ?? error.message : error)
-      // Mark as failed and continue with next source
-      try {
-        await db
-          .update(knowledgeSources)
-          .set({
-            status: 'failed',
-            error_message: error instanceof Error ? error.message : 'Batch analysis failed',
-          })
-          .where(eq(knowledgeSources.id, source.id))
-      } catch (statusErr) {
-        // Best effort: log so we know when status propagation is also broken.
-        console.warn(`[analysis-service] Failed to mark source ${source.id} as failed:`, statusErr instanceof Error ? statusErr.message : statusErr)
-      }
-    }
+  console.log(`[analysis-service] Firing background analysis for ${sourceIds.length} sources`)
+  for (const sourceId of sourceIds) {
+    fireSourceAnalysis(sourceId, projectId)
   }
 }
 
@@ -231,7 +90,7 @@ export async function triggerPackageCompilation(
   }
 
   // Check if a package compilation is already running for this project
-  const runningAnalyses = await db
+  const [runningPackageCompilation] = await db
     .select()
     .from(compilationRuns)
     .where(
@@ -241,13 +100,7 @@ export async function triggerPackageCompilation(
       )
     )
     .orderBy(desc(compilationRuns.started_at))
-
-  // Only block on package compilation runs, not source-level analyses
-  const runningPackageCompilation = runningAnalyses.find((r) => {
-    const meta = r.metadata as Record<string, unknown> | null
-    // Source analyses have type: 'source_analysis' - skip them
-    return meta?.type !== 'source_analysis'
-  })
+    .limit(1)
 
   if (runningPackageCompilation) {
     // If analysis has been running for >5 min, auto-cancel it (likely stuck)

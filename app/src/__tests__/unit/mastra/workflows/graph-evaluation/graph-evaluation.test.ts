@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockLoadEntityContent = vi.hoisted(() => vi.fn())
 const mockExtractTopics = vi.hoisted(() => vi.fn())
 const mockDiscoverRelationships = vi.hoisted(() => vi.fn())
+const mockGetGraphEvaluationSettingsAdmin = vi.hoisted(() => vi.fn())
 
 vi.mock('@/mastra/workflows/graph-evaluation/steps/load-entity-content', () => ({
   loadEntityContent: mockLoadEntityContent,
@@ -18,14 +19,26 @@ vi.mock('@/mastra/workflows/graph-evaluation/steps/extract-topics', () => ({
 vi.mock('@/mastra/workflows/graph-evaluation/steps/discover-relationships', () => ({
   discoverRelationships: mockDiscoverRelationships,
 }))
+vi.mock('@/lib/db/queries/graph-evaluation-settings', async () => {
+  const actual = await vi.importActual<typeof import('@/mastra/workflows/graph-evaluation/config')>(
+    '@/mastra/workflows/graph-evaluation/config',
+  )
+  return {
+    getGraphEvaluationSettingsAdmin: mockGetGraphEvaluationSettingsAdmin,
+    DEFAULT_GRAPH_EVAL_CONFIG: actual.DEFAULT_GRAPH_EVAL_CONFIG,
+    parseGraphEvalConfig: actual.parseGraphEvalConfig,
+  }
+})
 
 import { evaluateEntityRelationships } from '@/mastra/workflows/graph-evaluation'
 
 const PROJECT_ID = 'proj-1'
 const ENTITY_ID = 'entity-1'
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks()
+  const { DEFAULT_GRAPH_EVAL_CONFIG } = await import('@/mastra/workflows/graph-evaluation/config')
+  mockGetGraphEvaluationSettingsAdmin.mockResolvedValue(DEFAULT_GRAPH_EVAL_CONFIG)
 })
 
 describe('evaluateEntityRelationships', () => {
@@ -70,7 +83,7 @@ describe('evaluateEntityRelationships', () => {
 
     it('calls discoverRelationships with correct input shape', async () => {
       await evaluateEntityRelationships(PROJECT_ID, 'session', ENTITY_ID)
-      expect(mockDiscoverRelationships).toHaveBeenCalledWith({
+      expect(mockDiscoverRelationships).toHaveBeenCalledWith(expect.objectContaining({
         projectId: PROJECT_ID,
         entityType: 'session',
         entityId: ENTITY_ID,
@@ -79,7 +92,8 @@ describe('evaluateEntityRelationships', () => {
         contentForTextMatch: 'text match content',
         entityName: 'Test Entity',
         contentForSearch: 'search content',
-      })
+      }))
+      expect(mockDiscoverRelationships.mock.calls[0][0].config).toBeDefined()
     })
 
     it('returns combined output with identity fields and discovery results', async () => {

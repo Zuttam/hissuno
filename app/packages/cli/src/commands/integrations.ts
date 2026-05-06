@@ -53,7 +53,58 @@ async function promptSyncFrequency(existing?: string): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export async function getStatus(config: HissunoConfig, platform: Platform, projectId: string) {
-  return apiCall(config, 'GET', `/api/integrations/${platform}?projectId=${projectId}`)
+  // Use the unified plugin-kit endpoint. The old /api/integrations/<platform>
+  // per-platform routes were removed; without this the CLI reports every
+  // integration as disconnected.
+  const result = await apiCall(config, 'GET', `/api/plugins/${platform}?projectId=${projectId}`)
+  if (!result.ok) return result
+
+  const payload = result.data as {
+    plugin?: { id: string; name: string; multiInstance?: boolean }
+    connections?: Array<{
+      id: string
+      accountLabel: string | null
+      externalAccountId: string | null
+      settings: Record<string, unknown> | null
+      streams: Array<{
+        id: string
+        streamId: string
+        enabled: boolean
+        frequency: string | null
+        lastSyncAt: string | null
+        lastSyncStatus: string | null
+        lastSyncCounts: Record<string, unknown> | null
+      }>
+    }>
+  }
+
+  const connections = payload.connections ?? []
+  const primary = connections[0]
+  const streams = primary?.streams ?? []
+  const latestStream = streams
+    .filter((s) => s.lastSyncAt)
+    .sort((a, b) => (b.lastSyncAt ?? '').localeCompare(a.lastSyncAt ?? ''))[0]
+  const latestCounts = (latestStream?.lastSyncCounts ?? {}) as Record<string, number>
+  const totalSynced = Object.values(latestCounts).reduce((acc, v) => acc + (typeof v === 'number' ? v : 0), 0)
+
+  return {
+    ok: true as const,
+    status: result.status,
+    data: {
+      connected: connections.length > 0,
+      connectionCount: connections.length,
+      connectionId: primary?.id ?? null,
+      accountLabel: primary?.accountLabel ?? null,
+      externalAccountId: primary?.externalAccountId ?? null,
+      settings: primary?.settings ?? null,
+      streams,
+      syncEnabled: streams.some((s) => s.enabled),
+      syncFrequency: streams.find((s) => s.enabled)?.frequency ?? null,
+      lastSyncAt: latestStream?.lastSyncAt ?? null,
+      lastSyncStatus: latestStream?.lastSyncStatus ?? null,
+      stats: totalSynced > 0 ? { totalSynced } : null,
+    },
+  }
 }
 
 export function formatStatus(platform: Platform, data: Record<string, unknown>): string {

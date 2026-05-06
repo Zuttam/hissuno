@@ -5,8 +5,13 @@
  * as bug, feature_request, change_request, or skip.
  */
 
-import { createScorer } from '@mastra/core/scores'
+import { createScorer } from '@mastra/core/evals'
 import type { ExpectedClassification } from '../datasets/types'
+
+type ScorerRun = {
+  input?: ClassificationScorerInput
+  output: ClassificationScorerOutput
+}
 
 /**
  * Input type for classification scorer
@@ -37,10 +42,11 @@ export const classificationAccuracyScorer = createScorer<
   ClassificationScorerInput,
   ClassificationScorerOutput
 >({
+  id: 'classification-accuracy',
   name: 'Classification Accuracy',
   description: 'Evaluates whether the PM agent correctly classified a session',
 })
-  .preprocess(({ run }) => {
+  .preprocess(({ run }: { run: ScorerRun }) => {
     // Extract the raw response text
     const rawResponse = run.output.rawResponse || ''
     const textLower = rawResponse.toLowerCase()
@@ -84,7 +90,7 @@ export const classificationAccuracyScorer = createScorer<
       rawResponse,
     }
   })
-  .analyze(({ run, results }) => {
+  .analyze(({ run, results }: { run: ScorerRun; results: { preprocessStepResult: { actualClassification: ExpectedClassification | null } } }) => {
     const { actualClassification } = results.preprocessStepResult
     const expectedClassification = run.input?.expectedClassification ?? 'skip'
 
@@ -105,11 +111,11 @@ export const classificationAccuracyScorer = createScorer<
 
     return confusionInfo
   })
-  .generateScore(({ results }) => {
+  .generateScore(({ results }: { results: { analyzeStepResult: { isCorrect: boolean } } }) => {
     // Return 1.0 for correct classification, 0.0 for incorrect
     return results.analyzeStepResult.isCorrect ? 1.0 : 0.0
   })
-  .generateReason(({ run, results, score }) => {
+  .generateReason(({ run, results, score }: { run: ScorerRun; results: { analyzeStepResult: { expected: ExpectedClassification | null; actual: ExpectedClassification | null; matchType: string } }; score: number }) => {
     const { expected, actual, matchType } = results.analyzeStepResult
     const testCaseName = run.input?.testCaseName ?? 'Unknown'
     const testCaseId = run.input?.testCaseId ?? 'unknown'
@@ -123,7 +129,7 @@ export const classificationAccuracyScorer = createScorer<
     }
 
     return `[${testCaseId}] ${testCaseName}: FAIL - Expected "${expected}" but got "${actual}"`
-  })
+  });
 
 /**
  * Helper function to run classification scorer on a single test case
