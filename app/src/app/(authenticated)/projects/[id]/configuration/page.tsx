@@ -110,7 +110,6 @@ interface AgentSettings {
   issueAnalysis: {
     analysisGuidelines: string
     briefGuidelines: string
-    issueAnalysisEnabled: boolean
   }
   graphEvaluation: GraphEvaluationConfig
 }
@@ -127,7 +126,6 @@ const DEFAULT_SETTINGS: AgentSettings = {
   issueAnalysis: {
     analysisGuidelines: '',
     briefGuidelines: '',
-    issueAnalysisEnabled: true,
   },
   graphEvaluation: DEFAULT_GRAPH_EVAL_CONFIG,
 }
@@ -226,7 +224,6 @@ export default function AgentsSettingsPage() {
           next.issueAnalysis = {
             analysisGuidelines: (s.analysis_guidelines as string) ?? '',
             briefGuidelines: (s.brief_guidelines as string) ?? '',
-            issueAnalysisEnabled: (s.issue_analysis_enabled as boolean) ?? true,
           }
         }
         if (graphEvalData?.config) {
@@ -642,10 +639,8 @@ export default function AgentsSettingsPage() {
                 <SettingRow
                   icon="🎯"
                   title="Issue Analysis"
-                  description="Scores reach, impact, confidence, effort and generates a brief"
-                  rightMeta={<StatusPill enabled={settings.issueAnalysis.issueAnalysisEnabled} />}
+                  description="Customise the prompts. Toggle the skill on/off in Automations."
                   onClick={() => setShowIssueAnalysisDialog(true)}
-                  disabled={!settings.issueAnalysis.issueAnalysisEnabled}
                 />
               </div>
             </div>
@@ -696,7 +691,6 @@ export default function AgentsSettingsPage() {
         projectId={projectId}
         analysisGuidelines={settings.issueAnalysis.analysisGuidelines}
         briefGuidelines={settings.issueAnalysis.briefGuidelines}
-        issueAnalysisEnabled={settings.issueAnalysis.issueAnalysisEnabled}
         onSaved={handleSettingsSaved}
       />
       {showTestAgent && (

@@ -18,6 +18,7 @@ import { eq, and, or, ilike, desc } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { sessions, sessionMessages } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
+import { notifyAutomationEvent } from '@/lib/automations/events'
 import { fireSessionProcessing } from '@/lib/utils/session-processing'
 import { setSessionContact, linkEntities } from '@/lib/db/queries/entity-relationships'
 import { buildProgrammaticContext } from '@/lib/db/queries/relationship-metadata'
@@ -157,6 +158,17 @@ export async function createSessionWithMessagesAdmin(
     fireGraphEval(input.projectId, 'session', sessionId)
   }
 
+  notifyAutomationEvent('session.created', {
+    projectId: input.projectId,
+    entity: { type: 'session', id: sessionId },
+  })
+  if (input.status === 'closed') {
+    notifyAutomationEvent('session.closed', {
+      projectId: input.projectId,
+      entity: { type: 'session', id: sessionId },
+    })
+  }
+
   return { sessionId, messageCount: input.messages.length }
 }
 
@@ -250,6 +262,17 @@ export async function createSessionAdmin(
       fireSessionProcessing(sessionId, input.project_id)
     } else {
       fireGraphEval(input.project_id, 'session', sessionId)
+    }
+
+    notifyAutomationEvent('session.created', {
+      projectId: input.project_id,
+      entity: { type: 'session', id: sessionId },
+    })
+    if (resolvedStatus === 'closed') {
+      notifyAutomationEvent('session.closed', {
+        projectId: input.project_id,
+        entity: { type: 'session', id: sessionId },
+      })
     }
 
     // Fetch the session with relations

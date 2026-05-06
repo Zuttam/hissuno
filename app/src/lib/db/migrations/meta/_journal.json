@@ -43,6 +43,20 @@
       "when": 1777203256949,
       "tag": "0005_absurd_quasar",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1777205371214,
+      "tag": "0006_worried_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777206082243,
+      "tag": "0007_organic_war_machine",
+      "breakpoints": true
     }
   ]
 }

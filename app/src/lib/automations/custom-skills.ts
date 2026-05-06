@@ -39,8 +39,25 @@ export type CustomSkillSaveInput = {
   skillId: string
   /** Raw SKILL.md content (frontmatter + markdown body). */
   content: string
+  /**
+   * Additional supporting files keyed by path relative to the skill root.
+   * Allowed prefixes: `references/` and `scripts/`. Each value is the file's
+   * UTF-8 content. The runner materializes these alongside SKILL.md in the
+   * sandbox so the agent can `skill_read` them or invoke the scripts.
+   */
+  references?: Record<string, string>
   createdByUserId?: string | null
 }
+
+export type CustomSkillFile = {
+  path: string
+  size: number
+  contentType: string
+}
+
+const ALLOWED_PREFIXES = ['references/', 'scripts/'] as const
+const PER_FILE_MAX_BYTES = 200_000
+const MAX_FILES = 50
 
 export class CustomSkillValidationError extends Error {
   readonly issues: string[]
@@ -85,14 +102,52 @@ export async function saveCustomSkill(input: CustomSkillSaveInput): Promise<Cust
     ])
   }
 
-  const path = blobPath(input.projectId, input.skillId)
+  const refs = input.references ?? {}
+  const fileEntries = Object.entries(refs)
+  if (fileEntries.length > MAX_FILES) {
+    throw new CustomSkillValidationError([`Too many files (max ${MAX_FILES}).`])
+  }
+
+  const fileIssues: string[] = []
+  for (const [path, content] of fileEntries) {
+    if (!ALLOWED_PREFIXES.some((p) => path.startsWith(p))) {
+      fileIssues.push(`Path "${path}" must start with references/ or scripts/.`)
+    }
+    if (path.includes('..') || path.startsWith('/')) {
+      fileIssues.push(`Path "${path}" must be relative without "..".`)
+    }
+    if (Buffer.byteLength(content, 'utf8') > PER_FILE_MAX_BYTES) {
+      fileIssues.push(`File "${path}" exceeds ${PER_FILE_MAX_BYTES} bytes.`)
+    }
+  }
+  if (fileIssues.length > 0) throw new CustomSkillValidationError(fileIssues)
+
   const storage = getStorageProvider()
-  const result = await storage.upload(AUTOMATIONS_BUCKET, path, input.content, {
+  const skillPath = blobPath(input.projectId, input.skillId)
+  const skillUpload = await storage.upload(AUTOMATIONS_BUCKET, skillPath, input.content, {
     upsert: true,
     contentType: 'text/markdown; charset=utf-8',
   })
-  if (result.error) {
-    throw new Error(`Failed to upload skill content: ${result.error.message}`)
+  if (skillUpload.error) {
+    throw new Error(`Failed to upload skill content: ${skillUpload.error.message}`)
+  }
+
+  const fileManifest: CustomSkillFile[] = []
+  for (const [relPath, content] of fileEntries) {
+    const fullPath = `${input.projectId}/${input.skillId}/${relPath}`
+    const contentType = guessContentType(relPath)
+    const result = await storage.upload(AUTOMATIONS_BUCKET, fullPath, content, {
+      upsert: true,
+      contentType,
+    })
+    if (result.error) {
+      throw new Error(`Failed to upload "${relPath}": ${result.error.message}`)
+    }
+    fileManifest.push({
+      path: relPath,
+      size: Buffer.byteLength(content, 'utf8'),
+      contentType,
+    })
   }
 
   return upsertCustomSkill({
@@ -101,11 +156,34 @@ export async function saveCustomSkill(input: CustomSkillSaveInput): Promise<Cust
     name: frontmatter.name,
     description: frontmatter.description,
     version: frontmatter.version ?? null,
-    blob_path: path,
+    blob_path: skillPath,
     frontmatter: frontmatter as unknown as Record<string, unknown>,
-    enabled: true,
+    files: fileManifest as unknown as Record<string, unknown>,
     created_by_user_id: input.createdByUserId ?? null,
   })
+}
+
+function guessContentType(path: string): string {
+  if (path.endsWith('.md')) return 'text/markdown; charset=utf-8'
+  if (path.endsWith('.json')) return 'application/json; charset=utf-8'
+  if (path.endsWith('.sh')) return 'application/x-sh; charset=utf-8'
+  if (path.endsWith('.js') || path.endsWith('.ts')) return 'text/plain; charset=utf-8'
+  return 'application/octet-stream'
+}
+
+/** Read a single supporting file's content (referenced via files[].path). */
+export async function readCustomSkillFile(
+  projectId: string,
+  skillId: string,
+  relPath: string,
+): Promise<string | null> {
+  if (!ALLOWED_PREFIXES.some((p) => relPath.startsWith(p))) return null
+  if (relPath.includes('..') || relPath.startsWith('/')) return null
+  const storage = getStorageProvider()
+  const fullPath = `${projectId}/${skillId}/${relPath}`
+  const result = await storage.downloadText(AUTOMATIONS_BUCKET, fullPath)
+  if (result.error) return null
+  return result.content ?? null
 }
 
 export async function listCustomSkillDescriptors(projectId: string): Promise<SkillDescriptor[]> {
@@ -149,8 +227,13 @@ export async function deleteCustomSkill(projectId: string, skillId: string): Pro
   const row = await getCustomSkillRow(projectId, skillId)
   if (!row) return false
   const storage = getStorageProvider()
+  const files = (row.files as unknown as CustomSkillFile[] | null) ?? []
+  const allPaths = [
+    row.blob_path,
+    ...files.map((f) => `${projectId}/${skillId}/${f.path}`),
+  ]
   // Best-effort blob delete; the row is the source of truth.
-  await storage.delete(AUTOMATIONS_BUCKET, [row.blob_path]).catch((err) => {
+  await storage.delete(AUTOMATIONS_BUCKET, allPaths).catch((err) => {
     console.error('[custom-skills] failed to delete blob', err)
   })
   return deleteCustomSkillRow(projectId, skillId)

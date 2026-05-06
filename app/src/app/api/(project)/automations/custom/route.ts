@@ -4,10 +4,13 @@
  *                                                 (or replace an existing one)
  *
  * The POST body is a JSON object with:
- *   { skillId: string, content: string }
- * where `content` is the full SKILL.md (frontmatter + markdown body). The
- * server parses + validates the frontmatter, writes the blob, and upserts
- * the metadata row.
+ *   {
+ *     skillId: string,
+ *     content: string,                       // SKILL.md
+ *     references?: { 'references/foo.md': '...', 'scripts/bar.sh': '...' }
+ *   }
+ * Path keys must start with `references/` or `scripts/`. The server parses
+ * + validates the frontmatter, writes each blob, and upserts the row.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -33,6 +36,7 @@ const uploadSchema = z
       .max(80)
       .regex(/^[a-z0-9][a-z0-9-]*$/, 'skillId must be kebab-case'),
     content: z.string().min(20).max(200_000),
+    references: z.record(z.string(), z.string()).optional(),
   })
   .strict()
 
@@ -49,8 +53,8 @@ export async function GET(request: NextRequest) {
         name: r.name,
         description: r.description,
         version: r.version,
-        enabled: r.enabled,
         frontmatter: r.frontmatter,
+        files: r.files,
         createdAt: r.created_at.toISOString(),
         updatedAt: r.updated_at.toISOString(),
       })),
@@ -80,6 +84,7 @@ export async function POST(request: NextRequest) {
         projectId,
         skillId: parsed.data.skillId,
         content: parsed.data.content,
+        references: parsed.data.references,
         createdByUserId: identity.userId,
       })
       return NextResponse.json({
@@ -87,6 +92,7 @@ export async function POST(request: NextRequest) {
         name: row.name,
         description: row.description,
         version: row.version,
+        files: row.files,
       })
     } catch (err) {
       if (err instanceof CustomSkillValidationError) {

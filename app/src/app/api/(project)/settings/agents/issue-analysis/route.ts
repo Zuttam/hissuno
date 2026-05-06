@@ -30,7 +30,6 @@ export async function GET(request: NextRequest) {
       settings: {
         analysis_guidelines: all.analysis_guidelines,
         brief_guidelines: all.brief_guidelines,
-        issue_analysis_enabled: all.issue_analysis_enabled,
       },
     })
   } catch (error) {
@@ -64,23 +63,20 @@ export async function PATCH(request: NextRequest) {
     await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
-    const { analysis_guidelines, brief_guidelines, issue_analysis_enabled } = body as {
+    const { analysis_guidelines, brief_guidelines } = body as {
       analysis_guidelines?: string | null
       brief_guidelines?: string | null
-      issue_analysis_enabled?: boolean
     }
 
     const all = await updatePmAgentSettings(projectId, {
       analysis_guidelines,
       brief_guidelines,
-      issue_analysis_enabled,
     })
 
     return NextResponse.json({
       settings: {
         analysis_guidelines: all.analysis_guidelines,
         brief_guidelines: all.brief_guidelines,
-        issue_analysis_enabled: all.issue_analysis_enabled,
       },
     })
   } catch (error) {

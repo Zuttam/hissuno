@@ -34,7 +34,6 @@ interface IssueAnalysisDialogProps {
   projectId: string
   analysisGuidelines: string
   briefGuidelines: string
-  issueAnalysisEnabled: boolean
   onSaved: () => void
 }
 
@@ -44,16 +43,14 @@ export function IssueAnalysisDialog({
   projectId,
   analysisGuidelines,
   briefGuidelines,
-  issueAnalysisEnabled,
   onSaved,
 }: IssueAnalysisDialogProps) {
   const initialValues = useMemo(
     () => ({
       analysis_guidelines: analysisGuidelines,
       brief_guidelines: briefGuidelines,
-      issue_analysis_enabled: issueAnalysisEnabled,
     }),
-    [analysisGuidelines, briefGuidelines, issueAnalysisEnabled]
+    [analysisGuidelines, briefGuidelines]
   )
 
   return (
@@ -61,14 +58,12 @@ export function IssueAnalysisDialog({
       open={open}
       onClose={onClose}
       title="Issue Analysis"
-      subtitle="Scores reach, impact, confidence, effort and generates a brief"
+      subtitle="Customise the prompts the analysis skill uses. Toggle the skill on/off in Automations."
       projectId={projectId}
       steps={STEPS}
       initialValues={initialValues}
       onSaved={onSaved}
       saveFn={updateIssueAnalysisSettings}
-      masterToggleKey="issue_analysis_enabled"
-      masterToggleLabel="Enable Issue Analysis"
     />
   )
 }

@@ -12,13 +12,20 @@
  * Phase 2+ flips the default to always-on once we have a real base image.
  */
 
-import { LocalFilesystem, LocalSandbox, Workspace } from '@mastra/core/workspace'
+import {
+  LocalFilesystem,
+  LocalSandbox,
+  Workspace,
+  type WorkspaceSandbox,
+} from '@mastra/core/workspace'
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readCustomSkillContent } from '@/lib/automations/dispatch'
+import { getCustomSkill } from '@/lib/db/queries/custom-skills'
+import { readCustomSkillFile } from '@/lib/automations/custom-skills'
 import type { SkillDescriptor } from '@/lib/automations/types'
 
 export type WorkspaceForRunOptions = {
@@ -60,10 +67,10 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
   const workDir = join(tmpdir(), 'hissuno-automation', opts.runId)
   await mkdir(workDir, { recursive: true })
 
-  // For custom skills, materialize the SKILL.md from blob storage into a
-  // per-run skills directory and add it to the Workspace skills array. This
-  // lets Mastra's skill loader treat custom skills the same as bundled ones
-  // without us having to implement a custom SkillSource adapter.
+  // For custom skills, materialize the SKILL.md (plus any references/ +
+  // scripts/ files from the manifest) from blob storage into a per-run
+  // skills directory and add it to the Workspace skills array. Mastra's
+  // skill loader then treats custom skills the same as bundled ones.
   const skillDirs: string[] = [bundledSkillsDir]
   if (opts.skill.source === 'custom') {
     const content = await readCustomSkillContent(opts.projectId, opts.skill.id)
@@ -74,6 +81,17 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
     const customSkillDir = join(customSkillsRoot, opts.skill.id)
     await mkdir(customSkillDir, { recursive: true })
     await writeFile(join(customSkillDir, 'SKILL.md'), content, 'utf8')
+
+    const row = await getCustomSkill(opts.projectId, opts.skill.id)
+    const files = ((row?.files as unknown as { path: string }[] | null) ?? [])
+    for (const f of files) {
+      const fileContent = await readCustomSkillFile(opts.projectId, opts.skill.id, f.path)
+      if (fileContent === null) continue
+      const target = join(customSkillDir, f.path)
+      await mkdir(dirname(target), { recursive: true })
+      await writeFile(target, fileContent, 'utf8')
+    }
+
     skillDirs.push(customSkillsRoot)
   }
 
@@ -111,10 +129,42 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
     filesystem: new LocalFilesystem({ basePath: workDir }),
     skills: skillDirs,
     sandbox: enableSandbox
-      ? new LocalSandbox({
-          workingDirectory: workDir,
-          env: sandboxEnv,
-        })
+      ? await createSandbox({ runId: opts.runId, workDir, env: sandboxEnv })
       : undefined,
+  })
+}
+
+/**
+ * Pick a sandbox provider based on `SANDBOX_PROVIDER`. Defaults to
+ * `LocalSandbox` (works without external services) for dev. Set to `e2b`
+ * in prod with `E2B_API_KEY` + `E2B_SANDBOX_TEMPLATE` to run inside a
+ * pre-built E2B template image (see infra/sandbox/README.md for the spec).
+ *
+ * Adding a provider is two lines: a new case here and a corresponding
+ * env-var doc.
+ */
+async function createSandbox(opts: {
+  runId: string
+  workDir: string
+  env: NodeJS.ProcessEnv
+}): Promise<WorkspaceSandbox> {
+  const provider = (process.env.SANDBOX_PROVIDER ?? 'local').toLowerCase()
+  if (provider === 'e2b') {
+    const { E2BSandbox } = await import('@mastra/e2b')
+    const apiKey = process.env.E2B_API_KEY
+    const template = process.env.E2B_SANDBOX_TEMPLATE
+    if (!apiKey) throw new Error('SANDBOX_PROVIDER=e2b requires E2B_API_KEY.')
+    if (!template) throw new Error('SANDBOX_PROVIDER=e2b requires E2B_SANDBOX_TEMPLATE.')
+    return new E2BSandbox({
+      id: `automation-${opts.runId}`,
+      apiKey,
+      template,
+      env: opts.env as Record<string, string>,
+      timeout: 30 * 60 * 1000,
+    })
+  }
+  return new LocalSandbox({
+    workingDirectory: opts.workDir,
+    env: opts.env,
   })
 }
