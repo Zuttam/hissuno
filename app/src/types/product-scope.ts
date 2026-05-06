@@ -29,7 +29,6 @@ export interface ProductScopeRecord {
   is_default: boolean
   type: ProductScopeType
   goals: ProductScopeGoal[] | null
-  content: string | null
   custom_fields?: Record<string, unknown> | null
   created_at: string
   updated_at: string

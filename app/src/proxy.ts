@@ -85,7 +85,7 @@ const PUBLIC_PATHS = [
   '/api/integrations/widget/chat',
   // Plugin-kit OAuth callbacks + webhooks.
   '/api/plugins/oauth',
-  '/api/plugins/webhook',
+  '/api/webhooks',
   '/api/healthz',
 ]
 

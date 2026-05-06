@@ -12,7 +12,6 @@ import {
 } from '@/lib/integrations/shared/route-helpers'
 import {
   deleteConnection,
-  listStreams,
   updateConnection,
 } from '@/lib/integrations/shared/connections'
 
@@ -28,8 +27,6 @@ export async function GET(
     if (resolved instanceof NextResponse) return resolved
     const { connection } = resolved
 
-    const streams = await listStreams(connection.id)
-
     return NextResponse.json({
       id: connection.id,
       pluginId: connection.pluginId,
@@ -38,20 +35,6 @@ export async function GET(
       settings: connection.settings,
       createdAt: connection.createdAt?.toISOString() ?? null,
       updatedAt: connection.updatedAt?.toISOString() ?? null,
-      streams: streams.map((s) => ({
-        id: s.id,
-        streamId: s.streamId,
-        streamKind: s.streamKind,
-        enabled: s.enabled,
-        frequency: s.frequency,
-        lastSyncAt: s.lastSyncAt?.toISOString() ?? null,
-        lastSyncStatus: s.lastSyncStatus,
-        lastSyncError: s.lastSyncError,
-        lastSyncCounts: s.lastSyncCounts,
-        nextSyncAt: s.nextSyncAt?.toISOString() ?? null,
-        filterConfig: s.filterConfig,
-        settings: s.settings,
-      })),
     })
   } catch (error) {
     return handleRouteError(error, 'Failed to fetch connection.')

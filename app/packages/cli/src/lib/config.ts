@@ -84,8 +84,15 @@ function writeRawConfig(raw: RawConfig): void {
 
 /**
  * Load the active profile's config. Handles both legacy and multi-profile formats.
+ *
+ * Env vars take precedence when set — this lets sandbox runs that have
+ * `HISSUNO_API_KEY` (and optionally `HISSUNO_PROJECT_ID`, `HISSUNO_BASE_URL`)
+ * use the CLI without a config file.
  */
 export function loadConfig(): HissunoConfig | null {
+  const fromEnv = loadConfigFromEnv()
+  if (fromEnv) return fromEnv
+
   const raw = readRawConfig()
   if (!raw) return null
 
@@ -98,6 +105,20 @@ export function loadConfig(): HissunoConfig | null {
     return parseLegacyProfile(raw as LegacyConfig)
   } catch {
     return null
+  }
+}
+
+function loadConfigFromEnv(): HissunoConfig | null {
+  const apiKey = process.env.HISSUNO_API_KEY
+  if (!apiKey) return null
+  const baseUrl =
+    process.env.HISSUNO_BASE_URL ||
+    process.env.HISSUNO_API_BASE_URL ||
+    'http://localhost:3000'
+  return {
+    api_key: apiKey,
+    base_url: baseUrl,
+    ...(process.env.HISSUNO_PROJECT_ID ? { project_id: process.env.HISSUNO_PROJECT_ID } : {}),
   }
 }
 

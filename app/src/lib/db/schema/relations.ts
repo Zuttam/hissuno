@@ -29,9 +29,6 @@ import {
   slackThreadSessions,
   userNotifications,
   integrationConnections,
-  integrationStreams,
-  integrationSyncRuns,
-  integrationSyncedRecords,
 } from './app'
 
 // ---------------------------------------------------------------------------
@@ -253,30 +250,6 @@ export const userNotificationsRelations = relations(userNotifications, ({ one })
 // Unified integrations (plugin-kit)
 // ---------------------------------------------------------------------------
 
-export const integrationConnectionsRelations = relations(integrationConnections, ({ one, many }) => ({
+export const integrationConnectionsRelations = relations(integrationConnections, ({ one }) => ({
   project: one(projects, { fields: [integrationConnections.project_id], references: [projects.id] }),
-  streams: many(integrationStreams),
-  syncRuns: many(integrationSyncRuns),
-  syncedRecords: many(integrationSyncedRecords),
-}))
-
-export const integrationStreamsRelations = relations(integrationStreams, ({ one }) => ({
-  connection: one(integrationConnections, {
-    fields: [integrationStreams.connection_id],
-    references: [integrationConnections.id],
-  }),
-}))
-
-export const integrationSyncRunsRelations = relations(integrationSyncRuns, ({ one }) => ({
-  connection: one(integrationConnections, {
-    fields: [integrationSyncRuns.connection_id],
-    references: [integrationConnections.id],
-  }),
-}))
-
-export const integrationSyncedRecordsRelations = relations(integrationSyncedRecords, ({ one }) => ({
-  connection: one(integrationConnections, {
-    fields: [integrationSyncedRecords.connection_id],
-    references: [integrationConnections.id],
-  }),
 }))

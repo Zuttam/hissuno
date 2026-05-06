@@ -6,7 +6,7 @@ import type { IssueWithSessions } from '@/types/issue'
 import type { SessionSource } from '@/types/session'
 import { formatRelativeTime } from '@/lib/utils/format-time'
 import { formatARR } from '@/lib/utils/format-currency'
-import { getSourceIcon } from '@/lib/constants/source-icons'
+import { getSourceIcon } from '@/components/shared/get-source-icons'
 import { AddFeedbackDialog } from './add-feedback-dialog'
 
 type SessionItem = IssueWithSessions['sessions'][number]

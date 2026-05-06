@@ -12,16 +12,20 @@
 
 import { Mastra } from '@mastra/core/mastra'
 import { RequestContext } from '@mastra/core/request-context'
+import type { z } from 'zod'
 import { findSkill, listBundledSkills } from './skills'
 import {
   getCustomSkillDescriptor,
   listCustomSkillDescriptors,
 } from './custom-skills'
-import { buildHarnessPrefix } from './harness'
+import { buildHarnessPrefix, type HarnessCodebase } from './harness'
+import { jsonSchemaToZod } from './output-schema'
 import { closeRunChannel, publishRunEvent, subscribeRunCancel } from './run-bus'
 import { buildWorkspaceForRun } from '@/mastra/workspace/build'
 import { createSkillRunner } from '@/mastra/agents/skill-runner-agent'
 import { getOrCreateAutomationApiKey } from './api-key'
+import { getCodebaseInfo, releaseCodebase } from '@/lib/codebase/manager'
+import { getCodebaseById } from '@/lib/codebase/service'
 import {
   appendProgressEvent,
   createAutomationRun,
@@ -112,6 +116,27 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
 
   const timeoutMs = skill.frontmatter.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
+  // Compile the declared output schema (if any) up front so a malformed
+  // frontmatter fails the run cleanly before we spend tokens.
+  let outputZodSchema: z.ZodTypeAny | undefined
+  if (skill.frontmatter.output) {
+    try {
+      outputZodSchema = jsonSchemaToZod(skill.frontmatter.output)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Invalid output schema'
+      const errorEvent: ProgressEvent = {
+        ts: new Date().toISOString(),
+        type: 'error',
+        message,
+      }
+      await appendProgressEvent(run.id, errorEvent).catch(() => {})
+      publishRunEvent(run.id, errorEvent)
+      await markAutomationRunFailed(run.id, { message })
+      closeRunChannel(run.id)
+      return
+    }
+  }
+
   // Resolve the project's long-lived automation API key (created on first
   // use, stored encrypted). Reused across all runs — no per-run mint/revoke
   // churn. Rotation is a separate admin action.
@@ -126,12 +151,19 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
       entity: trigger.entity ? { type: trigger.entity.type, id: trigger.entity.id } : undefined,
       input: trigger.input,
     })
-    const harnessPrefix = buildHarnessPrefix({ skill, trigger, project })
+    const harnessCodebase = await resolveHarnessCodebase(project.id)
+    const harnessPrefix = buildHarnessPrefix({
+      skill,
+      trigger,
+      project,
+      codebase: harnessCodebase,
+    })
     const agent = createSkillRunner({
       runId: run.id,
       skillId: skill.id,
       harnessPrefix,
       workspace,
+      codebaseAvailable: harnessCodebase !== null,
     })
 
     // Register the agent on a one-off Mastra so its workspace lifecycle
@@ -160,12 +192,25 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
 
     let response: Awaited<ReturnType<typeof agent.generate>>
     try {
+      // Mastra's `structuredOutput` runs a separate structuring pass over the
+      // agent's tool-calling conversation and surfaces the typed result on
+      // `response.object`. Skills without an `output` schema keep using the
+      // file-based `output.json` path below. Branched calls keep TS happy
+      // because the two `generate()` overloads have different option shapes.
+      const generatePromise = outputZodSchema
+        ? agent.generate(userPrompt, {
+            requestContext,
+            maxSteps: 25,
+            abortSignal: abortController.signal,
+            structuredOutput: { schema: outputZodSchema },
+          })
+        : agent.generate(userPrompt, {
+            requestContext,
+            maxSteps: 25,
+            abortSignal: abortController.signal,
+          })
       response = await Promise.race([
-        agent.generate(userPrompt, {
-          requestContext,
-          maxSteps: 25,
-          abortSignal: abortController.signal,
-        }),
+        generatePromise,
         new Promise<never>((_resolve, reject) =>
           setTimeout(() => reject(new Error(`Run timed out after ${timeoutMs}ms`)), timeoutMs),
         ),
@@ -187,25 +232,33 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
       unsubscribeCancel()
     }
 
-    // Try to read output.json from the workspace filesystem; fall back to
-    // the agent's text output.
+    // Output resolution: when the skill declared an `output` schema, Mastra's
+    // structuredOutput pass populates `response.object` with the typed result.
+    // Otherwise, fall back to the legacy "agent writes output.json" contract.
     let output: Record<string, unknown> = {}
-    try {
-      const fs = workspace.filesystem
-      if (fs) {
-        const outputJson = await fs.readFile('output.json')
-        const text =
-          typeof outputJson === 'string'
-            ? outputJson
-            : Buffer.isBuffer(outputJson)
-              ? outputJson.toString('utf8')
-              : ''
-        output = text ? (JSON.parse(text) as Record<string, unknown>) : { text: response.text }
-      } else {
+    if (outputZodSchema) {
+      const obj = (response as { object?: unknown }).object
+      output = (obj && typeof obj === 'object')
+        ? (obj as Record<string, unknown>)
+        : { text: response.text ?? '' }
+    } else {
+      try {
+        const fs = workspace.filesystem
+        if (fs) {
+          const outputJson = await fs.readFile('output.json')
+          const text =
+            typeof outputJson === 'string'
+              ? outputJson
+              : Buffer.isBuffer(outputJson)
+                ? outputJson.toString('utf8')
+                : ''
+          output = text ? (JSON.parse(text) as Record<string, unknown>) : { text: response.text }
+        } else {
+          output = { text: response.text ?? '' }
+        }
+      } catch {
         output = { text: response.text ?? '' }
       }
-    } catch {
-      output = { text: response.text ?? '' }
     }
 
     const finishEvent: ProgressEvent = {
@@ -231,7 +284,28 @@ async function executeRun(input: ExecuteRunInput): Promise<void> {
 
     await markAutomationRunFailed(run.id, { message, stack })
   } finally {
+    // Idempotent — safe to call even if no codebase lease was acquired this run.
+    await releaseCodebase(run.id).catch((err) => {
+      console.warn(`[dispatch] Failed to release codebase lease for run ${run.id}:`, err)
+    })
     closeRunChannel(run.id)
+  }
+}
+
+/**
+ * Look up the project's connected codebase (if any) and return a harness-shaped
+ * descriptor. Returns null when nothing is configured. We pull the friendly
+ * `name` from the codebases row when available; getCodebaseInfo() doesn't
+ * include it, so when present we issue a second small fetch by id.
+ */
+async function resolveHarnessCodebase(projectId: string): Promise<HarnessCodebase | null> {
+  const info = await getCodebaseInfo(projectId)
+  if (!info) return null
+  const row = await getCodebaseById(info.codebaseId).catch(() => null)
+  return {
+    repositoryUrl: info.repositoryUrl,
+    branch: info.branch,
+    name: row?.name ?? null,
   }
 }
 
@@ -267,7 +341,7 @@ export { listBundledSkills }
 /**
  * Returns the merged catalog (bundled + custom) for a project. Custom
  * skills are loaded from the project-scoped blob storage; bundled skills
- * come from the repo's packages/skills/.
+ * come from `src/lib/automations/skills/`.
  */
 export async function listSkillsForProject(projectId: string) {
   const [custom] = await Promise.all([listCustomSkillDescriptors(projectId)])

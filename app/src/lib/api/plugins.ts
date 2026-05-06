@@ -1,24 +1,10 @@
 /**
- * Client helpers for the unified plugin API (`/api/(project)/plugins/[pluginId]/...`).
+ * Client helpers for the plugin API (`/api/(project)/plugins/[pluginId]/...`).
  *
- * These call the plugin-aware routes built in M3 and return typed responses
- * for the generic marketplace / config-dialog UI.
+ * Plugins are connect-only — sync logic lives in automation skills. Calls
+ * here are limited to listing connections and managing the connect/disconnect
+ * lifecycle.
  */
-
-export interface PluginConnectionStream {
-  id: string
-  streamId: string
-  streamKind: string
-  enabled: boolean
-  frequency: string
-  lastSyncAt: string | null
-  lastSyncStatus: string | null
-  lastSyncError: string | null
-  lastSyncCounts: Record<string, unknown> | null
-  nextSyncAt: string | null
-  filterConfig: Record<string, unknown> | null
-  settings: Record<string, unknown> | null
-}
 
 export interface PluginConnection {
   id: string
@@ -28,7 +14,6 @@ export interface PluginConnection {
   createdAt: string | null
   updatedAt: string | null
   settings: Record<string, unknown> | null
-  streams: PluginConnectionStream[]
 }
 
 export interface PluginConnectionsResponse {
@@ -104,149 +89,6 @@ export async function updatePluginConnection(
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error ?? `Failed to update connection.`)
   }
-}
-
-export interface StreamCatalogEntry {
-  key: string
-  kind: string
-  label: string
-  description?: string
-  frequencies: string[]
-}
-
-export interface StreamsPayload {
-  catalog: StreamCatalogEntry[]
-  enabled: PluginConnectionStream[]
-}
-
-export async function fetchPluginStreams(
-  pluginId: string,
-  connectionId: string,
-  projectId: string
-): Promise<StreamsPayload> {
-  const res = await fetch(
-    `/api/plugins/${pluginId}/${connectionId}/streams?projectId=${encodeURIComponent(projectId)}`
-  )
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? 'Failed to load streams.')
-  }
-  return res.json() as Promise<StreamsPayload>
-}
-
-export async function upsertPluginStream(
-  pluginId: string,
-  connectionId: string,
-  projectId: string,
-  body: {
-    streamKey: string
-    instanceId?: string | null
-    enabled?: boolean
-    frequency?: string
-    filterConfig?: Record<string, unknown>
-    settings?: Record<string, unknown>
-  }
-): Promise<void> {
-  const res = await fetch(
-    `/api/plugins/${pluginId}/${connectionId}/streams?projectId=${encodeURIComponent(projectId)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    }
-  )
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? 'Failed to save stream.')
-  }
-}
-
-export async function deletePluginStream(
-  pluginId: string,
-  connectionId: string,
-  projectId: string,
-  streamId: string
-): Promise<void> {
-  const res = await fetch(
-    `/api/plugins/${pluginId}/${connectionId}/streams?projectId=${encodeURIComponent(projectId)}&streamId=${encodeURIComponent(streamId)}`,
-    { method: 'DELETE' }
-  )
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error ?? 'Failed to delete stream.')
-  }
-}
-
-export interface PluginSseEvent {
-  type: string
-  message?: string
-  current?: number
-  total?: number
-  externalId?: string
-  hissunoId?: string
-}
-
-export function startPluginSync(
-  pluginId: string,
-  connectionId: string,
-  projectId: string,
-  options: {
-    streamId: string
-    mode?: 'incremental' | 'full'
-    onEvent?: (event: PluginSseEvent) => void
-    onError?: (error: Error) => void
-    onDone?: () => void
-    signal?: AbortSignal
-  }
-): () => void {
-  const url = new URL(`/api/plugins/${pluginId}/${connectionId}/sync`, window.location.origin)
-  url.searchParams.set('projectId', projectId)
-  url.searchParams.set('streamId', options.streamId)
-  url.searchParams.set('mode', options.mode ?? 'incremental')
-
-  const controller = new AbortController()
-  if (options.signal) {
-    options.signal.addEventListener('abort', () => controller.abort())
-  }
-
-  ;(async () => {
-    try {
-      const res = await fetch(url.toString(), { signal: controller.signal })
-      if (!res.ok || !res.body) {
-        const body = await res.text().catch(() => '')
-        throw new Error(body || `Sync failed (${res.status})`)
-      }
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        let idx: number
-        while ((idx = buffer.indexOf('\n\n')) >= 0) {
-          const chunk = buffer.slice(0, idx)
-          buffer = buffer.slice(idx + 2)
-          const lines = chunk.split('\n')
-          const dataLine = lines.find((l) => l.startsWith('data:'))
-          if (!dataLine) continue
-          try {
-            const payload = JSON.parse(dataLine.slice(5).trim()) as PluginSseEvent
-            options.onEvent?.(payload)
-          } catch {
-            // ignore malformed event
-          }
-        }
-      }
-      options.onDone?.()
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        options.onError?.(err as Error)
-      }
-    }
-  })()
-
-  return () => controller.abort()
 }
 
 // ---------------------------------------------------------------------------

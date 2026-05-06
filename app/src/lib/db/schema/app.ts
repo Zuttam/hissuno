@@ -9,6 +9,7 @@ import {
   doublePrecision,
   unique,
   index,
+  primaryKey,
 } from 'drizzle-orm/pg-core'
 import { users } from './auth'
 import { vector } from './custom-types'
@@ -45,6 +46,9 @@ export const projectSettings = pgTable('project_settings', {
   support_agent_package_id: uuid('support_agent_package_id'),
   support_agent_tone: text('support_agent_tone'),
   brand_guidelines: text('brand_guidelines'),
+  // Cross-session memory toggles for chat agents (resource-scoped Mastra working memory)
+  support_agent_memory_enabled: boolean('support_agent_memory_enabled').notNull().default(false),
+  product_agent_memory_enabled: boolean('product_agent_memory_enabled').notNull().default(false),
   // Knowledge analysis settings
   knowledge_relationship_guidelines: text('knowledge_relationship_guidelines'),
   // AI model configuration (per-project override)
@@ -162,7 +166,6 @@ export const productScopes = pgTable('product_scopes', {
   is_default: boolean('is_default').notNull().default(false),
   type: text('type').notNull().default('product_area'),
   goals: jsonb('goals'),
-  content: text('content'),
   custom_fields: jsonb('custom_fields'),
   created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
   updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
@@ -448,6 +451,47 @@ export const automationRuns = pgTable(
   ],
 )
 
+// Durable per-(project, skill) key/value state that survives run pruning.
+// Skill scripts persist cursors, last-synced IDs, and other resumable state
+// here via the hissuno CLI (`hissuno automations state get/set`). The shape
+// of `state` is opaque to core — each skill defines its own schema.
+export const automationSkillState = pgTable(
+  'automation_skill_state',
+  {
+    project_id: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    skill_id: text('skill_id').notNull(),
+    state: jsonb('state').notNull().default({}),
+    updated_at: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.project_id, t.skill_id] }),
+  ],
+)
+
+// Plugin-agnostic external→hissuno mapping.
+// `source` is a free-form string (typically a plugin id like 'slack', 'linear',
+// but skills can use any namespace). `external_id` is the provider's stable id.
+// `resource_type` identifies which hissuno table `resource_id` points at.
+export const externalRecords = pgTable(
+  'external_records',
+  {
+    project_id: uuid('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    external_id: text('external_id').notNull(),
+    resource_type: text('resource_type').notNull(), // 'session' | 'contact' | 'company' | 'issue' | 'knowledge'
+    resource_id: uuid('resource_id').notNull(),
+    last_synced_at: timestamp('last_synced_at', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.project_id, t.source, t.external_id, t.resource_type] }),
+    index('external_records_resource_idx').on(t.resource_type, t.resource_id),
+  ],
+)
+
 // ---------------------------------------------------------------------------
 // Knowledge
 // ---------------------------------------------------------------------------
@@ -697,91 +741,6 @@ export const integrationConnections = pgTable(
     ),
     index('idx_integration_connections_project').on(table.project_id),
     index('idx_integration_connections_plugin').on(table.plugin_id),
-  ]
-)
-
-export const integrationStreams = pgTable(
-  'integration_streams',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    connection_id: uuid('connection_id')
-      .notNull()
-      .references(() => integrationConnections.id, { onDelete: 'cascade' }),
-    plugin_id: text('plugin_id').notNull(),
-    /**
-     * Full stream key. For singleton streams equals the plugin's stream def key
-     * (e.g. "tickets"). For parameterized streams encodes instance id
-     * ("codebase:acme/repo"). See plugin-kit.buildStreamId / parseStreamId.
-     */
-    stream_id: text('stream_id').notNull(),
-    /** The stream kind ("sessions", "contacts", ...) for analytics/indexing. */
-    stream_kind: text('stream_kind').notNull(),
-    enabled: boolean('enabled').notNull().default(true),
-    /** 'manual' | '1h' | '6h' | '24h' | 'webhook' */
-    frequency: text('frequency').notNull().default('manual'),
-    filter_config: jsonb('filter_config'),
-    /** Stream-specific settings (e.g. per-channel "join-on-mention" flag). */
-    settings: jsonb('settings'),
-    last_sync_at: timestamp('last_sync_at', { mode: 'date' }),
-    last_sync_status: text('last_sync_status'),
-    last_sync_error: text('last_sync_error'),
-    last_sync_counts: jsonb('last_sync_counts'),
-    next_sync_at: timestamp('next_sync_at', { mode: 'date' }),
-    created_at: timestamp('created_at', { mode: 'date' }).defaultNow(),
-    updated_at: timestamp('updated_at', { mode: 'date' }).defaultNow(),
-  },
-  (table) => [
-    unique('integration_streams_unique').on(table.connection_id, table.stream_id),
-    index('idx_integration_streams_connection').on(table.connection_id),
-    index('idx_integration_streams_due').on(table.enabled, table.frequency, table.next_sync_at),
-  ]
-)
-
-export const integrationSyncRuns = pgTable(
-  'integration_sync_runs',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    connection_id: uuid('connection_id')
-      .notNull()
-      .references(() => integrationConnections.id, { onDelete: 'cascade' }),
-    plugin_id: text('plugin_id').notNull(),
-    /** Null for connection-level runs (currently unused but reserved). */
-    stream_id: text('stream_id'),
-    triggered_by: text('triggered_by').notNull(),
-    status: text('status').notNull().default('in_progress'),
-    counts: jsonb('counts'),
-    error_message: text('error_message'),
-    started_at: timestamp('started_at', { mode: 'date' }).defaultNow(),
-    completed_at: timestamp('completed_at', { mode: 'date' }),
-  },
-  (table) => [
-    index('idx_integration_sync_runs_connection').on(table.connection_id),
-    index('idx_integration_sync_runs_started').on(table.started_at),
-  ]
-)
-
-export const integrationSyncedRecords = pgTable(
-  'integration_synced_records',
-  {
-    connection_id: uuid('connection_id')
-      .notNull()
-      .references(() => integrationConnections.id, { onDelete: 'cascade' }),
-    stream_id: text('stream_id').notNull(),
-    /** External id (provider's primary key for the record, e.g. "ticket:12345"). */
-    external_id: text('external_id').notNull(),
-    /** The hissuno id the external record was mapped to (session id, issue id, ...). */
-    hissuno_id: text('hissuno_id').notNull(),
-    hissuno_kind: text('hissuno_kind').notNull(),
-    synced_at: timestamp('synced_at', { mode: 'date' }).defaultNow(),
-  },
-  (table) => [
-    // Composite PK — we look up by (connection, stream, external).
-    unique('integration_synced_records_pk').on(
-      table.connection_id,
-      table.stream_id,
-      table.external_id
-    ),
-    index('idx_integration_synced_records_connection').on(table.connection_id),
   ]
 )
 

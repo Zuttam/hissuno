@@ -10,6 +10,7 @@ import { RunHistoryDialog } from '@/components/projects/automations/run-history-
 import { SkillDetailDialog } from '@/components/projects/automations/skill-detail-dialog'
 import { TriggersDialog } from '@/components/projects/automations/triggers-dialog'
 import { formatRelativeTime } from '@/lib/utils/format-time'
+import type { JsonSchemaNode } from '@/lib/automations/types'
 
 type SkillTriggers = {
   manual?: { entity?: string }
@@ -27,6 +28,7 @@ type SkillSummary = {
   triggersOverridden: boolean
   declaredTriggers: SkillTriggers | null
   capabilities: { sandbox?: boolean; webSearch?: boolean } | null
+  output: JsonSchemaNode | null
   enabled: boolean
   lastRun: { runId: string; status: string; ranAt: string } | null
 }
@@ -35,7 +37,11 @@ export default function AutomationsPage() {
   const { project, projectId, isLoading: isLoadingProject } = useProject()
   const [skills, setSkills] = useState<SkillSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeRun, setActiveRun] = useState<{ runId: string; skillId: string } | null>(null)
+  const [activeRun, setActiveRun] = useState<{
+    runId: string
+    skillId: string
+    outputSchema: JsonSchemaNode | null
+  } | null>(null)
   const [showUpload, setShowUpload] = useState(false)
   const [historyFor, setHistoryFor] = useState<string | null>(null)
   const [detailFor, setDetailFor] = useState<string | null>(null)
@@ -78,7 +84,7 @@ export default function AutomationsPage() {
           return
         }
         const data = (await res.json()) as { runId: string }
-        setActiveRun({ runId: data.runId, skillId: skill.id })
+        setActiveRun({ runId: data.runId, skillId: skill.id, outputSchema: skill.output })
       } catch (err) {
         console.error('[automations] failed to start run', err)
         alert('Failed to start run')
@@ -259,6 +265,7 @@ export default function AutomationsPage() {
           runId={activeRun.runId}
           skillId={activeRun.skillId}
           projectId={projectId}
+          outputSchema={activeRun.outputSchema}
           onCloseAction={() => setActiveRun(null)}
         />
       )}
@@ -279,7 +286,8 @@ export default function AutomationsPage() {
           skillId={historyFor}
           onCloseAction={() => setHistoryFor(null)}
           onOpenRunAction={(runId) => {
-            setActiveRun({ runId, skillId: historyFor })
+            const skill = skills.find((s) => s.id === historyFor)
+            setActiveRun({ runId, skillId: historyFor, outputSchema: skill?.output ?? null })
             setHistoryFor(null)
           }}
         />

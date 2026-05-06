@@ -1,40 +1,32 @@
 /**
  * Plugin kit: the contract every integration plugin implements.
  *
+ * In the skill-driven sync model, plugins are responsible for ONE thing:
+ * authenticating a project against an external provider and producing an
+ * `integration_connections` row. All sync logic lives in automation skills
+ * under `src/lib/automations/skills/<plugin>-<stream>/`.
+ *
  * A plugin is a single `PluginDef` object produced by `definePlugin(...)`.
  * It declares:
  *   - metadata (id, name, icon, category)
  *   - auth schema (how users connect this integration)
- *   - streams (what data flows in — sessions, contacts, issues, knowledge, ...)
  *   - optional UI escape hatch (custom React dialog for complex flows)
- *   - optional custom API handlers (for integration-specific endpoints)
+ *   - optional custom API handlers (for OAuth callbacks, helper queries, etc.)
+ *   - optional webhook resolver (maps incoming webhook payloads to a connection
+ *     id; the route then fires an event-triggered automation)
  *
  * Plugin authors never touch DB schema, API routes, cron, or UI chrome.
- * All of that is shared infrastructure that looks up the plugin by id and delegates.
  */
 
 import type { NextRequest } from 'next/server'
 import type { LazyExoticComponent, ComponentType } from 'react'
-import type { ZodSchema } from 'zod'
 
 // ============================================================================
 // Shared primitives
 // ============================================================================
 
-export type SyncFrequency = 'manual' | '1h' | '6h' | '24h' | 'webhook'
-export type SyncMode = 'incremental' | 'full'
-export type TriggerSource = 'manual' | 'cron' | 'webhook'
-export type StreamKind =
-  | 'sessions'
-  | 'contacts'
-  | 'companies'
-  | 'issues'
-  | 'knowledge'
-  | 'analytics'
-
 export type Credentials = Record<string, unknown>
 export type Settings = Record<string, unknown>
-export type FilterConfig = Record<string, unknown>
 
 // ============================================================================
 // Auth schema
@@ -90,7 +82,7 @@ export interface OAuth2AuthSchema {
   ) => Promise<AuthTestResult>
   /**
    * Optional refresh handler. If absent and the provider issues refresh_tokens,
-   * the generic runtime will POST to tokenUrl with grant_type=refresh_token.
+   * the credential resolver POSTs to tokenUrl with grant_type=refresh_token.
    */
   refresh?: (
     credentials: Credentials,
@@ -188,232 +180,14 @@ export interface AuthTestResult {
 }
 
 // ============================================================================
-// Stream definition
+// Logger
 // ============================================================================
-
-export interface StreamInstanceRef {
-  id: string
-  label: string
-  metadata?: Record<string, unknown>
-}
-
-export interface PluginListCtx {
-  projectId: string
-  connectionId: string
-  credentials: Credentials
-  settings: Settings
-  fetch: typeof fetch
-  logger: Logger
-  signal: AbortSignal
-}
-
-export interface StreamDef<
-  TSettings extends Settings = Settings,
-  TFilters extends FilterConfig = FilterConfig
-> {
-  kind: StreamKind
-  label: string
-  description?: string
-  /**
-   * For parameterized streams (per-repo, per-database, per-channel), return the list
-   * of available instances. Each selected instance gets its own `integration_streams` row
-   * with `stream_id = '<streamKey>:<instance.id>'`.
-   * If omitted, the stream is singleton.
-   */
-  instances?: (ctx: PluginListCtx) => Promise<StreamInstanceRef[]>
-  /** Scheduled sync handler. */
-  sync?: (ctx: SyncCtx<TSettings, TFilters>) => Promise<void>
-  /**
-   * Webhook handler. If present, the stream defaults to `frequency = 'webhook'`
-   * (no polling). A stream can have both sync (backfill) + webhook (live).
-   */
-  webhook?: (ctx: WebhookCtx) => Promise<Response | void>
-  /** Allowed frequencies for this stream. Defaults to ['manual','1h','6h','24h']. */
-  frequencies?: SyncFrequency[]
-  /** Zod schema for stream-specific filters (date ranges, status filters, etc). */
-  filterSchema?: ZodSchema<TFilters>
-  /** Zod schema for stream-specific settings (e.g. a channel's "join-on-mention" flag). */
-  settingsSchema?: ZodSchema<TSettings>
-  /** Default filter values. */
-  defaultFilters?: TFilters
-  /** Default settings values. */
-  defaultSettings?: TSettings
-}
-
-// ============================================================================
-// Sync context — the plugin's only view into the platform
-// ============================================================================
-
-export interface ProgressEvent {
-  type: string
-  message?: string
-  current?: number
-  total?: number
-  externalId?: string
-  hissunoId?: string
-}
-
-export interface SessionIngestInput {
-  externalId: string
-  source: string
-  /** Session content type. See SessionType in @/types/session. */
-  sessionType?: 'chat' | 'meeting' | 'behavioral'
-  status?: 'active' | 'closed'
-  name?: string
-  description?: string
-  userMetadata?: Record<string, unknown>
-  firstMessageAt?: Date
-  lastActivityAt?: Date
-  createdAt?: Date
-  messages: Array<{
-    senderType: string
-    content: string
-    createdAt?: Date
-  }>
-  contactId?: string
-  /** Optional email to resolve/upsert a contact before linking. */
-  contactEmail?: string
-  contactName?: string
-}
-
-export interface ContactIngestInput {
-  externalId: string
-  email: string
-  name?: string
-  phone?: string | null
-  title?: string | null
-  companyId?: string | null
-  companyDomain?: string
-  customFields?: Record<string, unknown>
-  mergeStrategy?: 'fill_nulls' | 'overwrite' | 'never_overwrite'
-}
-
-export interface CompanyIngestInput {
-  externalId: string
-  domain: string
-  name?: string
-  industry?: string | null
-  country?: string | null
-  employeeCount?: number | null
-  notes?: string | null
-  customFields?: Record<string, unknown>
-  mergeStrategy?: 'fill_nulls' | 'overwrite' | 'never_overwrite'
-}
-
-export interface IssueIngestInput {
-  externalId: string
-  name: string
-  description: string
-  type: 'bug' | 'feature_request' | 'change_request'
-  status?: 'open' | 'ready' | 'in_progress' | 'resolved' | 'closed'
-  priority?: 'low' | 'medium' | 'high'
-  sessionId?: string
-  productScopeId?: string | null
-  customFields?: Record<string, unknown>
-}
-
-export interface KnowledgeIngestInput {
-  externalId: string
-  /** Matches knowledgeSources.type values used across the codebase. */
-  type: string
-  name?: string | null
-  description?: string | null
-  url?: string | null
-  content?: string | null
-  storagePath?: string | null
-  analyzedContent?: string | null
-  analysisScope?: string | null
-  origin?: string | null
-  parentId?: string | null
-  notionPageId?: string | null
-  customFields?: Record<string, unknown> | null
-  enabled?: boolean
-  /**
-   * Required: every knowledge entry lives under a product scope. Plugins
-   * should resolve this from a stream setting, falling back to the project's
-   * default scope (see `resolveTargetScopeId` in shared/scope-helpers.ts).
-   */
-  productScopeId: string
-  skipInlineProcessing?: boolean
-}
 
 export interface Logger {
   info: (message: string, data?: Record<string, unknown>) => void
   warn: (message: string, data?: Record<string, unknown>) => void
   error: (message: string, data?: Record<string, unknown>) => void
   debug: (message: string, data?: Record<string, unknown>) => void
-}
-
-export interface SyncCtx<
-  TSettings extends Settings = Settings,
-  TFilters extends FilterConfig = FilterConfig
-> {
-  // identity
-  projectId: string
-  connectionId: string
-  /** Full stream key as persisted — for singleton streams this equals the stream def key.
-   *  For parameterized streams this looks like 'codebase:acme/repo'. */
-  streamId: string
-  /** The stream definition key as declared in `definePlugin({ streams: { <here>: ... } })`. */
-  streamKey: string
-  /** For parameterized streams, the instance id portion (e.g. 'acme/repo'). Null otherwise. */
-  instanceId: string | null
-
-  // runtime
-  credentials: Credentials
-  settings: TSettings
-  filters: TFilters
-  syncMode: SyncMode
-  triggeredBy: TriggerSource
-  signal: AbortSignal
-  logger: Logger
-
-  /** When the connection was last successfully synced for this stream (incremental cursor). */
-  lastSyncAt: Date | null
-
-  // ingestion primitives — the only way a plugin writes data
-  ingest: {
-    session: (input: SessionIngestInput) => Promise<{ sessionId: string }>
-    contact: (input: ContactIngestInput) => Promise<{ contactId: string }>
-    company: (input: CompanyIngestInput) => Promise<{ companyId: string }>
-    issue: (input: IssueIngestInput) => Promise<{ issueId: string }>
-    knowledge: (input: KnowledgeIngestInput) => Promise<{ docId: string }>
-  }
-
-  // dedup helpers
-  isSynced: (externalId: string) => Promise<boolean>
-  getSyncedIds: () => Promise<Set<string>>
-  recordSynced: (params: {
-    externalId: string
-    hissunoId: string
-    kind: StreamKind
-  }) => Promise<void>
-
-  // progress emission (runtime adapts to SSE for manual triggers)
-  progress: (event: ProgressEvent) => void
-
-  // incremental save of OAuth refreshed tokens, etc
-  saveCredentials: (credentials: Credentials) => Promise<void>
-}
-
-// ============================================================================
-// Webhook context
-// ============================================================================
-
-export interface WebhookCtx {
-  projectId: string
-  connectionId: string
-  streamId: string
-  streamKey: string
-  credentials: Credentials
-  settings: Settings
-  request: NextRequest
-  logger: Logger
-
-  ingest: SyncCtx['ingest']
-  isSynced: SyncCtx['isSynced']
-  recordSynced: SyncCtx['recordSynced']
-  saveCredentials: SyncCtx['saveCredentials']
 }
 
 // ============================================================================
@@ -474,22 +248,15 @@ export interface PluginDef {
   setupLabel?: string
 
   auth: AuthSchema
-  streams: Record<string, StreamDef>
 
   /**
-   * For webhook plugins where the URL is static (can't include connectionId):
-   * given the payload, resolve which connection this event belongs to.
-   * Return null to reject the webhook with 404.
-   */
-  /**
-   * Map an incoming webhook to a hissuno connection id. The plugin is
-   * responsible for verifying request authenticity (signature, token, …)
-   * before returning a connection id — the route trusts whatever this
-   * returns and only then touches the database.
+   * Map an incoming webhook to a hissuno connection id. The plugin verifies
+   * request authenticity (signature, token, …) before returning a connection
+   * id — the webhook route trusts whatever this returns.
    *
    * Return value:
-   *   - `string` — connection id; the route loads it and dispatches to
-   *     the stream's webhook handler.
+   *   - `string` — connection id; the route fires an event-triggered automation
+   *     scoped to that connection's project.
    *   - `Response` — the plugin fully handled the request (e.g. a setup
    *     challenge); the route returns this Response as-is.
    *   - `null` — unknown sender; the route responds 404.
@@ -533,38 +300,5 @@ export function definePlugin(def: PluginDef): PluginDef {
       `[plugin-kit] Invalid plugin id: ${JSON.stringify(def.id)}. Must match /^[a-z][a-z0-9_-]*$/`
     )
   }
-  if (!def.streams || Object.keys(def.streams).length === 0) {
-    throw new Error(
-      `[plugin-kit] Plugin "${def.id}" has no streams. At least one is required.`
-    )
-  }
-  for (const [key, stream] of Object.entries(def.streams)) {
-    if (!/^[a-z][a-z0-9_]*$/.test(key)) {
-      throw new Error(
-        `[plugin-kit] Plugin "${def.id}" has invalid stream key "${key}". Must match /^[a-z][a-z0-9_]*$/`
-      )
-    }
-    if (!stream.sync && !stream.webhook) {
-      throw new Error(
-        `[plugin-kit] Plugin "${def.id}" stream "${key}" must define sync or webhook.`
-      )
-    }
-  }
   return def
-}
-
-// ============================================================================
-// Public helpers
-// ============================================================================
-
-export const DEFAULT_FREQUENCIES: SyncFrequency[] = ['manual', '1h', '6h', '24h']
-
-export function buildStreamId(streamKey: string, instanceId: string | null): string {
-  return instanceId == null ? streamKey : `${streamKey}:${instanceId}`
-}
-
-export function parseStreamId(streamId: string): { streamKey: string; instanceId: string | null } {
-  const idx = streamId.indexOf(':')
-  if (idx < 0) return { streamKey: streamId, instanceId: null }
-  return { streamKey: streamId.slice(0, idx), instanceId: streamId.slice(idx + 1) }
 }

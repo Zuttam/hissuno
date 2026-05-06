@@ -85,7 +85,6 @@ interface ProductScopeSidebarCreateProps {
     type: ProductScopeType
     goals: ProductScopeGoal[] | null
     parent_id?: string | null
-    content?: string | null
     custom_fields?: Record<string, unknown>
   }) => void
   existingSlugs: string[]
@@ -357,19 +356,6 @@ function EditModeSidebar({
               />
             </div>
           )}
-
-          {/* Content (markdown) */}
-          <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
-            <EditableTextField
-              value={scope.content}
-              fieldKey="content"
-              onSave={handleFieldSave}
-              placeholder="Add detailed content (markdown)..."
-              type="textarea"
-              maxLength={50000}
-              label="Content"
-            />
-          </div>
 
           {/* Business Goals */}
           <div className="border-b-2 border-[color:var(--border-subtle)] p-4">
@@ -853,7 +839,6 @@ function CreateModeSidebar({
   const [scopeType, setScopeType] = useState<ProductScopeType>('product_area')
   const [goals, setGoals] = useState<ProductScopeGoal[]>([])
   const [parentId, setParentId] = useState<string | null>(initialParentId ?? null)
-  const [content, setContent] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({})
 
@@ -895,10 +880,9 @@ function CreateModeSidebar({
       type: scopeType,
       goals: filteredGoals.length > 0 ? filteredGoals : null,
       parent_id: parentId,
-      content: content.trim() || null,
       custom_fields: cfPayload,
     })
-  }, [name, description, color, scopeType, goals, parentId, content, customFieldValues, existingSlugs, onCreate])
+  }, [name, description, color, scopeType, goals, parentId, customFieldValues, existingSlugs, onCreate])
 
   const handleAddGoal = useCallback(() => {
     setGoals((prev) => [...prev, { id: `goal_${Date.now()}`, text: '' }])
@@ -1049,18 +1033,6 @@ function CreateModeSidebar({
                   + Add goal
                 </button>
               </div>
-            </FormField>
-            {/* Content (markdown) */}
-            <FormField
-              label="Content"
-              supportingText="Optional markdown content describing this scope in detail"
-            >
-              <Textarea
-                value={content}
-                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setContent(e.target.value)}
-                placeholder="Detailed scope description (markdown)..."
-                rows={4}
-              />
             </FormField>
             {/* Custom fields */}
             {customFields.length > 0 && (

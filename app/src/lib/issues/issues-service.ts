@@ -84,6 +84,28 @@ function maybeFireIssueAnalysis(issueId: string, projectId: string): void {
   })
 }
 
+/**
+ * Fire `issue.status_changed` only when the status field is being set to a
+ * value different from the current row. The previous + new status are passed
+ * in the entity snapshot so subscribers don't need a re-fetch.
+ */
+function maybeFireIssueStatusChanged(
+  issueId: string,
+  projectId: string,
+  fromStatus: IssueRecord['status'],
+  toStatus: IssueRecord['status'] | undefined
+): void {
+  if (toStatus === undefined || toStatus === fromStatus) return
+  notifyAutomationEvent('issue.status_changed', {
+    projectId,
+    entity: {
+      type: 'issue',
+      id: issueId,
+      snapshot: { from: fromStatus, to: toStatus },
+    },
+  })
+}
+
 // ============================================================================
 // User-Authenticated Operations (for API routes)
 // ============================================================================
@@ -155,6 +177,7 @@ export async function updateIssue(issueId: string, input: UpdateIssueInput): Pro
   // Update embedding if text changed
   if (current) {
     maybeFireIssueEmbedding(issueId, projectId, current.name, current.description, input.name, input.description)
+    maybeFireIssueStatusChanged(issueId, projectId, current.status, input.status)
   }
 
   fireGraphEval(projectId, 'issue', issueId)
@@ -278,6 +301,7 @@ export async function updateIssueAdmin(
   // Update embedding if text changed
   if (current) {
     maybeFireIssueEmbedding(issueId, projectId, current.name, current.description, input.name, input.description)
+    maybeFireIssueStatusChanged(issueId, projectId, current.status, input.status)
   }
 
   fireGraphEval(projectId, 'issue', issueId)

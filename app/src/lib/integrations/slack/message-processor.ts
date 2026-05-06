@@ -11,11 +11,12 @@ import { slackThreadSessions, projectSettings } from '@/lib/db/schema/app'
 import { sessions } from '@/lib/db/schema/app'
 import { upsertSession, updateSessionActivity } from '@/lib/db/queries/sessions'
 import { saveSessionMessage } from '@/lib/db/queries/session-messages'
-import { triggerChatRun, updateChatRunStatus, type ChatMessage } from '@/lib/agent/chat-run-service'
+import { triggerChatRun, updateChatRunStatus, type ChatMessage } from '@/lib/chat/chat-run-service'
 
 import type { SupportAgentContext } from '@/types/agent'
-import { resolveAgent } from '@/mastra/agents/router'
+import { resolveAgent } from '@/mastra/agents/chat-agent'
 import { getSupportAgentSettingsAdmin } from '@/lib/db/queries/project-settings/support-agent'
+import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings/workflow-guidelines'
 import { resolveContactForSession } from '@/lib/customers/contact-resolution'
 import { SlackClient, type SlackMessage } from './client'
 import {
@@ -444,13 +445,27 @@ async function executeAgentSync(params: {
   const { projectId, sessionId, chatRunId, messages, userId, userMetadata, contactId } = params
 
   try {
-    // Load knowledge package ID from project settings
+    // Load knowledge package + memory toggle from the relevant agent's settings.
+    // Support mode keys memory by contactId; PM mode keys by userId. Skip memory
+    // entirely when no stable resourceId is available.
     let supportPackageId: string | null = null
+    let memoryEnabled = false
+    let resourceId: string | null = null
     try {
-      const agentSettings = await getSupportAgentSettingsAdmin(projectId)
-      supportPackageId = agentSettings.support_agent_package_id
+      if (contactId) {
+        const supportSettings = await getSupportAgentSettingsAdmin(projectId)
+        supportPackageId = supportSettings.support_agent_package_id
+        memoryEnabled = supportSettings.support_agent_memory_enabled
+        resourceId = contactId
+      } else {
+        const supportSettings = await getSupportAgentSettingsAdmin(projectId)
+        supportPackageId = supportSettings.support_agent_package_id
+        const pmSettings = await getPmAgentSettingsAdmin(projectId)
+        memoryEnabled = pmSettings.product_agent_memory_enabled
+        resourceId = userId ?? null
+      }
     } catch (err) {
-      console.warn(`${LOG_PREFIX} Failed to load agent settings for knowledge:`, err)
+      console.warn(`${LOG_PREFIX} Failed to load agent settings:`, err)
     }
 
     // Resolve agent via router (support or PM based on contactId)
@@ -480,12 +495,12 @@ async function executeAgentSync(params: {
     ]
 
     // Generate response -- tools are baked into the agent
+    const memoryArgs = memoryEnabled && resourceId
+      ? { memory: { thread: sessionId, resource: resourceId } }
+      : {}
     const result = await agent.generate(mastraMessages, {
       requestContext,
-      memory: {
-        thread: sessionId,
-        resource: userId || 'anonymous',
-      },
+      ...memoryArgs,
     })
 
     // Mark as completed

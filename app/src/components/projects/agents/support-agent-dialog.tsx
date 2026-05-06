@@ -34,6 +34,7 @@ interface SupportAgentDialogProps {
     sessionIdleTimeoutMinutes: number
     sessionGoodbyeDelaySeconds: number
     sessionIdleResponseTimeoutSeconds: number
+    memoryEnabled: boolean
   }
   onSaved: () => void
   onOpenTestAgent: () => void
@@ -56,6 +57,7 @@ export function SupportAgentDialog({
   const [idleTimeout, setIdleTimeout] = useState(initialSettings.sessionIdleTimeoutMinutes)
   const [goodbyeDelay, setGoodbyeDelay] = useState(initialSettings.sessionGoodbyeDelaySeconds)
   const [responseTimeout, setResponseTimeout] = useState(initialSettings.sessionIdleResponseTimeoutSeconds)
+  const [memoryEnabled, setMemoryEnabled] = useState(initialSettings.memoryEnabled)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [packageView, setPackageView] = useState<PackageView>(null)
@@ -69,6 +71,7 @@ export function SupportAgentDialog({
       setIdleTimeout(initialSettings.sessionIdleTimeoutMinutes)
       setGoodbyeDelay(initialSettings.sessionGoodbyeDelaySeconds)
       setResponseTimeout(initialSettings.sessionIdleResponseTimeoutSeconds)
+      setMemoryEnabled(initialSettings.memoryEnabled)
       setError(null)
       setPackageView(null)
     }
@@ -86,6 +89,7 @@ export function SupportAgentDialog({
         session_idle_timeout_minutes: idleTimeout,
         session_goodbye_delay_seconds: goodbyeDelay,
         session_idle_response_timeout_seconds: responseTimeout,
+        support_agent_memory_enabled: memoryEnabled,
       })
 
       onSaved()
@@ -240,6 +244,36 @@ export function SupportAgentDialog({
                 placeholder="Enter any brand-specific guidelines, terminology, or style instructions..."
                 rows={3}
               />
+            </div>
+
+            {/* Memory */}
+            <div className="flex flex-col gap-3">
+              <label className="block font-mono text-xs font-semibold uppercase text-[color:var(--text-secondary)]">
+                Memory
+              </label>
+              <div className="flex items-center justify-between rounded-lg border border-[color:var(--border-subtle)] px-4 py-3">
+                <div>
+                  <span className="text-sm font-medium text-[color:var(--foreground)]">Enable memory</span>
+                  <p className="text-xs text-[color:var(--text-tertiary)] mt-0.5">
+                    Remember context across this contact's sessions so they can pick up where they left off.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={memoryEnabled}
+                  onClick={() => setMemoryEnabled((v) => !v)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-primary)] focus:ring-offset-2 ${
+                    memoryEnabled ? 'bg-[color:var(--accent-primary)]' : 'bg-[color:var(--surface-hover)]'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      memoryEnabled ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
 
             {/* Session Lifecycle */}

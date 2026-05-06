@@ -28,6 +28,10 @@ import { sanitizeSearchInput, dateToIso } from '@/lib/db/server'
 import { setSessionContact, setEntityProductScope, getSessionLinkedIssueIds, getRelatedIds, batchGetIssueSessionCounts } from '@/lib/db/queries/entity-relationships'
 import { ensureSessionName } from '@/lib/sessions/name-generator'
 import { sendHumanNeededNotification } from '@/lib/notifications/human-needed-notifications'
+import { fireEmbedding } from '@/lib/utils/embeddings'
+import { buildSessionEmbeddingText } from '@/lib/sessions/embedding-service'
+import { fireSessionProcessing } from '@/lib/utils/session-processing'
+import { notifyAutomationEvent } from '@/lib/automations/events'
 import type {
   SessionRecord,
   SessionWithProject,
@@ -594,16 +598,12 @@ export async function updateSession(
 
     // Re-embed if name changed (fire-and-forget)
     if (input.name !== undefined && result.name && result.description) {
-      const { fireEmbedding } = await import('@/lib/utils/embeddings')
-      const { buildSessionEmbeddingText } = await import('@/lib/sessions/embedding-service')
       fireEmbedding(sessionId, 'session', result.project_id, buildSessionEmbeddingText(result.name, result.description))
     }
 
     // Fire session processing when status transitions to closed (fire-and-forget)
     if (input.status === 'closed') {
-      const { fireSessionProcessing } = await import('@/lib/utils/session-processing')
       fireSessionProcessing(sessionId, result.project_id)
-      const { notifyAutomationEvent } = await import('@/lib/automations/events')
       notifyAutomationEvent('session.closed', {
         projectId: result.project_id,
         entity: { type: 'session', id: sessionId },

@@ -18,7 +18,14 @@ import type { EntityType, EventName } from './types'
 
 export type EventContext = {
   projectId: string
-  entity?: { type: EntityType; id: string }
+  entity?: {
+    type: EntityType
+    id: string
+    name?: string
+    snapshot?: Record<string, unknown>
+  }
+  /** Optional structured payload — surfaced to the skill as HISSUNO_RUN_INPUT. */
+  input?: Record<string, unknown>
 }
 
 export function notifyAutomationEvent(event: EventName, ctx: EventContext): void {
@@ -53,6 +60,7 @@ export function notifyAutomationEvent(event: EventName, ctx: EventContext): void
               trigger: {
                 type: 'event',
                 entity: ctx.entity,
+                input: ctx.input,
               },
             })
           } catch (err) {

@@ -85,7 +85,6 @@ export default function ProductsPage() {
     type: ProductScopeType
     goals: ProductScopeGoal[] | null
     parent_id?: string | null
-    content?: string | null
     custom_fields?: Record<string, unknown>
   }) => {
     if (!projectId) return
@@ -97,7 +96,6 @@ export default function ProductsPage() {
       type: newScope.type,
       goals: newScope.goals,
       parent_id: newScope.parent_id,
-      content: newScope.content,
       custom_fields: newScope.custom_fields,
     })
     setIsCreatingScope(false)

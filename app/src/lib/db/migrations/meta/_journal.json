@@ -71,6 +71,48 @@
       "when": 1777400000000,
       "tag": "0009_project_skill_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777500000000,
+      "tag": "0010_drop_codebase_from_relationships",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777600000000,
+      "tag": "0011_chat_agent_memory_toggles",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777700000000,
+      "tag": "0012_automation_skill_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1777800000000,
+      "tag": "0013_drop_product_scope_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1777900000000,
+      "tag": "0014_external_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1778000000000,
+      "tag": "0015_drop_legacy_integration_sync",
+      "breakpoints": true
     }
   ]
 }

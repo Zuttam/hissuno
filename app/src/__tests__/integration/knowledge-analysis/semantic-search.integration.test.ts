@@ -105,25 +105,12 @@ beforeAll(async () => {
   await cleanupOrphanedTestData()
 
   // Mock agents for deterministic testing
-  // New workflow: fetch-content → sanitize-content → save-and-embed
-  vi.spyOn(mastra, 'getAgent').mockImplementation((agentId: string) => {
+  // New workflow: fetch-content → save-and-embed
+  // (Sanitization is now handled by the hissuno-knowledge-sanitizer skill,
+  // triggered async on knowledge.created, and is not exercised here.)
+  vi.spyOn(mastra, 'getAgent').mockImplementation(() => {
     return {
-      generate: vi.fn().mockImplementation(async (messages) => {
-        if (agentId === 'codebaseAnalyzerAgent') {
-          return { text: '' }
-        }
-        if (agentId === 'webScraperAgent') {
-          return { text: '' }
-        }
-        if (agentId === 'securityScannerAgent') {
-          // Passthrough: return the content as-is (no redactions in test data)
-          const prompt = messages?.[0]?.content || ''
-          // Extract content after the "CONTENT TO SCAN:" marker
-          const contentMatch = prompt.match(/CONTENT TO SCAN:\n([\s\S]*?)(?:\n---$|$)/m)
-          return { text: contentMatch?.[1]?.trim() || prompt }
-        }
-        return { text: 'Mock response' }
-      }),
+      generate: vi.fn().mockResolvedValue({ text: '' }),
     } as unknown as ReturnType<typeof mastra.getAgent>;
   })
 }, 30000)
@@ -514,7 +501,7 @@ describe('Semantic Search Mastra Tool', () => {
   it(
     'should be available in knowledge tools',
     async () => {
-      const { semanticSearchKnowledgeToolV2: semanticSearchKnowledgeTool } = await import('@/mastra/tools/analysis-knowledge-tools')
+      const { semanticSearchKnowledgeTool } = await import('@/mastra/tools/data-tools/knowledge-tools')
 
       expect(semanticSearchKnowledgeTool).toBeDefined()
       expect(semanticSearchKnowledgeTool.id).toBe('semantic-search-knowledge')
@@ -525,7 +512,7 @@ describe('Semantic Search Mastra Tool', () => {
   it(
     'should have correct schema',
     async () => {
-      const { semanticSearchKnowledgeToolV2: semanticSearchKnowledgeTool } = await import('@/mastra/tools/analysis-knowledge-tools')
+      const { semanticSearchKnowledgeTool } = await import('@/mastra/tools/data-tools/knowledge-tools')
 
       // Tool should have input and output schemas
       expect(semanticSearchKnowledgeTool.inputSchema).toBeDefined()
@@ -541,7 +528,7 @@ describe('Semantic Search Mastra Tool', () => {
   it(
     'should return error when projectId not in context',
     async () => {
-      const { semanticSearchKnowledgeToolV2: semanticSearchKnowledgeTool } = await import('@/mastra/tools/analysis-knowledge-tools')
+      const { semanticSearchKnowledgeTool } = await import('@/mastra/tools/data-tools/knowledge-tools')
 
       // Execute with empty runtime context (no projectId set)
       const emptyRuntimeContext = new RequestContext()
@@ -585,7 +572,7 @@ Our main features include:
         sources: [{ id: source.id, type: 'raw_text', content: source.content }],
       })
 
-      const { semanticSearchKnowledgeToolV2: semanticSearchKnowledgeTool } = await import('@/mastra/tools/analysis-knowledge-tools')
+      const { semanticSearchKnowledgeTool } = await import('@/mastra/tools/data-tools/knowledge-tools')
 
       // Create runtime context with projectId
       const requestContext = new RequestContext()
@@ -611,7 +598,7 @@ describe('Hissuno Agent Knowledge', () => {
   it(
     'should not have knowledge tools (knowledge is injected via system prompt)',
     async () => {
-      const { supportAgent } = await import('@/mastra/agents/support-agent')
+      const { supportAgent } = await import('@/mastra/agents/chat-agent')
 
       expect(supportAgent.tools).toBeDefined()
       // Hissuno Agent no longer has knowledge tools - knowledge is loaded into system prompt
@@ -624,7 +611,7 @@ describe('Hissuno Agent Knowledge', () => {
   it(
     'should mention Knowledge Base in instructions',
     async () => {
-      const { supportAgent } = await import('@/mastra/agents/support-agent')
+      const { supportAgent } = await import('@/mastra/agents/chat-agent')
 
       // Verify agent instructions mention knowledge base (injected via system prompt)
       expect(supportAgent.instructions).toContain('Knowledge Base')

@@ -13,6 +13,8 @@ import { resolveModel } from '@/mastra/models'
 import { getAIModelSettingsAdmin } from '@/lib/db/queries/project-settings'
 
 import type { IssueMatch } from './discover-relationships'
+import { matchProductScope } from './discover-relationships'
+import { linkSessionToIssueAdmin, createIssueAdmin } from '@/lib/issues/issues-service'
 import type { GraphEvaluationConfig } from '../config'
 
 export interface IssueCreationInput {
@@ -78,7 +80,6 @@ export async function runIssueCreationPolicy(
 
   if (bestMatch && bestMatch.similarity >= issueConfig.linkThreshold) {
     try {
-      const { linkSessionToIssueAdmin } = await import('@/lib/issues/issues-service')
       await linkSessionToIssueAdmin(bestMatch.issueId, sessionId, projectId)
     } catch { /* duplicate link is fine */ }
     return {
@@ -97,7 +98,6 @@ export async function runIssueCreationPolicy(
     // Safety net: if PM says "create" but there's a moderate match, override to link
     if (decision.action === 'create' && bestMatch && bestMatch.similarity >= issueConfig.safetyNetThreshold) {
       try {
-        const { linkSessionToIssueAdmin } = await import('@/lib/issues/issues-service')
         await linkSessionToIssueAdmin(bestMatch.issueId, sessionId, projectId)
       } catch { /* duplicate link is fine */ }
       return {
@@ -106,8 +106,6 @@ export async function runIssueCreationPolicy(
     }
 
     if (decision.action === 'create' && decision.newIssues && decision.newIssues.length > 0) {
-      const { createIssueAdmin } = await import('@/lib/issues/issues-service')
-      const { matchProductScope } = await import('./discover-relationships')
       const results: IssueCreationResultEntry[] = []
 
       for (const newIssue of decision.newIssues) {

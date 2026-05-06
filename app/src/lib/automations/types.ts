@@ -5,8 +5,10 @@
  * supporting files. The frontmatter describes what triggers it, what input
  * it expects, and what capabilities it needs at runtime.
  *
- * Bundled skills ship in `packages/skills/`. Custom skills live in blob
- * storage. Both surface to the project as a single catalog.
+ * Bundled automation skills ship in `src/lib/automations/skills/`. Custom
+ * skills live in blob storage. Both surface to the project as a single
+ * catalog. (User-facing skills shipped via the CLI live in `packages/skills/`
+ * and are unrelated to this catalog.)
  */
 
 import type { SkillSource, TriggerType } from '@/lib/db/queries/automation-runs'
@@ -22,12 +24,18 @@ export type EntityType =
 
 export type EventName =
   | 'issue.created'
+  | 'issue.status_changed'
   | 'feedback.created'
   | 'contact.created'
   | 'company.created'
   | 'session.created'
   | 'session.closed'
   | 'knowledge.created'
+  | 'scope.created'
+  | 'scope.updated'
+  /** External webhook landed for a plugin connection. Payload flows via trigger.input. */
+  | 'webhook.slack'
+  | 'webhook.github'
 
 export type SkillFrontmatter = {
   /** Stable kebab-case id used for DB rows and routing. Must match folder name. */
@@ -54,6 +62,14 @@ export type SkillFrontmatter = {
       description?: string
     }
   >
+  /**
+   * Output schema. When set, the harness passes a Zod equivalent to Mastra's
+   * `structuredOutput`, which coerces the agent's final response into a typed
+   * object. The dispatcher persists `response.object` as `automation_runs.output`
+   * instead of reading `output.json`. Skills without this field keep the file-based
+   * output path. Subset of JSON Schema — no $ref / oneOf / anyOf.
+   */
+  output?: JsonSchemaNode
   /** Per-skill capabilities. v1: sandbox is always on; webSearch is optional. */
   capabilities?: {
     sandbox?: boolean
@@ -61,6 +77,52 @@ export type SkillFrontmatter = {
   }
   /** Per-run wall-clock cap in ms. Defaults to 30 * 60_000. */
   timeoutMs?: number
+  /**
+   * Declared runtime dependencies. The harness fails the run early if any
+   * required plugin is not connected for the project.
+   *
+   * `plugins`: each id must match a registered integration plugin. The
+   * resolver injects per-plugin tokens into the sandbox env (e.g.
+   * `SLACK_ACCESS_TOKEN`, `LINEAR_API_KEY`). Multi-connection plugins
+   * additionally require the script to read `<PLUGIN>_EXTERNAL_ACCOUNT_ID` to
+   * disambiguate; the harness chooses one connection per run.
+   *
+   * `scopes`: surfaced for UX/connect-time only — not enforced at run time.
+   */
+  requires?: {
+    plugins?: string[]
+    scopes?: string[]
+  }
+}
+
+/**
+ * Narrow JSON Schema subset usable in SKILL.md frontmatter.
+ *
+ * Keep intentionally small so YAML stays readable and the converter in
+ * `output-schema.ts` can stay deterministic.
+ */
+export type JsonSchemaNode =
+  | JsonSchemaObject
+  | JsonSchemaArray
+  | JsonSchemaPrimitive
+
+export type JsonSchemaObject = {
+  type: 'object'
+  description?: string
+  properties: Record<string, JsonSchemaNode>
+  required?: string[]
+}
+
+export type JsonSchemaArray = {
+  type: 'array'
+  description?: string
+  items: JsonSchemaNode
+}
+
+export type JsonSchemaPrimitive = {
+  type: 'string' | 'number' | 'integer' | 'boolean'
+  description?: string
+  enum?: (string | number | boolean)[]
 }
 
 /**

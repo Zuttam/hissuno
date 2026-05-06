@@ -12,7 +12,6 @@ export interface DataContext {
 
 /**
  * Extract projectId and contactId from requestContext with validation.
- * Same pattern as getContextFromRuntime() in analysis-knowledge-tools.ts.
  */
 export function getDataContext(requestContext: unknown): DataContext {
   if (!requestContext || typeof requestContext !== 'object') {

@@ -29,9 +29,6 @@ import type {
   slackChannels,
   slackThreadSessions,
   integrationConnections,
-  integrationStreams,
-  integrationSyncRuns,
-  integrationSyncedRecords,
   userNotifications,
 } from '@/lib/db/schema/app'
 
@@ -139,12 +136,6 @@ export type SlackThreadSessionRow = typeof slackThreadSessions.$inferSelect
 
 export type IntegrationConnectionRow = typeof integrationConnections.$inferSelect
 export type IntegrationConnectionInsert = typeof integrationConnections.$inferInsert
-export type IntegrationStreamRow = typeof integrationStreams.$inferSelect
-export type IntegrationStreamInsert = typeof integrationStreams.$inferInsert
-export type IntegrationSyncRunRow = typeof integrationSyncRuns.$inferSelect
-export type IntegrationSyncRunInsert = typeof integrationSyncRuns.$inferInsert
-export type IntegrationSyncedRecordRow = typeof integrationSyncedRecords.$inferSelect
-export type IntegrationSyncedRecordInsert = typeof integrationSyncedRecords.$inferInsert
 
 // ---------------------------------------------------------------------------
 // Notifications

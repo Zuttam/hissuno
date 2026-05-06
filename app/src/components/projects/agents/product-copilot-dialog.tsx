@@ -1,7 +1,9 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Dialog, Button, Heading } from '@/components/ui'
+import { Dialog, Button, Heading, Alert } from '@/components/ui'
+import { updateIssueAnalysisSettings } from '@/lib/api/settings'
 import type { IntegrationStatuses } from '@/hooks/use-integration-statuses'
 
 interface ProductCopilotDialogProps {
@@ -9,6 +11,10 @@ interface ProductCopilotDialogProps {
   onClose: () => void
   projectId: string
   integrationStatuses: IntegrationStatuses
+  initialSettings: {
+    memoryEnabled: boolean
+  }
+  onSaved: () => void
 }
 
 function ChannelStatus({ connected }: { connected: boolean }) {
@@ -19,10 +25,46 @@ function ChannelStatus({ connected }: { connected: boolean }) {
   )
 }
 
-export function ProductCopilotDialog({ open, onClose, projectId, integrationStatuses }: ProductCopilotDialogProps) {
+export function ProductCopilotDialog({
+  open,
+  onClose,
+  projectId,
+  integrationStatuses,
+  initialSettings,
+  onSaved,
+}: ProductCopilotDialogProps) {
+  const [memoryEnabled, setMemoryEnabled] = useState(initialSettings.memoryEnabled)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (open) {
+      setMemoryEnabled(initialSettings.memoryEnabled)
+      setError(null)
+    }
+  }, [open, initialSettings])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    setError(null)
+    try {
+      await updateIssueAnalysisSettings(projectId, {
+        product_agent_memory_enabled: memoryEnabled,
+      })
+      onSaved()
+      onClose()
+    } catch {
+      setError('Failed to save settings. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <Dialog open={open} onClose={onClose} title="Product Co-pilot" size="lg">
       <div className="flex flex-col gap-6">
+        {error && <Alert variant="warning">{error}</Alert>}
+
         <p className="text-sm text-[color:var(--text-secondary)]">
           When used as a team agent (via the dashboard), Hissuno has broader access to your project data.
         </p>
@@ -47,6 +89,34 @@ export function ProductCopilotDialog({ open, onClose, projectId, integrationStat
               <span>Available via CLI, Skills, or the dashboard chat</span>
             </li>
           </ul>
+        </div>
+
+        {/* Memory */}
+        <div className="flex flex-col gap-3">
+          <Heading as="h4" size="subsection">Memory</Heading>
+          <div className="flex items-center justify-between rounded-lg border border-[color:var(--border-subtle)] px-4 py-3">
+            <div>
+              <span className="text-sm font-medium text-[color:var(--foreground)]">Enable memory</span>
+              <p className="text-xs text-[color:var(--text-tertiary)] mt-0.5">
+                Remember context across this team member's sessions so they can pick up where they left off.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={memoryEnabled}
+              onClick={() => setMemoryEnabled((v) => !v)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-primary)] focus:ring-offset-2 ${
+                memoryEnabled ? 'bg-[color:var(--accent-primary)]' : 'bg-[color:var(--surface-hover)]'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  memoryEnabled ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         {/* Interactive Channels */}
@@ -93,9 +163,12 @@ export function ProductCopilotDialog({ open, onClose, projectId, integrationStat
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end border-t border-[color:var(--border-subtle)] pt-4">
-          <Button variant="secondary" onClick={onClose}>
-            Close
+        <div className="flex items-center justify-end gap-3 border-t border-[color:var(--border-subtle)] pt-4">
+          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleSave} loading={isSaving} disabled={isSaving}>
+            Save
           </Button>
         </div>
       </div>

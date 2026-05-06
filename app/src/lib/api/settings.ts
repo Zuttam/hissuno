@@ -36,7 +36,6 @@ export interface CreateProductScopeParams {
   type?: 'product_area' | 'initiative' | 'experiment'
   goals?: Array<{ id: string; text: string }> | null
   parent_id?: string | null
-  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -61,7 +60,6 @@ export interface UpdateProductScopeParams {
   type?: 'product_area' | 'initiative' | 'experiment'
   goals?: Array<{ id: string; text: string }> | null
   parent_id?: string | null
-  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 

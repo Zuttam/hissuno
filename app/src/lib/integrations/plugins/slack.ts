@@ -1,23 +1,22 @@
 /**
- * Slack plugin — capture threads as sessions and respond as the bot.
+ * Slack plugin — connect-only.
  *
  * Auth: custom (Slack's oauth.v2.access returns bot token + workspace info —
  *   doesn't fit the generic oauth2 flow).
- * Streams: events (webhook-driven — routes to the existing slack event handlers).
+ *
+ * Webhooks: resolveConnection verifies the signature and maps the payload to
+ * a connection id; the webhook route fires an event-triggered automation
+ * (the `slack-events` skill) for the resolved project.
  */
 
 import { NextResponse, type NextRequest } from 'next/server'
 import {
   definePlugin,
-  type WebhookCtx,
   type CustomAuthCtx,
   type PluginRouteCtx,
 } from '../plugin-kit'
 import { verifySlackRequest } from '../slack/index'
-import { handleSlackEvent } from '../slack/event-handlers'
 import { findConnectionByExternalId } from '../shared/connections'
-
-type SlackEventPayload = Parameters<typeof handleSlackEvent>[0]['event']
 
 export const SLACK_OAUTH_SCOPES = [
   'app_mentions:read',
@@ -107,16 +106,6 @@ export const slackPlugin = definePlugin({
     },
   },
 
-  streams: {
-    events: {
-      kind: 'sessions',
-      label: 'Events',
-      description: 'Real-time Slack events (threads, mentions, messages).',
-      frequencies: ['webhook'],
-      webhook: runWebhook,
-    },
-  },
-
   resolveConnection: async ({ payload, rawBody, request }) => {
     const signingSecret = process.env.SLACK_SIGNING_SECRET
     if (!signingSecret) {
@@ -126,16 +115,7 @@ export const slackPlugin = definePlugin({
     const timestamp = request.headers.get('x-slack-request-timestamp') ?? ''
     const signature = request.headers.get('x-slack-signature') ?? ''
     if (!verifySlackRequest(rawBody, timestamp, signature, signingSecret)) {
-      console.warn('[slack.resolveConnection] signature mismatch', {
-        bodyBytes: rawBody.length,
-        bodyPrefix: rawBody.slice(0, 80),
-        hasTimestamp: Boolean(timestamp),
-        hasSignature: Boolean(signature),
-        timestampAgeSec: timestamp
-          ? Math.floor(Date.now() / 1000) - parseInt(timestamp, 10)
-          : null,
-        secretLen: signingSecret.length,
-      })
+      console.warn('[slack.resolveConnection] signature mismatch')
       return null
     }
 
@@ -152,15 +132,9 @@ export const slackPlugin = definePlugin({
     }
 
     const teamId = body.team_id ?? body.event?.team
-    if (!teamId) {
-      console.warn('[slack.resolveConnection] no team_id in payload', { type: body.type })
-      return null
-    }
+    if (!teamId) return null
     const connection = await findConnectionByExternalId('slack', teamId)
-    if (!connection) {
-      console.warn('[slack.resolveConnection] no connection for team', { teamId })
-      return null
-    }
+    if (!connection) return null
     return connection.id
   },
 
@@ -170,39 +144,3 @@ export const slackPlugin = definePlugin({
     },
   },
 })
-
-async function runWebhook(ctx: WebhookCtx): Promise<Response | void> {
-  // Signature + url_verification are handled upstream in resolveConnection,
-  // so by the time we're here the request is authenticated and carries a
-  // real event_callback for a known connection.
-  const rawBody = await ctx.request.text()
-  let payload: unknown
-  try {
-    payload = JSON.parse(rawBody)
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 })
-  }
-  const body = payload as {
-    type?: string
-    team_id?: string
-    event?: Record<string, unknown>
-    event_id?: string
-    event_time?: number
-  }
-  if (body.type !== 'event_callback' || !body.event || !body.team_id) {
-    return NextResponse.json({ ok: true })
-  }
-
-  await handleSlackEvent({
-    teamId: body.team_id,
-    event: body.event as SlackEventPayload,
-    eventId: body.event_id ?? '',
-    eventTime: body.event_time ?? Math.floor(Date.now() / 1000),
-  }).catch((err: unknown) => {
-    ctx.logger.error('slack event handler failed', {
-      error: err instanceof Error ? err.message : String(err),
-    })
-  })
-
-  return NextResponse.json({ ok: true })
-}

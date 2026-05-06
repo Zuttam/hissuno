@@ -46,6 +46,7 @@ import type {
   IssueImpactAnalysis,
   EffortEstimate,
   MetricLevel,
+  IssueStatus,
 } from '@/types/issue'
 import { calculateRICEScore, riceScoreToPriority } from '@/lib/issues/rice'
 
@@ -260,16 +261,23 @@ export async function unlinkSessionFromIssue(issueId: string, sessionId: string)
 }
 
 /**
- * Get issue with current name/description for embedding comparison
+ * Get current issue fields needed by update paths: project id for routing,
+ * name/description for embedding diffing, and status for change detection.
  */
 export async function getIssueForEmbedding(
   issueId: string
-): Promise<{ projectId: string; name: string; description: string } | null> {
+): Promise<{
+  projectId: string
+  name: string
+  description: string
+  status: IssueStatus
+} | null> {
   const [row] = await db
     .select({
       project_id: issues.project_id,
       name: issues.name,
       description: issues.description,
+      status: issues.status,
     })
     .from(issues)
     .where(eq(issues.id, issueId))
@@ -281,6 +289,7 @@ export async function getIssueForEmbedding(
     projectId: row.project_id,
     name: row.name,
     description: row.description,
+    status: row.status as IssueStatus,
   }
 }
 

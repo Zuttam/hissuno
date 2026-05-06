@@ -26,6 +26,7 @@ function cliTypeToEntityType(type: string, customerType?: string): string {
     codebases: 'codebase',
     scopes: 'product_scope',
     scope: 'product_scope',
+    knowledge: 'knowledge_source',
   }
   return map[type] ?? type
 }
@@ -38,28 +39,49 @@ const TYPE_ENDPOINTS: Record<string, { path: (id: string) => string; key: string
   codebase: { path: (id) => `/api/codebases/${id}`, key: 'codebase' },
 }
 
+const SUPPORTED_TYPES = [...Object.keys(TYPE_ENDPOINTS), 'knowledge']
+
+/**
+ * Resolve the parent scope for a knowledge source via the relationships endpoint.
+ * Knowledge lives under product scopes, so fetching by ID alone requires the lookup.
+ */
+async function resolveKnowledgeParentScope(
+  config: ReturnType<typeof requireConfig>,
+  projectId: string,
+  sourceId: string,
+): Promise<string | null> {
+  const result = await apiCall<{ relationships?: { productScopes?: Array<{ id: string }> } }>(
+    config,
+    'GET',
+    buildPath('/api/relationships', {
+      projectId,
+      entityType: 'knowledge_source',
+      entityId: sourceId,
+    }),
+  )
+  if (!result.ok) return null
+  const scopes = result.data.relationships?.productScopes ?? []
+  return scopes[0]?.id ?? null
+}
+
 export const getCommand = new Command('get')
   .description('Get full details of a specific resource')
-  .argument('<type>', 'Resource type: feedback, issues, customers, scopes, codebase')
+  .argument('<type>', 'Resource type: feedback, issues, customers, scopes, codebase, knowledge')
   .argument('<id>', 'Resource ID')
   .option('--customer-type <type>', 'Customer sub-type: contacts (default) or companies')
   .action(async (type, id, opts, cmd) => {
     const config = requireConfig()
     const jsonMode = cmd.parent?.opts().json
 
-    const validTypes = Object.keys(TYPE_ENDPOINTS)
-    if (!validTypes.includes(type)) {
-      if (type === 'knowledge') {
-        error('Knowledge entries are scope-attached and don\'t have a top-level get. Use `hissuno list knowledge [--scope <id>]` to find them, or `hissuno get scopes <id>` for the parent scope.')
-      } else {
-        error(`Invalid type "${type}". Must be one of: ${validTypes.join(', ')}`)
-      }
+    if (!SUPPORTED_TYPES.includes(type)) {
+      error(`Invalid type "${type}". Must be one of: ${SUPPORTED_TYPES.join(', ')}`)
       process.exit(1)
     }
 
     const projectId = await resolveProjectId(config)
 
-    // Resolve endpoint - for customers, route based on --customer-type
+    // Resolve endpoint - for customers, route based on --customer-type;
+    // for knowledge, look up the parent scope and use the scoped endpoint.
     let endpoint: { path: (id: string) => string; key: string }
     let displayType = type
     const customerType = resolveCustomerType(opts.customerType)
@@ -67,6 +89,13 @@ export const getCommand = new Command('get')
       const key = customerType === 'companies' ? 'company' : 'contact'
       endpoint = { path: (id) => `/api/${customerType}/${id}`, key }
       displayType = customerType
+    } else if (type === 'knowledge') {
+      const scopeId = await resolveKnowledgeParentScope(config, projectId, id)
+      if (!scopeId) {
+        error(`Knowledge source ${id} is not attached to any scope (or you don't have access).`)
+        process.exit(1)
+      }
+      endpoint = { path: (sid) => `/api/product-scopes/${scopeId}/knowledge/${sid}`, key: 'source' }
     } else {
       endpoint = TYPE_ENDPOINTS[type]
     }

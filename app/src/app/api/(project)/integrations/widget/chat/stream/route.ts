@@ -7,14 +7,15 @@ import { chatRuns as chatRunsTable, sessions as sessionsTable, projectSettings }
 import { eq } from 'drizzle-orm'
 import { updateSessionActivity, setSessionHumanTakeover } from '@/lib/db/queries/sessions'
 import { saveSessionMessage } from '@/lib/db/queries/session-messages'
-import { getRunningChatRun, updateChatRunStatus } from '@/lib/agent/chat-run-service'
+import { getRunningChatRun, updateChatRunStatus } from '@/lib/chat/chat-run-service'
 import { getSupportAgentSettingsAdmin } from '@/lib/db/queries/project-settings/support-agent'
+import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings/workflow-guidelines'
 import {
   type BaseSSEEvent,
   createSSEStreamWithExecutor,
   createSSEEvent,
 } from '@/lib/utils/sse'
-import { resolveAgent } from '@/mastra/agents/router'
+import { resolveAgent } from '@/mastra/agents/chat-agent'
 import { isOriginAllowed } from '@/lib/utils/widget-auth'
 import { getWidgetRequestOrigin, createWidgetCorsHeaders, createWidgetOptionsResponse } from '@/lib/utils/widget-cors'
 import type { SupportAgentContext } from '@/types/agent'
@@ -123,11 +124,28 @@ export async function GET(request: NextRequest) {
         console.log(`${LOG_PREFIX} Sending connected event...`)
         emitEvent('connected', { message: 'Connected to chat stream' })
 
-        // Get the knowledge package ID - use override from metadata if provided, otherwise fetch from settings
+        // Resolve memory toggle + knowledge package from the relevant agent's settings.
+        // Support mode keys memory by contactId; PM mode keys by userId. Anonymous
+        // visitors (no stable resourceId) skip memory to avoid a shared scratchpad.
         let supportPackageId: string | null = metadata?.packageId as string | null
-        if (!supportPackageId) {
-          const agentSettings = await getSupportAgentSettingsAdmin(projectId)
-          supportPackageId = agentSettings.support_agent_package_id
+        let memoryEnabled = false
+        let resourceId: string | null = null
+
+        if (widgetContactId) {
+          const supportSettings = await getSupportAgentSettingsAdmin(projectId)
+          if (!supportPackageId) {
+            supportPackageId = supportSettings.support_agent_package_id
+          }
+          memoryEnabled = supportSettings.support_agent_memory_enabled
+          resourceId = widgetContactId
+        } else {
+          if (!supportPackageId) {
+            const supportSettings = await getSupportAgentSettingsAdmin(projectId)
+            supportPackageId = supportSettings.support_agent_package_id
+          }
+          const pmSettings = await getPmAgentSettingsAdmin(projectId)
+          memoryEnabled = pmSettings.product_agent_memory_enabled
+          resourceId = (metadata?.userId as string) ?? null
         }
 
         // Resolve agent via router (support or PM based on contactId)
@@ -169,12 +187,12 @@ export async function GET(request: NextRequest) {
         }
 
         // Stream the response — tools are baked into the agent
+        const memoryArgs = memoryEnabled && resourceId
+          ? { memory: { thread: sessionId, resource: resourceId } }
+          : {}
         const agentStream = await agent.stream(mastraMessages, {
           requestContext,
-          memory: {
-            thread: sessionId,
-            resource: (metadata?.userId as string) || 'anonymous',
-          },
+          ...memoryArgs,
         })
 
         // Update session activity (fire and forget)

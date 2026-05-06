@@ -88,7 +88,7 @@ export function buildPath(path: string, params: Record<string, string | number |
  */
 export async function apiCall<T = unknown>(
   config: HissunoConfig,
-  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
 ): Promise<ApiResult<T>> {

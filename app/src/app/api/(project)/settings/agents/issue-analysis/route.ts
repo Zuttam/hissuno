@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
         analysis_guidelines: all.analysis_guidelines,
         brief_guidelines: all.brief_guidelines,
         issue_analysis_enabled: all.issue_analysis_enabled,
+        product_agent_memory_enabled: all.product_agent_memory_enabled,
       },
     })
   } catch (error) {
@@ -64,16 +65,22 @@ export async function PATCH(request: NextRequest) {
     await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
-    const { analysis_guidelines, brief_guidelines, issue_analysis_enabled } = body as {
+    const { analysis_guidelines, brief_guidelines, issue_analysis_enabled, product_agent_memory_enabled } = body as {
       analysis_guidelines?: string | null
       brief_guidelines?: string | null
       issue_analysis_enabled?: boolean
+      product_agent_memory_enabled?: boolean
+    }
+
+    if (product_agent_memory_enabled !== undefined && typeof product_agent_memory_enabled !== 'boolean') {
+      return NextResponse.json({ error: 'product_agent_memory_enabled must be a boolean.' }, { status: 400 })
     }
 
     const all = await updatePmAgentSettings(projectId, {
       analysis_guidelines,
       brief_guidelines,
       issue_analysis_enabled,
+      product_agent_memory_enabled,
     })
 
     return NextResponse.json({
@@ -81,6 +88,7 @@ export async function PATCH(request: NextRequest) {
         analysis_guidelines: all.analysis_guidelines,
         brief_guidelines: all.brief_guidelines,
         issue_analysis_enabled: all.issue_analysis_enabled,
+        product_agent_memory_enabled: all.product_agent_memory_enabled,
       },
     })
   } catch (error) {

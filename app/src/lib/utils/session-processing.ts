@@ -1,4 +1,3 @@
-import { getPmAgentSettingsAdmin } from '@/lib/db/queries/project-settings'
 import { ensureSessionName } from '@/lib/sessions/name-generator'
 
 /**
@@ -12,9 +11,8 @@ export function fireSessionProcessing(sessionId: string, projectId: string) {
   void (async () => {
     try {
       await ensureSessionName({ sessionId, projectId })
-      const pmSettings = await getPmAgentSettingsAdmin(projectId)
       const { processSession } = await import('@/lib/sessions/sessions-service')
-      await processSession(sessionId, projectId, pmSettings.classification_guidelines ?? undefined)
+      await processSession(sessionId, projectId)
     } catch (error) {
       console.error(`[fireSessionProcessing] Error for session ${sessionId}:`, error)
     }

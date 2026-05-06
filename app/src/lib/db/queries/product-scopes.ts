@@ -72,7 +72,6 @@ export interface UpdateProductScopeInput {
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
   parent_id?: string | null
-  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -119,7 +118,6 @@ export async function updateProductScope(
   if (input.type !== undefined) updates.type = input.type
   if (input.goals !== undefined) updates.goals = input.goals as unknown as Record<string, unknown>
   if (input.parent_id !== undefined) updates.parent_id = input.parent_id
-  if (input.content !== undefined) updates.content = input.content
   if (input.custom_fields !== undefined) updates.custom_fields = input.custom_fields
 
   if (Object.keys(updates).length === 0) {

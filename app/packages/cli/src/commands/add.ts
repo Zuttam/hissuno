@@ -279,7 +279,6 @@ async function addScope(opts: AddOpts): Promise<Record<string, unknown>> {
   const data: Record<string, unknown> = { name, type }
   if (description) data.description = description
   if (opts.parentId) data.parent_id = opts.parentId as string
-  if (opts.content) data.content = opts.content as string
 
   // Goals
   if (opts.goals !== undefined) {
@@ -542,7 +541,7 @@ export const addCommand = new Command('add')
   .option('--tags <tags>', 'Comma-separated tags for feedback')
   .option('--contact-email <email>', 'Contact email for feedback (resolves or creates a contact)')
   .option('--parent-id <id>', 'Parent scope ID for hierarchical scopes')
-  .option('--content <text>', 'Markdown content for scopes / raw_text knowledge')
+  .option('--content <text>', 'Content body for raw_text knowledge')
   .option('--goals <goals>', 'Comma-separated goals for scopes')
   .option('--repo <url>', 'Repository URL for codebase')
   .option('--branch <name>', 'Repository branch for codebase', 'main')

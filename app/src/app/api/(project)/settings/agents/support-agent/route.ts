@@ -70,6 +70,7 @@ export async function PATCH(request: NextRequest) {
       session_idle_timeout_minutes,
       session_goodbye_delay_seconds,
       session_idle_response_timeout_seconds,
+      support_agent_memory_enabled,
     } = body as {
       support_agent_package_id?: string | null
       support_agent_tone?: string | null
@@ -77,13 +78,20 @@ export async function PATCH(request: NextRequest) {
       session_idle_timeout_minutes?: number
       session_goodbye_delay_seconds?: number
       session_idle_response_timeout_seconds?: number
+      support_agent_memory_enabled?: boolean
     }
 
     // Build update object with only provided fields
-    const updates: Record<string, string | number | null> = {}
+    const updates: Record<string, string | number | boolean | null> = {}
     if (support_agent_package_id !== undefined) updates.support_agent_package_id = support_agent_package_id
     if (support_agent_tone !== undefined) updates.support_agent_tone = support_agent_tone
     if (brand_guidelines !== undefined) updates.brand_guidelines = brand_guidelines
+    if (support_agent_memory_enabled !== undefined) {
+      if (typeof support_agent_memory_enabled !== 'boolean') {
+        return NextResponse.json({ error: 'support_agent_memory_enabled must be a boolean.' }, { status: 400 })
+      }
+      updates.support_agent_memory_enabled = support_agent_memory_enabled
+    }
 
     // Session lifecycle fields with validation
     if (session_idle_timeout_minutes !== undefined) {

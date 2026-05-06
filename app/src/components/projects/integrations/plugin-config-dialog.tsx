@@ -14,31 +14,18 @@
  * oauth2 — their auth.connect handler returns an authorizeUrl.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, GitBranch, Plug, Plus, RefreshCw, Unplug, X } from 'lucide-react'
-import { Badge, Button, Dialog, FormField, InlineAlert, Input, Select, Spinner, Text } from '@/components/ui'
+import { useCallback, useEffect, useState } from 'react'
+import { Check, GitBranch, Plug, Plus, Unplug } from 'lucide-react'
+import { Button, Dialog, FormField, InlineAlert, Input, Spinner, Text } from '@/components/ui'
 import {
   fetchPluginConnections,
   connectPlugin,
   disconnectPluginConnection,
-  upsertPluginStream,
-  startPluginSync,
   type PluginConnection,
-  type PluginConnectionStream,
-  type PluginSseEvent,
 } from '@/lib/api/plugins'
 import { listCodebases, type CodebaseRecord } from '@/lib/api/codebases'
 import { CodebaseCreateDialog } from '@/components/projects/codebases/codebase-create-dialog'
 import type { CatalogPlugin } from '@/app/api/plugins/catalog/route'
-import { formatRelativeTime } from '@/lib/utils/format-time'
-
-const FREQ_LABELS: Record<string, string> = {
-  manual: 'Manual only',
-  '1h': 'Every hour',
-  '6h': 'Every 6 hours',
-  '24h': 'Daily',
-  webhook: 'Webhook-driven',
-}
 
 interface Props {
   open: boolean
@@ -305,20 +292,11 @@ function ConnectionCard({
       )}
 
       <div className="mt-4 flex flex-col gap-3">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-tertiary)]">Streams</h4>
-        {(plugin.streams ?? []).map((streamDef) => (
-          <StreamRow
-            key={streamDef.key}
-            plugin={plugin}
-            projectId={projectId}
-            connection={connection}
-            streamDef={streamDef}
-            onChanged={onChanged}
-          />
-        ))}
-        {(plugin.streams ?? []).length === 0 && (
-          <p className="text-xs text-[color:var(--text-tertiary)]">No streams defined for this plugin.</p>
-        )}
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-tertiary)]">Sync</h4>
+        <p className="text-xs text-[color:var(--text-tertiary)]">
+          Sync is owned by automation skills. Manage scheduled runs in the
+          Automations tab.
+        </p>
       </div>
     </div>
   )
@@ -328,179 +306,8 @@ function ConnectionCard({
 // Per-stream controls
 // ---------------------------------------------------------------------------
 
-function StreamRow({
-  plugin,
-  projectId,
-  connection,
-  streamDef,
-  onChanged,
-}: {
-  plugin: CatalogPlugin
-  projectId: string
-  connection: PluginConnection
-  streamDef: CatalogPlugin['streams'][number]
-  onChanged: () => void
-}) {
-  const existing = useMemo(() => {
-    // Match singleton streams (streamId === key) or any instance of a parameterized stream.
-    return connection.streams.find((s) => {
-      const [base] = s.streamId.split(':')
-      return base === streamDef.key
-    })
-  }, [connection.streams, streamDef.key])
-
-  const [frequency, setFrequency] = useState(existing?.frequency ?? streamDef.frequencies[0] ?? 'manual')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleSave = async () => {
-    if (streamDef.parameterized && !existing) {
-      setError('This stream requires an instance (e.g. repo or database). Use the legacy dialog for now.')
-      return
-    }
-    setSaving(true)
-    setError(null)
-    try {
-      const instanceId = existing ? parseInstanceId(existing.streamId) : null
-      await upsertPluginStream(plugin.id, connection.id, projectId, {
-        streamKey: streamDef.key,
-        instanceId,
-        enabled: true,
-        frequency,
-      })
-      onChanged()
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-2 rounded-[4px] bg-[color:var(--surface-muted)] p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[color:var(--foreground)]">{streamDef.label}</span>
-            <Badge variant="default">{streamDef.kind}</Badge>
-            {streamDef.parameterized && <Badge variant="warning">parameterized</Badge>}
-            {existing ? (
-              <Badge variant={existing.enabled ? 'success' : 'default'}>
-                {existing.enabled ? 'enabled' : 'disabled'}
-              </Badge>
-            ) : null}
-          </div>
-          {streamDef.description && (
-            <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">{streamDef.description}</p>
-          )}
-          {existing && <StreamStatus stream={existing} />}
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={frequency} onChange={(e) => setFrequency(e.target.value)}>
-            {streamDef.frequencies.map((f) => (
-              <option key={f} value={f}>
-                {FREQ_LABELS[f] ?? f}
-              </option>
-            ))}
-          </Select>
-          <Button variant="secondary" size="sm" onClick={handleSave} loading={saving}>
-            Save
-          </Button>
-          {existing && (
-            <SyncButton plugin={plugin} projectId={projectId} connection={connection} stream={existing} onChanged={onChanged} />
-          )}
-        </div>
-      </div>
-      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-    </div>
-  )
-}
-
-function parseInstanceId(streamId: string): string | null {
-  const idx = streamId.indexOf(':')
-  return idx < 0 ? null : streamId.slice(idx + 1)
-}
-
-function StreamStatus({ stream }: { stream: PluginConnectionStream }) {
-  const parts: string[] = []
-  if (stream.lastSyncAt) {
-    parts.push(`last sync ${formatRelativeTime(stream.lastSyncAt)}`)
-  }
-  if (stream.lastSyncStatus) {
-    parts.push(`status ${stream.lastSyncStatus}`)
-  }
-  if (stream.nextSyncAt) {
-    parts.push(`next ${formatRelativeTime(stream.nextSyncAt)}`)
-  }
-  if (parts.length === 0) return null
-  return (
-    <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">{parts.join(' · ')}</p>
-  )
-}
-
-function SyncButton({
-  plugin,
-  projectId,
-  connection,
-  stream,
-  onChanged,
-}: {
-  plugin: CatalogPlugin
-  projectId: string
-  connection: PluginConnection
-  stream: PluginConnectionStream
-  onChanged: () => void
-}) {
-  const [running, setRunning] = useState(false)
-  const [progress, setProgress] = useState<PluginSseEvent | null>(null)
-  const [cancel, setCancel] = useState<(() => void) | null>(null)
-
-  const handleStart = () => {
-    setRunning(true)
-    setProgress(null)
-    const abort = startPluginSync(plugin.id, connection.id, projectId, {
-      streamId: stream.streamId,
-      mode: 'incremental',
-      onEvent: (evt) => setProgress(evt),
-      onError: (err) => {
-        setProgress({ type: 'failed', message: err.message })
-        setRunning(false)
-      },
-      onDone: () => {
-        setRunning(false)
-        onChanged()
-      },
-    })
-    setCancel(() => abort)
-  }
-
-  const handleStop = () => {
-    cancel?.()
-    setRunning(false)
-  }
-
-  if (running) {
-    return (
-      <div className="flex items-center gap-2">
-        {progress?.message && (
-          <span className="max-w-[180px] truncate text-xs text-[color:var(--text-tertiary)]">
-            {progress.message}
-          </span>
-        )}
-        <Button variant="ghost" size="sm" onClick={handleStop}>
-          <X size={14} />
-          Stop
-        </Button>
-      </div>
-    )
-  }
-  return (
-    <Button variant="primary" size="sm" onClick={handleStart}>
-      <RefreshCw size={14} />
-      Sync
-    </Button>
-  )
-}
+// Sync UI removed — sync is owned by automation skills now. The Automations
+// tab manages scheduled runs per skill.
 
 // ---------------------------------------------------------------------------
 // GitHub-specific: list and create codebases

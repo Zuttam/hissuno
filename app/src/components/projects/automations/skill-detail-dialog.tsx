@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Badge, Dialog, MarkdownContent, Spinner, Text } from '@/components/ui'
+import { summarizeOutputSchema } from '@/lib/automations/output-schema'
+import type { JsonSchemaNode } from '@/lib/automations/types'
 
 interface Frontmatter {
   name?: string
@@ -12,6 +14,7 @@ interface Frontmatter {
     scheduled?: { cron: string }
     events?: string[]
   } | null
+  output?: JsonSchemaNode | null
 }
 
 interface SkillDetailResponse {
@@ -57,6 +60,11 @@ export function SkillDetailDialog({ open, projectId, skillId, onCloseAction }: P
     }
   }, [open, projectId, skillId])
 
+  const outputFields = useMemo(
+    () => (data?.frontmatter.output ? summarizeOutputSchema(data.frontmatter.output) : null),
+    [data?.frontmatter.output],
+  )
+
   return (
     <Dialog open={open} onClose={onCloseAction} title={data?.frontmatter?.name ?? skillId} size="lg">
       {loading ? (
@@ -79,6 +87,31 @@ export function SkillDetailDialog({ open, projectId, skillId, onCloseAction }: P
             <Text variant="muted" size="sm">
               {data.frontmatter.description}
             </Text>
+          )}
+          {outputFields && outputFields.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <Text variant="muted" size="sm">Output schema</Text>
+              <div className="rounded-[4px] border border-[color:var(--border-subtle)] overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-[color:var(--bg-muted)] text-left text-[color:var(--text-tertiary)]">
+                      <th className="px-2 py-1 font-medium">Field</th>
+                      <th className="px-2 py-1 font-medium">Type</th>
+                      <th className="px-2 py-1 font-medium">Required</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {outputFields.map((f) => (
+                      <tr key={f.path} className="border-t border-[color:var(--border-subtle)]">
+                        <td className="px-2 py-1 font-mono">{f.path}</td>
+                        <td className="px-2 py-1 font-mono text-[color:var(--text-tertiary)]">{f.type}</td>
+                        <td className="px-2 py-1">{f.required ? 'yes' : 'no'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
           <div className="max-h-[60vh] overflow-y-auto rounded-[4px] border border-[color:var(--border-subtle)] p-3">
             <MarkdownContent content={data.content} />

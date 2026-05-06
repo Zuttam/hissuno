@@ -29,16 +29,14 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-const mockGetAgent = vi.fn()
+const mockClassify = vi.fn()
 
-vi.mock('@/mastra', () => ({
-  mastra: {
-    getAgent: (name: string) => mockGetAgent(name),
-  },
+vi.mock('@/lib/integrations/slack/response-classifier', () => ({
+  classifyShouldRespond: (...args: unknown[]) => mockClassify(...args),
 }))
 
 // Import after mocks
-import { decideIfShouldRespond, type ResponseDecision } from '@/lib/integrations/slack/response-decision'
+import { decideIfShouldRespond } from '@/lib/integrations/slack/response-decision'
 
 // ============================================================================
 // HELPERS
@@ -53,9 +51,10 @@ function setupDbMock(sessionData: { is_human_takeover: boolean } | null) {
 }
 
 function setupClassifierMock(response: string) {
-  mockGetAgent.mockReturnValue({
-    generate: vi.fn().mockResolvedValue({ text: response }),
-  })
+  const upper = response.trim().toUpperCase()
+  const shouldRespond = upper.startsWith('RESPOND')
+  const reason = response.split('\n')[0] || 'Classifier decision'
+  mockClassify.mockResolvedValue({ shouldRespond, reason })
 }
 
 // ============================================================================
@@ -277,7 +276,7 @@ describe('decideIfShouldRespond', () => {
       expect(result.shouldRespond).toBe(true)
       expect(result.confidence).toBe('low')
       expect(result.usedClassifier).toBe(true)
-      expect(mockGetAgent).toHaveBeenCalledWith('responseClassifierAgent')
+      expect(mockClassify).toHaveBeenCalledTimes(1)
     })
 
     it('should use classifier when lastResponderType is null', async () => {
@@ -294,23 +293,8 @@ describe('decideIfShouldRespond', () => {
       expect(result.usedClassifier).toBe(true)
     })
 
-    it('should default to RESPOND when classifier agent is not found', async () => {
-      mockGetAgent.mockReturnValue(null)
-
-      const result = await decideIfShouldRespond({
-        text: 'some ambiguous message',
-        botUserId: BOT_USER_ID,
-        lastResponderType: null,
-      })
-
-      expect(result.shouldRespond).toBe(true)
-      expect(result.usedClassifier).toBe(true)
-    })
-
     it('should default to RESPOND when classifier throws an error', async () => {
-      mockGetAgent.mockReturnValue({
-        generate: vi.fn().mockRejectedValue(new Error('Agent error')),
-      })
+      mockClassify.mockRejectedValue(new Error('Classifier error'))
 
       const result = await decideIfShouldRespond({
         text: 'some ambiguous message',
@@ -323,8 +307,7 @@ describe('decideIfShouldRespond', () => {
     })
 
     it('should pass thread history to classifier', async () => {
-      const mockGenerate = vi.fn().mockResolvedValue({ text: 'RESPOND - question' })
-      mockGetAgent.mockReturnValue({ generate: mockGenerate })
+      mockClassify.mockResolvedValue({ shouldRespond: true, reason: 'question' })
 
       const threadHistory = [
         { user: 'UUSER0001', text: 'How do I reset my password?', type: 'message' as const, ts: '1700000001.000000' },
@@ -339,9 +322,11 @@ describe('decideIfShouldRespond', () => {
         threadHistory,
       })
 
-      expect(mockGenerate).toHaveBeenCalledTimes(1)
-      const prompt = mockGenerate.mock.calls[0][0][0].content
-      expect(prompt).toContain('Recent thread context')
+      expect(mockClassify).toHaveBeenCalledTimes(1)
+      expect(mockClassify).toHaveBeenCalledWith({
+        text: 'I have the same question',
+        threadHistory,
+      })
     })
   })
 

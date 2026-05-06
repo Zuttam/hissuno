@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProjectById } from '@/lib/projects/keys'
-import { cancelChatRun } from '@/lib/agent/chat-run-service'
+import { cancelChatRun } from '@/lib/chat/chat-run-service'
 import { isOriginAllowed } from '@/lib/utils/widget-auth'
 import { getWidgetRequestOrigin, addWidgetCorsHeaders, createWidgetOptionsResponse } from '@/lib/utils/widget-cors'
 

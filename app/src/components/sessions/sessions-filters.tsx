@@ -7,7 +7,7 @@ import type { SessionFilters, SessionSource } from '@/types/session'
 import { SESSION_SOURCE_INFO, SESSION_TAGS, SESSION_TAG_INFO } from '@/types/session'
 import type { ProjectRow } from '@/lib/db/queries/projects'
 import { useProductScopes } from '@/hooks/use-product-scopes'
-import { getSourceIcon } from '@/lib/constants/source-icons'
+import { getSourceIcon } from '@/components/shared/get-source-icons'
 
 interface SessionsFiltersProps {
   projects: ProjectRow[]

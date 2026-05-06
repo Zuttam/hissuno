@@ -23,6 +23,7 @@ export async function getSupportAgentSettings(projectId: string): Promise<Suppor
         session_idle_timeout_minutes: true,
         session_goodbye_delay_seconds: true,
         session_idle_response_timeout_seconds: true,
+        support_agent_memory_enabled: true,
       },
     })
 
@@ -37,6 +38,7 @@ export async function getSupportAgentSettings(projectId: string): Promise<Suppor
       session_idle_timeout_minutes: row.session_idle_timeout_minutes ?? DEFAULT_SUPPORT_AGENT_SETTINGS.session_idle_timeout_minutes,
       session_goodbye_delay_seconds: row.session_goodbye_delay_seconds ?? DEFAULT_SUPPORT_AGENT_SETTINGS.session_goodbye_delay_seconds,
       session_idle_response_timeout_seconds: row.session_idle_response_timeout_seconds ?? DEFAULT_SUPPORT_AGENT_SETTINGS.session_idle_response_timeout_seconds,
+      support_agent_memory_enabled: row.support_agent_memory_enabled ?? DEFAULT_SUPPORT_AGENT_SETTINGS.support_agent_memory_enabled,
     }
   } catch (error) {
     console.error('[project-settings.support-agent] unexpected error', projectId, error)
@@ -98,6 +100,7 @@ export async function updateSupportAgentSettings(
         session_idle_timeout_minutes: projectSettings.session_idle_timeout_minutes,
         session_goodbye_delay_seconds: projectSettings.session_goodbye_delay_seconds,
         session_idle_response_timeout_seconds: projectSettings.session_idle_response_timeout_seconds,
+        support_agent_memory_enabled: projectSettings.support_agent_memory_enabled,
       })
 
     if (!row) {
@@ -111,6 +114,7 @@ export async function updateSupportAgentSettings(
       session_idle_timeout_minutes: row.session_idle_timeout_minutes ?? DEFAULT_SUPPORT_AGENT_SETTINGS.session_idle_timeout_minutes,
       session_goodbye_delay_seconds: row.session_goodbye_delay_seconds ?? DEFAULT_SUPPORT_AGENT_SETTINGS.session_goodbye_delay_seconds,
       session_idle_response_timeout_seconds: row.session_idle_response_timeout_seconds ?? DEFAULT_SUPPORT_AGENT_SETTINGS.session_idle_response_timeout_seconds,
+      support_agent_memory_enabled: row.support_agent_memory_enabled ?? DEFAULT_SUPPORT_AGENT_SETTINGS.support_agent_memory_enabled,
     }
   } catch (error) {
     console.error('[project-settings.support-agent] unexpected error updating', projectId, error)

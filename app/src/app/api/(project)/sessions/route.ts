@@ -8,6 +8,7 @@ import { createSession } from '@/lib/sessions/sessions-service'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import type { SessionFilters, CreateSessionInput, CreateMessageInput, SessionTag, SessionType, SessionSource } from '@/types/session'
 import { SESSION_TAGS, SESSION_SOURCES } from '@/types/session'
+import { upsertExternalRecord } from '@/lib/db/queries/external-records'
 
 const VALID_SESSION_TYPES: SessionType[] = ['chat', 'meeting', 'behavioral']
 
@@ -190,6 +191,19 @@ export async function POST(request: NextRequest) {
 
     // Note: Limits are enforced at analysis time (PM review), not at session creation
     const session = await createSession({ ...input, source })
+
+    // External-records mapping: when caller provides external_id +
+    // external_source, register the mapping so subsequent syncs can resolve
+    // "have I seen this id?" without re-creating the row.
+    if (body.external_id && body.external_source && session?.id) {
+      await upsertExternalRecord({
+        projectId,
+        source: body.external_source,
+        externalId: body.external_id,
+        resourceType: 'session',
+        resourceId: session.id,
+      })
+    }
 
     return NextResponse.json({ session }, { status: 201 })
   } catch (error) {

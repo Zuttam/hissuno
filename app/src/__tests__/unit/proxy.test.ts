@@ -223,8 +223,8 @@ describe('public paths', () => {
     '/docs/api',
     '/api/healthz',
     '/api/plugins/oauth/slack/callback',
-    '/api/plugins/webhook/slack',
-    '/api/plugins/webhook/github',
+    '/api/webhooks/slack',
+    '/api/webhooks/github',
     '/api/integrations/widget/chat',
     '/api/integrations/widget/embed',
   ]

@@ -16,6 +16,7 @@ const WORKFLOW_COLUMNS = {
   brief_guidelines: true,
   analysis_guidelines: true,
   issue_analysis_enabled: true,
+  product_agent_memory_enabled: true,
 } as const
 
 function rowToSettings(row: {
@@ -23,12 +24,14 @@ function rowToSettings(row: {
   brief_guidelines: string | null
   analysis_guidelines: string | null
   issue_analysis_enabled: boolean | null
+  product_agent_memory_enabled: boolean | null
 }): PmAgentSettings {
   return {
     classification_guidelines: row.classification_guidelines ?? null,
     brief_guidelines: row.brief_guidelines ?? null,
     analysis_guidelines: row.analysis_guidelines ?? null,
     issue_analysis_enabled: row.issue_analysis_enabled ?? true,
+    product_agent_memory_enabled: row.product_agent_memory_enabled ?? false,
   }
 }
 
@@ -92,6 +95,9 @@ export async function updatePmAgentSettings(
     if (settings.issue_analysis_enabled !== undefined) {
       updatePayload.issue_analysis_enabled = settings.issue_analysis_enabled
     }
+    if (settings.product_agent_memory_enabled !== undefined) {
+      updatePayload.product_agent_memory_enabled = settings.product_agent_memory_enabled
+    }
 
     const [row] = await db
       .insert(projectSettings)
@@ -108,6 +114,7 @@ export async function updatePmAgentSettings(
         brief_guidelines: projectSettings.brief_guidelines,
         analysis_guidelines: projectSettings.analysis_guidelines,
         issue_analysis_enabled: projectSettings.issue_analysis_enabled,
+        product_agent_memory_enabled: projectSettings.product_agent_memory_enabled,
       })
 
     if (!row) {

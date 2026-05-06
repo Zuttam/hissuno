@@ -4,15 +4,17 @@
  * Returns plugin metadata the UI needs to render the generic config dialog:
  *   - basic info (id, name, description, category, icon)
  *   - auth schema summary (type + field definitions; no test/connect functions)
- *   - stream catalog (key, kind, label, description, frequencies)
  *
- * Server-only plugin implementations (sync handlers, test() callbacks, etc.)
- * are NOT exposed here. This endpoint is safe to call without authentication.
+ * Server-only plugin implementations (test()/connect() callbacks, etc.) are
+ * NOT exposed here. This endpoint is safe to call without authentication.
+ *
+ * Sync logic lives in automation skills under
+ * `src/lib/automations/skills/<plugin>-<stream>/`. The list of available
+ * skills tied to a plugin is surfaced separately through the automations API.
  */
 
 import { NextResponse } from 'next/server'
 import { listPlugins } from '@/lib/integrations/registry'
-import { DEFAULT_FREQUENCIES } from '@/lib/integrations/plugin-kit'
 import type { AuthFieldDef } from '@/lib/integrations/plugin-kit'
 
 export const runtime = 'nodejs'
@@ -31,14 +33,6 @@ export interface CatalogPlugin {
     fields?: AuthFieldDef[]
     scopes?: string[]
   }
-  streams: Array<{
-    key: string
-    kind: string
-    label: string
-    description?: string
-    frequencies: string[]
-    parameterized: boolean
-  }>
 }
 
 export interface CatalogResponse {
@@ -66,14 +60,6 @@ export async function GET() {
             : p.auth.type === 'github_app'
               ? { type: 'github_app' }
               : { type: 'custom' },
-      streams: Object.entries(p.streams).map(([key, stream]) => ({
-        key,
-        kind: stream.kind,
-        label: stream.label,
-        description: stream.description,
-        frequencies: stream.frequencies ?? DEFAULT_FREQUENCIES,
-        parameterized: Boolean(stream.instances),
-      })),
     })),
   }
 

@@ -18,6 +18,8 @@ import { contactDataTools } from './contact-data-tools'
 
 export { userDataTools } from './user-data-tools'
 export { contactDataTools } from './contact-data-tools'
+export { feedbackTools } from './feedback-tools'
+export { knowledgeTools } from './knowledge-tools'
 export { getDataContext } from './helpers'
 
 /**

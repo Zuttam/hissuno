@@ -18,11 +18,19 @@ import { db } from '@/lib/db'
 import { knowledgeSources } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
 import { fireSourceAnalysis } from '@/lib/utils/source-processing'
-import { embedKnowledgeSource } from '@/lib/knowledge/embedding-service'
+import {
+  embedKnowledgeSource,
+  searchKnowledgeBySourceIds,
+} from '@/lib/knowledge/embedding-service'
 import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import { setEntityProductScope } from '@/lib/db/queries/entity-relationships'
 import { generateSourceDescription } from '@/mastra/workflows/common/generate-description'
 import { evaluateEntityRelationships } from '@/mastra/workflows/graph-evaluation'
+import { getNotionCredentials } from '@/lib/integrations/notion'
+import { NotionClient } from '@/lib/integrations/notion/client'
+import { blocksToMarkdown } from '@/lib/integrations/notion/blocks-to-markdown'
+import { crawlDocsPortal, combineCrawlResults } from '@/lib/knowledge/docs-crawler'
+import { notifyAutomationEvent } from '@/lib/automations/events'
 
 // ============================================================================
 // Source Analysis Types
@@ -57,20 +65,6 @@ export interface AnalyzeSourceResult {
 // ============================================================================
 
 /**
- * Strips common LLM preamble/introduction lines from agent output.
- */
-function stripLLMPreamble(text: string): string {
-  return text
-    .replace(
-      /^(?:here(?:'s| is) (?:the )?(?:sanitized|redacted|cleaned|analyzed|extracted|organized|processed)[\s\S]*?:\s*\n+)/i,
-      '',
-    )
-    .replace(/^(?:below is (?:the )?(?:sanitized|redacted|cleaned|analyzed|extracted|organized|processed)[\s\S]*?:\s*\n+)/i, '')
-    .replace(/^(?:i'?ve (?:sanitized|redacted|cleaned|analyzed|extracted|organized|processed)[\s\S]*?:\s*\n+)/i, '')
-    .trim()
-}
-
-/**
  * Basic HTML to text extraction
  */
 function extractTextFromHtml(html: string): string {
@@ -86,28 +80,6 @@ function extractTextFromHtml(html: string): string {
     .replace(/&gt;/g, '>')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-const REDACTION_PATTERNS = [
-  { pattern: /\[REDACTED_AWS_KEY\]/g, type: 'aws_key' },
-  { pattern: /\[REDACTED_API_KEY\]/g, type: 'api_key' },
-  { pattern: /\[REDACTED_GITHUB_TOKEN\]/g, type: 'github_token' },
-  { pattern: /\[REDACTED_DATABASE_URL\]/g, type: 'database_url' },
-  { pattern: /\[REDACTED_PASSWORD\]/g, type: 'password' },
-  { pattern: /\[REDACTED_PRIVATE_KEY\]/g, type: 'private_key' },
-  { pattern: /\[REDACTED_INTERNAL_IP\]/g, type: 'internal_ip' },
-  { pattern: /\[REDACTED_SECRET\]/g, type: 'secret' },
-  { pattern: /\[REDACTED_TOKEN\]/g, type: 'token' },
-  { pattern: /\[REDACTED_CREDENTIAL\]/g, type: 'credential' },
-]
-
-function countRedactions(content: string): number {
-  let count = 0
-  for (const { pattern } of REDACTION_PATTERNS) {
-    const matches = content.match(pattern)
-    if (matches) count += matches.length
-  }
-  return count
 }
 
 interface FetchedContent {
@@ -144,31 +116,7 @@ async function fetchSourceContent(
         const html = await response.text()
         const textContent = extractTextFromHtml(html)
 
-        const { webScraperAgent: webAgent = null } = await import('@/mastra/agents/web-scraper-agent').catch(() => ({ webScraperAgent: null as null }))
-
-        if (webAgent) {
-          const prompt = `Analyze this website content and extract key information:
-
-URL: ${url}
-
-Content:
-${textContent.slice(0, 20000)}
-
-Please extract:
-1. Company/Product Overview
-2. Key Features and Capabilities
-3. Pricing Information (if available)
-4. Documentation highlights
-5. Support resources`
-
-          const agentResponse = await webAgent.generate([{ role: 'user', content: prompt }])
-          return {
-            fetchedContent: stripLLMPreamble(agentResponse.text) || textContent,
-            hasContent: true,
-          }
-        }
-
-        return { fetchedContent: textContent, hasContent: true }
+        return { fetchedContent: textContent, hasContent: Boolean(textContent) }
       }
 
       case 'docs_portal': {
@@ -176,7 +124,6 @@ Please extract:
 
         onProgress?.('fetch-content', `Crawling documentation portal: ${url}`)
 
-        const { crawlDocsPortal, combineCrawlResults } = await import('@/lib/knowledge/docs-crawler')
         const crawlResults = await crawlDocsPortal(url, { maxPages: 50, rateLimit: 500 })
         const successfulPages = crawlResults.filter((r) => !r.error && r.content)
 
@@ -185,30 +132,7 @@ Please extract:
         onProgress?.('fetch-content', `Crawled ${successfulPages.length} pages`)
 
         const combinedContent = combineCrawlResults(crawlResults)
-
-        const { webScraperAgent: webAgent = null } = await import('@/mastra/agents/web-scraper-agent').catch(() => ({ webScraperAgent: null as null }))
-
-        if (webAgent) {
-          const prompt = `Analyze this documentation portal content and extract key information:
-
-${combinedContent.slice(0, 30000)}
-
-Please extract and organize:
-1. Main product/service overview
-2. Key features and capabilities
-3. Getting started guides
-4. API documentation highlights
-5. Common FAQs or troubleshooting
-6. Best practices and tutorials`
-
-          const agentResponse = await webAgent.generate([{ role: 'user', content: prompt }])
-          return {
-            fetchedContent: stripLLMPreamble(agentResponse.text) || combinedContent,
-            hasContent: true,
-          }
-        }
-
-        return { fetchedContent: combinedContent, hasContent: true }
+        return { fetchedContent: combinedContent, hasContent: Boolean(combinedContent) }
       }
 
       case 'raw_text': {
@@ -220,20 +144,17 @@ Please extract and organize:
 
       case 'uploaded_doc': {
         if (input.origin === 'notion' && input.notionPageId) {
-          const { getNotionCredentials } = await import('@/lib/integrations/notion')
           const credentials = await getNotionCredentials(projectId)
           if (!credentials) {
             console.warn(`[analyzeSource] No Notion credentials for project ${projectId}`)
             return noContent
           }
 
-          const { NotionClient } = await import('@/lib/integrations/notion/client')
           const notionClient = new NotionClient(credentials.accessToken)
 
           onProgress?.('fetch-content', 'Fetching Notion page blocks...')
           const blocks = await notionClient.getAllPageBlocks(input.notionPageId)
 
-          const { blocksToMarkdown } = await import('@/lib/integrations/notion/blocks-to-markdown')
           const markdown = blocksToMarkdown(blocks)
 
           return {
@@ -267,20 +188,17 @@ Please extract and organize:
         // Fallback: fetch directly from Notion API
         if (!input.notionPageId) return noContent
 
-        const { getNotionCredentials } = await import('@/lib/integrations/notion')
         const credentials = await getNotionCredentials(projectId)
         if (!credentials) {
           console.warn(`[analyzeSource] No Notion credentials for project ${projectId}`)
           return noContent
         }
 
-        const { NotionClient } = await import('@/lib/integrations/notion/client')
         const notionClient = new NotionClient(credentials.accessToken)
 
         onProgress?.('fetch-content', 'Fetching Notion page blocks...')
         const blocks = await notionClient.getAllPageBlocks(input.notionPageId)
 
-        const { blocksToMarkdown } = await import('@/lib/integrations/notion/blocks-to-markdown')
         const markdown = blocksToMarkdown(blocks)
 
         return {
@@ -299,63 +217,16 @@ Please extract and organize:
   }
 }
 
-/**
- * Phase 2: Sanitize content by scanning for sensitive information.
- */
-async function sanitizeSourceContent(
-  fetchedContent: string,
-  onProgress?: (step: string, message: string) => void
-): Promise<{ sanitizedContent: string; redactionCount: number }> {
-  if (!fetchedContent) {
-    return { sanitizedContent: '', redactionCount: 0 }
-  }
-
-  onProgress?.('sanitize-content', 'Scanning for sensitive information...')
-
-  const { securityScannerAgent: agent = null } = await import('@/mastra/agents/security-scanner-agent').catch(() => ({ securityScannerAgent: null as null }))
-
-  if (!agent) {
-    console.warn('[analyzeSource] Security scanner agent not found, skipping sanitization')
-    return { sanitizedContent: fetchedContent, redactionCount: 0 }
-  }
-
-  try {
-    const prompt = `Scan the following knowledge content for sensitive information and redact any secrets, credentials, API keys, or other sensitive data you find. Return the content with all sensitive information replaced by appropriate placeholders.
-
----
-CONTENT TO SCAN:
-${fetchedContent.slice(0, 50000)}
----
-
-Return the sanitized content maintaining the exact same structure and formatting. Only replace sensitive values with redaction placeholders.`
-
-    const response = await agent.generate([{ role: 'user', content: prompt }])
-    const sanitizedContent = stripLLMPreamble(response.text) || fetchedContent
-    const redactionCount = countRedactions(sanitizedContent)
-
-    if (redactionCount > 0) {
-      onProgress?.('sanitize-content', `Redacted ${redactionCount} sensitive item(s)`)
-    } else {
-      onProgress?.('sanitize-content', 'Security scan complete - no sensitive data found')
-    }
-
-    return { sanitizedContent, redactionCount }
-  } catch (error) {
-    console.error('[analyzeSource] Sanitization error:', error instanceof Error ? error.message : error)
-    // On error, return original content to avoid data loss
-    return { sanitizedContent: fetchedContent, redactionCount: 0 }
-  }
-}
-
 // ============================================================================
 // Source Analysis - Public API
 // ============================================================================
 
 /**
- * Analyzes a single knowledge source end-to-end.
+ * Analyzes a single knowledge source end-to-end: fetch -> save+embed -> graph eval.
  *
- * Consolidates the 4 workflow steps (fetch, sanitize, save+embed, graph eval)
- * into a single service function. Replaces the Mastra sourceAnalysisWorkflow.
+ * Sanitization (redacting secrets/credentials) is handled separately by the
+ * hissuno-knowledge-sanitizer automation skill, triggered by the
+ * knowledge.created event after the source is saved.
  */
 export async function analyzeSource(
   input: AnalyzeSourceInput,
@@ -369,17 +240,11 @@ export async function analyzeSource(
 
   // Phase 1: Fetch content
   const fetched = await fetchSourceContent(input, onProgress)
+  const fetchedContent = fetched.hasContent ? fetched.fetchedContent : ''
 
-  // Phase 2: Sanitize
-  let sanitizedContent = ''
-  if (fetched.hasContent && fetched.fetchedContent) {
-    const sanitized = await sanitizeSourceContent(fetched.fetchedContent, onProgress)
-    sanitizedContent = sanitized.sanitizedContent
-  }
-
-  // Phase 3: Save and embed
+  // Phase 2: Save and embed
   try {
-    if (!fetched.hasContent || !sanitizedContent) {
+    if (!fetched.hasContent || !fetchedContent) {
       onProgress?.('save-and-embed', 'No content to save')
 
       await db
@@ -401,7 +266,7 @@ export async function analyzeSource(
 
       if (!existingSource?.description) {
         onProgress?.('save-and-embed', 'Generating description...')
-        generatedDescription = await generateSourceDescription(sanitizedContent, input.sourceName, projectId)
+        generatedDescription = await generateSourceDescription(fetchedContent, input.sourceName, projectId)
       }
     } catch (descErr) {
       // Non-critical - continue without description
@@ -414,7 +279,7 @@ export async function analyzeSource(
     try {
       const updateFields: Record<string, unknown> = {
         status: 'done',
-        analyzed_content: sanitizedContent,
+        analyzed_content: fetchedContent,
         analyzed_at: new Date(),
         error_message: null,
       }
@@ -439,7 +304,7 @@ export async function analyzeSource(
       const embedResult = await embedKnowledgeSource({
         id: sourceId,
         project_id: projectId,
-        analyzed_content: sanitizedContent,
+        analyzed_content: fetchedContent,
       })
 
       chunksEmbedded = embedResult.chunksEmbedded
@@ -574,7 +439,7 @@ export interface UpdateKnowledgeSourceAdminInput {
  * Creates a knowledge source with graph eval. No user auth required.
  * Use this for integrations, sync jobs, and internal workflows.
  */
-export async function createKnowledgeSourceAdmin(
+export async function createKnowledgeSource(
   input: CreateKnowledgeSourceAdminInput
 ) {
   const hasContent = !!input.analyzedContent
@@ -625,10 +490,13 @@ export async function createKnowledgeSourceAdmin(
   }
 
   if (input.type !== 'folder') {
-    const { notifyAutomationEvent } = await import('@/lib/automations/events')
     notifyAutomationEvent('knowledge.created', {
       projectId: input.projectId,
-      entity: { type: 'knowledge_source', id: source.id },
+      entity: {
+        type: 'knowledge_source',
+        id: source.id,
+        snapshot: { productScopeId: input.productScopeId },
+      },
     })
   }
 
@@ -681,7 +549,7 @@ export async function createKnowledgeSourceBulkAdmin(
  * Updates a knowledge source with graph eval. No user auth required.
  * Use this for integrations, sync jobs, and internal workflows.
  */
-export async function updateKnowledgeSourceAdmin(
+export async function updateKnowledgeSource(
   sourceId: string,
   projectId: string,
   input: UpdateKnowledgeSourceAdminInput
@@ -725,12 +593,6 @@ export async function updateKnowledgeSourceAdmin(
   return source
 }
 
-// ============================================================================
-// Aliases - auth is handled at the route level, not in the service layer
-// ============================================================================
-
-export const createKnowledgeSource = createKnowledgeSourceAdmin
-export const updateKnowledgeSource = updateKnowledgeSourceAdmin
 
 // ============================================================================
 // Search Operations
@@ -756,9 +618,6 @@ export async function searchKnowledge(
     logPrefix: '[knowledge-service]',
     mode: options?.mode,
     semanticSearch: async () => {
-      const { searchKnowledgeBySourceIds } = await import(
-        '@/lib/knowledge/embedding-service'
-      )
       const results = await searchKnowledgeBySourceIds(projectId, query, {
         limit,
         similarityThreshold: options?.threshold ?? 0.5,

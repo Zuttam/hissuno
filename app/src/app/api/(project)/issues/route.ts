@@ -7,6 +7,7 @@ import { listIssues } from '@/lib/db/queries/issues'
 import { createIssue } from '@/lib/issues/issues-service'
 import { isDatabaseConfigured } from '@/lib/db/config'
 import type { IssueType, IssuePriority, IssueStatus, MetricLevel, CreateIssueInput } from '@/types/issue'
+import { upsertExternalRecord } from '@/lib/db/queries/external-records'
 
 export const runtime = 'nodejs'
 
@@ -113,6 +114,16 @@ export async function POST(request: NextRequest) {
     }
 
     const issue = await createIssue(input)
+
+    if (body.external_id && body.external_source && issue?.id) {
+      await upsertExternalRecord({
+        projectId,
+        source: body.external_source,
+        externalId: body.external_id,
+        resourceType: 'issue',
+        resourceId: issue.id,
+      })
+    }
 
     return NextResponse.json({ issue }, { status: 201 })
   } catch (error) {

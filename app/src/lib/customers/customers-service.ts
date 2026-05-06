@@ -18,6 +18,13 @@ import { eq, and, ilike, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { companies, contacts } from '@/lib/db/schema/app'
 import { fireGraphEval } from '@/lib/utils/graph-eval'
+import { fireEmbedding } from '@/lib/utils/embeddings'
+import {
+  buildContactEmbeddingText,
+  buildCompanyEmbeddingText,
+  searchContactsSemantic,
+  searchCompaniesSemantic,
+} from '@/lib/customers/customer-embedding-service'
 import { notifyAutomationEvent } from '@/lib/automations/events'
 import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
 import {
@@ -123,8 +130,6 @@ function fireContactEmbedding(
 ): void {
   void (async () => {
     try {
-      const { fireEmbedding } = await import('@/lib/utils/embeddings')
-      const { buildContactEmbeddingText } = await import('@/lib/customers/customer-embedding-service')
       let companyName: string | null = null
       if (fields.companyId) {
         const companyRow = await db.query.companies.findFirst({
@@ -155,8 +160,6 @@ function fireCompanyEmbedding(
 ): void {
   void (async () => {
     try {
-      const { fireEmbedding } = await import('@/lib/utils/embeddings')
-      const { buildCompanyEmbeddingText } = await import('@/lib/customers/customer-embedding-service')
       fireEmbedding(companyId, 'company', projectId, buildCompanyEmbeddingText(fields))
     } catch (err) {
       console.warn('[customers-service] Company embedding failed', companyId, err)
@@ -396,9 +399,6 @@ export async function searchContacts(
     logPrefix: '[customers-service:contacts]',
     mode: options?.mode,
     semanticSearch: async () => {
-      const { searchContactsSemantic } = await import(
-        '@/lib/customers/customer-embedding-service'
-      )
       const semanticResults = await searchContactsSemantic(projectId, query, {
         limit,
         threshold: options?.threshold ?? 0.5,
@@ -457,9 +457,6 @@ export async function searchCompanies(
     logPrefix: '[customers-service:companies]',
     mode: options?.mode,
     semanticSearch: async () => {
-      const { searchCompaniesSemantic } = await import(
-        '@/lib/customers/customer-embedding-service'
-      )
       const results = await searchCompaniesSemantic(projectId, query, {
         limit,
         threshold: options?.threshold ?? 0.5,

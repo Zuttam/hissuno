@@ -16,7 +16,6 @@ function makeScope(overrides: Partial<ProductScopeRecord> = {}): ProductScopeRec
     is_default: false,
     type: 'product_area',
     goals: null,
-    content: null,
     created_at: '2025-01-01T00:00:00Z',
     updated_at: '2025-01-01T00:00:00Z',
     ...overrides,

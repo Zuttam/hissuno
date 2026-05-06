@@ -13,7 +13,7 @@ import {
 import { generateSlugFromName } from '@/lib/security/sanitize'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import type { ProductScopeGoal } from '@/types/product-scope'
-import { MAX_SCOPES, MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_GOAL_TEXT_LENGTH, MAX_GOALS_PER_SCOPE, MAX_CONTENT_LENGTH, VALID_TYPES } from './validation'
+import { MAX_SCOPES, MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, MAX_GOAL_TEXT_LENGTH, MAX_GOALS_PER_SCOPE, VALID_TYPES } from './validation'
 
 export const runtime = 'nodejs'
 
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     await assertProjectAccess(identity, projectId)
 
     const body = await request.json()
-    const { name, slug, description, color, type, goals, parent_id, content, custom_fields } = body as {
+    const { name, slug, description, color, type, goals, parent_id, custom_fields } = body as {
       name?: string
       slug?: string
       description?: string
@@ -76,7 +76,6 @@ export async function POST(request: NextRequest) {
       type?: string
       goals?: ProductScopeGoal[]
       parent_id?: string | null
-      content?: string | null
       custom_fields?: Record<string, unknown>
     }
 
@@ -119,10 +118,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Invalid slug. Must start with a letter and contain only lowercase alphanumeric and underscores.` }, { status: 400 })
     }
 
-    if (content !== undefined && content !== null && content.length > MAX_CONTENT_LENGTH) {
-      return NextResponse.json({ error: `Content must be ${MAX_CONTENT_LENGTH} characters or less.` }, { status: 400 })
-    }
-
     const input: CreateProductScopeAdminInput = {
       name: trimmedName,
       slug: resolvedSlug,
@@ -131,7 +126,6 @@ export async function POST(request: NextRequest) {
       type: type as CreateProductScopeAdminInput['type'],
       goals: goals ?? null,
       parent_id: parent_id ?? null,
-      content: content ?? null,
       custom_fields: custom_fields,
     }
 

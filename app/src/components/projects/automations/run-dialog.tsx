@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Dialog, Text } from '@/components/ui'
+import { summarizeOutputSchema } from '@/lib/automations/output-schema'
+import type { JsonSchemaNode } from '@/lib/automations/types'
 
 type StreamEvent = {
   type: string
@@ -15,10 +17,19 @@ type Props = {
   runId: string
   skillId: string
   projectId: string
+  /** When set, the output panel renders the produced fields against this schema. */
+  outputSchema?: JsonSchemaNode | null
   onCloseAction: () => void
 }
 
-export function AutomationRunDialog({ open, runId, skillId, projectId, onCloseAction }: Props) {
+export function AutomationRunDialog({
+  open,
+  runId,
+  skillId,
+  projectId,
+  outputSchema,
+  onCloseAction,
+}: Props) {
   const [events, setEvents] = useState<StreamEvent[]>([])
   const [status, setStatus] = useState<string>('queued')
   const [output, setOutput] = useState<Record<string, unknown> | null>(null)
@@ -89,9 +100,13 @@ export function AutomationRunDialog({ open, runId, skillId, projectId, onCloseAc
         {output && (
           <div className="flex flex-col gap-1">
             <Text variant="muted" size="sm">Output</Text>
-            <pre className="bg-[color:var(--bg-muted)] rounded p-2 text-xs overflow-x-auto max-h-[30vh]">
-              {JSON.stringify(output, null, 2)}
-            </pre>
+            {outputSchema ? (
+              <StructuredOutputView output={output} schema={outputSchema} />
+            ) : (
+              <pre className="bg-[color:var(--bg-muted)] rounded p-2 text-xs overflow-x-auto max-h-[30vh]">
+                {JSON.stringify(output, null, 2)}
+              </pre>
+            )}
           </div>
         )}
 
@@ -112,4 +127,68 @@ export function AutomationRunDialog({ open, runId, skillId, projectId, onCloseAc
       </div>
     </Dialog>
   )
+}
+
+function StructuredOutputView({
+  output,
+  schema,
+}: {
+  output: Record<string, unknown>
+  schema: JsonSchemaNode
+}) {
+  const fields = useMemo(() => summarizeOutputSchema(schema), [schema])
+  return (
+    <div className="rounded-[4px] border border-[color:var(--border-subtle)] overflow-hidden max-h-[40vh] overflow-y-auto">
+      <table className="w-full text-xs">
+        <tbody>
+          {fields.map((f) => {
+            const value = lookupPath(output, f.path)
+            return (
+              <tr key={f.path} className="border-t border-[color:var(--border-subtle)] first:border-t-0 align-top">
+                <td className="px-2 py-1 font-mono text-[color:var(--text-secondary)] whitespace-nowrap">
+                  {f.path}
+                </td>
+                <td className="px-2 py-1">
+                  <ValueCell value={value} type={f.type} />
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ValueCell({ value, type }: { value: unknown; type: string }) {
+  if (value === undefined) {
+    return <span className="text-[color:var(--text-tertiary)] italic">missing</span>
+  }
+  if (type === 'object' || type.endsWith('[]')) {
+    return (
+      <pre className="bg-[color:var(--bg-muted)] rounded p-1 text-[10px] overflow-x-auto">
+        {JSON.stringify(value, null, 2)}
+      </pre>
+    )
+  }
+  if (typeof value === 'string' && value.length > 200) {
+    return (
+      <pre className="bg-[color:var(--bg-muted)] rounded p-1 text-[10px] whitespace-pre-wrap">
+        {value}
+      </pre>
+    )
+  }
+  return <span className="font-mono">{String(value)}</span>
+}
+
+function lookupPath(root: Record<string, unknown>, path: string): unknown {
+  let current: unknown = root
+  for (const segment of path.split('.')) {
+    if (current && typeof current === 'object' && segment in (current as Record<string, unknown>)) {
+      current = (current as Record<string, unknown>)[segment]
+    } else {
+      return undefined
+    }
+  }
+  return current
 }

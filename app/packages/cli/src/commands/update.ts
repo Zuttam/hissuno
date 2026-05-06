@@ -113,6 +113,7 @@ interface UpdateFeedbackOpts {
   description?: string
   status?: string
   contactId?: string
+  tags?: string
 }
 
 export const VALID_SESSION_STATUSES = ['active', 'closing_soon', 'awaiting_idle_response', 'closed']
@@ -135,6 +136,10 @@ export async function updateFeedback(
   if (opts.contactId !== undefined) data.contact_id = opts.contactId || null
 
   return data
+}
+
+export function parseTagsFlag(raw: string): string[] {
+  return raw.split(',').map((t) => t.trim()).filter(Boolean)
 }
 
 // ─── Customers (contacts + companies) ────────────────────
@@ -430,6 +435,7 @@ export const updateCommand = new Command('update')
   .option('--notes <text>', 'Notes')
   // Feedback options
   .option('--contact-id <id>', 'Feedback contact ID (empty string to clear)')
+  .option('--tags <tags>', 'Feedback tags (comma-separated). Replaces all current tags. Empty string clears them.')
   .action(async (type, id, opts, cmd) => {
     const config = requireConfig()
     const jsonMode = cmd.parent?.opts().json
@@ -484,27 +490,51 @@ export const updateCommand = new Command('update')
         process.exit(1)
     }
 
-    if (Object.keys(updates).length === 0) {
+    const tagsRaw = type === 'feedback' ? (opts.tags as string | undefined) : undefined
+
+    if (Object.keys(updates).length === 0 && tagsRaw === undefined) {
       console.log('No changes made.')
       return
     }
 
     try {
-      const result = await apiCall<Record<string, unknown>>(
-        config,
-        'PATCH',
-        buildPath(endpoint.patchPath(id), { projectId }),
-        updates,
-      )
+      let result: { ok: boolean; status: number; data: Record<string, unknown> } | null = null
 
-      if (!result.ok) {
-        const errData = result.data as { error?: string }
-        error(`Failed: ${errData.error || `HTTP ${result.status}`}`)
-        process.exit(1)
+      if (Object.keys(updates).length > 0) {
+        result = await apiCall<Record<string, unknown>>(
+          config,
+          'PATCH',
+          buildPath(endpoint.patchPath(id), { projectId }),
+          updates,
+        )
+
+        if (!result.ok) {
+          const errData = result.data as { error?: string }
+          error(`Failed: ${errData.error || `HTTP ${result.status}`}`)
+          process.exit(1)
+        }
+      }
+
+      if (tagsRaw !== undefined) {
+        const tags = parseTagsFlag(tagsRaw)
+        const tagsResult = await apiCall<Record<string, unknown>>(
+          config,
+          'PATCH',
+          buildPath(`/api/sessions/${id}/tags`, { projectId }),
+          { tags },
+        )
+
+        if (!tagsResult.ok) {
+          const errData = tagsResult.data as { error?: string }
+          error(`Failed to update tags: ${errData.error || `HTTP ${tagsResult.status}`}`)
+          process.exit(1)
+        }
+
+        result = tagsResult
       }
 
       if (jsonMode) {
-        console.log(renderJson(result.data))
+        console.log(renderJson(result?.data ?? {}))
       } else {
         success('\nUpdated successfully!')
       }

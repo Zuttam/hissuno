@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { db } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql as sqlTemplate } from 'drizzle-orm'
 import { slackWorkspaceTokens, slackChannels, slackThreadSessions, sessions } from '@/lib/db/schema/app'
 
 /**
@@ -599,8 +599,6 @@ export async function getNotificationThreadSession(
   // human_takeover_user_id) may not be in the Drizzle schema yet.
   // We use a raw SQL approach via db.execute or a select with the available schema.
   // Since these columns aren't in the Drizzle schema, we use sql template.
-  const { sql: sqlTemplate } = await import('drizzle-orm')
-
   let rows: { id: string; project_id: string; human_takeover_user_id: string }[]
 
   if (threadTs) {
@@ -638,8 +636,6 @@ export async function setSessionHumanTakeoverNotification(
   }
 ): Promise<void> {
   // These columns (human_takeover_slack_channel_id, etc.) may not be in the Drizzle schema.
-  const { sql: sqlTemplate } = await import('drizzle-orm')
-
   try {
     await db.execute(
       sqlTemplate`UPDATE sessions SET human_takeover_slack_channel_id = ${params.slackChannelId}, human_takeover_slack_thread_ts = ${params.slackThreadTs ?? null}, human_takeover_user_id = ${params.userId} WHERE id = ${params.sessionId}`

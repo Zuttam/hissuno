@@ -25,6 +25,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { getCustomSkillBundle } from '@/lib/automations/custom-skills'
 import type { SkillDescriptor } from '@/lib/automations/types'
+import { resolveConnectionToken } from '@/lib/integrations/credential-resolver'
 
 export type WorkspaceForRunOptions = {
   runId: string
@@ -44,6 +45,25 @@ export type WorkspaceForRunOptions = {
   input?: Record<string, unknown>
   /** Whether to attach a sandbox. Defaults to true (the design says always-on). */
   enableSandbox?: boolean
+}
+
+function resolveLocalBinDir(): string | null {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const candidates = [
+    join(here, '..', '..', '..', '..', 'node_modules', '.bin'),
+    join(here, '..', '..', '..', 'node_modules', '.bin'),
+    join(process.cwd(), 'node_modules', '.bin'),
+    join(process.cwd(), '..', 'node_modules', '.bin'),
+    join(process.cwd(), 'app', 'node_modules', '.bin'),
+  ]
+  return candidates.find((c) => existsSync(c)) ?? null
+}
+
+function prependLocalBinToPath(currentPath: string): string {
+  const localBin = resolveLocalBinDir()
+  if (!localBin) return currentPath
+  if (currentPath.split(':').includes(localBin)) return currentPath
+  return `${localBin}:${currentPath}`
 }
 
 function resolveBundledSkillsDir(): string | null {
@@ -96,8 +116,12 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
   // this run. Trigger context surfaces as `$ISSUE_ID`, `$ENTITY_TYPE`, etc.
   // We deliberately drop process.env passthrough so global admin secrets
   // (like the host's HISSUNO_API_KEY) don't leak into the sandbox.
+  //
+  // PATH is augmented with the repo's node_modules/.bin so skill scripts can
+  // invoke locally-installed tools (tsx, etc.). The E2B template must bake
+  // these in separately.
   const sandboxEnv: NodeJS.ProcessEnv = {
-    PATH: process.env.PATH,
+    PATH: prependLocalBinToPath(process.env.PATH ?? ''),
     HOME: process.env.HOME,
     NODE_ENV: process.env.NODE_ENV,
     HISSUNO_API_KEY: opts.apiKey,
@@ -115,6 +139,28 @@ export async function buildWorkspaceForRun(opts: WorkspaceForRunOptions): Promis
   }
   if (opts.input && Object.keys(opts.input).length > 0) {
     sandboxEnv.HISSUNO_RUN_INPUT = JSON.stringify(opts.input)
+  }
+
+  // Plugin credentials: skills declare `requires.plugins` and the resolver
+  // injects per-plugin tokens as env vars. Naming convention:
+  //   <PLUGIN>_ACCESS_TOKEN          — primary access token / api key
+  //   <PLUGIN>_EXTERNAL_ACCOUNT_ID   — workspace/org/install identifier
+  //   <PLUGIN>_CREDENTIALS           — full credentials JSON (for plugins
+  //                                    where one token isn't enough)
+  // Plugin id `github-app` → env prefix `GITHUB_APP`.
+  const requiredPlugins = opts.skill.frontmatter.requires?.plugins ?? []
+  for (const pluginId of requiredPlugins) {
+    const resolved = await resolveConnectionToken(opts.projectId, pluginId).catch((err) => {
+      throw new Error(
+        `Skill "${opts.skill.id}" requires plugin "${pluginId}" but: ${err instanceof Error ? err.message : String(err)}`,
+      )
+    })
+    const prefix = pluginId.toUpperCase().replace(/-/g, '_')
+    if (resolved.accessToken) {
+      sandboxEnv[`${prefix}_ACCESS_TOKEN`] = resolved.accessToken
+    }
+    sandboxEnv[`${prefix}_EXTERNAL_ACCOUNT_ID`] = resolved.externalAccountId
+    sandboxEnv[`${prefix}_CREDENTIALS`] = JSON.stringify(resolved.credentials)
   }
 
   return new Workspace({

@@ -1,12 +1,12 @@
 /**
  * Skill catalog resolver.
  *
- * Discovers bundled skills (under `packages/skills/`) and combines them with
- * project-scoped custom skills from blob storage.
+ * Discovers bundled automation skills (sibling `skills/` directory) and
+ * combines them with project-scoped custom skills from blob storage.
  *
- * The base "hissuno" skill is intentionally excluded from the automation
- * catalog: it's documentation distributed for local Claude/Cursor use, not a
- * server-run automation.
+ * These are server-run automations — distinct from the user-facing skills in
+ * `packages/skills/`, which are shipped via the CLI for installation into the
+ * user's own Claude/Cursor environment.
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
@@ -17,16 +17,13 @@ import type { SkillDescriptor, SkillFrontmatter } from './types'
 
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---/
 
-const EXCLUDED_BUNDLED_SKILLS = new Set(['hissuno'])
-
-/** Resolve the bundled skills directory at runtime. */
+/** Resolve the bundled automation skills directory at runtime. */
 function resolveBundledSkillsDir(): string | null {
   const here = dirname(fileURLToPath(import.meta.url))
   const candidates = [
-    join(here, '..', '..', '..', 'packages', 'skills'),
-    join(here, '..', '..', '..', '..', 'packages', 'skills'),
-    join(process.cwd(), 'packages', 'skills'),
-    join(process.cwd(), 'app', 'packages', 'skills'),
+    join(here, 'skills'),
+    join(process.cwd(), 'src', 'lib', 'automations', 'skills'),
+    join(process.cwd(), 'app', 'src', 'lib', 'automations', 'skills'),
   ]
   for (const c of candidates) {
     if (existsSync(c)) return c
@@ -48,8 +45,7 @@ function parseFrontmatter(content: string): SkillFrontmatter | null {
 
 /**
  * List bundled skills as descriptors. Reads SKILL.md frontmatter for each
- * subdirectory and skips any that don't parse cleanly or are in the excluded
- * set.
+ * subdirectory and skips any that don't parse cleanly.
  */
 export function listBundledSkills(): SkillDescriptor[] {
   const dir = resolveBundledSkillsDir()
@@ -60,7 +56,6 @@ export function listBundledSkills(): SkillDescriptor[] {
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    if (EXCLUDED_BUNDLED_SKILLS.has(entry.name)) continue
 
     const skillPath = join(dir, entry.name)
     const skillFile = join(skillPath, 'SKILL.md')

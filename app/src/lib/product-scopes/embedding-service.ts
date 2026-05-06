@@ -39,7 +39,6 @@ export function buildProductScopeEmbeddingText(scope: {
   description?: string | null
   type?: string | null
   goals?: Array<{ id: string; text: string }> | null
-  content?: string | null
 }): string {
   const lines: string[] = [scope.name]
 
@@ -47,9 +46,6 @@ export function buildProductScopeEmbeddingText(scope: {
   if (scope.type) lines.push(`Type: ${scope.type}`)
   if (scope.goals && scope.goals.length > 0) {
     lines.push(`Goals: ${scope.goals.map((g) => g.text).join(', ')}`)
-  }
-  if (scope.content) {
-    lines.push(scope.content.slice(0, 2000))
   }
 
   return lines.join('\n\n')
@@ -119,7 +115,6 @@ export async function batchEmbedProductScopes(
     description?: string | null
     type?: string | null
     goals?: Array<{ id: string; text: string }> | null
-    content?: string | null
   }>
 ): Promise<{ embedded: number; errors: string[] }> {
   return embeddingService.batch(

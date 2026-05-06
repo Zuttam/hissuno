@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
         triggersOverridden: settings?.hasOverride ?? false,
         declaredTriggers: s.frontmatter.triggers ?? null,
         capabilities: s.frontmatter.capabilities ?? null,
+        // Surface declared plugin/scope requirements so the UI can render
+        // "needs Linear" badges next to skills that depend on connections.
+        requires: s.frontmatter.requires ?? null,
         input: s.frontmatter.input ?? null,
+        output: s.frontmatter.output ?? null,
         enabled: settings?.enabled ?? true,
         lastRun: lastRun
           ? {

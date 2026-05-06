@@ -8,6 +8,7 @@ import { db } from '@/lib/db'
 import { knowledgeSources, entityRelationships, productScopes } from '@/lib/db/schema/app'
 import { requireProjectId, MissingProjectIdError } from '@/lib/auth/project-context'
 import { setEntityProductScope } from '@/lib/db/queries/entity-relationships'
+import { deleteDocument } from '@/lib/knowledge/storage'
 
 export const runtime = 'nodejs'
 
@@ -286,7 +287,6 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     }
 
     if (source.storage_path && source.type === 'uploaded_doc') {
-      const { deleteDocument } = await import('@/lib/knowledge/storage')
       await deleteDocument(source.storage_path)
     }
 

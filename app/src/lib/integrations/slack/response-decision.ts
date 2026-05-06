@@ -4,11 +4,11 @@
  * Uses heuristics-first approach with classifier agent fallback for ambiguous cases
  */
 
-import { mastra } from '@/mastra'
 import { db } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { sessions } from '@/lib/db/schema/app'
 import type { SlackMessage } from './client'
+import { classifyShouldRespond } from './response-classifier'
 
 const LOG_PREFIX = '[slack.response-decision]'
 
@@ -82,43 +82,12 @@ function containsHumanTakeoverPhrase(text: string): boolean {
   return HUMAN_TAKEOVER_PHRASES.some((phrase) => normalizedText.includes(phrase))
 }
 
-/**
- * Use classifier agent to determine if message is directed at bot
- * Only called for ambiguous cases
- */
 async function classifyMessage(
   text: string,
   threadHistory?: SlackMessage[]
 ): Promise<{ shouldRespond: boolean; reason: string }> {
   try {
-    const agent = mastra.getAgent('responseClassifierAgent')
-    if (!agent) {
-      console.warn(`${LOG_PREFIX} responseClassifierAgent not found, defaulting to respond`)
-      return { shouldRespond: true, reason: 'Classifier not available, defaulting to respond' }
-    }
-
-    // Build context from recent thread history
-    const recentHistory = threadHistory?.slice(-5).map((msg) => `${msg.user}: ${msg.text}`).join('\n') || ''
-
-    const prompt = `Analyze if this message in a support thread is directed at the support bot (Hissuno) and expects a response.
-
-${recentHistory ? `Recent thread context:\n${recentHistory}\n\n` : ''}Latest message: "${text}"
-
-Consider:
-- Is this a question or request that needs a response?
-- Is this directed at someone else (another human in the thread)?
-- Is this just a comment or acknowledgment that doesn't need a reply?
-- Is the user asking for help or information?
-
-Respond with only "RESPOND" or "SKIP" followed by a brief reason.`
-
-    const result = await agent.generate([{ role: 'user', content: prompt }])
-    const response = result.text?.trim().toUpperCase() || ''
-
-    const shouldRespond = response.startsWith('RESPOND')
-    const reason = result.text?.split('\n')[0] || 'Classifier decision'
-
-    return { shouldRespond, reason }
+    return await classifyShouldRespond({ text, threadHistory })
   } catch (error) {
     console.error(`${LOG_PREFIX} Classifier error:`, error)
     return { shouldRespond: true, reason: 'Classifier error, defaulting to respond' }

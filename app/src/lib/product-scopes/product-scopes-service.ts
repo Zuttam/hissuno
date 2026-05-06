@@ -20,7 +20,9 @@ import { db } from '@/lib/db'
 import { productScopes } from '@/lib/db/schema/app'
 import { isUniqueViolation } from '@/lib/db/errors'
 import { fireEmbedding } from '@/lib/utils/embeddings'
+import { notifyAutomationEvent } from '@/lib/automations/events'
 import { searchByMode, type SearchMode } from '@/lib/search/search-by-mode'
+import { getScopeDescendantIds } from '@/lib/product-scopes/tree-utils'
 import {
   buildProductScopeEmbeddingText,
   searchProductScopesSemantic,
@@ -56,7 +58,6 @@ export interface CreateProductScopeAdminInput {
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
   parent_id?: string | null
-  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -72,7 +73,6 @@ export interface UpdateProductScopeAdminInput {
   type?: ProductScopeType
   goals?: ProductScopeGoal[] | null
   parent_id?: string | null
-  content?: string | null
   custom_fields?: Record<string, unknown>
 }
 
@@ -143,13 +143,16 @@ export async function createProductScopeAdmin(
         is_default: false,
         type: input.type ?? 'product_area',
         goals: (input.goals ?? null) as unknown as Record<string, unknown>,
-        content: input.content ?? null,
         custom_fields: input.custom_fields ?? null,
       })
       .returning()
 
     const record = created as unknown as ProductScopeRecord
     fireEmbedding(record.id, 'product_scope', projectId, buildProductScopeEmbeddingText(record))
+    notifyAutomationEvent('scope.created', {
+      projectId,
+      entity: { type: 'scope', id: record.id, name: record.name },
+    })
     return record
   } catch (err: unknown) {
     if (isUniqueViolation(err)) {
@@ -201,7 +204,6 @@ export async function updateProductScopeAdmin(
         .from(productScopes)
         .where(eq(productScopes.project_id, existing.project_id))
       const allRecords = allScopes as unknown as ProductScopeRecord[]
-      const { getScopeDescendantIds } = await import('@/lib/product-scopes/tree-utils')
       const descendantIds = getScopeDescendantIds(allRecords, scopeId)
       if (descendantIds.includes(input.parent_id)) {
         throw new Error('Cannot move a scope under one of its own descendants.')
@@ -222,7 +224,6 @@ export async function updateProductScopeAdmin(
   if (input.type !== undefined) updates.type = input.type
   if (input.goals !== undefined) updates.goals = input.goals as unknown as Record<string, unknown>
   if (input.parent_id !== undefined) updates.parent_id = input.parent_id
-  if (input.content !== undefined) updates.content = input.content
   if (input.custom_fields !== undefined) updates.custom_fields = input.custom_fields
 
   if (Object.keys(updates).length === 0) {
@@ -253,6 +254,10 @@ export async function updateProductScopeAdmin(
 
     const record = updated as unknown as ProductScopeRecord
     fireEmbedding(record.id, 'product_scope', record.project_id, buildProductScopeEmbeddingText(record))
+    notifyAutomationEvent('scope.updated', {
+      projectId: record.project_id,
+      entity: { type: 'scope', id: record.id, name: record.name },
+    })
     return record
   }
 
@@ -265,6 +270,10 @@ export async function updateProductScopeAdmin(
 
     const record = updated as unknown as ProductScopeRecord
     fireEmbedding(record.id, 'product_scope', record.project_id, buildProductScopeEmbeddingText(record))
+    notifyAutomationEvent('scope.updated', {
+      projectId: record.project_id,
+      entity: { type: 'scope', id: record.id, name: record.name },
+    })
     return record
   } catch (err: unknown) {
     if (isUniqueViolation(err)) {
@@ -497,9 +506,20 @@ export async function syncProductScopesAdmin(
     await updateExistingScopes(tx, existingIncomingScopes, existingScopesById, result)
   })
 
-  // Fire embeddings for created/updated scopes after transaction commits
-  for (const scope of [...result.created, ...result.updated]) {
+  // Fire embeddings + automation events for created/updated scopes after txn commits
+  for (const scope of result.created) {
     fireEmbedding(scope.id, 'product_scope', projectId, buildProductScopeEmbeddingText(scope))
+    notifyAutomationEvent('scope.created', {
+      projectId,
+      entity: { type: 'scope', id: scope.id, name: scope.name },
+    })
+  }
+  for (const scope of result.updated) {
+    fireEmbedding(scope.id, 'product_scope', projectId, buildProductScopeEmbeddingText(scope))
+    notifyAutomationEvent('scope.updated', {
+      projectId,
+      entity: { type: 'scope', id: scope.id, name: scope.name },
+    })
   }
 
   return result
@@ -544,7 +564,6 @@ export async function searchScopes(
           id: productScopes.id,
           name: productScopes.name,
           description: productScopes.description,
-          content: productScopes.content,
         })
         .from(productScopes)
         .where(
@@ -554,7 +573,6 @@ export async function searchScopes(
               ilike(productScopes.name, s),
               ilike(productScopes.description, s),
               sql`${productScopes.goals}::text ILIKE ${s}`,
-              sql`to_tsvector('english', coalesce(${productScopes.content}, '')) @@ plainto_tsquery('english', ${query})`
             )
           )
         )
@@ -563,7 +581,7 @@ export async function searchScopes(
       return data.map((r) => ({
         id: r.id,
         name: r.name,
-        snippet: (r.description || r.content || '').slice(0, 200),
+        snippet: (r.description || '').slice(0, 200),
       }))
     },
   })

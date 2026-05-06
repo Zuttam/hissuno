@@ -1,188 +1,96 @@
 /**
- * Convert Notion blocks to Markdown.
- * Handles common block types: paragraphs, headings, lists, code, quotes, etc.
+ * Notion blocks → Markdown converter.
+ *
+ * Used by the in-process knowledge analyzer (`knowledge-service.analyzeSource`)
+ * to turn a fetched Notion page into searchable markdown text.
  */
 
-import type { NotionBlock, NotionRichText } from './client'
+interface RichTextItem {
+  plain_text?: string
+  annotations?: {
+    bold?: boolean
+    italic?: boolean
+    code?: boolean
+    strikethrough?: boolean
+  }
+  href?: string | null
+}
 
-/**
- * Convert an array of Notion blocks to a markdown string.
- */
+interface NotionBlock {
+  id: string
+  type: string
+  has_children?: boolean
+  paragraph?: { rich_text?: RichTextItem[] }
+  heading_1?: { rich_text?: RichTextItem[] }
+  heading_2?: { rich_text?: RichTextItem[] }
+  heading_3?: { rich_text?: RichTextItem[] }
+  bulleted_list_item?: { rich_text?: RichTextItem[] }
+  numbered_list_item?: { rich_text?: RichTextItem[] }
+  to_do?: { rich_text?: RichTextItem[]; checked?: boolean }
+  toggle?: { rich_text?: RichTextItem[] }
+  quote?: { rich_text?: RichTextItem[] }
+  callout?: { rich_text?: RichTextItem[] }
+  code?: { rich_text?: RichTextItem[]; language?: string }
+  divider?: Record<string, unknown>
+  child_page?: { title?: string }
+}
+
 export function blocksToMarkdown(blocks: NotionBlock[]): string {
   const lines: string[] = []
-
   for (const block of blocks) {
-    const line = blockToMarkdown(block)
-    if (line !== null) {
-      lines.push(line)
-    }
+    const rendered = renderBlock(block)
+    if (rendered !== null) lines.push(rendered)
   }
-
-  return lines.join('\n\n')
+  return lines.filter((line) => line.length > 0).join('\n\n').trim()
 }
 
-function richTextToMarkdown(richTexts: NotionRichText[]): string {
-  if (!richTexts || !Array.isArray(richTexts)) return ''
-
-  return richTexts
-    .map((rt) => {
-      let text = rt.plain_text || ''
-      if (!text) return ''
-
-      const annotations = rt.annotations
-      if (annotations?.code) text = `\`${text}\``
-      if (annotations?.bold) text = `**${text}**`
-      if (annotations?.italic) text = `*${text}*`
-      if (annotations?.strikethrough) text = `~~${text}~~`
-
-      if (rt.href) {
-        text = `[${text}](${rt.href})`
-      }
-
-      return text
-    })
-    .join('')
-}
-
-function getBlockRichText(block: NotionBlock): NotionRichText[] {
-  const data = block[block.type] as Record<string, unknown> | undefined
-  if (!data) return []
-  return (data.rich_text as NotionRichText[]) || []
-}
-
-function blockToMarkdown(block: NotionBlock): string | null {
-  const type = block.type
-
-  switch (type) {
-    case 'paragraph': {
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return text || ''
-    }
-
-    case 'heading_1': {
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `# ${text}`
-    }
-
-    case 'heading_2': {
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `## ${text}`
-    }
-
-    case 'heading_3': {
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `### ${text}`
-    }
-
-    case 'bulleted_list_item': {
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `- ${text}`
-    }
-
-    case 'numbered_list_item': {
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `1. ${text}`
-    }
-
+function renderBlock(block: NotionBlock): string | null {
+  switch (block.type) {
+    case 'paragraph':
+      return renderRichText(block.paragraph?.rich_text)
+    case 'heading_1':
+      return `# ${renderRichText(block.heading_1?.rich_text)}`
+    case 'heading_2':
+      return `## ${renderRichText(block.heading_2?.rich_text)}`
+    case 'heading_3':
+      return `### ${renderRichText(block.heading_3?.rich_text)}`
+    case 'bulleted_list_item':
+      return `- ${renderRichText(block.bulleted_list_item?.rich_text)}`
+    case 'numbered_list_item':
+      return `1. ${renderRichText(block.numbered_list_item?.rich_text)}`
     case 'to_do': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const checked = data?.checked === true
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `- [${checked ? 'x' : ' '}] ${text}`
+      const checked = block.to_do?.checked ? 'x' : ' '
+      return `- [${checked}] ${renderRichText(block.to_do?.rich_text)}`
     }
-
-    case 'toggle': {
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `<details><summary>${text}</summary></details>`
-    }
-
+    case 'toggle':
+      return `> ${renderRichText(block.toggle?.rich_text)}`
+    case 'quote':
+      return `> ${renderRichText(block.quote?.rich_text)}`
+    case 'callout':
+      return `> ${renderRichText(block.callout?.rich_text)}`
     case 'code': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const language = (data?.language as string) || ''
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `\`\`\`${language}\n${text}\n\`\`\``
+      const lang = block.code?.language ?? ''
+      return `\`\`\`${lang}\n${renderRichText(block.code?.rich_text)}\n\`\`\``
     }
-
-    case 'quote': {
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `> ${text}`
-    }
-
-    case 'callout': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const icon = data?.icon as { emoji?: string } | undefined
-      const emoji = icon?.emoji || ''
-      const text = richTextToMarkdown(getBlockRichText(block))
-      return `> ${emoji} ${text}`
-    }
-
     case 'divider':
       return '---'
-
-    case 'table': {
-      // Tables need child rows - return placeholder
-      return '[Table]'
-    }
-
-    case 'image': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const caption = (data?.caption as NotionRichText[]) || []
-      const captionText = richTextToMarkdown(caption)
-      let imageUrl = ''
-
-      if (data?.type === 'external') {
-        imageUrl = (data.external as { url: string })?.url || ''
-      } else if (data?.type === 'file') {
-        imageUrl = (data.file as { url: string })?.url || ''
-      }
-
-      return imageUrl ? `![${captionText || 'image'}](${imageUrl})` : captionText ? `[Image: ${captionText}]` : '[Image]'
-    }
-
-    case 'bookmark': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const url = data?.url as string || ''
-      const caption = (data?.caption as NotionRichText[]) || []
-      const captionText = richTextToMarkdown(caption)
-      return url ? `[${captionText || url}](${url})` : ''
-    }
-
-    case 'embed': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const url = data?.url as string || ''
-      return url ? `[Embed: ${url}](${url})` : ''
-    }
-
-    case 'child_page': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const title = data?.title as string || 'Untitled'
-      const pageId = block.id.replace(/-/g, '')
-      return `**[${title}](https://www.notion.so/${pageId})**`
-    }
-
-    case 'child_database': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const title = data?.title as string || 'Untitled'
-      return `**[Database: ${title}]**`
-    }
-
-    case 'equation': {
-      const data = block[type] as Record<string, unknown> | undefined
-      const expression = data?.expression as string || ''
-      return `$$${expression}$$`
-    }
-
-    case 'table_of_contents':
-      return '[Table of Contents]'
-
-    case 'breadcrumb':
-      return null // skip
-
-    case 'column_list':
-    case 'column':
-      return null // handled by children
-
+    case 'child_page':
+      return `[Child page: ${block.child_page?.title ?? 'Untitled'}]`
     default:
       return null
   }
+}
+
+function renderRichText(items: RichTextItem[] | undefined): string {
+  if (!items || items.length === 0) return ''
+  return items.map((item) => {
+    let text = item.plain_text ?? ''
+    const ann = item.annotations
+    if (ann?.code) text = `\`${text}\``
+    if (ann?.bold) text = `**${text}**`
+    if (ann?.italic) text = `_${text}_`
+    if (ann?.strikethrough) text = `~~${text}~~`
+    if (item.href) text = `[${text}](${item.href})`
+    return text
+  }).join('')
 }

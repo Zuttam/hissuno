@@ -29,6 +29,7 @@ import {
   getGraphEvaluationSettingsClient,
   getAIModelSettingsClient,
   updateAIModelSettingsClient,
+  getIssueAnalysisSettings,
 } from '@/lib/api/settings'
 import type { SupportPackageWithSources } from '@/lib/knowledge/types'
 
@@ -108,6 +109,10 @@ interface AgentSettings {
     sessionIdleTimeoutMinutes: number
     sessionGoodbyeDelaySeconds: number
     sessionIdleResponseTimeoutSeconds: number
+    memoryEnabled: boolean
+  }
+  productCoPilot: {
+    memoryEnabled: boolean
   }
   graphEvaluation: GraphEvaluationConfig
 }
@@ -120,6 +125,10 @@ const DEFAULT_SETTINGS: AgentSettings = {
     sessionIdleTimeoutMinutes: 5,
     sessionGoodbyeDelaySeconds: 90,
     sessionIdleResponseTimeoutSeconds: 60,
+    memoryEnabled: false,
+  },
+  productCoPilot: {
+    memoryEnabled: false,
   },
   graphEvaluation: DEFAULT_GRAPH_EVAL_CONFIG,
 }
@@ -192,8 +201,9 @@ export default function AgentsSettingsPage() {
   const fetchSettings = useCallback(async () => {
     if (!projectId) return
     try {
-      const [supportAgentData, graphEvalData] = await Promise.all([
+      const [supportAgentData, issueAnalysisData, graphEvalData] = await Promise.all([
         getSupportAgentSettings(projectId).catch(() => null),
+        getIssueAnalysisSettings(projectId).catch(() => null),
         getGraphEvaluationSettingsClient(projectId).catch(() => null),
       ])
 
@@ -209,6 +219,13 @@ export default function AgentsSettingsPage() {
             sessionIdleTimeoutMinutes: (s.session_idle_timeout_minutes as number) ?? 5,
             sessionGoodbyeDelaySeconds: (s.session_goodbye_delay_seconds as number) ?? 90,
             sessionIdleResponseTimeoutSeconds: (s.session_idle_response_timeout_seconds as number) ?? 60,
+            memoryEnabled: (s.support_agent_memory_enabled as boolean) ?? false,
+          }
+        }
+        if (issueAnalysisData?.settings) {
+          const s = issueAnalysisData.settings
+          next.productCoPilot = {
+            memoryEnabled: (s.product_agent_memory_enabled as boolean) ?? false,
           }
         }
         if (graphEvalData?.config) {
@@ -654,6 +671,8 @@ export default function AgentsSettingsPage() {
         onClose={() => setShowProductCopilotDialog(false)}
         projectId={projectId}
         integrationStatuses={integrationStatuses}
+        initialSettings={settings.productCoPilot}
+        onSaved={handleSettingsSaved}
       />
 
       {showTestAgent && (

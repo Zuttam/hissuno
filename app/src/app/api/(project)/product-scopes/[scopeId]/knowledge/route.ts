@@ -14,6 +14,8 @@ import {
   createKnowledgeSourceBulkAdmin,
 } from '@/lib/knowledge/knowledge-service'
 import { getRateLimiter } from '@/lib/utils/rate-limiter'
+import { upsertExternalRecord } from '@/lib/db/queries/external-records'
+import { hasNotionConnection } from '@/lib/integrations/notion'
 
 export const runtime = 'nodejs'
 
@@ -132,6 +134,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const contentType = request.headers.get('content-type') ?? ''
     let sourceData: KnowledgeSourceInsert
+    let external_id: string | undefined
+    let external_source: string | undefined
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData()
@@ -192,6 +196,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       }
 
       const { type, url, content, name, description, notionPageId, pages, custom_fields, parent_id, origin } = payload
+      if (typeof payload.external_id === 'string') external_id = payload.external_id
+      if (typeof payload.external_source === 'string') external_source = payload.external_source
 
       if (type === 'folder') {
         const data = await createKnowledgeSource({
@@ -217,7 +223,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
           return NextResponse.json({ error: 'Too many pages. Maximum is 500.' }, { status: 400 })
         }
 
-        const { hasNotionConnection } = await import('@/lib/integrations/notion')
         const notionStatus = await hasNotionConnection(projectId)
         if (!notionStatus.connected) {
           return NextResponse.json({ error: 'Notion integration not connected.' }, { status: 400 })
@@ -282,6 +287,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!data) {
       console.error('[scope-knowledge.post] failed to create source')
       return NextResponse.json({ error: 'Failed to create knowledge source.' }, { status: 500 })
+    }
+
+    if (external_id && external_source && data?.id) {
+      await upsertExternalRecord({
+        projectId,
+        source: external_source,
+        externalId: external_id,
+        resourceType: 'knowledge',
+        resourceId: data.id,
+      })
     }
 
     return NextResponse.json({ source: { ...data, product_scope_id: scopeId } }, { status: 201 })

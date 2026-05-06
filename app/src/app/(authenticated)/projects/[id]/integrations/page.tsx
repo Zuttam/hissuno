@@ -89,7 +89,7 @@ export default function IntegrationsPage() {
           name: marketplaceEntry?.name ?? conn.pluginId,
           detail: conn.accountLabel ?? conn.externalAccountId,
           status: 'active',
-          lastSyncAt: lastSyncFromConnection(conn),
+          lastSyncAt: conn.updatedAt,
         }
       }),
     [pluginConnections]
@@ -158,13 +158,3 @@ export default function IntegrationsPage() {
   )
 }
 
-function lastSyncFromConnection(conn: PluginConnection): string | null {
-  let latest: string | null = null
-  for (const s of conn.streams) {
-    if (!s.lastSyncAt) continue
-    if (!latest || new Date(s.lastSyncAt) > new Date(latest)) {
-      latest = s.lastSyncAt
-    }
-  }
-  return latest
-}

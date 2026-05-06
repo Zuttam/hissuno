@@ -46,12 +46,7 @@ export function buildProductScopePromptSection(
             ? 'Experiment'
             : 'Product Area'
       const indent = scope.parent_id ? '  - ' : ''
-      const contentExcerpt =
-        scope.content && scope.content.length > 0
-          ? ` ${scope.content.slice(0, 100).replace(/\n/g, ' ')}${scope.content.length > 100 ? '...' : ''}`
-          : ''
-      const description = `${scope.description}${contentExcerpt}`
-      return `| ${indent}${scope.slug} | ${scope.name} | ${typeLabel} | ${description} |${scope.is_default ? ' (default)' : ''}`
+      return `| ${indent}${scope.slug} | ${scope.name} | ${typeLabel} | ${scope.description} |${scope.is_default ? ' (default)' : ''}`
     })
     .join('\n')
 

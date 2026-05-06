@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { sessions, issues, knowledgeSources, contacts, companies } from '@/lib/db/schema/app'
 import { getKnowledgeAnalysisSettingsAdmin } from '@/lib/db/queries/project-settings/knowledge-analysis'
+import { buildContactEmbeddingText } from '@/lib/customers/customer-embedding-service'
 import type { GraphEntityType } from '../schemas'
 
 /**
@@ -69,7 +70,6 @@ export async function loadEntityContent(
         with: { company: { columns: { name: true } } },
       })
       entityName = row?.name || 'Unknown contact'
-      const { buildContactEmbeddingText } = await import('@/lib/customers/customer-embedding-service')
       const text = buildContactEmbeddingText({
         name: row?.name || '',
         email: row?.email || '',

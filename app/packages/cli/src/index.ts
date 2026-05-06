@@ -19,6 +19,10 @@ import { membersCommand } from './commands/members.js'
 import { loginCommand } from './commands/login.js'
 import { logoutCommand } from './commands/logout.js'
 import { compileCommand } from './commands/compile.js'
+import { sanitizeCommand } from './commands/sanitize.js'
+import { pluginCommand } from './commands/plugin.js'
+import { automationsCommand } from './commands/automations.js'
+import { externalRecordsCommand } from './commands/external_records.js'
 
 const program = new Command()
   .name('hissuno')
@@ -42,5 +46,9 @@ program.addCommand(updateCommand)
 program.addCommand(integrationsCommand)
 program.addCommand(membersCommand)
 program.addCommand(compileCommand)
+program.addCommand(sanitizeCommand)
+program.addCommand(pluginCommand)
+program.addCommand(automationsCommand)
+program.addCommand(externalRecordsCommand)
 
 program.parseAsync(process.argv)

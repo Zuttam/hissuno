@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProjectById } from '@/lib/projects/keys'
 import { upsertSession, isSessionInHumanTakeover } from '@/lib/db/queries/sessions'
-import { triggerChatRun, getChatRunStatus } from '@/lib/agent/chat-run-service'
+import { triggerChatRun, getChatRunStatus } from '@/lib/chat/chat-run-service'
 import { saveSessionMessage } from '@/lib/db/queries/session-messages'
 import { resolveContactForSession } from '@/lib/customers/contact-resolution'
 import { isProjectMember } from '@/lib/auth/project-members'

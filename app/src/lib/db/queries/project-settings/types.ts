@@ -25,6 +25,7 @@ export interface SupportAgentSettings {
   session_idle_timeout_minutes: number
   session_goodbye_delay_seconds: number
   session_idle_response_timeout_seconds: number
+  support_agent_memory_enabled: boolean
 }
 
 /**
@@ -60,6 +61,7 @@ export interface PmAgentSettings {
   brief_guidelines: string | null
   analysis_guidelines: string | null
   issue_analysis_enabled: boolean
+  product_agent_memory_enabled: boolean
 }
 
 /**
@@ -77,6 +79,7 @@ export const DEFAULT_SUPPORT_AGENT_SETTINGS: SupportAgentSettings = {
   session_idle_timeout_minutes: 5,
   session_goodbye_delay_seconds: 90,
   session_idle_response_timeout_seconds: 60,
+  support_agent_memory_enabled: false,
 }
 
 /**
@@ -87,6 +90,7 @@ export const DEFAULT_PM_AGENT_SETTINGS: PmAgentSettings = {
   brief_guidelines: null,
   analysis_guidelines: null,
   issue_analysis_enabled: true,
+  product_agent_memory_enabled: false,
 }
 
 /**
