@@ -7,11 +7,23 @@ import * as relations from './schema/relations'
 // HMR-safe singleton pattern (same as mastra/index.ts)
 const globalForDb = globalThis as unknown as { dbPool: pg.Pool | undefined }
 
-const pool =
-  globalForDb.dbPool ??
-  new pg.Pool({
+function createPool(): pg.Pool {
+  const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL!,
   })
+  // Force every connection to UTC so `defaultNow()` and JS `new Date()` writes
+  // both land as UTC wall-clock values in naked-timestamp columns. Without
+  // this, `now()` records the postgres session's local time, which Drizzle's
+  // mode:'date' reads back as if it were UTC.
+  pool.on('connect', (client) => {
+    client.query("SET TIME ZONE 'UTC'").catch((err) => {
+      console.error('[db] failed to set session TZ to UTC', err)
+    })
+  })
+  return pool
+}
+
+const pool = globalForDb.dbPool ?? createPool()
 
 if (process.env.NODE_ENV !== 'production') {
   globalForDb.dbPool = pool

@@ -47,8 +47,7 @@ export function AutomationRunDialog({
         const event = JSON.parse(ev.data) as StreamEvent
         setEvents((prev) => [...prev, event])
         if (event.type === 'snapshot' || event.type === 'final') {
-          const next = (event.data?.status as string | undefined) ?? status
-          setStatus(next)
+          setStatus((prev) => (event.data?.status as string | undefined) ?? prev)
         }
         if (event.type === 'output' && event.data) {
           setOutput(event.data as Record<string, unknown>)
@@ -71,7 +70,7 @@ export function AutomationRunDialog({
       es.close()
       eventSourceRef.current = null
     }
-  }, [open, runId, projectId, status])
+  }, [open, runId, projectId])
 
   return (
     <Dialog open={open} onClose={onCloseAction} title={`Run · ${skillId}`} size="lg">

@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { parseExpression } from 'cron-parser'
 import { z } from 'zod'
 import { requireRequestIdentity } from '@/lib/auth/identity'
 import { assertProjectAccess, ForbiddenError } from '@/lib/auth/authorization'
@@ -44,7 +45,20 @@ const triggersSchema = z
       .optional(),
     scheduled: z
       .object({
-        cron: z.string().min(1),
+        cron: z
+          .string()
+          .min(1)
+          .refine(
+            (v) => {
+              try {
+                parseExpression(v)
+                return true
+              } catch {
+                return false
+              }
+            },
+            { message: 'Invalid cron expression.' },
+          ),
       })
       .optional(),
     events: z

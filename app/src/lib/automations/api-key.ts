@@ -82,7 +82,7 @@ async function findAutomationActor(projectId: string): Promise<string> {
     .where(
       and(
         eq(projectMembers.project_id, projectId),
-        eq(projectMembers.role, 'admin'),
+        eq(projectMembers.role, 'owner'),
         eq(projectMembers.status, 'active'),
       ),
     )
@@ -91,7 +91,7 @@ async function findAutomationActor(projectId: string): Promise<string> {
   const userId = row[0]?.user_id
   if (!userId) {
     throw new Error(
-      `No active admin found for project ${projectId}; cannot create automation API key.`,
+      `No active owner found for project ${projectId}; cannot create automation API key.`,
     )
   }
   return userId
