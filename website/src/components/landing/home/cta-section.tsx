@@ -16,11 +16,11 @@ export function CTASection() {
 
       <div className="relative z-10 mx-auto max-w-4xl text-center">
         <h2 className="font-mono text-3xl font-bold text-[var(--foreground)] md:text-4xl">
-          Stop Rebuilding Product Context for Every Agent
+          Stop wiring context for every agent. Start shipping the loop.
         </h2>
 
         <p className="mx-auto mt-4 max-w-2xl text-lg text-[var(--text-secondary)]">
-          Open source product intelligence. One graph. Every agent.
+          Open source. One graph. One runtime. Your customers, your code, connected.
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-4">

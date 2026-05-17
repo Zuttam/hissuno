@@ -5,7 +5,7 @@ export { UTMCapture } from './utm-capture'
 export { MarketingNav } from './marketing-nav'
 
 // Home page sections
-export { HeroSection, ProblemSection, FeaturesSection, InterfacesSection, AgentsShowcaseSection, ValuePropsSection, QuotesSection, CommunitySection, CTASection, MistOverlay } from './home'
+export { HeroSection, ProblemSection, FeaturesSection, InterfacesSection, AgentsShowcaseSection, AutomationsSection, ValuePropsSection, QuotesSection, CommunitySection, CTASection, MistOverlay } from './home'
 
 // Hissuno Agent landing page
 export {

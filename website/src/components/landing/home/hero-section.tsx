@@ -34,14 +34,14 @@ export function HeroSection() {
         className="relative z-10 mx-auto max-w-4xl text-center">
 
         <h1 className="mt-12 font-mono text-4xl font-bold tracking-tight text-[var(--foreground)] md:text-6xl">
-          Your Agents Don&apos;t Know Your Product.
+          The graph that connects
           <span className="block bg-gradient-to-r from-[var(--accent-teal)] to-[var(--accent-selected)] bg-clip-text text-transparent">
-            We Built the Missing Layer.
+            your customers to your code.
           </span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-lg text-[var(--text-secondary)] md:text-xl">
-          Hissuno builds the organizational knowledge layer your AI agents are missing - connecting customer signals, product goals, issues, docs, and codebase into one traversable graph.
+          Every customer signal, every product spec, every line of your codebase in one queryable graph. Plus the agents and automations that act on it.
         </p>
 
         {/* Integration logos row */}
@@ -73,6 +73,12 @@ export function HeroSection() {
 
         <div className="mt-10 flex flex-col items-center justify-center gap-4">
           <InstallCommand />
+          <a
+            href="#automations"
+            className="font-mono text-sm text-[var(--accent-teal)] transition-colors hover:text-[var(--accent-teal-hover)]"
+          >
+            See a live automation →
+          </a>
         </div>
       </motion.div>
     </section>
